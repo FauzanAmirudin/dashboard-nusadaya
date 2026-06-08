@@ -1,0 +1,17 @@
+{
+	"name": "dashboard-nusadaya",
+	"version": "1.0.0",
+	"private": true,
+	"workspaces": [
+		"apps/*"
+	],
+	"scripts": {
+		"dev": "bun --filter '*' dev",
+		"prepare": "husky"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.16",
+		"husky": "^9.1.7",
+		"lint-staged": "^17.0.7"
+	}
+}
