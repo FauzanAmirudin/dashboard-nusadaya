@@ -1,3 +1,4 @@
+import { relations } from "drizzle-orm";
 import {
 	boolean,
 	integer,
@@ -26,6 +27,14 @@ export const statusEnum = pgEnum("status", [
 	"AMAN",
 	"PERLU_PERHATIAN",
 	"TIDAK_AMAN",
+]);
+
+export const evaluatorDecisionEnum = pgEnum("evaluator_decision", [
+	"menunggu",
+	"lanjut_interview",
+	"ttd_kontrak",
+	"layak_berangkat",
+	"remedial",
 ]);
 
 // 1. Users (RBAC)
@@ -58,10 +67,35 @@ export const pmbData = pgTable("pmb_data", {
 		.references(() => students.id)
 		.notNull()
 		.unique(),
+	formReceived: boolean("form_received").default(false),
 	documentsComplete: boolean("documents_complete").default(false),
-	medicalCheckupPassed: boolean("medical_checkup_passed").default(false),
+	dataInputted: boolean("data_inputted").default(false),
+	initialFollowUp: boolean("initial_follow_up").default(false),
+	notes: text("notes"),
+	isAcc: boolean("is_acc").default(false),
+	accAt: timestamp("acc_at"),
+	accBy: integer("acc_by").references(() => users.id),
 	status: statusEnum("status").default("PERLU_PERHATIAN"),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 3b. PMB Documents
+export const pmbDocuments = pgTable("pmb_documents", {
+	id: serial("id").primaryKey(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
+	// Key sesuai checklist: form_received | documents_complete | data_inputted | initial_follow_up
+	documentKey: text("document_key").notNull(),
+	fileName: text("file_name").notNull(),
+	fileUrl: text("file_url").notNull(),
+	fileSize: integer("file_size"),
+	mimeType: text("mime_type"),
+	uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+	uploadedBy: integer("uploaded_by").references(() => users.id),
+	isVerified: boolean("is_verified").default(false),
+	verifiedAt: timestamp("verified_at"),
+	verifiedBy: integer("verified_by").references(() => users.id),
 });
 
 // 4. CRM Data
@@ -71,10 +105,66 @@ export const crmData = pgTable("crm_data", {
 		.references(() => students.id)
 		.notNull()
 		.unique(),
-	parentConsultationDone: boolean("parent_consultation_done").default(false),
-	parentAgreementSigned: boolean("parent_agreement_signed").default(false),
+	odsActive: boolean("ods_active").default(false),
+	studentMonitoring: boolean("student_monitoring").default(false),
+	parentFollowUp: boolean("parent_follow_up").default(false),
+	practiceAttendance: boolean("practice_attendance").default(false),
+	odsDocumentation: boolean("ods_documentation").default(false),
+	practiceDaysPresent: integer("practice_days_present").default(0),
+	practiceDaysTotal: integer("practice_days_total").default(0),
+	isAcc: boolean("is_acc").default(false),
+	accAt: timestamp("acc_at"),
+	accBy: integer("acc_by").references(() => users.id),
 	status: statusEnum("status").default("PERLU_PERHATIAN"),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 4b. CRM Logs (Komunikasi Orang Tua)
+export const crmLogs = pgTable("crm_logs", {
+	id: serial("id").primaryKey(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
+	authorId: integer("author_id")
+		.references(() => users.id)
+		.notNull(),
+	logText: text("log_text").notNull(),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// 4c. CRM Documents
+export const crmDocuments = pgTable("crm_documents", {
+	id: serial("id").primaryKey(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
+	documentKey: text("document_key").notNull(),
+	fileName: text("file_name").notNull(),
+	fileUrl: text("file_url").notNull(),
+	fileSize: integer("file_size"),
+	mimeType: text("mime_type"),
+	uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+	uploadedBy: integer("uploaded_by").references(() => users.id),
+	isVerified: boolean("is_verified").default(false),
+	verifiedAt: timestamp("verified_at"),
+	verifiedBy: integer("verified_by").references(() => users.id),
+});
+// 5b. Finance Documents
+export const financeDocuments = pgTable("finance_documents", {
+	id: serial("id").primaryKey(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
+	documentKey: text("document_key").notNull(),
+	fileName: text("file_name").notNull(),
+	fileUrl: text("file_url").notNull(),
+	fileSize: integer("file_size"),
+	mimeType: text("mime_type"),
+	uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+	uploadedBy: integer("uploaded_by").references(() => users.id),
+	isVerified: boolean("is_verified").default(false),
+	verifiedAt: timestamp("verified_at"),
+	verifiedBy: integer("verified_by").references(() => users.id),
 });
 
 // 5. Finance Data
@@ -84,8 +174,21 @@ export const financeData = pgTable("finance_data", {
 		.references(() => students.id)
 		.notNull()
 		.unique(),
-	tuitionPaid: boolean("tuition_paid").default(false),
-	depositPaid: boolean("deposit_paid").default(false),
+	registrationPaid: boolean("registration_paid").default(false),
+	registrationAmount: integer("registration_amount").default(0),
+	registrationDate: timestamp("registration_date"),
+	semesterPaid: boolean("semester_paid").default(false),
+	semesterAmount: integer("semester_amount").default(0),
+	semesterDate: timestamp("semester_date"),
+	installmentCleared: boolean("installment_cleared").default(false),
+	installmentAmount: integer("installment_amount").default(0),
+	installmentDate: timestamp("installment_date"),
+	arrearsCleared: boolean("arrears_cleared").default(false),
+	arrearsAmount: integer("arrears_amount").default(0),
+	notes: text("notes"),
+	isAcc: boolean("is_acc").default(false),
+	accAt: timestamp("acc_at"),
+	accBy: integer("acc_by").references(() => users.id),
 	status: statusEnum("status").default("PERLU_PERHATIAN"),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -99,8 +202,41 @@ export const academicData = pgTable("academic_data", {
 		.unique(),
 	gpa: integer("gpa").default(0), // scaled by 100
 	creditsCompleted: integer("credits_completed").default(0),
+	
+	// New Academic Checklist Fields
+	pddiktiInput: boolean("pddikti_input").default(false),
+	attendanceTotal: integer("attendance_total").default(0),
+	attendancePresent: integer("attendance_present").default(0),
+	attendanceAlphaNote: text("attendance_alpha_note"),
+	utsPassed: boolean("uts_passed").default(false),
+	uasPassed: boolean("uas_passed").default(false),
+	attitudeIndicator: boolean("attitude_indicator").default(false),
+	assignmentsCompleted: boolean("assignments_completed").default(false),
+	academicCommunication: boolean("academic_communication").default(false),
+	notes: text("notes"),
+	
+	isAcc: boolean("is_acc").default(false),
+	accAt: timestamp("acc_at"),
+	accBy: integer("acc_by").references(() => users.id),
 	status: statusEnum("status").default("PERLU_PERHATIAN"),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const academicDocuments = pgTable("academic_documents", {
+	id: serial("id").primaryKey(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
+	documentKey: text("document_key").notNull(),
+	fileName: text("file_name").notNull(),
+	fileUrl: text("file_url").notNull(),
+	fileSize: integer("file_size"),
+	mimeType: text("mime_type"),
+	uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+	uploadedBy: integer("uploaded_by").references(() => users.id),
+	isVerified: boolean("is_verified").default(false),
+	verifiedAt: timestamp("verified_at"),
+	verifiedBy: integer("verified_by").references(() => users.id),
 });
 
 // 7. Course Grades
@@ -110,9 +246,38 @@ export const courseGrades = pgTable("course_grades", {
 		.references(() => students.id)
 		.notNull(),
 	courseCode: text("course_code").notNull(),
+	courseName: text("course_name").notNull(),
+	dosenId: integer("dosen_id").references(() => users.id),
 	grade: text("grade"),
 	attendanceRate: integer("attendance_rate").default(0),
+	attitudeNote: text("attitude_note"),
+	
+	isAcc: boolean("is_acc").default(false),
+	accAt: timestamp("acc_at"),
+	accBy: integer("acc_by").references(() => users.id),
+	
+	status: statusEnum("status").default("PERLU_PERHATIAN"),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const courseGradeDocuments = pgTable("course_grade_documents", {
+	id: serial("id").primaryKey(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
+	courseGradeId: integer("course_grade_id")
+		.references(() => courseGrades.id)
+		.notNull(),
+	documentKey: text("document_key").notNull(),
+	fileName: text("file_name").notNull(),
+	fileUrl: text("file_url").notNull(),
+	fileSize: integer("file_size"),
+	mimeType: text("mime_type"),
+	uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+	uploadedBy: integer("uploaded_by").references(() => users.id),
+	isVerified: boolean("is_verified").default(false),
+	verifiedAt: timestamp("verified_at"),
+	verifiedBy: integer("verified_by").references(() => users.id),
 });
 
 // 8. PA (Pendamping Akademik) Data
@@ -122,10 +287,40 @@ export const paData = pgTable("pa_data", {
 		.references(() => students.id)
 		.notNull()
 		.unique(),
-	counselingSessions: integer("counseling_sessions").default(0),
-	behavioralScore: integer("behavioral_score").default(0),
+	counselingDone: boolean("counseling_done").default(false),
+	mentalStable: boolean("mental_stable").default(false),
+	disciplineGood: boolean("discipline_good").default(false),
+	vocabTarget: integer("vocab_target").default(500),
+	disciplineNotes: text("discipline_notes"),
+	
+	isAcc: boolean("is_acc").default(false),
+	accAt: timestamp("acc_at"),
+	accBy: integer("acc_by").references(() => users.id),
+	
 	status: statusEnum("status").default("PERLU_PERHATIAN"),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const vocabLogs = pgTable("vocab_logs", {
+	id: serial("id").primaryKey(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
+	date: timestamp("date").notNull(),
+	addedWords: integer("added_words").notNull(),
+	notes: text("notes"),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const counselingLogs = pgTable("counseling_logs", {
+	id: serial("id").primaryKey(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
+	date: timestamp("date").notNull(),
+	notes: text("notes").notNull(),
+	condition: text("condition").notNull(), // "Stabil", "Perlu Perhatian", "Kritis"
+	createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // 9. Internship Data
@@ -135,9 +330,61 @@ export const internshipData = pgTable("internship_data", {
 		.references(() => students.id)
 		.notNull()
 		.unique(),
+	
+	// 1. Passport
 	passportReady: boolean("passport_ready").default(false),
+	passportNo: text("passport_no"),
+	passportExp: timestamp("passport_exp"),
+	
+	// 2. Interview
+	interviewReady: boolean("interview_ready").default(false),
+	interviewDate: timestamp("interview_date"),
+	interviewResult: text("interview_result"), // Lulus / Tidak Lulus / Pending
+	
+	// 3. LoA
+	loaReady: boolean("loa_ready").default(false),
+	loaCompany: text("loa_company"),
+	loaPosition: text("loa_position"),
+	
+	// 4. Contract
+	contractReady: boolean("contract_ready").default(false),
+	contractDate: timestamp("contract_date"),
+	
+	// 5. MCU
+	mcuReady: boolean("mcu_ready").default(false),
+	mcuPlace: text("mcu_place"),
+	mcuDate: timestamp("mcu_date"),
+	mcuResult: text("mcu_result"),
+	
+	// 6. Visa
 	visaReady: boolean("visa_ready").default(false),
-	languageTestPassed: boolean("language_test_passed").default(false),
+	visaType: text("visa_type"),
+	visaStatus: text("visa_status"),
+	visaNo: text("visa_no"),
+	
+	// 7. Ticket
+	ticketReady: boolean("ticket_ready").default(false),
+	ticketAirline: text("ticket_airline"),
+	ticketDate: timestamp("ticket_date"),
+	ticketFlight: text("ticket_flight"),
+	
+	// 8. PDT
+	pdtReady: boolean("pdt_ready").default(false),
+	pdtDate: timestamp("pdt_date"),
+	pdtPlace: text("pdt_place"),
+	
+	// Schedule
+	estDepartureDate: timestamp("est_departure_date"),
+	destinationCity: text("destination_city"),
+	internshipDuration: text("internship_duration"),
+	internshipCompany: text("internship_company"),
+	
+	notes: text("notes"),
+	
+	isAcc: boolean("is_acc").default(false),
+	accAt: timestamp("acc_at"),
+	accBy: integer("acc_by").references(() => users.id),
+	
 	status: statusEnum("status").default("PERLU_PERHATIAN"),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -149,6 +396,10 @@ export const finalDecision = pgTable("final_decision", {
 		.references(() => students.id)
 		.notNull()
 		.unique(),
+	evaluatorDecision: evaluatorDecisionEnum("evaluator_decision").default("menunggu"),
+	evaluatorNotes: text("evaluator_notes"),
+	decidedAt: timestamp("decided_at"),
+	decidedBy: integer("decided_by").references(() => users.id),
 	isApprovedByDirector: boolean("is_approved_by_director").default(false),
 	departureDate: timestamp("departure_date"),
 	notes: text("notes"),
@@ -178,3 +429,115 @@ export const auditLogs = pgTable("audit_logs", {
 	details: json("details"),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const pmbDocumentsRelations = relations(pmbDocuments, ({ one }) => ({
+	uploadedBy: one(users, {
+		fields: [pmbDocuments.uploadedBy],
+		references: [users.id],
+	}),
+	verifiedBy: one(users, {
+		fields: [pmbDocuments.verifiedBy],
+		references: [users.id],
+	}),
+}));
+
+export const crmDataRelations = relations(crmData, ({ one }) => ({
+	accBy: one(users, {
+		fields: [crmData.accBy],
+		references: [users.id],
+	}),
+}));
+
+export const crmLogsRelations = relations(crmLogs, ({ one }) => ({
+	author: one(users, {
+		fields: [crmLogs.authorId],
+		references: [users.id],
+	}),
+}));
+
+export const crmDocumentsRelations = relations(crmDocuments, ({ one }) => ({
+	uploadedBy: one(users, {
+		fields: [crmDocuments.uploadedBy],
+		references: [users.id],
+	}),
+	verifiedBy: one(users, {
+		fields: [crmDocuments.verifiedBy],
+		references: [users.id],
+	}),
+}));
+
+export const financeDataRelations = relations(financeData, ({ one }) => ({
+	accBy: one(users, {
+		fields: [financeData.accBy],
+		references: [users.id],
+	}),
+}));
+
+export const financeDocumentsRelations = relations(financeDocuments, ({ one }) => ({
+	uploadedBy: one(users, {
+		fields: [financeDocuments.uploadedBy],
+		references: [users.id],
+	}),
+	verifiedBy: one(users, {
+		fields: [financeDocuments.verifiedBy],
+		references: [users.id],
+	}),
+}));
+
+export const academicDataRelations = relations(academicData, ({ one }) => ({
+	accBy: one(users, {
+		fields: [academicData.accBy],
+		references: [users.id],
+	}),
+}));
+
+export const academicDocumentsRelations = relations(academicDocuments, ({ one }) => ({
+	uploadedBy: one(users, {
+		fields: [academicDocuments.uploadedBy],
+		references: [users.id],
+	}),
+	verifiedBy: one(users, {
+		fields: [academicDocuments.verifiedBy],
+		references: [users.id],
+	}),
+}));
+
+export const courseGradesRelations = relations(courseGrades, ({ one }) => ({
+	accBy: one(users, {
+		fields: [courseGrades.accBy],
+		references: [users.id],
+	}),
+	dosen: one(users, {
+		fields: [courseGrades.dosenId],
+		references: [users.id],
+	}),
+}));
+
+export const courseGradeDocumentsRelations = relations(courseGradeDocuments, ({ one }) => ({
+	uploadedBy: one(users, {
+		fields: [courseGradeDocuments.uploadedBy],
+		references: [users.id],
+	}),
+	verifiedBy: one(users, {
+		fields: [courseGradeDocuments.verifiedBy],
+		references: [users.id],
+	}),
+	courseGrade: one(courseGrades, {
+		fields: [courseGradeDocuments.courseGradeId],
+		references: [courseGrades.id],
+	}),
+}));
+
+export const paDataRelations = relations(paData, ({ one }) => ({
+	accBy: one(users, {
+		fields: [paData.accBy],
+		references: [users.id],
+	}),
+}));
+
+export const internshipDataRelations = relations(internshipData, ({ one }) => ({
+	accBy: one(users, {
+		fields: [internshipData.accBy],
+		references: [users.id],
+	}),
+}));

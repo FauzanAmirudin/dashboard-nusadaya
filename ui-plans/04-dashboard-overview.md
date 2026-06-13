@@ -80,8 +80,8 @@ interface KPICard {
 ```
 
 **Style:**
-- Background: `#1E293B`
-- Border: `1px solid #334155`
+- Background: `#FFFFFF`
+- Border: `1px solid #E2E8F0`
 - Border-left: `4px solid [warna status]` — aksen visual
 - Padding: `p-5`
 - Nilai: `text-3xl font-bold`
@@ -107,7 +107,7 @@ interface KPICard {
 
 ### 5. Progress Bar Divisi
 - Setiap baris: label divisi + progress bar + persentase
-- Progress bar: background `#334155`, fill `#6366F1`
+- Progress bar: background `#E2E8F0`, fill `#0517B0`
 - Kode warna fill berubah jika < 50% → merah, 50-80% → kuning, > 80% → hijau
 
 ---

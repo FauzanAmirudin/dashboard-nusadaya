@@ -35,7 +35,7 @@ Pintu masuk aman untuk semua 9 role pengguna. Desain harus meyakinkan, clean, da
 ## Panel Kiri (Branding)
 
 ### Konten
-- **Background:** Gradient gelap `#0F172A` → `#1E293B` dengan mesh grid animasi tipis
+- **Background:** Gradient gelap `#F8FAFF` → `#FFFFFF` dengan mesh grid animasi tipis
 - **Logo:** Teks "Nusadaya Academy" + subtitle "Integrated Student Tracking System"
 - **Visual utama:** Mock mini-dashboard card transparan yang menampilkan:
   - Nama mahasiswa contoh (fiktif)
@@ -45,8 +45,8 @@ Pintu masuk aman untuk semua 9 role pengguna. Desain harus meyakinkan, clean, da
 
 ### Style
 ```css
-background: linear-gradient(135deg, #0F172A 0%, #1E293B 60%, #0F172A 100%);
-border-right: 1px solid #334155;
+background: linear-gradient(135deg, #F8FAFF 0%, #FFFFFF 60%, #F8FAFF 100%);
+border-right: 1px solid #E2E8F0;
 ```
 
 ---
@@ -89,12 +89,12 @@ border-right: 1px solid #334155;
 
 **Heading:**
 - `h1`: "Selamat Datang Kembali" — `text-2xl font-bold text-slate-100`
-- `p`: Sub-heading muted — `text-sm text-slate-400`
+- `p`: Sub-heading muted — `text-sm text-slate-500`
 
 **Input Username:**
 - Komponen: `shadcn/ui Input`
 - Ikon lucide `User` di sisi kiri (prefix icon)
-- Focus ring: `ring-2 ring-indigo-500`
+- Focus ring: `ring-2 ring-[#0517B0]500`
 - Placeholder: `"superadmin, pmb, akademik..."`
 
 **Input Password:**
@@ -104,13 +104,13 @@ border-right: 1px solid #334155;
 **Tombol Login:**
 - Komponen: `shadcn/ui Button` variant `default`
 - Full width, height `h-11`
-- Background: `#6366F1`, hover: `#4F46E5`
+- Background: `#0517B0`, hover: `#04128A`
 - Loading state: spinner animasi + teks "Memverifikasi..."
 - Ikon `ArrowRight` di kanan
 
 **Role Hint Chips (untuk development/testing):**
 - Baris pill kecil clickable yang auto-fill username field
-- Style: `text-xs bg-slate-800 text-slate-400 rounded-full px-2 py-1 hover:bg-indigo-900`
+- Style: `text-xs bg-slate-800 text-slate-500 rounded-full px-2 py-1 hover:bg-blue-900`
 - Hanya tampil di environment non-production
 
 ---

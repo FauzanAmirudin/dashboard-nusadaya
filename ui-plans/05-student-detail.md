@@ -80,7 +80,7 @@ Halaman inti sistem. Menampilkan **profil lengkap satu mahasiswa** beserta **sel
 
 - Sticky di bawah header identitas
 - Klik → scroll ke panel yang relevan (smooth scroll)
-- Active tab: underline indigo `border-b-2 border-indigo-500`
+- Active tab: underline indigo `border-b-2 border-blue-500`
 - Setiap tab menampilkan ikon status mini: ✅ ❌ ⏳
 
 ---
@@ -104,8 +104,8 @@ Halaman inti sistem. Menampilkan **profil lengkap satu mahasiswa** beserta **sel
 **Style setiap panel card:**
 ```css
 .panel-card {
-  background: #1E293B;
-  border: 1px solid #334155;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 16px;
@@ -114,7 +114,7 @@ Halaman inti sistem. Menampilkan **profil lengkap satu mahasiswa** beserta **sel
 ```
 
 **Tombol ACC:**
-- Jika role sesuai dan belum ACC → solid indigo `"ACC [Divisi] →"`
+- Jika role sesuai dan belum ACC → solid blue `"ACC [Divisi] →"`
 - Jika sudah ACC → disabled abu-abu dengan timestamp `"✅ ACC PMB — 07 Jun 2026 14:30"`
 - Jika role tidak sesuai → tombol disembunyikan total
 

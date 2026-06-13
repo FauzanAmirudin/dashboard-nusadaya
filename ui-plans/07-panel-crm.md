@@ -99,7 +99,7 @@ Timeline vertikal dari bawah ke atas (terbaru di atas):
 - Hanya role `crm` yang dapat menambah log
 - Setiap log menyimpan: teks, tanggal, nama admin
 - Maksimal tampil 5 log terbaru, ada tombol "Lihat Semua"
-- Style: timeline dengan garis vertikal, dot kiri indigo
+- Style: timeline dengan garis vertikal, dot kiri blue
 
 ---
 

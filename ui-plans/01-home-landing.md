@@ -11,16 +11,16 @@ Halaman pertama yang dilihat pengunjung sebelum login. Memberikan kesan profesio
 ### Warna
 | Token | Hex | Penggunaan |
 |---|---|---|
-| `--color-primary` | `#0F172A` | Background utama (dark navy) |
-| `--color-surface` | `#1E293B` | Card/panel background |
-| `--color-accent` | `#6366F1` | CTA button, highlight (indigo) |
+| `--color-primary` | `#F8FAFF` | Background utama (dark navy) |
+| `--color-surface` | `#FFFFFF` | Card/panel background |
+| `--color-accent` | `#0517B0` | CTA button, highlight (indigo) |
 | `--color-accent-glow` | `#818CF8` | Hover state, glow effect |
 | `--color-green` | `#10B981` | Status Aman |
 | `--color-yellow` | `#F59E0B` | Status Perlu Perhatian |
 | `--color-red` | `#EF4444` | Status Tidak Aman |
-| `--color-text-primary` | `#F1F5F9` | Teks utama |
+| `--color-text-primary` | `#0F172A` | Teks utama |
 | `--color-text-muted` | `#94A3B8` | Teks sekunder |
-| `--color-border` | `#334155` | Border card |
+| `--color-border` | `#E2E8F0` | Border card |
 
 ### Tipografi
 - **Font Family:** `Inter` (dari Google Fonts)
@@ -57,10 +57,10 @@ Halaman pertama yang dilihat pengunjung sebelum login. Memberikan kesan profesio
 ```
 
 **Detail Komponen:**
-- Background: Dark gradient (`#0F172A` → `#1E293B`) + subtle animated mesh grid
+- Background: Dark gradient (`#F8FAFF` → `#FFFFFF`) + subtle animated mesh grid
 - Teks "Dashboard Progress Mahasiswa Nusadaya" dengan gradient text (indigo ke purple)
 - Badge kecil "✦ Sistem Terpadu" di atas heading (pill shape, glass effect)
-- Tombol CTA utama: solid indigo dengan shadow glow `box-shadow: 0 0 24px #6366F140`
+- Tombol CTA utama: solid blue dengan shadow glow `box-shadow: 0 0 24px #0517B040`
 - Tombol sekunder: ghost/outline style
 - 3 stat counter: angka counter animasi (framer motion / CSS counter)
 

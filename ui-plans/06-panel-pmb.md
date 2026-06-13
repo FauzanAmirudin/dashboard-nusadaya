@@ -68,8 +68,8 @@ interface ChecklistItem {
 
 **Visual per item:**
 - Container: `flex items-center gap-4 p-4 rounded-lg`
-- Background idle: `bg-slate-800/50`
-- Background checked: `bg-emerald-950/30 border-emerald-800/30`
+- Background idle: `bg-slate-50`
+- Background checked: `bg-emerald-50 border-emerald-200`
 - **Checkbox:** shadcn `Checkbox` component, size lebih besar, warna hijau saat checked
 - **Label:** teks utama bold, deskripsi kecil muted
 - **Icon kanan:** ✅ green / ⏳ kuning / ❌ merah (berdasarkan state)
@@ -107,7 +107,7 @@ Badge status di header panel update otomatis saat checkbox berubah.
 
 **State 1 — Belum ACC (role pmb):**
 ```
-[✔ ACC PMB →]  — solid indigo, enabled
+[✔ ACC PMB →]  — solid blue, enabled
 ```
 
 **State 2 — Sudah ACC:**

@@ -9,12 +9,12 @@
 ### Warna Utama
 | Token | Hex | Fungsi |
 |---|---|---|
-| Primary BG | `#0F172A` | Background halaman utama |
-| Surface | `#1E293B` | Card, panel, sidebar |
-| Border | `#334155` | Border semua elemen |
-| Accent | `#6366F1` | Button CTA, active state, highlight |
-| Accent Hover | `#4F46E5` | Hover button |
-| Text Primary | `#F1F5F9` | Teks utama |
+| Primary BG | `#F8FAFF` | Background halaman utama |
+| Surface | `#FFFFFF` | Card, panel, sidebar |
+| Border | `#E2E8F0` | Border semua elemen |
+| Accent | `#0517B0` | Button CTA, active state, highlight |
+| Accent Hover | `#04128A` | Hover button |
+| Text Primary | `#0F172A` | Teks utama |
 | Text Muted | `#94A3B8` | Teks sekunder, label |
 | **🟢 Aman** | `#10B981` | Status Aman |
 | **🟡 Perhatian** | `#F59E0B` | Status Perlu Perhatian |

@@ -45,8 +45,8 @@ Layout permanen yang membungkus semua halaman dashboard. Terdiri dari **Top Navb
 ```css
 .navbar {
   height: 64px;
-  background: #1E293B;
-  border-bottom: 1px solid #334155;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
   backdrop-filter: blur(8px);
   position: sticky;
   top: 0;
@@ -116,7 +116,7 @@ interface SidebarItem {
 | Keluar | `LogOut` | all |
 
 ### Active State
-- Item aktif: background `rgba(99, 102, 241, 0.15)`, border-left `3px solid #6366F1`, teks `#A5B4FC`
+- Item aktif: background `rgba(99, 102, 241, 0.15)`, border-left `3px solid #0517B0`, teks `#A5B4FC`
 - Item hover: background `rgba(255,255,255,0.04)`
 - Transisi: `transition: all 150ms ease`
 
@@ -125,8 +125,8 @@ interface SidebarItem {
 .sidebar {
   width: 240px;
   min-height: 100vh;
-  background: #1E293B;
-  border-right: 1px solid #334155;
+  background: #FFFFFF;
+  border-right: 1px solid #E2E8F0;
   transition: width 300ms ease;
   overflow: hidden;
 }
@@ -158,8 +158,8 @@ interface SidebarItem {
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- Background: `#0F172A`
-- Border-top: `1px solid #1E293B`
+- Background: `#F8FAFF`
+- Border-top: `1px solid #FFFFFF`
 - Teks: `text-xs text-slate-500`
 - Posisi: di bawah konten, `sticky` hanya jika konten pendek
 
