@@ -1,0 +1,10 @@
+node_modules
+apps/web/node_modules
+apps/web/.next
+apps/api/node_modules
+.git
+.env
+.DS_Store
+.github
+.husky
+.gemini

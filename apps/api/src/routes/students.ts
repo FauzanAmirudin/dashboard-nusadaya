@@ -1591,7 +1591,6 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			set.status = 404;
 			return { success: false, message: "File tidak ditemukan" };
 		}
-		// @ts-expect-error
 		const file = Bun.file(doc.fileUrl);
 		return new Response(file, {
 			headers: {

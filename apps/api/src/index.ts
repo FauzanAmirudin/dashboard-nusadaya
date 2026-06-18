@@ -74,7 +74,6 @@ const app = new Elysia()
 						return { success: false, message: "Username atau password salah." };
 					}
 
-					// @ts-expect-error - Bun is globally available in the runtime
 					const isPasswordValid = await Bun.password.verify(
 						password,
 						user.passwordHash,
