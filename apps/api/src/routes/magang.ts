@@ -1,4 +1,4 @@
-import { eq, desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { db } from "../db";
 import { internshipData, students } from "../db/schema";
@@ -17,16 +17,21 @@ export const magangRouter = new Elysia({ prefix: "/magang" })
 			.orderBy(desc(students.createdAt));
 
 		// Calculate KPIs
-		let totalStudents = results.length;
+		const totalStudents = results.length;
 		let readyToDepart = 0;
 		let processing = 0;
 		let actionNeeded = 0;
 
 		const mappedStudents = results.map(({ student, internship }) => {
 			const checks = [
-				internship?.passportReady, internship?.interviewReady, internship?.loaReady, 
-				internship?.contractReady, internship?.mcuReady, internship?.visaReady, 
-				internship?.ticketReady, internship?.pdtReady
+				internship?.passportReady,
+				internship?.interviewReady,
+				internship?.loaReady,
+				internship?.contractReady,
+				internship?.mcuReady,
+				internship?.visaReady,
+				internship?.ticketReady,
+				internship?.pdtReady,
 			];
 			const completedCount = checks.filter(Boolean).length;
 			let status = "TIDAK_AMAN";

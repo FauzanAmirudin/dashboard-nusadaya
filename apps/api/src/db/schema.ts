@@ -37,6 +37,15 @@ export const evaluatorDecisionEnum = pgEnum("evaluator_decision", [
 	"remedial",
 ]);
 
+export const noteTypeEnum = pgEnum("note_type", [
+	"pengecualian_akademik",
+	"izin_resmi",
+	"sedang_ods",
+	"praktik_luar",
+	"informasi_umum",
+	"lainnya",
+]);
+
 // 1. Users (RBAC)
 export const users = pgTable("users", {
 	id: serial("id").primaryKey(),
@@ -202,7 +211,7 @@ export const academicData = pgTable("academic_data", {
 		.unique(),
 	gpa: integer("gpa").default(0), // scaled by 100
 	creditsCompleted: integer("credits_completed").default(0),
-	
+
 	// New Academic Checklist Fields
 	pddiktiInput: boolean("pddikti_input").default(false),
 	attendanceTotal: integer("attendance_total").default(0),
@@ -214,7 +223,7 @@ export const academicData = pgTable("academic_data", {
 	assignmentsCompleted: boolean("assignments_completed").default(false),
 	academicCommunication: boolean("academic_communication").default(false),
 	notes: text("notes"),
-	
+
 	isAcc: boolean("is_acc").default(false),
 	accAt: timestamp("acc_at"),
 	accBy: integer("acc_by").references(() => users.id),
@@ -251,11 +260,11 @@ export const courseGrades = pgTable("course_grades", {
 	grade: text("grade"),
 	attendanceRate: integer("attendance_rate").default(0),
 	attitudeNote: text("attitude_note"),
-	
+
 	isAcc: boolean("is_acc").default(false),
 	accAt: timestamp("acc_at"),
 	accBy: integer("acc_by").references(() => users.id),
-	
+
 	status: statusEnum("status").default("PERLU_PERHATIAN"),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -292,11 +301,11 @@ export const paData = pgTable("pa_data", {
 	disciplineGood: boolean("discipline_good").default(false),
 	vocabTarget: integer("vocab_target").default(500),
 	disciplineNotes: text("discipline_notes"),
-	
+
 	isAcc: boolean("is_acc").default(false),
 	accAt: timestamp("acc_at"),
 	accBy: integer("acc_by").references(() => users.id),
-	
+
 	status: statusEnum("status").default("PERLU_PERHATIAN"),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -330,61 +339,61 @@ export const internshipData = pgTable("internship_data", {
 		.references(() => students.id)
 		.notNull()
 		.unique(),
-	
+
 	// 1. Passport
 	passportReady: boolean("passport_ready").default(false),
 	passportNo: text("passport_no"),
 	passportExp: timestamp("passport_exp"),
-	
+
 	// 2. Interview
 	interviewReady: boolean("interview_ready").default(false),
 	interviewDate: timestamp("interview_date"),
 	interviewResult: text("interview_result"), // Lulus / Tidak Lulus / Pending
-	
+
 	// 3. LoA
 	loaReady: boolean("loa_ready").default(false),
 	loaCompany: text("loa_company"),
 	loaPosition: text("loa_position"),
-	
+
 	// 4. Contract
 	contractReady: boolean("contract_ready").default(false),
 	contractDate: timestamp("contract_date"),
-	
+
 	// 5. MCU
 	mcuReady: boolean("mcu_ready").default(false),
 	mcuPlace: text("mcu_place"),
 	mcuDate: timestamp("mcu_date"),
 	mcuResult: text("mcu_result"),
-	
+
 	// 6. Visa
 	visaReady: boolean("visa_ready").default(false),
 	visaType: text("visa_type"),
 	visaStatus: text("visa_status"),
 	visaNo: text("visa_no"),
-	
+
 	// 7. Ticket
 	ticketReady: boolean("ticket_ready").default(false),
 	ticketAirline: text("ticket_airline"),
 	ticketDate: timestamp("ticket_date"),
 	ticketFlight: text("ticket_flight"),
-	
+
 	// 8. PDT
 	pdtReady: boolean("pdt_ready").default(false),
 	pdtDate: timestamp("pdt_date"),
 	pdtPlace: text("pdt_place"),
-	
+
 	// Schedule
 	estDepartureDate: timestamp("est_departure_date"),
 	destinationCity: text("destination_city"),
 	internshipDuration: text("internship_duration"),
 	internshipCompany: text("internship_company"),
-	
+
 	notes: text("notes"),
-	
+
 	isAcc: boolean("is_acc").default(false),
 	accAt: timestamp("acc_at"),
 	accBy: integer("acc_by").references(() => users.id),
-	
+
 	status: statusEnum("status").default("PERLU_PERHATIAN"),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -396,7 +405,8 @@ export const finalDecision = pgTable("final_decision", {
 		.references(() => students.id)
 		.notNull()
 		.unique(),
-	evaluatorDecision: evaluatorDecisionEnum("evaluator_decision").default("menunggu"),
+	evaluatorDecision:
+		evaluatorDecisionEnum("evaluator_decision").default("menunggu"),
 	evaluatorNotes: text("evaluator_notes"),
 	decidedAt: timestamp("decided_at"),
 	decidedBy: integer("decided_by").references(() => users.id),
@@ -416,7 +426,11 @@ export const internalNotes = pgTable("internal_notes", {
 		.references(() => users.id)
 		.notNull(),
 	note: text("note").notNull(),
+	noteType: noteTypeEnum("note_type").default("informasi_umum").notNull(),
+	validFrom: timestamp("valid_from"),
+	validUntil: timestamp("valid_until"),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // 12. Audit Logs
@@ -473,16 +487,19 @@ export const financeDataRelations = relations(financeData, ({ one }) => ({
 	}),
 }));
 
-export const financeDocumentsRelations = relations(financeDocuments, ({ one }) => ({
-	uploadedBy: one(users, {
-		fields: [financeDocuments.uploadedBy],
-		references: [users.id],
+export const financeDocumentsRelations = relations(
+	financeDocuments,
+	({ one }) => ({
+		uploadedBy: one(users, {
+			fields: [financeDocuments.uploadedBy],
+			references: [users.id],
+		}),
+		verifiedBy: one(users, {
+			fields: [financeDocuments.verifiedBy],
+			references: [users.id],
+		}),
 	}),
-	verifiedBy: one(users, {
-		fields: [financeDocuments.verifiedBy],
-		references: [users.id],
-	}),
-}));
+);
 
 export const academicDataRelations = relations(academicData, ({ one }) => ({
 	accBy: one(users, {
@@ -491,16 +508,19 @@ export const academicDataRelations = relations(academicData, ({ one }) => ({
 	}),
 }));
 
-export const academicDocumentsRelations = relations(academicDocuments, ({ one }) => ({
-	uploadedBy: one(users, {
-		fields: [academicDocuments.uploadedBy],
-		references: [users.id],
+export const academicDocumentsRelations = relations(
+	academicDocuments,
+	({ one }) => ({
+		uploadedBy: one(users, {
+			fields: [academicDocuments.uploadedBy],
+			references: [users.id],
+		}),
+		verifiedBy: one(users, {
+			fields: [academicDocuments.verifiedBy],
+			references: [users.id],
+		}),
 	}),
-	verifiedBy: one(users, {
-		fields: [academicDocuments.verifiedBy],
-		references: [users.id],
-	}),
-}));
+);
 
 export const courseGradesRelations = relations(courseGrades, ({ one }) => ({
 	accBy: one(users, {
@@ -513,20 +533,23 @@ export const courseGradesRelations = relations(courseGrades, ({ one }) => ({
 	}),
 }));
 
-export const courseGradeDocumentsRelations = relations(courseGradeDocuments, ({ one }) => ({
-	uploadedBy: one(users, {
-		fields: [courseGradeDocuments.uploadedBy],
-		references: [users.id],
+export const courseGradeDocumentsRelations = relations(
+	courseGradeDocuments,
+	({ one }) => ({
+		uploadedBy: one(users, {
+			fields: [courseGradeDocuments.uploadedBy],
+			references: [users.id],
+		}),
+		verifiedBy: one(users, {
+			fields: [courseGradeDocuments.verifiedBy],
+			references: [users.id],
+		}),
+		courseGrade: one(courseGrades, {
+			fields: [courseGradeDocuments.courseGradeId],
+			references: [courseGrades.id],
+		}),
 	}),
-	verifiedBy: one(users, {
-		fields: [courseGradeDocuments.verifiedBy],
-		references: [users.id],
-	}),
-	courseGrade: one(courseGrades, {
-		fields: [courseGradeDocuments.courseGradeId],
-		references: [courseGrades.id],
-	}),
-}));
+);
 
 export const paDataRelations = relations(paData, ({ one }) => ({
 	accBy: one(users, {
@@ -539,5 +562,16 @@ export const internshipDataRelations = relations(internshipData, ({ one }) => ({
 	accBy: one(users, {
 		fields: [internshipData.accBy],
 		references: [users.id],
+	}),
+}));
+
+export const internalNotesRelations = relations(internalNotes, ({ one }) => ({
+	author: one(users, {
+		fields: [internalNotes.authorId],
+		references: [users.id],
+	}),
+	student: one(students, {
+		fields: [internalNotes.studentId],
+		references: [students.id],
 	}),
 }));

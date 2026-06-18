@@ -1,11 +1,11 @@
-import { db } from './src/db'; 
-import { sql } from 'drizzle-orm'; 
+import { sql } from "drizzle-orm";
+import { db } from "./src/db";
 
 async function dropAll() {
-    await db.execute(sql`DROP SCHEMA public CASCADE;`);
-    await db.execute(sql`CREATE SCHEMA public;`);
-    console.log('Dropped all tables in public schema');
-    process.exit(0);
+	await db.execute(sql`DROP SCHEMA public CASCADE;`);
+	await db.execute(sql`CREATE SCHEMA public;`);
+	console.log("Dropped all tables in public schema");
+	process.exit(0);
 }
 
 dropAll();

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { CheckCircle, Clock, Download, Search, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, Clock, Search, XCircle, Download } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
 	Table,
 	TableBody,
@@ -26,12 +26,12 @@ type StudentData = {
 		program: string;
 		overallStatus: string | null;
 	};
-	pmb: { status: string | null } | null;
-	crm: { status: string | null } | null;
-	finance: { status: string | null } | null;
-	academic: { status: string | null } | null;
-	pa: { status: string | null } | null;
-	internship: { status: string | null } | null;
+	pmb: { status: string | null; isAcc: boolean | null } | null;
+	crm: { status: string | null; isAcc: boolean | null } | null;
+	finance: { status: string | null; isAcc: boolean | null } | null;
+	academic: { status: string | null; isAcc: boolean | null } | null;
+	pa: { status: string | null; isAcc: boolean | null } | null;
+	internship: { status: string | null; isAcc: boolean | null } | null;
 	decision: { isApprovedByDirector: boolean | null } | null;
 };
 
@@ -76,6 +76,8 @@ export default function StudentsPage() {
 		};
 
 		fetchStudents();
+		const interval = setInterval(fetchStudents, 15000);
+		return () => clearInterval(interval);
 	}, [isAuthenticated, hasHydrated, router]);
 
 	if (isLoading) {
@@ -105,9 +107,7 @@ export default function StudentsPage() {
 			{/* Header */}
 			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 				<div>
-					<h1 className="text-2xl font-bold text-slate-900">
-						Semua Mahasiswa
-					</h1>
+					<h1 className="text-2xl font-bold text-slate-900">Semua Mahasiswa</h1>
 					<p className="text-slate-500 mt-1 text-sm">
 						Daftar lengkap seluruh mahasiswa beserta status tiap panel.
 					</p>
@@ -146,15 +146,31 @@ export default function StudentsPage() {
 								<TableHead className="text-slate-500">NIM</TableHead>
 								<TableHead className="text-slate-500">Nama Lengkap</TableHead>
 								<TableHead className="text-slate-500">Angkatan</TableHead>
-								<TableHead className="text-slate-500 text-center">Status</TableHead>
-								<TableHead className="text-slate-500 text-center">PMB</TableHead>
-								<TableHead className="text-slate-500 text-center">CRM</TableHead>
-								<TableHead className="text-slate-500 text-center">Finance</TableHead>
-								<TableHead className="text-slate-500 text-center">Akademik</TableHead>
+								<TableHead className="text-slate-500 text-center">
+									Status
+								</TableHead>
+								<TableHead className="text-slate-500 text-center">
+									PMB
+								</TableHead>
+								<TableHead className="text-slate-500 text-center">
+									CRM
+								</TableHead>
+								<TableHead className="text-slate-500 text-center">
+									Finance
+								</TableHead>
+								<TableHead className="text-slate-500 text-center">
+									Akademik
+								</TableHead>
 								<TableHead className="text-slate-500 text-center">PA</TableHead>
-								<TableHead className="text-slate-500 text-center">Magang</TableHead>
-								<TableHead className="text-slate-500 text-center">Direktur</TableHead>
-								<TableHead className="text-slate-500 text-right">Aksi</TableHead>
+								<TableHead className="text-slate-500 text-center">
+									Magang
+								</TableHead>
+								<TableHead className="text-slate-500 text-center">
+									Direktur
+								</TableHead>
+								<TableHead className="text-slate-500 text-right">
+									Aksi
+								</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
@@ -169,7 +185,9 @@ export default function StudentsPage() {
 									<TableRow
 										key={s.student.id}
 										className="border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors"
-										onClick={() => router.push(`/dashboard/students/${s.student.id}`)}
+										onClick={() =>
+											router.push(`/dashboard/students/${s.student.id}`)
+										}
 									>
 										<TableCell className="font-medium text-slate-700">
 											{s.student.nim}
@@ -196,12 +214,30 @@ export default function StudentsPage() {
 														: "🟡 Perhatian"}
 											</Badge>
 										</TableCell>
-										<TableCell>{renderStatusIcon(s.pmb?.status)}</TableCell>
-										<TableCell>{renderStatusIcon(s.crm?.status)}</TableCell>
-										<TableCell>{renderStatusIcon(s.finance?.status)}</TableCell>
-										<TableCell>{renderStatusIcon(s.academic?.status)}</TableCell>
-										<TableCell>{renderStatusIcon(s.pa?.status)}</TableCell>
-										<TableCell>{renderStatusIcon(s.internship?.status)}</TableCell>
+										<TableCell>
+											{renderStatusIcon(s.pmb?.isAcc ? "AMAN" : s.pmb?.status)}
+										</TableCell>
+										<TableCell>
+											{renderStatusIcon(s.crm?.isAcc ? "AMAN" : s.crm?.status)}
+										</TableCell>
+										<TableCell>
+											{renderStatusIcon(
+												s.finance?.isAcc ? "AMAN" : s.finance?.status,
+											)}
+										</TableCell>
+										<TableCell>
+											{renderStatusIcon(
+												s.academic?.isAcc ? "AMAN" : s.academic?.status,
+											)}
+										</TableCell>
+										<TableCell>
+											{renderStatusIcon(s.pa?.isAcc ? "AMAN" : s.pa?.status)}
+										</TableCell>
+										<TableCell>
+											{renderStatusIcon(
+												s.internship?.isAcc ? "AMAN" : s.internship?.status,
+											)}
+										</TableCell>
 										<TableCell className="text-center">
 											{s.decision?.isApprovedByDirector ? (
 												<Badge className="bg-blue-100 text-[#0517B0] hover:bg-blue-100">

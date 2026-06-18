@@ -86,7 +86,9 @@ export default async function Home() {
 				{/* Stats */}
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl w-full">
 					<div className="flex flex-col items-center justify-center p-6 rounded-2xl bg-white border border-slate-200/50 shadow-sm backdrop-blur-sm">
-						<span className="text-4xl font-bold text-[#0517B0] mb-2">1,200+</span>
+						<span className="text-4xl font-bold text-[#0517B0] mb-2">
+							1,200+
+						</span>
 						<span className="text-sm text-slate-500 font-medium">
 							Mahasiswa Aktif
 						</span>

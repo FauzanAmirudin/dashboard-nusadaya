@@ -1,10 +1,11 @@
-import { Elysia } from "elysia";
 import { eq } from "drizzle-orm";
+import { Elysia } from "elysia";
 import { db } from "../db";
 import { courseGrades, students } from "../db/schema";
 
-export const dosenRouter = new Elysia({ prefix: "/dosen" })
-	.get("/dashboard", async (context) => {
+export const dosenRouter = new Elysia({ prefix: "/dosen" }).get(
+	"/dashboard",
+	async (context) => {
 		const user = (context as any).user;
 		const set = context.set;
 
@@ -27,7 +28,7 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" })
 		let pendingAcc = 0;
 		let lowAttendance = 0;
 
-		const mappedGrades = grades.map(g => {
+		const mappedGrades = grades.map((g) => {
 			totalStudentsSet.add(g.student.id);
 			if (!g.courseGrade.isAcc) pendingAcc++;
 			if ((g.courseGrade.attendanceRate || 0) < 70) lowAttendance++;
@@ -47,7 +48,8 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" })
 		});
 
 		// Count unique courses based on courseCode
-		const uniqueCourses = new Set(grades.map(g => g.courseGrade.courseCode)).size;
+		const uniqueCourses = new Set(grades.map((g) => g.courseGrade.courseCode))
+			.size;
 
 		return {
 			success: true,
@@ -58,7 +60,8 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" })
 					pendingAcc,
 					lowAttendance,
 				},
-				courseGrades: mappedGrades
-			}
+				courseGrades: mappedGrades,
+			},
 		};
-	});
+	},
+);

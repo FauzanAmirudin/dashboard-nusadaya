@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/eden";
 import { Progress } from "@/components/ui/progress";
+import { api } from "@/lib/eden";
 
-export function StudentProgress({ studentId }: { studentId: number }) {
+export function StudentProgress({
+	studentId,
+	updateTrigger,
+}: {
+	studentId: number;
+	updateTrigger?: number;
+}) {
 	const [total, setTotal] = useState(0);
 	const [completed, setCompleted] = useState(0);
 
@@ -18,9 +24,9 @@ export function StudentProgress({ studentId }: { studentId: number }) {
 		};
 
 		fetchStatus();
-		const interval = setInterval(fetchStatus, 30000);
+		const interval = setInterval(fetchStatus, 15000);
 		return () => clearInterval(interval);
-	}, [studentId]);
+	}, [studentId, updateTrigger]);
 
 	if (total === 0) {
 		return (

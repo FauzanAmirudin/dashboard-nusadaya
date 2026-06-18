@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
 	BookOpen,
 	CheckSquare,
@@ -18,6 +17,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
 	Tooltip,
 	TooltipContent,
@@ -40,13 +40,33 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 		icon: LayoutDashboard,
 		label: "Dashboard",
 		href: "/dashboard",
-		roles: ["superadmin", "pmb", "crm", "finance", "akademik", "dosen", "pa", "magang", "evaluator"],
+		roles: [
+			"superadmin",
+			"pmb",
+			"crm",
+			"finance",
+			"akademik",
+			"dosen",
+			"pa",
+			"magang",
+			"evaluator",
+		],
 	},
 	{
 		icon: Users,
 		label: "Semua Mahasiswa",
 		href: "/dashboard/students",
-		roles: ["superadmin", "pmb", "crm", "finance", "akademik", "dosen", "pa", "magang", "evaluator"],
+		roles: [
+			"superadmin",
+			"pmb",
+			"crm",
+			"finance",
+			"akademik",
+			"dosen",
+			"pa",
+			"magang",
+			"evaluator",
+		],
 	},
 	{
 		icon: ClipboardList,

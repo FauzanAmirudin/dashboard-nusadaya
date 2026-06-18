@@ -2,7 +2,8 @@ import { cookie } from "@elysiajs/cookie";
 import { jwt } from "@elysiajs/jwt";
 import { Elysia } from "elysia";
 
-const JWT_SECRET = process.env.JWT_SECRET || "super_secret_jwt_key_nusadaya_2026";
+const JWT_SECRET =
+	process.env.JWT_SECRET || "super_secret_jwt_key_nusadaya_2026";
 
 // Export JWT_SECRET for reuse
 export { JWT_SECRET };

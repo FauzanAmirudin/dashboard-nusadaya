@@ -23,7 +23,7 @@ export const paRouter = new Elysia({ prefix: "/pa" })
 				(s) =>
 					s.student.name.toLowerCase().includes(lowerQuery) ||
 					s.student.nim.toLowerCase().includes(lowerQuery) ||
-					s.student.program.toLowerCase().includes(lowerQuery)
+					s.student.program.toLowerCase().includes(lowerQuery),
 			);
 		}
 
@@ -37,12 +37,13 @@ export const paRouter = new Elysia({ prefix: "/pa" })
 
 		const formattedStudents = allStudents.map(({ student, pa }) => {
 			if (pa?.status === "AMAN") kpi.aman++;
-			if (pa?.status === "PERLU_PERHATIAN" || pa?.status === "TIDAK_AMAN") kpi.perhatian++;
-			
+			if (pa?.status === "PERLU_PERHATIAN" || pa?.status === "TIDAK_AMAN")
+				kpi.perhatian++;
+
 			// We don't have vocabLogs directly attached, but we could fetch them.
 			// For simplicity and performance, vocabLow is calculated based on disciplineGood
 			// as a mock. In a real scenario we'd do a subquery or join for vocabLogs sum.
-			// Let's assume if it's TIDAK_AMAN, we mark vocabLow as a placeholder metric for now, 
+			// Let's assume if it's TIDAK_AMAN, we mark vocabLow as a placeholder metric for now,
 			// or we can fetch vocab logs if we want to be exact.
 			// To be perfectly accurate we'd join vocabLogs, but this is a start.
 			if (pa?.status === "TIDAK_AMAN") kpi.vocabLow++;

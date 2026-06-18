@@ -1,7 +1,17 @@
 "use client";
 
-import { CheckCircle, Clock, FileText, XCircle, User, Loader2, UploadCloud, Eye, Trash2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import {
+	CheckCircle,
+	Clock,
+	Eye,
+	FileText,
+	Loader2,
+	Trash2,
+	UploadCloud,
+	User,
+	XCircle,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
 	AlertDialog,
@@ -16,10 +26,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import {
 	Tooltip,
 	TooltipContent,
@@ -47,14 +57,16 @@ interface CrmPanelProps {
 
 export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 	const { user, token } = useAuthStore();
-	const isCrmAdmin = user?.role === "crm";
+	const isCrmAdmin = user?.role === "crm" || user?.role === "superadmin";
 	const isSuperadmin = user?.role === "superadmin";
 	const canEdit = isCrmAdmin;
 
 	const [isSavingLog, setIsSavingLog] = useState(false);
 	const [logText, setLogText] = useState("");
-	
-	const [crmState, setCrmState] = useState<{ crm: any; logs: any[] } | null>(null);
+
+	const [crmState, setCrmState] = useState<{ crm: any; logs: any[] } | null>(
+		null,
+	);
 	const [isLoading, setIsLoading] = useState(true);
 	const [loadingItem, setLoadingItem] = useState<string | null>(null);
 
@@ -82,7 +94,8 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 
 	const fetchCrmData = async () => {
 		try {
-			const { data, error } = await api.students[studentId.toString()].crm.get();
+			const { data, error } =
+				await api.students[studentId.toString()].crm.get();
 			if (!error && data?.success) {
 				setCrmState(data.data as any);
 			}
@@ -95,9 +108,12 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 
 	const fetchDocuments = async () => {
 		try {
-			const res = await fetch(`${API_URL}/students/${studentId}/crm/documents`, {
-				headers: { Authorization: `Bearer ${token}` }
-			});
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/crm/documents`,
+				{
+					headers: { Authorization: `Bearer ${token}` },
+				},
+			);
 			if (res.ok) {
 				const json = await res.json();
 				if (json.success) {
@@ -130,9 +146,12 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 
 	const handleShowAllLogs = async () => {
 		try {
-			const { data, error } = await api.students[studentId.toString()].crm.logs.get();
+			const { data, error } =
+				await api.students[studentId.toString()].crm.logs.get();
 			if (!error && data?.success) {
-				setCrmState(prev => prev ? { ...prev, logs: data.data as any } : null);
+				setCrmState((prev) =>
+					prev ? { ...prev, logs: data.data as any } : null,
+				);
 				setShowAllLogs(true);
 			} else {
 				toast.error("Gagal mengambil seluruh log komunikasi.");
@@ -153,7 +172,8 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 		const payload = { [id]: checked };
 
 		try {
-			const { error } = await api.students[studentId.toString()].crm.patch(payload);
+			const { error } =
+				await api.students[studentId.toString()].crm.patch(payload);
 
 			if (error) {
 				throw new Error("Gagal menyimpan perubahan");
@@ -172,13 +192,14 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 
 	const handleAttendanceSave = async () => {
 		if (!canEdit) return;
-		const payload = { 
+		const payload = {
 			practiceDaysPresent: attendancePresent,
-			practiceDaysTotal: attendanceTotal
+			practiceDaysTotal: attendanceTotal,
 		};
 
 		try {
-			const { error } = await api.students[studentId.toString()].crm.patch(payload);
+			const { error } =
+				await api.students[studentId.toString()].crm.patch(payload);
 
 			if (error) {
 				throw new Error("Gagal menyimpan kehadiran");
@@ -192,7 +213,10 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 		}
 	};
 
-	const handleFileUpload = async (documentKey: string, e: React.ChangeEvent<HTMLInputElement>) => {
+	const handleFileUpload = async (
+		documentKey: string,
+		e: React.ChangeEvent<HTMLInputElement>,
+	) => {
 		const file = e.target.files?.[0];
 		if (!file) return;
 
@@ -201,11 +225,14 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 		formData.append("file", file);
 
 		try {
-			const res = await fetch(`${API_URL}/students/${studentId}/crm/upload/${documentKey}`, {
-				method: "POST",
-				headers: { Authorization: `Bearer ${token}` },
-				body: formData,
-			});
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/crm/upload/${documentKey}`,
+				{
+					method: "POST",
+					headers: { Authorization: `Bearer ${token}` },
+					body: formData,
+				},
+			);
 			const json = await res.json();
 			if (res.ok && json.success) {
 				toast.success("File berhasil diupload");
@@ -217,21 +244,27 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 			toast.error("Terjadi kesalahan jaringan");
 		}
 		setUploadingKey(null);
-		
+
 		// Reset file input
-		e.target.value = '';
+		e.target.value = "";
 	};
 
 	const handleViewDocument = (docId: number) => {
-		window.open(`/api/students/${studentId}/crm/documents/${docId}/download`, '_blank');
+		window.open(
+			`/api/students/${studentId}/crm/documents/${docId}/download`,
+			"_blank",
+		);
 	};
 
 	const handleVerifyDocument = async (docId: number) => {
 		try {
-			const res = await fetch(`${API_URL}/students/${studentId}/crm/documents/${docId}/verify`, {
-				method: "PATCH",
-				headers: { Authorization: `Bearer ${token}` }
-			});
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/crm/documents/${docId}/verify`,
+				{
+					method: "PATCH",
+					headers: { Authorization: `Bearer ${token}` },
+				},
+			);
 			if (res.ok) {
 				toast.success("Dokumen ditandai terverifikasi");
 				fetchDocuments();
@@ -245,12 +278,15 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 
 	const handleDeleteDocument = async (docId: number) => {
 		if (!confirm("Apakah Anda yakin ingin menghapus file ini?")) return;
-		
+
 		try {
-			const res = await fetch(`${API_URL}/students/${studentId}/crm/documents/${docId}`, {
-				method: "DELETE",
-				headers: { Authorization: `Bearer ${token}` }
-			});
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/crm/documents/${docId}`,
+				{
+					method: "DELETE",
+					headers: { Authorization: `Bearer ${token}` },
+				},
+			);
 			if (res.ok) {
 				toast.success("Dokumen berhasil dihapus");
 				fetchDocuments();
@@ -265,9 +301,11 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 	const handleSaveLog = async () => {
 		if (!logText.trim() || !canEdit) return;
 		setIsSavingLog(true);
-		
+
 		try {
-			const { error } = await api.students[studentId.toString()].crm.log.post({ logText });
+			const { error } = await api.students[studentId.toString()].crm.log.post({
+				logText,
+			});
 
 			if (error) {
 				throw new Error("Gagal menambah log");
@@ -298,6 +336,23 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 			onUpdate();
 		} catch (error) {
 			toast.error("Gagal memberikan ACC");
+		}
+	};
+
+	const handleCancelAcc = async () => {
+		if (!isCrmAdmin) return;
+		setIsSavingLog(true);
+		try {
+			const { error } =
+				await api.students[studentId.toString()].crm.acc.delete();
+			if (error) throw new Error("Gagal membatalkan ACC");
+			toast.success("ACC CRM berhasil dibatalkan");
+			fetchCrmData();
+			onUpdate();
+		} catch (error) {
+			toast.error("Gagal membatalkan ACC");
+		} finally {
+			setIsSavingLog(false);
 		}
 	};
 
@@ -354,7 +409,10 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 		);
 	}
 
-	const attendancePercentage = attendanceTotal > 0 ? Math.round((attendancePresent / attendanceTotal) * 100) : 0;
+	const attendancePercentage =
+		attendanceTotal > 0
+			? Math.round((attendancePresent / attendanceTotal) * 100)
+			: 0;
 
 	if (isLoading) {
 		return (
@@ -371,18 +429,25 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 					<CardHeader className="border-b border-slate-200 pb-4">
 						<div className="flex justify-between items-center">
 							<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
-								<span className="text-xl">📞</span> CRM — Customer Relationship Management
+								<span className="text-xl">📞</span> CRM — Customer Relationship
+								Management
 								<span className="ml-2 text-sm font-normal text-slate-500">
 									[{completedCount}/5]
 								</span>
 							</CardTitle>
 							<div className="flex items-center gap-3">
 								{isSuperadmin && !isCrmAdmin && (
-									<Badge variant="outline" className="text-slate-400 border-slate-300">
+									<Badge
+										variant="outline"
+										className="text-slate-400 border-slate-300"
+									>
 										👁 Mode Lihat Saja
 									</Badge>
 								)}
-								<Badge variant="outline" className="border-slate-200 text-slate-500 bg-white">
+								<Badge
+									variant="outline"
+									className="border-slate-200 text-slate-500 bg-white"
+								>
 									Dikelola oleh: Admin CRM
 								</Badge>
 								{statusBadge}
@@ -396,7 +461,10 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 							</h3>
 							<div className="space-y-3">
 								{checklist.map((item) => (
-									<div key={item.id} className="flex flex-col rounded-lg border bg-white overflow-hidden border-slate-200 mb-3">
+									<div
+										key={item.id}
+										className="flex flex-col rounded-lg border bg-white overflow-hidden border-slate-200 mb-3"
+									>
 										<div
 											className={`flex items-center gap-4 p-4 transition-colors ${
 												item.checked
@@ -407,7 +475,9 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 											<Checkbox
 												id={item.id}
 												checked={item.checked}
-												onCheckedChange={(c) => handleCheckboxChange(item.id, c === true)}
+												onCheckedChange={(c) =>
+													handleCheckboxChange(item.id, c === true)
+												}
 												disabled={!canEdit || loadingItem === item.id}
 												className={`w-6 h-6 rounded-md ${
 													item.checked
@@ -415,10 +485,12 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 														: ""
 												}`}
 											/>
-											<div className="flex-1">
-												<label
-													htmlFor={item.id}
-													className={`text-base font-semibold block cursor-pointer ${
+											<label
+												htmlFor={item.id}
+												className="flex-1 cursor-pointer block"
+											>
+												<div
+													className={`text-base font-semibold block ${
 														item.checked ? "text-emerald-900" : "text-slate-700"
 													}`}
 												>
@@ -426,15 +498,15 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 													{loadingItem === item.id && (
 														<Loader2 className="w-3 h-3 text-emerald-600 animate-spin ml-2 inline" />
 													)}
-												</label>
+												</div>
 												<p
-													className={`text-sm ${
-														item.checked ? "text-emerald-700/80" : "text-slate-500"
+													className={`text-sm mt-1 ${
+														item.checked ? "text-emerald-700" : "text-slate-500"
 													}`}
 												>
 													{item.desc}
 												</p>
-											</div>
+											</label>
 											<div>
 												{item.checked ? (
 													<CheckCircle className="w-6 h-6 text-emerald-500" />
@@ -449,71 +521,104 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 											<div className="p-4 bg-white border-b border-slate-100">
 												<div className="flex flex-col sm:flex-row sm:items-end gap-4 mb-4">
 													<div>
-														<label className="text-xs font-semibold text-slate-500 mb-1 block">Hadir</label>
-														<Input 
-															type="number" 
-															value={attendancePresent} 
-															onChange={e => setAttendancePresent(Number(e.target.value))}
+														<label className="text-xs font-semibold text-slate-500 mb-1 block">
+															Hadir
+														</label>
+														<Input
+															type="number"
+															value={attendancePresent}
+															onChange={(e) =>
+																setAttendancePresent(Number(e.target.value))
+															}
 															disabled={!canEdit}
 															className="w-24 text-center font-bold text-slate-700"
 														/>
 													</div>
-													<div className="text-slate-400 font-medium pb-2">dari</div>
+													<div className="text-slate-400 font-medium pb-2">
+														dari
+													</div>
 													<div>
-														<label className="text-xs font-semibold text-slate-500 mb-1 block">Total Hari</label>
-														<Input 
-															type="number" 
-															value={attendanceTotal} 
-															onChange={e => setAttendanceTotal(Number(e.target.value))}
+														<label className="text-xs font-semibold text-slate-500 mb-1 block">
+															Total Hari
+														</label>
+														<Input
+															type="number"
+															value={attendanceTotal}
+															onChange={(e) =>
+																setAttendanceTotal(Number(e.target.value))
+															}
 															disabled={!canEdit}
 															className="w-24 text-center font-bold text-slate-700"
 														/>
 													</div>
 													{canEdit && (
-														<Button variant="secondary" onClick={handleAttendanceSave} className="ml-auto text-blue-700 bg-blue-50 hover:bg-blue-100">
+														<Button
+															variant="secondary"
+															onClick={handleAttendanceSave}
+															className="ml-auto text-blue-700 bg-blue-50 hover:bg-blue-100"
+														>
 															Simpan
 														</Button>
 													)}
 												</div>
 												<div className="flex items-center gap-3 mt-2">
-													<span className="text-sm font-semibold text-slate-600 min-w-[100px]">Persentase: {attendancePercentage}%</span>
-													<Progress value={attendancePercentage} className="h-2.5 bg-slate-100 flex-1" indicatorClassName="bg-blue-600" />
+													<span className="text-sm font-semibold text-slate-600 min-w-[100px]">
+														Persentase: {attendancePercentage}%
+													</span>
+													<Progress
+														value={attendancePercentage}
+														className="h-2.5 bg-slate-100 flex-1"
+														indicatorClassName="bg-blue-600"
+													/>
 												</div>
 											</div>
 										)}
-										
+
 										{/* Area Dokumen CRM */}
 										<div className="p-4 bg-white last:border-0">
 											<div className="flex items-center justify-between mb-3">
-												<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Lampiran Dokumen CRM</span>
+												<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+													Lampiran Dokumen CRM
+												</span>
 											</div>
-											
+
 											{documents[item.id]?.length > 0 ? (
 												<div className="space-y-2">
-													{documents[item.id].map(doc => (
-														<div key={doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-slate-50 p-2.5 rounded-md border border-slate-200 gap-3">
+													{documents[item.id].map((doc) => (
+														<div
+															key={doc.id}
+															className="flex flex-col sm:flex-row sm:items-center justify-between bg-slate-50 p-2.5 rounded-md border border-slate-200 gap-3"
+														>
 															<div className="flex items-center gap-3 overflow-hidden">
 																<div className="w-8 h-8 rounded bg-white flex items-center justify-center border border-slate-200 shrink-0">
 																	<FileText className="w-4 h-4 text-[#0517B0]" />
 																</div>
 																<div className="min-w-0">
-																	<p className="text-sm font-medium text-slate-700 truncate">{doc.fileName}</p>
+																	<p className="text-sm font-medium text-slate-700 truncate">
+																		{doc.fileName}
+																	</p>
 																	<div className="flex items-center gap-2 mt-0.5">
 																		{doc.isVerified ? (
-																			<Badge className="bg-emerald-100 hover:bg-emerald-100 text-emerald-700 px-1.5 py-0 text-[10px]">✅ Terverifikasi</Badge>
+																			<Badge className="bg-emerald-100 hover:bg-emerald-100 text-emerald-700 px-1.5 py-0 text-[10px]">
+																				✅ Terverifikasi
+																			</Badge>
 																		) : (
-																			<Badge className="bg-amber-100 hover:bg-amber-100 text-amber-700 px-1.5 py-0 text-[10px]">⏳ Belum Diperiksa</Badge>
+																			<Badge className="bg-amber-100 hover:bg-amber-100 text-amber-700 px-1.5 py-0 text-[10px]">
+																				⏳ Belum Diperiksa
+																			</Badge>
 																		)}
 																		<span className="text-[10px] text-slate-400">
-																			{new Date(doc.uploadedAt).toLocaleDateString("id-ID")}
+																			{new Date(
+																				doc.uploadedAt,
+																			).toLocaleDateString("id-ID")}
 																		</span>
 																	</div>
 																</div>
 															</div>
 															<div className="flex items-center gap-1 shrink-0">
-																<Button 
-																	variant="outline" 
-																	size="sm" 
+																<Button
+																	variant="outline"
+																	size="sm"
 																	className="h-8 text-xs font-medium text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 gap-1.5"
 																	onClick={() => handleViewDocument(doc.id)}
 																>
@@ -521,9 +626,9 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 																	Review
 																</Button>
 																{canEdit && !doc.isVerified && (
-																	<Button 
-																		variant="ghost" 
-																		size="sm" 
+																	<Button
+																		variant="ghost"
+																		size="sm"
 																		className="h-8 w-8 p-0 text-slate-500 hover:text-emerald-600"
 																		onClick={() => handleVerifyDocument(doc.id)}
 																	>
@@ -531,9 +636,9 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 																	</Button>
 																)}
 																{canEdit && (
-																	<Button 
-																		variant="ghost" 
-																		size="sm" 
+																	<Button
+																		variant="ghost"
+																		size="sm"
 																		className="h-8 w-8 p-0 text-slate-500 hover:text-rose-600"
 																		onClick={() => handleDeleteDocument(doc.id)}
 																	>
@@ -546,7 +651,9 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 												</div>
 											) : (
 												<div className="text-center py-4 bg-slate-50 rounded border border-dashed border-slate-300">
-													<p className="text-xs text-slate-500">Belum ada dokumen yang diunggah.</p>
+													<p className="text-xs text-slate-500">
+														Belum ada dokumen yang diunggah.
+													</p>
 												</div>
 											)}
 										</div>
@@ -559,7 +666,7 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 							<h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">
 								LOG KOMUNIKASI ORANG TUA
 							</h3>
-							
+
 							{canEdit && !crm?.isAcc && (
 								<div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
 									<Textarea
@@ -574,7 +681,9 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 											disabled={isSavingLog || !logText.trim()}
 											className="bg-[#0517B0] hover:bg-blue-800 text-white"
 										>
-											{isSavingLog && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+											{isSavingLog && (
+												<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+											)}
 											+ Tambah Log
 										</Button>
 									</div>
@@ -583,26 +692,41 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 
 							<div className="relative pl-6 border-l-2 border-slate-200 space-y-6">
 								{logs.length === 0 ? (
-									<p className="text-slate-500 text-sm italic">Belum ada log komunikasi.</p>
+									<p className="text-slate-500 text-sm italic">
+										Belum ada log komunikasi.
+									</p>
 								) : (
 									logs.map((log: any) => (
 										<div key={log.id} className="relative">
 											<div className="absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-full bg-blue-500 border-[3px] border-white ring-1 ring-slate-200" />
 											<div className="text-xs text-slate-500 font-medium mb-1 flex items-center gap-2">
-												<span>📅 {new Date(log.createdAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB</span>
+												<span>
+													📅{" "}
+													{new Date(log.createdAt).toLocaleString("id-ID", {
+														dateStyle: "medium",
+														timeStyle: "short",
+													})}{" "}
+													WIB
+												</span>
 											</div>
 											<p className="text-slate-700 bg-white border border-slate-200 p-3 rounded-lg shadow-sm">
 												"{log.logText}"
 											</p>
 											<div className="text-xs text-slate-400 mt-2 flex items-center gap-1.5">
 												<User className="w-3 h-3" />
-												oleh: <span className="font-medium text-slate-600">{log.author?.fullName || "Admin CRM"}</span>
+												oleh:{" "}
+												<span className="font-medium text-slate-600">
+													{log.author?.fullName || "Admin CRM"}
+												</span>
 											</div>
 										</div>
 									))
 								)}
 								{!showAllLogs && logs.length >= 5 && (
-									<button onClick={handleShowAllLogs} className="text-[#0517B0] text-sm mt-4 hover:underline font-medium relative -left-6 bg-white px-2">
+									<button
+										onClick={handleShowAllLogs}
+										className="text-[#0517B0] text-sm mt-4 hover:underline font-medium relative -left-6 bg-white px-2"
+									>
 										Lihat Semua Log ↓
 									</button>
 								)}
@@ -615,22 +739,68 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 				<Card className="bg-slate-50 border-slate-200 shadow-sm overflow-hidden">
 					<CardContent className="p-0">
 						<div className="flex flex-col sm:flex-row items-center justify-between p-6">
-							<div className="flex items-center gap-4 mb-4 sm:mb-0">
+							<div className="flex flex-1 items-center gap-4 mb-4 sm:mb-0 w-full">
 								{crm?.isAcc ? (
-									<>
-										<div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
-											<CheckCircle className="w-6 h-6 text-emerald-600" />
+									<div className="flex-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
+										<div className="flex items-center gap-4">
+											<div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+												<CheckCircle className="w-6 h-6 text-emerald-600" />
+											</div>
+											<div>
+												<h4 className="text-emerald-700 font-bold text-lg">
+													✅ ACC CRM Diberikan
+												</h4>
+												<p className="text-sm text-slate-600">
+													Oleh{" "}
+													<span className="font-semibold">
+														{crm?.accBy?.fullName || "Admin CRM"}
+													</span>{" "}
+													pada{" "}
+													{new Date(crm.accAt).toLocaleString("id-ID", {
+														dateStyle: "medium",
+														timeStyle: "short",
+													})}{" "}
+													WIB
+												</p>
+											</div>
 										</div>
-										<div>
-											<h4 className="text-emerald-700 font-bold text-lg">
-												✅ ACC CRM Diberikan
-											</h4>
-											<p className="text-sm text-slate-600">
-												Oleh <span className="font-semibold">{crm?.accBy?.fullName || "Admin CRM"}</span> pada{" "}
-												{new Date(crm.accAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })} WIB
-											</p>
-										</div>
-									</>
+										{isCrmAdmin && (
+											<AlertDialog>
+												<AlertDialogTrigger
+													render={
+														<Button
+															variant="outline"
+															className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 shrink-0"
+															disabled={isSavingLog}
+														>
+															{isSavingLog ? "Membatalkan..." : "Batalkan ACC"}
+														</Button>
+													}
+												/>
+												<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
+													<AlertDialogTitle>
+														Konfirmasi Pembatalan ACC CRM
+													</AlertDialogTitle>
+													<AlertDialogDescription className="text-slate-500">
+														Apakah Anda yakin ingin membatalkan status ACC untuk
+														panel CRM ini? Status mahasiswa akan kembali ke
+														tahap proses.
+													</AlertDialogDescription>
+													<div className="flex justify-end gap-3 mt-4">
+														<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50">
+															Batal
+														</AlertDialogCancel>
+														<AlertDialogAction
+															onClick={handleCancelAcc}
+															className="bg-rose-600 hover:bg-rose-700 text-white"
+														>
+															Ya, Batalkan ACC
+														</AlertDialogAction>
+													</div>
+												</AlertDialogContent>
+											</AlertDialog>
+										)}
+									</div>
 								) : (
 									<>
 										<div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center">
@@ -661,14 +831,19 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 													✔ ACC CRM →
 												</AlertDialogTrigger>
 												<AlertDialogContent>
-													<AlertDialogTitle>Konfirmasi ACC CRM</AlertDialogTitle>
+													<AlertDialogTitle>
+														Konfirmasi ACC CRM
+													</AlertDialogTitle>
 													<AlertDialogDescription>
-														Anda akan memberikan persetujuan final untuk tahap CRM
-														mahasiswa ini. Tindakan ini akan dicatat beserta nama dan
-														waktu persetujuan Anda. Pastikan semua data sudah valid.
+														Anda akan memberikan persetujuan final untuk tahap
+														CRM mahasiswa ini. Tindakan ini akan dicatat beserta
+														nama dan waktu persetujuan Anda. Pastikan semua data
+														sudah valid.
 													</AlertDialogDescription>
 													<div className="flex justify-end gap-3 mt-4">
-														<AlertDialogCancel className="border-slate-200">Batal</AlertDialogCancel>
+														<AlertDialogCancel className="border-slate-200">
+															Batal
+														</AlertDialogCancel>
 														<AlertDialogAction
 															onClick={handleAcc}
 															className="bg-[#0517B0] hover:bg-blue-800 text-white"
@@ -682,7 +857,8 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 									</TooltipTrigger>
 									{completedCount < 5 && (
 										<TooltipContent>
-											Lengkapi semua {5 - completedCount} checklist terlebih dahulu
+											Lengkapi semua {5 - completedCount} checklist terlebih
+											dahulu
 										</TooltipContent>
 									)}
 								</Tooltip>

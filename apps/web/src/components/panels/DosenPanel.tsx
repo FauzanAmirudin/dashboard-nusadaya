@@ -1,7 +1,20 @@
 "use client";
 
-import { CheckCircle, Clock, Edit2, Loader2, Save, X, XCircle, Eye, Trash2, PlusCircle, Paperclip } from "lucide-react";
-import React, { useState, useEffect } from "react";
+import {
+	CheckCircle,
+	Clock,
+	Edit2,
+	Eye,
+	Loader2,
+	Paperclip,
+	PlusCircle,
+	Save,
+	Trash2,
+	X,
+	XCircle,
+} from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -14,22 +27,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import {
 	Dialog,
 	DialogContent,
@@ -38,9 +35,24 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
-import { toast } from "sonner";
 
 interface DocFile {
 	id: number;
@@ -77,11 +89,13 @@ interface DosenPanelProps {
 
 export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 	const { user } = useAuthStore();
-	const isDosen = user?.role === "dosen";
+	const isDosen = user?.role === "dosen" || user?.role === "superadmin";
 	const isSuperadmin = user?.role === "superadmin";
 
 	const [gradesData, setGradesData] = useState<CourseGrade[]>([]);
-	const [documents, setDocuments] = useState<Record<number, Record<string, DocFile[]>>>({});
+	const [documents, setDocuments] = useState<
+		Record<number, Record<string, DocFile[]>>
+	>({});
 	const [isLoading, setIsLoading] = useState(true);
 	const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
@@ -101,10 +115,15 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 
 	// State for Add MK Dialog
 	const [showAddModal, setShowAddModal] = useState(false);
-	const [newMK, setNewMK] = useState({ courseCode: "", courseName: "", dosenId: user?.id || 0 });
+	const [newMK, setNewMK] = useState({
+		courseCode: "",
+		courseName: "",
+		dosenId: user?.id || 0,
+	});
 
 	const fetchGrades = async () => {
-		const { data, error } = await api.students[studentId.toString()]["course-grades"].get();
+		const { data, error } =
+			await api.students[studentId.toString()]["course-grades"].get();
 		if (!error && data?.success) {
 			setGradesData(data.data as CourseGrade[]);
 		}
@@ -112,9 +131,15 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 	};
 
 	const fetchDocumentsForCourse = async (courseId: number) => {
-		const { data, error } = await api.students[studentId.toString()]["course-grades"][courseId.toString()].documents.get();
+		const { data, error } =
+			await api.students[studentId.toString()]["course-grades"][
+				courseId.toString()
+			].documents.get();
 		if (!error && data?.success) {
-			setDocuments(prev => ({ ...prev, [courseId]: data.data as Record<string, DocFile[]> }));
+			setDocuments((prev) => ({
+				...prev,
+				[courseId]: data.data as Record<string, DocFile[]>,
+			}));
 		}
 	};
 
@@ -123,22 +148,32 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 	}, [studentId]);
 
 	useEffect(() => {
-		gradesData.forEach(g => fetchDocumentsForCourse(g.id));
+		gradesData.forEach((g) => fetchDocumentsForCourse(g.id));
 	}, [gradesData]);
 
 	// Calculation helpers
 	const getGpaPoints = (grade: string | null) => {
 		switch (grade) {
-			case "A": return 4.0;
-			case "A-": return 3.7;
-			case "B+": return 3.3;
-			case "B": return 3.0;
-			case "B-": return 2.7;
-			case "C+": return 2.3;
-			case "C": return 2.0;
-			case "D": return 1.0;
-			case "E": return 0.0;
-			default: return 0.0;
+			case "A":
+				return 4.0;
+			case "A-":
+				return 3.7;
+			case "B+":
+				return 3.3;
+			case "B":
+				return 3.0;
+			case "B-":
+				return 2.7;
+			case "C+":
+				return 2.3;
+			case "C":
+				return 2.0;
+			case "D":
+				return 1.0;
+			case "E":
+				return 0.0;
+			default:
+				return 0.0;
 		}
 	};
 
@@ -147,20 +182,35 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 	let badAttitudeCount = 0;
 	let isAllAcc = gradesData.length > 0;
 
-	gradesData.forEach(g => {
+	gradesData.forEach((g) => {
 		totalGpaPoints += getGpaPoints(g.grade);
 		if (g.status === "TIDAK_AMAN") badGradeCount++;
 		if (g.attitudeNote === "Buruk") badAttitudeCount++;
 		if (!g.isAcc) isAllAcc = false;
 	});
 
-	const estimatedGpa = gradesData.length > 0 ? (totalGpaPoints / gradesData.length).toFixed(2) : "0.00";
+	const estimatedGpa =
+		gradesData.length > 0
+			? (totalGpaPoints / gradesData.length).toFixed(2)
+			: "0.00";
 
-	let panelStatusBadge = <Badge className="bg-emerald-50 text-emerald-600 border-emerald-200">🟢 AMAN</Badge>;
+	let panelStatusBadge = (
+		<Badge className="bg-emerald-50 text-emerald-600 border-emerald-200">
+			🟢 AMAN
+		</Badge>
+	);
 	if (badGradeCount > 0) {
-		panelStatusBadge = <Badge className="bg-rose-50 text-rose-600 border-rose-200">🔴 TIDAK AMAN</Badge>;
-	} else if (gradesData.some(g => g.status === "PERLU_PERHATIAN")) {
-		panelStatusBadge = <Badge className="bg-amber-50 text-amber-600 border-amber-200">🟡 PERLU PERHATIAN</Badge>;
+		panelStatusBadge = (
+			<Badge className="bg-rose-50 text-rose-600 border-rose-200">
+				🔴 TIDAK AMAN
+			</Badge>
+		);
+	} else if (gradesData.some((g) => g.status === "PERLU_PERHATIAN")) {
+		panelStatusBadge = (
+			<Badge className="bg-amber-50 text-amber-600 border-amber-200">
+				🟡 PERLU PERHATIAN
+			</Badge>
+		);
 	}
 
 	// Actions
@@ -179,12 +229,14 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 
 	const handleSaveEdit = async (courseId: number) => {
 		setSavingId(courseId);
-		const { error } = await api.students[studentId.toString()]["course-grades"][courseId.toString()].patch({
+		const { error } = await api.students[studentId.toString()]["course-grades"][
+			courseId.toString()
+		].patch({
 			attendanceRate: editForm.attendanceRate,
 			grade: editForm.grade,
-			attitudeNote: editForm.attitudeNote
+			attitudeNote: editForm.attitudeNote,
 		});
-		
+
 		if (!error) {
 			toast.success("Nilai MK berhasil disimpan");
 			setEditingId(null);
@@ -197,7 +249,10 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 	};
 
 	const handleAcc = async (courseId: number, courseName: string) => {
-		const { error } = await api.students[studentId.toString()]["course-grades"][courseId.toString()].acc.post();
+		const { error } =
+			await api.students[studentId.toString()]["course-grades"][
+				courseId.toString()
+			].acc.post();
 		if (!error) {
 			toast.success(`MK ${courseName} berhasil di-ACC dan dikunci`);
 			fetchGrades();
@@ -212,7 +267,8 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 			toast.error("Semua field harus diisi");
 			return;
 		}
-		const { error } = await api.students[studentId.toString()]["course-grades"].post(newMK);
+		const { error } =
+			await api.students[studentId.toString()]["course-grades"].post(newMK);
 		if (!error) {
 			toast.success("Mata Kuliah berhasil ditambahkan");
 			setNewMK({ courseCode: "", courseName: "", dosenId: user?.id || 0 });
@@ -224,20 +280,24 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 	};
 
 	const handleDeleteCourse = async (courseId: number, courseName: string) => {
-		if (!confirm(`Hapus MK "${courseName}"? Data nilai dan ACC akan hilang.`)) return;
-	  
-		const { error } = await api.students[studentId.toString()]["course-grades"][courseId.toString()].delete();
+		if (!confirm(`Hapus MK "${courseName}"? Data nilai dan ACC akan hilang.`))
+			return;
+
+		const { error } =
+			await api.students[studentId.toString()]["course-grades"][
+				courseId.toString()
+			].delete();
 		if (!error) {
-		  toast.success(`MK "${courseName}" berhasil dihapus`);
-		  fetchGrades();
-		  onUpdate();
+			toast.success(`MK "${courseName}" berhasil dihapus`);
+			fetchGrades();
+			onUpdate();
 		} else {
-		  toast.error("Gagal menghapus MK");
+			toast.error("Gagal menghapus MK");
 		}
 	};
 
 	const toggleExpand = (courseId: number) => {
-		setExpandedRows(prev => {
+		setExpandedRows((prev) => {
 			const next = new Set(prev);
 			if (next.has(courseId)) next.delete(courseId);
 			else next.add(courseId);
@@ -246,22 +306,29 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 	};
 
 	// Document Actions
-	const handleFileUpload = async (courseId: number, documentKey: string, file: File) => {
+	const handleFileUpload = async (
+		courseId: number,
+		documentKey: string,
+		file: File,
+	) => {
 		setUploadingKey(`${courseId}-${documentKey}`);
-		
+
 		const formData = new FormData();
 		formData.append("file", file);
-		
+
 		const token = localStorage.getItem("token");
 		const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-		
+
 		try {
-			const res = await fetch(`${API_URL}/students/${studentId}/course-grades/${courseId}/upload/${documentKey}`, {
-				method: "POST",
-				body: formData,
-				headers: { Authorization: `Bearer ${token}` }
-			});
-			
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/course-grades/${courseId}/upload/${documentKey}`,
+				{
+					method: "POST",
+					body: formData,
+					headers: { Authorization: `Bearer ${token}` },
+				},
+			);
+
 			if (res.ok) {
 				toast.success("Dokumen berhasil diupload");
 				fetchDocumentsForCourse(courseId);
@@ -278,11 +345,16 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 
 	const handleViewDocument = (courseId: number, docId: number) => {
 		const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-		window.open(`${API_URL}/students/${studentId}/course-grades/${courseId}/documents/${docId}/download`, '_blank');
+		window.open(
+			`${API_URL}/students/${studentId}/course-grades/${courseId}/documents/${docId}/download`,
+			"_blank",
+		);
 	};
-	
+
 	const handleVerifyDocument = async (courseId: number, docId: number) => {
-		const { error } = await api.students[studentId.toString()]["course-grades"][courseId.toString()].documents[docId.toString()].verify.patch({});
+		const { error } = await api.students[studentId.toString()]["course-grades"][
+			courseId.toString()
+		].documents[docId.toString()].verify.patch({});
 		if (!error) {
 			toast.success("Dokumen terverifikasi");
 			fetchDocumentsForCourse(courseId);
@@ -290,10 +362,13 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 			toast.error("Gagal memverifikasi dokumen");
 		}
 	};
-	
+
 	const handleDeleteDocument = async (courseId: number, docId: number) => {
 		if (!confirm("Hapus dokumen ini?")) return;
-		const { error } = await api.students[studentId.toString()]["course-grades"][courseId.toString()].documents[docId.toString()].delete();
+		const { error } =
+			await api.students[studentId.toString()]["course-grades"][
+				courseId.toString()
+			].documents[docId.toString()].delete();
 		if (!error) {
 			toast.success("Dokumen dihapus");
 			fetchDocumentsForCourse(courseId);
@@ -302,9 +377,16 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 		}
 	};
 
-	const renderDocumentItem = (courseId: number, courseGrade: CourseGrade, title: string, key: string, desc: string) => {
+	const renderDocumentItem = (
+		courseId: number,
+		courseGrade: CourseGrade,
+		title: string,
+		key: string,
+		desc: string,
+	) => {
 		const docs = documents[courseId]?.[key] || [];
-		const canEditThisRow = (isSuperadmin || (isDosen && user?.id === courseGrade.dosenId));
+		const canEditThisRow =
+			isSuperadmin || (isDosen && user?.id === courseGrade.dosenId);
 
 		return (
 			<div className="flex flex-col sm:flex-row gap-3 py-3 border-b border-slate-100 last:border-0 pl-6 sm:pl-12">
@@ -319,7 +401,10 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 					{docs.length > 0 ? (
 						<div className="space-y-2">
 							{docs.map((doc) => (
-								<div key={doc.id} className="flex flex-wrap items-center justify-between bg-white border border-slate-200 p-2 rounded-md gap-2">
+								<div
+									key={doc.id}
+									className="flex flex-wrap items-center justify-between bg-white border border-slate-200 p-2 rounded-md gap-2"
+								>
 									<div className="flex items-center gap-2 overflow-hidden">
 										<div className="text-sm font-medium text-blue-700 truncate max-w-[200px]">
 											{doc.fileName}
@@ -328,22 +413,41 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 											({doc.fileSize ? Math.round(doc.fileSize / 1024) : 0} KB)
 										</div>
 										{doc.isVerified ? (
-											<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0 h-5 px-1.5 text-[10px]">✅ Verified</Badge>
+											<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0 h-5 px-1.5 text-[10px]">
+												✅ Verified
+											</Badge>
 										) : (
-											<Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-0 h-5 px-1.5 text-[10px]">⏳ Pending</Badge>
+											<Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-0 h-5 px-1.5 text-[10px]">
+												⏳ Pending
+											</Badge>
 										)}
 									</div>
 									<div className="flex items-center gap-1">
-										<Button size="sm" variant="ghost" className="h-7 px-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50" onClick={() => handleViewDocument(courseId, doc.id)}>
+										<Button
+											size="sm"
+											variant="ghost"
+											className="h-7 px-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
+											onClick={() => handleViewDocument(courseId, doc.id)}
+										>
 											<Eye className="w-4 h-4" />
 										</Button>
 										{canEditThisRow && !doc.isVerified && (
-											<Button size="sm" variant="ghost" className="h-7 px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" onClick={() => handleVerifyDocument(courseId, doc.id)}>
+											<Button
+												size="sm"
+												variant="ghost"
+												className="h-7 px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+												onClick={() => handleVerifyDocument(courseId, doc.id)}
+											>
 												<CheckCircle className="w-4 h-4" />
 											</Button>
 										)}
 										{canEditThisRow && (
-											<Button size="sm" variant="ghost" className="h-7 px-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50" onClick={() => handleDeleteDocument(courseId, doc.id)}>
+											<Button
+												size="sm"
+												variant="ghost"
+												className="h-7 px-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50"
+												onClick={() => handleDeleteDocument(courseId, doc.id)}
+											>
 												<Trash2 className="w-4 h-4" />
 											</Button>
 										)}
@@ -372,7 +476,9 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 								variant="outline"
 								size="sm"
 								className="h-8 border-dashed text-slate-500 w-full"
-								onClick={() => document.getElementById(`file-${courseId}-${key}`)?.click()}
+								onClick={() =>
+									document.getElementById(`file-${courseId}-${key}`)?.click()
+								}
 								disabled={uploadingKey === `${courseId}-${key}`}
 							>
 								{uploadingKey === `${courseId}-${key}` ? (
@@ -390,10 +496,12 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 	};
 
 	if (isLoading) {
-		return <div className="p-8 text-center text-slate-500 flex flex-col items-center gap-3">
-			<Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-			Memuat data dosen & mata kuliah...
-		</div>;
+		return (
+			<div className="p-8 text-center text-slate-500 flex flex-col items-center gap-3">
+				<Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+				Memuat data dosen & mata kuliah...
+			</div>
+		);
 	}
 
 	return (
@@ -402,19 +510,28 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 				<CardHeader className="border-b border-slate-200 pb-4">
 					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 						<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
-							<span className="text-xl">📚</span> Dosen — Nilai & Kehadiran per MK
+							<span className="text-xl">📚</span> Dosen — Nilai & Kehadiran per
+							MK
 							<span className="ml-2 text-sm font-normal text-slate-500">
-								[{gradesData.filter(g => g.isAcc).length}/{gradesData.length} ACC]
+								[{gradesData.filter((g) => g.isAcc).length}/{gradesData.length}{" "}
+								ACC]
 							</span>
 						</CardTitle>
 						<div className="flex items-center gap-3 w-full sm:w-auto">
 							{isSuperadmin && (
-								<Button size="sm" onClick={() => setShowAddModal(true)} className="bg-[#0517B0] hover:bg-blue-800 text-white gap-2 h-8">
+								<Button
+									size="sm"
+									onClick={() => setShowAddModal(true)}
+									className="bg-[#0517B0] hover:bg-blue-800 text-white gap-2 h-8"
+								>
 									<PlusCircle className="w-4 h-4" /> Tambah MK
 								</Button>
 							)}
 							{!isSuperadmin && (
-								<Badge variant="outline" className="border-slate-200 text-slate-500 bg-white">
+								<Badge
+									variant="outline"
+									className="border-slate-200 text-slate-500 bg-white"
+								>
 									Dikelola oleh: Dosen MK
 								</Badge>
 							)}
@@ -423,7 +540,6 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 					</div>
 				</CardHeader>
 				<CardContent className="pt-6">
-					
 					{/* TABLE SECTION */}
 					<div className="mb-8">
 						<h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">
@@ -444,47 +560,74 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 								<TableBody>
 									{gradesData.map((g) => {
 										const isEditing = editingId === g.id;
-										const canEditThisRow = (isSuperadmin || (isDosen && user?.id === g.dosenId));
+										const canEditThisRow =
+											isSuperadmin || (isDosen && user?.id === g.dosenId);
 										const isExpanded = expandedRows.has(g.id);
 
-										const rowBgColor = 
-											g.status === "AMAN" ? "bg-emerald-50/50 hover:bg-emerald-50" :
-											g.status === "PERLU_PERHATIAN" ? "bg-amber-50/50 hover:bg-amber-50" :
-											"bg-rose-50/50 hover:bg-rose-50";
+										const rowBgColor =
+											g.status === "AMAN"
+												? "bg-emerald-50/50 hover:bg-emerald-50"
+												: g.status === "PERLU_PERHATIAN"
+													? "bg-amber-50/50 hover:bg-amber-50"
+													: "bg-rose-50/50 hover:bg-rose-50";
 
 										return (
 											<React.Fragment key={g.id}>
-												<TableRow className={`${rowBgColor} ${isExpanded ? 'border-b-0' : ''}`}>
+												<TableRow
+													className={`${rowBgColor} ${isExpanded ? "border-b-0" : ""}`}
+												>
 													<TableCell className="font-medium">
 														<div className="flex items-center gap-2">
-															<button onClick={() => toggleExpand(g.id)} className="text-blue-600 hover:text-blue-800 focus:outline-none">
-																<Badge variant="outline" className="text-[10px] h-5 cursor-pointer hover:bg-blue-50 transition-colors">
-																	{isExpanded ? '▼' : '▶'} Lampiran
+															<button
+																onClick={() => toggleExpand(g.id)}
+																className="text-blue-600 hover:text-blue-800 focus:outline-none"
+															>
+																<Badge
+																	variant="outline"
+																	className="text-[10px] h-5 cursor-pointer hover:bg-blue-50 transition-colors"
+																>
+																	{isExpanded ? "▼" : "▶"} Lampiran
 																</Badge>
 															</button>
 															<div>
 																<div>{g.courseName}</div>
-																<div className="text-xs text-slate-500">{g.courseCode}</div>
+																<div className="text-xs text-slate-500">
+																	{g.courseCode}
+																</div>
 															</div>
 														</div>
 													</TableCell>
-													
+
 													{isEditing ? (
 														<>
 															<TableCell className="text-center">
 																<div className="flex items-center justify-center gap-1">
-																	<Input 
-																		type="number" 
-																		value={editForm.attendanceRate} 
-																		onChange={(e) => setEditForm({...editForm, attendanceRate: Number(e.target.value)})}
+																	<Input
+																		type="number"
+																		value={editForm.attendanceRate}
+																		onChange={(e) =>
+																			setEditForm({
+																				...editForm,
+																				attendanceRate: Number(e.target.value),
+																			})
+																		}
 																		className="w-20 text-center h-8"
-																		min={0} max={100}
+																		min={0}
+																		max={100}
 																	/>
 																	<span className="text-slate-500">%</span>
 																</div>
 															</TableCell>
 															<TableCell className="text-center">
-																<Select value={editForm.grade ?? ""} onValueChange={(val) => setEditForm({...editForm, grade: val as string})}>
+																<Select
+																	value={editForm.grade ?? ""}
+																	onValueChange={(val) =>
+																		setEditForm({
+																			...editForm,
+																			grade: val as string,
+																		})
+																	}
+																>
 																	<SelectTrigger className="w-20 h-8 mx-auto bg-white">
 																		<SelectValue placeholder="Grade" />
 																	</SelectTrigger>
@@ -502,7 +645,15 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																</Select>
 															</TableCell>
 															<TableCell>
-																<Select value={editForm.attitudeNote ?? ""} onValueChange={(val) => setEditForm({...editForm, attitudeNote: val as string})}>
+																<Select
+																	value={editForm.attitudeNote ?? ""}
+																	onValueChange={(val) =>
+																		setEditForm({
+																			...editForm,
+																			attitudeNote: val as string,
+																		})
+																	}
+																>
 																	<SelectTrigger className="w-28 h-8 bg-white">
 																		<SelectValue placeholder="Catatan" />
 																	</SelectTrigger>
@@ -514,15 +665,32 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																</Select>
 															</TableCell>
 															<TableCell className="text-center">
-																<span className="text-slate-400 text-xs italic">Unsaved</span>
+																<span className="text-slate-400 text-xs italic">
+																	Unsaved
+																</span>
 															</TableCell>
 															<TableCell className="text-right">
 																<div className="flex justify-end gap-2">
-																	<Button variant="ghost" size="sm" onClick={handleCancelEdit} className="h-8 px-2 text-slate-500 hover:text-slate-700">
+																	<Button
+																		variant="ghost"
+																		size="sm"
+																		onClick={handleCancelEdit}
+																		className="h-8 px-2 text-slate-500 hover:text-slate-700"
+																	>
 																		<X className="w-4 h-4" />
 																	</Button>
-																	<Button size="sm" onClick={() => handleSaveEdit(g.id)} disabled={savingId === g.id} className="h-8 px-3 bg-blue-600 hover:bg-blue-700">
-																		{savingId === g.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />} Simpan
+																	<Button
+																		size="sm"
+																		onClick={() => handleSaveEdit(g.id)}
+																		disabled={savingId === g.id}
+																		className="h-8 px-3 bg-blue-600 hover:bg-blue-700"
+																	>
+																		{savingId === g.id ? (
+																			<Loader2 className="w-4 h-4 mr-1 animate-spin" />
+																		) : (
+																			<Save className="w-4 h-4 mr-1" />
+																		)}{" "}
+																		Simpan
 																	</Button>
 																</div>
 															</TableCell>
@@ -543,27 +711,43 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																{g.grade || "-"}
 															</TableCell>
 															<TableCell>
-																<span className={
-																	g.attitudeNote === "Baik" ? "text-emerald-700" :
-																	g.attitudeNote === "Cukup" ? "text-amber-700" :
-																	"text-rose-700"
-																}>
+																<span
+																	className={
+																		g.attitudeNote === "Baik"
+																			? "text-emerald-700"
+																			: g.attitudeNote === "Cukup"
+																				? "text-amber-700"
+																				: "text-rose-700"
+																	}
+																>
 																	{g.attitudeNote || "-"}
 																</span>
 															</TableCell>
 															<TableCell className="text-center">
-																{g.status === "AMAN" ? "🟢" : g.status === "PERLU_PERHATIAN" ? "🟡" : "🔴"}
+																{g.status === "AMAN"
+																	? "🟢"
+																	: g.status === "PERLU_PERHATIAN"
+																		? "🟡"
+																		: "🔴"}
 															</TableCell>
 															<TableCell className="text-right">
 																{g.isAcc ? (
-																	<Badge variant="secondary" className="bg-slate-100 text-slate-500 hover:bg-slate-100">
+																	<Badge
+																		variant="secondary"
+																		className="bg-slate-100 text-slate-500 hover:bg-slate-100"
+																	>
 																		🔒 Terkunci
 																	</Badge>
 																) : (
 																	<div className="flex justify-end items-center gap-2">
 																		{canEditThisRow ? (
 																			<>
-																				<Button variant="ghost" size="sm" onClick={() => handleEditClick(g)} className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-50">
+																				<Button
+																					variant="ghost"
+																					size="sm"
+																					onClick={() => handleEditClick(g)}
+																					className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+																				>
 																					<Edit2 className="w-4 h-4" />
 																				</Button>
 																				<AlertDialog>
@@ -571,28 +755,53 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																						ACC
 																					</AlertDialogTrigger>
 																					<AlertDialogContent>
-																						<AlertDialogTitle>ACC Mata Kuliah: {g.courseName}</AlertDialogTitle>
+																						<AlertDialogTitle>
+																							ACC Mata Kuliah: {g.courseName}
+																						</AlertDialogTitle>
 																						<AlertDialogDescription>
-																							Anda akan mengunci nilai untuk mata kuliah ini:
+																							Anda akan mengunci nilai untuk
+																							mata kuliah ini:
 																							<div className="mt-3 bg-slate-50 border rounded-md p-3 space-y-2 mb-3 text-slate-900">
 																								<div className="flex justify-between text-sm">
-																									<span className="text-slate-500">Kehadiran:</span>
-																									<span className="font-bold">{g.attendanceRate}%</span>
+																									<span className="text-slate-500">
+																										Kehadiran:
+																									</span>
+																									<span className="font-bold">
+																										{g.attendanceRate}%
+																									</span>
 																								</div>
 																								<div className="flex justify-between text-sm">
-																									<span className="text-slate-500">Nilai/Grade:</span>
-																									<span className="font-bold text-blue-700">{g.grade || "-"}</span>
+																									<span className="text-slate-500">
+																										Nilai/Grade:
+																									</span>
+																									<span className="font-bold text-blue-700">
+																										{g.grade || "-"}
+																									</span>
 																								</div>
 																								<div className="flex justify-between text-sm">
-																									<span className="text-slate-500">Catatan Sikap:</span>
-																									<span className="font-bold">{g.attitudeNote || "-"}</span>
+																									<span className="text-slate-500">
+																										Catatan Sikap:
+																									</span>
+																									<span className="font-bold">
+																										{g.attitudeNote || "-"}
+																									</span>
 																								</div>
 																							</div>
-																							<span className="text-amber-700 text-sm font-medium">⚠️ Data tidak dapat diubah setelah dikunci!</span>
+																							<span className="text-amber-700 text-sm font-medium">
+																								⚠️ Data tidak dapat diubah
+																								setelah dikunci!
+																							</span>
 																						</AlertDialogDescription>
 																						<div className="flex justify-end gap-3 mt-4">
-																							<AlertDialogCancel>Batal</AlertDialogCancel>
-																							<AlertDialogAction onClick={() => handleAcc(g.id, g.courseName)} className="bg-emerald-600 hover:bg-emerald-700">
+																							<AlertDialogCancel>
+																								Batal
+																							</AlertDialogCancel>
+																							<AlertDialogAction
+																								onClick={() =>
+																									handleAcc(g.id, g.courseName)
+																								}
+																								className="bg-emerald-600 hover:bg-emerald-700"
+																							>
 																								Ya, Kunci Nilai
 																							</AlertDialogAction>
 																						</div>
@@ -602,14 +811,26 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																		) : (
 																			<>
 																				{!isSuperadmin && isDosen && (
-																					<Badge variant="outline" className="text-slate-400 border-slate-300 text-[10px]">🔒 Bukan MK Anda</Badge>
+																					<Badge
+																						variant="outline"
+																						className="text-slate-400 border-slate-300 text-[10px]"
+																					>
+																						🔒 Bukan MK Anda
+																					</Badge>
 																				)}
 																			</>
 																		)}
 
 																		{/* Superadmin can delete if not ACC */}
 																		{isSuperadmin && (
-																			<Button variant="ghost" size="sm" onClick={() => handleDeleteCourse(g.id, g.courseName)} className="h-8 w-8 p-0 text-rose-500 hover:text-rose-700 hover:bg-rose-50">
+																			<Button
+																				variant="ghost"
+																				size="sm"
+																				onClick={() =>
+																					handleDeleteCourse(g.id, g.courseName)
+																				}
+																				className="h-8 w-8 p-0 text-rose-500 hover:text-rose-700 hover:bg-rose-50"
+																			>
 																				<Trash2 className="w-4 h-4" />
 																			</Button>
 																		)}
@@ -619,14 +840,32 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 														</>
 													)}
 												</TableRow>
-												
+
 												{isExpanded && (
 													<TableRow className="bg-slate-50/50">
 														<TableCell colSpan={6} className="p-0">
 															<div className="border-t border-slate-200 py-2">
-																{renderDocumentItem(g.id, g, "Bukti Kehadiran", "attendance_proof", "Daftar hadir/rekap absensi dari Dosen")}
-																{renderDocumentItem(g.id, g, "Kartu Nilai", "grade_card", "Scan nilai UTS/UAS")}
-																{renderDocumentItem(g.id, g, "Surat Dispensasi", "dispensation", "Surat izin ketidakhadiran resmi")}
+																{renderDocumentItem(
+																	g.id,
+																	g,
+																	"Bukti Kehadiran",
+																	"attendance_proof",
+																	"Daftar hadir/rekap absensi dari Dosen",
+																)}
+																{renderDocumentItem(
+																	g.id,
+																	g,
+																	"Kartu Nilai",
+																	"grade_card",
+																	"Scan nilai UTS/UAS",
+																)}
+																{renderDocumentItem(
+																	g.id,
+																	g,
+																	"Surat Dispensasi",
+																	"dispensation",
+																	"Surat izin ketidakhadiran resmi",
+																)}
 															</div>
 														</TableCell>
 													</TableRow>
@@ -636,8 +875,12 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 									})}
 									{gradesData.length === 0 && (
 										<TableRow>
-											<TableCell colSpan={6} className="text-center py-8 text-slate-500">
-												Belum ada data mata kuliah yang di-assign untuk mahasiswa ini.
+											<TableCell
+												colSpan={6}
+												className="text-center py-8 text-slate-500"
+											>
+												Belum ada data mata kuliah yang di-assign untuk
+												mahasiswa ini.
 											</TableCell>
 										</TableRow>
 									)}
@@ -653,21 +896,36 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 						</h3>
 						<div className="bg-slate-50 p-5 rounded-lg border border-slate-200 flex flex-col sm:flex-row gap-6">
 							<div className="flex-1">
-								<p className="text-sm text-slate-500 font-semibold mb-1">GPA Estimasi</p>
-								<div className="text-3xl font-bold text-blue-900">{estimatedGpa}</div>
+								<p className="text-sm text-slate-500 font-semibold mb-1">
+									GPA Estimasi
+								</p>
+								<div className="text-3xl font-bold text-blue-900">
+									{estimatedGpa}
+								</div>
 							</div>
 							<div className="flex-1">
-								<p className="text-sm text-slate-500 font-semibold mb-1">MK Tidak Aman</p>
-								<div className="text-xl font-bold text-rose-700">{badGradeCount}</div>
+								<p className="text-sm text-slate-500 font-semibold mb-1">
+									MK Tidak Aman
+								</p>
+								<div className="text-xl font-bold text-rose-700">
+									{badGradeCount}
+								</div>
 								{badGradeCount > 0 && (
 									<p className="text-xs text-rose-600 mt-1">
-										{gradesData.filter(g => g.status === "TIDAK_AMAN").map(g => g.courseName).join(", ")}
+										{gradesData
+											.filter((g) => g.status === "TIDAK_AMAN")
+											.map((g) => g.courseName)
+											.join(", ")}
 									</p>
 								)}
 							</div>
 							<div className="flex-1">
-								<p className="text-sm text-slate-500 font-semibold mb-1">Catatan Buruk</p>
-								<div className="text-xl font-bold text-amber-700">{badAttitudeCount}</div>
+								<p className="text-sm text-slate-500 font-semibold mb-1">
+									Catatan Buruk
+								</p>
+								<div className="text-xl font-bold text-amber-700">
+									{badAttitudeCount}
+								</div>
 							</div>
 						</div>
 					</div>
@@ -689,7 +947,8 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 											✅ Semua MK Telah di-ACC
 										</h4>
 										<p className="text-sm text-slate-600">
-											Seluruh dosen pengampu telah memberikan nilai dan menyetujui secara final.
+											Seluruh dosen pengampu telah memberikan nilai dan
+											menyetujui secara final.
 										</p>
 									</div>
 								</>
@@ -703,7 +962,10 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 											⏳ Menunggu ACC Dosen
 										</h4>
 										<p className="text-sm text-slate-500 max-w-md">
-											Masih ada {gradesData.length - gradesData.filter(g => g.isAcc).length} mata kuliah yang belum di-ACC oleh dosen pengampu.
+											Masih ada{" "}
+											{gradesData.length -
+												gradesData.filter((g) => g.isAcc).length}{" "}
+											mata kuliah yang belum di-ACC oleh dosen pengampu.
 										</p>
 									</div>
 								</>
@@ -719,39 +981,59 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 					<DialogHeader>
 						<DialogTitle>Tambah Mata Kuliah Baru</DialogTitle>
 						<DialogDescription>
-							Masukkan data mata kuliah dan ID dosen pengampu. (Fitur ini khusus Superadmin).
+							Masukkan data mata kuliah dan ID dosen pengampu. (Fitur ini khusus
+							Superadmin).
 						</DialogDescription>
 					</DialogHeader>
 					<div className="space-y-4 py-4">
 						<div className="space-y-2">
-							<label className="text-sm font-medium text-slate-700">Kode Mata Kuliah</label>
-							<Input 
-								placeholder="e.g. IT-101" 
+							<label className="text-sm font-medium text-slate-700">
+								Kode Mata Kuliah
+							</label>
+							<Input
+								placeholder="e.g. IT-101"
 								value={newMK.courseCode}
-								onChange={(e) => setNewMK({ ...newMK, courseCode: e.target.value })}
+								onChange={(e) =>
+									setNewMK({ ...newMK, courseCode: e.target.value })
+								}
 							/>
 						</div>
 						<div className="space-y-2">
-							<label className="text-sm font-medium text-slate-700">Nama Mata Kuliah</label>
-							<Input 
-								placeholder="e.g. Pemrograman Dasar" 
+							<label className="text-sm font-medium text-slate-700">
+								Nama Mata Kuliah
+							</label>
+							<Input
+								placeholder="e.g. Pemrograman Dasar"
 								value={newMK.courseName}
-								onChange={(e) => setNewMK({ ...newMK, courseName: e.target.value })}
+								onChange={(e) =>
+									setNewMK({ ...newMK, courseName: e.target.value })
+								}
 							/>
 						</div>
 						<div className="space-y-2">
-							<label className="text-sm font-medium text-slate-700">ID Dosen Pengampu</label>
-							<Input 
+							<label className="text-sm font-medium text-slate-700">
+								ID Dosen Pengampu
+							</label>
+							<Input
 								type="number"
-								placeholder="ID User Dosen" 
+								placeholder="ID User Dosen"
 								value={newMK.dosenId || ""}
-								onChange={(e) => setNewMK({ ...newMK, dosenId: parseInt(e.target.value) || 0 })}
+								onChange={(e) =>
+									setNewMK({ ...newMK, dosenId: parseInt(e.target.value) || 0 })
+								}
 							/>
 						</div>
 					</div>
 					<DialogFooter>
-						<Button variant="outline" onClick={() => setShowAddModal(false)}>Batal</Button>
-						<Button onClick={handleAddMK} className="bg-[#0517B0] hover:bg-blue-800 text-white">Simpan MK</Button>
+						<Button variant="outline" onClick={() => setShowAddModal(false)}>
+							Batal
+						</Button>
+						<Button
+							onClick={handleAddMK}
+							className="bg-[#0517B0] hover:bg-blue-800 text-white"
+						>
+							Simpan MK
+						</Button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>

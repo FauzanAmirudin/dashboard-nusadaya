@@ -3,10 +3,10 @@
 import {
 	CheckCircle,
 	Clock,
-	Users,
-	XCircle,
 	Download,
 	LayoutDashboard,
+	Users,
+	XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -31,13 +31,24 @@ import {
 
 const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
 
-export function AkademikDashboard({ data, searchQuery, setSearchQuery, user }: any) {
+export function AkademikDashboard({
+	data,
+	searchQuery,
+	setSearchQuery,
+	user,
+}: any) {
 	const router = useRouter();
 
 	const totalStudents = data.length;
-	const countAman = data.filter((s: any) => s.academic?.status === "AMAN").length;
-	const countPerhatian = data.filter((s: any) => s.academic?.status === "PERLU_PERHATIAN" || !s.academic?.status).length;
-	const countTidakAman = data.filter((s: any) => s.academic?.status === "TIDAK_AMAN").length;
+	const countAman = data.filter(
+		(s: any) => s.academic?.status === "AMAN",
+	).length;
+	const countPerhatian = data.filter(
+		(s: any) => s.academic?.status === "PERLU_PERHATIAN" || !s.academic?.status,
+	).length;
+	const countTidakAman = data.filter(
+		(s: any) => s.academic?.status === "TIDAK_AMAN",
+	).length;
 
 	const pieData = [
 		{ name: "Aman", value: countAman },
@@ -53,12 +64,24 @@ export function AkademikDashboard({ data, searchQuery, setSearchQuery, user }: a
 
 	const renderStatusBadge = (status: string | null | undefined) => {
 		if (status === "AMAN") {
-			return <Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/10">🟢 Aman</Badge>;
+			return (
+				<Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/10">
+					🟢 Aman
+				</Badge>
+			);
 		}
 		if (status === "TIDAK_AMAN") {
-			return <Badge className="bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/10">🔴 Tdk Aman</Badge>;
+			return (
+				<Badge className="bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/10">
+					🔴 Tdk Aman
+				</Badge>
+			);
 		}
-		return <Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/10">🟡 Perhatian</Badge>;
+		return (
+			<Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/10">
+				🟡 Perhatian
+			</Badge>
+		);
 	};
 
 	const getGpaGrade = (gpaScaled: number) => {
@@ -80,7 +103,8 @@ export function AkademikDashboard({ data, searchQuery, setSearchQuery, user }: a
 						Dashboard Divisi Akademik
 					</h1>
 					<p className="text-slate-500 mt-1 text-sm">
-						Selamat datang, {user.username}. Berikut ringkasan status akademik dan kehadiran mahasiswa.
+						Selamat datang, {user.username}. Berikut ringkasan status akademik
+						dan kehadiran mahasiswa.
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
@@ -102,8 +126,12 @@ export function AkademikDashboard({ data, searchQuery, setSearchQuery, user }: a
 							<Users className="h-6 w-6" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">Total Mahasiswa</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">{totalStudents}</p>
+							<p className="text-slate-500 text-sm font-medium">
+								Total Mahasiswa
+							</p>
+							<p className="text-3xl font-bold text-slate-900 mt-1">
+								{totalStudents}
+							</p>
 						</div>
 					</CardContent>
 				</Card>
@@ -113,8 +141,12 @@ export function AkademikDashboard({ data, searchQuery, setSearchQuery, user }: a
 							<CheckCircle className="h-6 w-6" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">Kepatuhan Akademik (Aman)</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">{countAman}</p>
+							<p className="text-slate-500 text-sm font-medium">
+								Kepatuhan Akademik (Aman)
+							</p>
+							<p className="text-3xl font-bold text-slate-900 mt-1">
+								{countAman}
+							</p>
 						</div>
 					</CardContent>
 				</Card>
@@ -124,8 +156,12 @@ export function AkademikDashboard({ data, searchQuery, setSearchQuery, user }: a
 							<Clock className="h-6 w-6" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">Akademik Proses (Perhatian)</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">{countPerhatian}</p>
+							<p className="text-slate-500 text-sm font-medium">
+								Akademik Proses (Perhatian)
+							</p>
+							<p className="text-3xl font-bold text-slate-900 mt-1">
+								{countPerhatian}
+							</p>
 						</div>
 					</CardContent>
 				</Card>
@@ -135,8 +171,12 @@ export function AkademikDashboard({ data, searchQuery, setSearchQuery, user }: a
 							<XCircle className="h-6 w-6" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">Masalah Akademik</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">{countTidakAman}</p>
+							<p className="text-slate-500 text-sm font-medium">
+								Masalah Akademik
+							</p>
+							<p className="text-3xl font-bold text-slate-900 mt-1">
+								{countTidakAman}
+							</p>
 						</div>
 					</CardContent>
 				</Card>
@@ -163,11 +203,18 @@ export function AkademikDashboard({ data, searchQuery, setSearchQuery, user }: a
 										dataKey="value"
 									>
 										{pieData.map((entry, index) => (
-											<Cell key={`cell-${entry.name}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+											<Cell
+												key={`cell-${entry.name}`}
+												fill={PIE_COLORS[index % PIE_COLORS.length]}
+											/>
 										))}
 									</Pie>
 									<RechartsTooltip
-										contentStyle={{ backgroundColor: "#ffffff", borderColor: "#e2e8f0", color: "#0f172a" }}
+										contentStyle={{
+											backgroundColor: "#ffffff",
+											borderColor: "#e2e8f0",
+											color: "#0f172a",
+										}}
 										itemStyle={{ color: "#0f172a" }}
 									/>
 									<Legend verticalAlign="bottom" height={36} />
@@ -176,11 +223,13 @@ export function AkademikDashboard({ data, searchQuery, setSearchQuery, user }: a
 						</div>
 					</CardContent>
 				</Card>
-				
+
 				{/* List Mahasiswa dengan Kendala */}
 				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-2">
 					<CardHeader>
-						<CardTitle className="text-slate-800">Tabel Status Akademik Mahasiswa</CardTitle>
+						<CardTitle className="text-slate-800">
+							Tabel Status Akademik Mahasiswa
+						</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<div className="mb-4">
@@ -195,21 +244,39 @@ export function AkademikDashboard({ data, searchQuery, setSearchQuery, user }: a
 							<Table>
 								<TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
 									<TableRow className="border-slate-200 hover:bg-slate-50">
-										<TableHead className="text-slate-500 font-semibold py-3">NIM</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3">Nama Lengkap</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3 text-center">Kehadiran</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3 text-center">IPK / Grade</TableHead>
-										<TableHead className="text-slate-500 font-semibold text-center py-3">Status</TableHead>
-										<TableHead className="text-slate-500 font-semibold text-right py-3 pr-4">Aksi</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3">
+											NIM
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3">
+											Nama Lengkap
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3 text-center">
+											Kehadiran
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3 text-center">
+											IPK / Grade
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold text-center py-3">
+											Status
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold text-right py-3 pr-4">
+											Aksi
+										</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
 									{filteredData.map((s: any) => {
 										const attendanceTotal = s.academic?.attendanceTotal || 0;
-										const attendancePresent = s.academic?.attendancePresent || 0;
-										const attPct = attendanceTotal > 0 ? Math.round((attendancePresent / attendanceTotal) * 100) : 0;
+										const attendancePresent =
+											s.academic?.attendancePresent || 0;
+										const attPct =
+											attendanceTotal > 0
+												? Math.round(
+														(attendancePresent / attendanceTotal) * 100,
+													)
+												: 0;
 										const isPassed = attPct >= 70;
-										
+
 										const gpa = s.academic?.gpa || 0;
 										const gpaStr = (gpa / 100).toFixed(2);
 										const grade = getGpaGrade(gpa);
@@ -219,11 +286,17 @@ export function AkademikDashboard({ data, searchQuery, setSearchQuery, user }: a
 												key={s.student.id}
 												className="border-slate-200 hover:bg-blue-50/50 transition-colors"
 											>
-												<TableCell className="font-medium text-slate-700">{s.student.nim}</TableCell>
-												<TableCell className="text-slate-900 font-semibold">{s.student.name}</TableCell>
+												<TableCell className="font-medium text-slate-700">
+													{s.student.nim}
+												</TableCell>
+												<TableCell className="text-slate-900 font-semibold">
+													{s.student.name}
+												</TableCell>
 												<TableCell className="text-center">
 													{attendanceTotal > 0 ? (
-														<span className={`text-sm font-bold ${isPassed ? 'text-emerald-600' : 'text-rose-600'}`}>
+														<span
+															className={`text-sm font-bold ${isPassed ? "text-emerald-600" : "text-rose-600"}`}
+														>
 															{attPct}%
 														</span>
 													) : (
@@ -232,7 +305,9 @@ export function AkademikDashboard({ data, searchQuery, setSearchQuery, user }: a
 												</TableCell>
 												<TableCell className="text-center">
 													{gpa > 0 ? (
-														<span className="text-sm font-semibold text-blue-700">{gpaStr} ({grade})</span>
+														<span className="text-sm font-semibold text-blue-700">
+															{gpaStr} ({grade})
+														</span>
 													) : (
 														<span className="text-xs text-slate-400">-</span>
 													)}
@@ -243,7 +318,11 @@ export function AkademikDashboard({ data, searchQuery, setSearchQuery, user }: a
 												<TableCell className="text-right pr-4">
 													<button
 														type="button"
-														onClick={() => router.push(`/dashboard/students/${s.student.id}#panel-akademik`)}
+														onClick={() =>
+															router.push(
+																`/dashboard/students/${s.student.id}#panel-akademik`,
+															)
+														}
 														className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
 													>
 														Periksa

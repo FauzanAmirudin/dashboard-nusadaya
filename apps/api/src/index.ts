@@ -1,17 +1,18 @@
 import { cookie } from "@elysiajs/cookie";
-import { jwt as elysiaJwt } from "@elysiajs/jwt";
 import { cors } from "@elysiajs/cors";
+import { jwt as elysiaJwt } from "@elysiajs/jwt";
 import { swagger } from "@elysiajs/swagger";
 import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "./db";
 import { users } from "./db/schema";
-import { studentsRouter } from "./routes/students";
 import { dosenRouter } from "./routes/dosen";
-import { paRouter } from "./routes/pa";
 import { magangRouter } from "./routes/magang";
+import { paRouter } from "./routes/pa";
+import { studentsRouter } from "./routes/students";
 
-const JWT_SECRET = process.env.JWT_SECRET || "super_secret_jwt_key_nusadaya_2026";
+const JWT_SECRET =
+	process.env.JWT_SECRET || "super_secret_jwt_key_nusadaya_2026";
 
 const app = new Elysia()
 	.use(
@@ -38,14 +39,18 @@ const app = new Elysia()
 			const token = authHeader.slice(7);
 			const profile = await jwt.verify(token);
 			if (profile) {
-				return { user: profile as { id: number; username: string; role: string } };
+				return {
+					user: profile as { id: number; username: string; role: string },
+				};
 			}
 		}
 		// 2. Fallback: httpOnly cookie (same-origin)
 		if (auth.value) {
 			const profile = await jwt.verify(auth.value as string);
 			if (profile) {
-				return { user: profile as { id: number; username: string; role: string } };
+				return {
+					user: profile as { id: number; username: string; role: string },
+				};
 			}
 		}
 		return { user: null };
@@ -69,14 +74,21 @@ const app = new Elysia()
 						return { success: false, message: "Username atau password salah." };
 					}
 
-					// @ts-ignore - Bun is globally available in the runtime
-					const isPasswordValid = await Bun.password.verify(password, user.passwordHash);
+					// @ts-expect-error - Bun is globally available in the runtime
+					const isPasswordValid = await Bun.password.verify(
+						password,
+						user.passwordHash,
+					);
 					if (!isPasswordValid) {
 						set.status = 401;
 						return { success: false, message: "Username atau password salah." };
 					}
 
-					const jwtPayload = { id: user.id, username: user.username, role: user.role };
+					const jwtPayload = {
+						id: user.id,
+						username: user.username,
+						role: user.role,
+					};
 					const token = await jwt.sign(jwtPayload);
 
 					auth.set({

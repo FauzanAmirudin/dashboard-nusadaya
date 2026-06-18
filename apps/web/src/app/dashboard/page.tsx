@@ -74,13 +74,13 @@ const STATUS_COLORS = {
 
 const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
 
-import { PmbDashboard } from "@/components/dashboards/PmbDashboard";
-import { CrmDashboard } from "@/components/dashboards/CrmDashboard";
 import { AkademikDashboard } from "@/components/dashboards/AkademikDashboard";
+import { CrmDashboard } from "@/components/dashboards/CrmDashboard";
 import { DosenDashboard } from "@/components/dashboards/DosenDashboard";
-import { PaDashboard } from "@/components/dashboards/PaDashboard";
-import { MagangDashboard } from "@/components/dashboards/MagangDashboard";
 import { FinanceDashboard } from "@/components/dashboards/FinanceDashboard";
+import { MagangDashboard } from "@/components/dashboards/MagangDashboard";
+import { PaDashboard } from "@/components/dashboards/PaDashboard";
+import { PmbDashboard } from "@/components/dashboards/PmbDashboard";
 
 export default function DashboardPage() {
 	const router = useRouter();
@@ -119,13 +119,53 @@ export default function DashboardPage() {
 		);
 	}
 
-	if (user?.role === "pmb") return <PmbDashboard data={data} searchQuery={searchQuery} setSearchQuery={setSearchQuery} user={user} />;
-	if (user?.role === "crm") return <CrmDashboard data={data} searchQuery={searchQuery} setSearchQuery={setSearchQuery} user={user} />;
-	if (user?.role === "akademik") return <AkademikDashboard data={data} searchQuery={searchQuery} setSearchQuery={setSearchQuery} user={user} />;
+	if (user?.role === "pmb")
+		return (
+			<PmbDashboard
+				data={data}
+				searchQuery={searchQuery}
+				setSearchQuery={setSearchQuery}
+				user={user}
+			/>
+		);
+	if (user?.role === "crm")
+		return (
+			<CrmDashboard
+				data={data}
+				searchQuery={searchQuery}
+				setSearchQuery={setSearchQuery}
+				user={user}
+			/>
+		);
+	if (user?.role === "akademik")
+		return (
+			<AkademikDashboard
+				data={data}
+				searchQuery={searchQuery}
+				setSearchQuery={setSearchQuery}
+				user={user}
+			/>
+		);
 	if (user?.role === "dosen") return <DosenDashboard user={user!} />;
-	if (user?.role === "pa") return <PaDashboard data={data} searchQuery={searchQuery} setSearchQuery={setSearchQuery} user={user} />;
+	if (user?.role === "pa")
+		return (
+			<PaDashboard
+				data={data}
+				searchQuery={searchQuery}
+				setSearchQuery={setSearchQuery}
+				user={user}
+			/>
+		);
 	if (user?.role === "magang") return <MagangDashboard />;
-	if (user?.role === "finance") return <FinanceDashboard data={data} searchQuery={searchQuery} setSearchQuery={setSearchQuery} user={user} />;
+	if (user?.role === "finance")
+		return (
+			<FinanceDashboard
+				data={data}
+				searchQuery={searchQuery}
+				setSearchQuery={setSearchQuery}
+				user={user}
+			/>
+		);
 
 	// Calculate KPIs
 	const totalStudents = data.length;
@@ -241,7 +281,9 @@ export default function DashboardPage() {
 						</div>
 						<div>
 							<p className="text-slate-500 text-sm font-medium">🟢 Aman</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">{countAman}</p>
+							<p className="text-3xl font-bold text-slate-900 mt-1">
+								{countAman}
+							</p>
 						</div>
 					</CardContent>
 				</Card>

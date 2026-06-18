@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Bell, ChevronDown, LogOut, Menu, User } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -59,7 +59,8 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
 		mounted && user?.role
 			? (ROLE_COLORS[user.role] ?? ROLE_COLORS.superadmin)
 			: "";
-	const initials = mounted && user?.username ? getInitials(user.username) : "NA";
+	const initials =
+		mounted && user?.username ? getInitials(user.username) : "NA";
 
 	return (
 		<header className="h-16 bg-white border-b border-slate-200 sticky top-0 z-30 flex items-center justify-between px-4 lg:px-6 shrink-0">

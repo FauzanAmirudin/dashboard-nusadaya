@@ -1,7 +1,16 @@
 "use client";
 
-import { CheckCircle, Clock, XCircle, AlertTriangle, Loader2, Eye, Trash2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import {
+	AlertTriangle,
+	CheckCircle,
+	Clock,
+	Eye,
+	Loader2,
+	Trash2,
+	XCircle,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -15,9 +24,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import {
 	Tooltip,
 	TooltipContent,
@@ -26,7 +35,6 @@ import {
 } from "@/components/ui/tooltip";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
-import { toast } from "sonner";
 
 interface DocFile {
 	id: number;
@@ -47,7 +55,8 @@ interface AkademikPanelProps {
 
 export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 	const { user } = useAuthStore();
-	const isAkademikAdmin = user?.role === "akademik";
+	const isAkademikAdmin =
+		user?.role === "akademik" || user?.role === "superadmin";
 	const isSuperadmin = user?.role === "superadmin";
 	const canEdit = isAkademikAdmin || isSuperadmin;
 
@@ -79,7 +88,8 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 
 	const fetchAcademicData = async () => {
 		try {
-			const { data, error } = await api.students[studentId.toString()].academic.get();
+			const { data, error } =
+				await api.students[studentId.toString()].academic.get();
 			if (!error && data?.success) {
 				setAcadState(data.data);
 			}
@@ -92,7 +102,8 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 
 	const fetchDocuments = async () => {
 		try {
-			const { data, error } = await api.students[studentId.toString()].academic.documents.get();
+			const { data, error } =
+				await api.students[studentId.toString()].academic.documents.get();
 			if (!error && data?.success) {
 				setDocuments(data.data as Record<string, DocFile[]>);
 			}
@@ -125,9 +136,12 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 		}
 	}, [acadState]);
 
-	const attendancePercentage = attendance.attendanceTotal > 0
-		? Math.round((attendance.attendancePresent / attendance.attendanceTotal) * 100)
-		: 0;
+	const attendancePercentage =
+		attendance.attendanceTotal > 0
+			? Math.round(
+					(attendance.attendancePresent / attendance.attendanceTotal) * 100,
+				)
+			: 0;
 
 	const isAttendancePassed = attendancePercentage >= 70;
 
@@ -215,11 +229,13 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 	const handleCheckboxChange = async (id: string, checked: boolean) => {
 		if (!canEdit) return;
 		const prevState = { ...localChecks };
-		setLocalChecks(prev => ({ ...prev, [id]: checked }));
+		setLocalChecks((prev) => ({ ...prev, [id]: checked }));
 		setLoadingItem(id);
 
 		try {
-			const { error } = await api.students[studentId.toString()].academic.patch({ [id]: checked });
+			const { error } = await api.students[studentId.toString()].academic.patch(
+				{ [id]: checked },
+			);
 			if (!error) {
 				toast.success("Berhasil disimpan");
 				fetchAcademicData();
@@ -241,11 +257,13 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 		setIsSavingAttendance(true);
 
 		try {
-			const { error } = await api.students[studentId.toString()].academic.patch({
-				attendanceTotal: attendance.attendanceTotal,
-				attendancePresent: attendance.attendancePresent,
-				attendanceAlphaNote: attendance.attendanceAlphaNote
-			});
+			const { error } = await api.students[studentId.toString()].academic.patch(
+				{
+					attendanceTotal: attendance.attendanceTotal,
+					attendancePresent: attendance.attendancePresent,
+					attendanceAlphaNote: attendance.attendanceAlphaNote,
+				},
+			);
 			if (!error) {
 				toast.success("Data kehadiran berhasil disimpan");
 				fetchAcademicData();
@@ -264,7 +282,9 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 		if (!canEdit) return;
 		setIsSavingNotes(true);
 		try {
-			const { error } = await api.students[studentId.toString()].academic.patch({ notes });
+			const { error } = await api.students[studentId.toString()].academic.patch(
+				{ notes },
+			);
 			if (!error) {
 				toast.success("Catatan akademik disimpan");
 				fetchAcademicData();
@@ -282,7 +302,9 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 	const handleAcc = async () => {
 		if (!isAkademikAdmin && !isSuperadmin) return;
 		try {
-			const { error } = await api.students[studentId.toString()].academic.acc.post({});
+			const { error } = await api.students[
+				studentId.toString()
+			].academic.acc.post({});
 			if (!error) {
 				toast.success("ACC Akademik berhasil dicatat");
 				fetchAcademicData();
@@ -295,14 +317,36 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 		}
 	};
 
+	const handleCancelAcc = async () => {
+		if (!isAkademikAdmin && !isSuperadmin) return;
+		setIsSavingNotes(true);
+		try {
+			const { error } =
+				await api.students[studentId.toString()].academic.acc.delete();
+			if (error) throw new Error("Gagal membatalkan ACC");
+			toast.success("ACC Akademik berhasil dibatalkan");
+			fetchAcademicData();
+			onUpdate();
+		} catch {
+			toast.error("Gagal membatalkan ACC");
+		} finally {
+			setIsSavingNotes(false);
+		}
+	};
+
 	const handleViewDocument = (docId: number) => {
-		window.open(`${API_URL}/students/${studentId}/academic/documents/${docId}/download`, '_blank');
+		window.open(
+			`${API_URL}/students/${studentId}/academic/documents/${docId}/download`,
+			"_blank",
+		);
 	};
 
 	const handleVerifyDocument = async (docId: number) => {
 		if (!canEdit) return;
 		try {
-			const { error } = await api.students[studentId.toString()].academic.documents[docId.toString()].verify.patch({});
+			const { error } = await api.students[
+				studentId.toString()
+			].academic.documents[docId.toString()].verify.patch({});
 			if (!error) {
 				toast.success("Dokumen ditandai terverifikasi");
 				fetchDocuments();
@@ -318,7 +362,10 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 		if (!canEdit) return;
 		if (!confirm("Apakah Anda yakin ingin menghapus file ini?")) return;
 		try {
-			const { error } = await api.students[studentId.toString()].academic.documents[docId.toString()].delete();
+			const { error } =
+				await api.students[studentId.toString()].academic.documents[
+					docId.toString()
+				].delete();
 			if (!error) {
 				toast.success("Dokumen berhasil dihapus");
 				fetchDocuments();
@@ -365,7 +412,10 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 							</span>
 						</CardTitle>
 						<div className="flex items-center gap-3">
-							<Badge variant="outline" className="border-slate-200 text-slate-500 bg-white">
+							<Badge
+								variant="outline"
+								className="border-slate-200 text-slate-500 bg-white"
+							>
 								Dikelola oleh: Admin Akademik
 							</Badge>
 							{statusBadge}
@@ -379,28 +429,47 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 							INDIKATOR KEPATUHAN UTAMA
 						</h3>
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-							<div className={`p-4 rounded-xl border ${pddiktiOk ? "bg-emerald-950/10 border-emerald-500/30" : "bg-rose-950/10 border-rose-500/30"}`}>
-								<p className="text-xs font-bold text-slate-500 uppercase mb-1">PDDIKTI Input</p>
-								<h4 className={`text-lg font-bold mb-1 ${pddiktiOk ? "text-emerald-700" : "text-rose-700"}`}>
+							<div
+								className={`p-4 rounded-xl border ${pddiktiOk ? "bg-emerald-950/10 border-emerald-500/30" : "bg-rose-950/10 border-rose-500/30"}`}
+							>
+								<p className="text-xs font-bold text-slate-500 uppercase mb-1">
+									PDDIKTI Input
+								</p>
+								<h4
+									className={`text-lg font-bold mb-1 ${pddiktiOk ? "text-emerald-700" : "text-rose-700"}`}
+								>
 									{pddiktiOk ? "✅ SELESAI" : "❌ BELUM"}
 								</h4>
-								<p className={`text-sm font-semibold ${pddiktiOk ? "text-emerald-700" : "text-rose-700"}`}>
+								<p
+									className={`text-sm font-semibold ${pddiktiOk ? "text-emerald-700" : "text-rose-700"}`}
+								>
 									Sinkronisasi Data
 								</p>
 							</div>
 
-							<div className={`p-4 rounded-xl border ${isAttendancePassed ? "bg-emerald-950/10 border-emerald-500/30" : attendancePercentage > 50 ? "bg-amber-950/10 border-amber-500/30" : "bg-rose-950/10 border-rose-500/30"}`}>
-								<p className="text-xs font-bold text-slate-500 uppercase mb-1">Kehadiran Kelas</p>
-								<h4 className={`text-lg font-bold mb-1 ${isAttendancePassed ? "text-emerald-700" : attendancePercentage > 50 ? "text-amber-700" : "text-rose-700"}`}>
-									{attendancePercentage}% {isAttendancePassed ? "▲ AMAN" : "▼ KURANG"}
+							<div
+								className={`p-4 rounded-xl border ${isAttendancePassed ? "bg-emerald-950/10 border-emerald-500/30" : attendancePercentage > 50 ? "bg-amber-950/10 border-amber-500/30" : "bg-rose-950/10 border-rose-500/30"}`}
+							>
+								<p className="text-xs font-bold text-slate-500 uppercase mb-1">
+									Kehadiran Kelas
+								</p>
+								<h4
+									className={`text-lg font-bold mb-1 ${isAttendancePassed ? "text-emerald-700" : attendancePercentage > 50 ? "text-amber-700" : "text-rose-700"}`}
+								>
+									{attendancePercentage}%{" "}
+									{isAttendancePassed ? "▲ AMAN" : "▼ KURANG"}
 								</h4>
-								<p className={`text-sm font-semibold ${isAttendancePassed ? "text-emerald-700" : attendancePercentage > 50 ? "text-amber-700" : "text-rose-700"}`}>
+								<p
+									className={`text-sm font-semibold ${isAttendancePassed ? "text-emerald-700" : attendancePercentage > 50 ? "text-amber-700" : "text-rose-700"}`}
+								>
 									Min. 70%
 								</p>
 							</div>
 
 							<div className="p-4 rounded-xl border bg-blue-950/10 border-blue-500/30">
-								<p className="text-xs font-bold text-slate-500 uppercase mb-1">Nilai Rata-rata</p>
+								<p className="text-xs font-bold text-slate-500 uppercase mb-1">
+									Nilai Rata-rata
+								</p>
 								<h4 className="text-lg font-bold mb-1 text-blue-700">
 									{gpaGrade} ({gpaDisplay})
 								</h4>
@@ -421,21 +490,35 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 								<div className="flex flex-col gap-4">
 									<div className="flex gap-4">
 										<div className="flex-1">
-											<label className="text-xs font-semibold text-slate-500 mb-1 block">Total Pertemuan</label>
-											<Input 
-												type="number" 
-												value={attendance.attendanceTotal} 
-												onChange={e => setAttendance({...attendance, attendanceTotal: Number(e.target.value)})}
+											<label className="text-xs font-semibold text-slate-500 mb-1 block">
+												Total Pertemuan
+											</label>
+											<Input
+												type="number"
+												value={attendance.attendanceTotal}
+												onChange={(e) =>
+													setAttendance({
+														...attendance,
+														attendanceTotal: Number(e.target.value),
+													})
+												}
 												disabled={!canEdit}
 												className="font-bold text-slate-700 bg-white"
 											/>
 										</div>
 										<div className="flex-1">
-											<label className="text-xs font-semibold text-slate-500 mb-1 block">Hadir</label>
-											<Input 
-												type="number" 
-												value={attendance.attendancePresent} 
-												onChange={e => setAttendance({...attendance, attendancePresent: Number(e.target.value)})}
+											<label className="text-xs font-semibold text-slate-500 mb-1 block">
+												Hadir
+											</label>
+											<Input
+												type="number"
+												value={attendance.attendancePresent}
+												onChange={(e) =>
+													setAttendance({
+														...attendance,
+														attendancePresent: Number(e.target.value),
+													})
+												}
 												disabled={!canEdit}
 												className="font-bold text-slate-700 bg-white"
 											/>
@@ -443,19 +526,42 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 									</div>
 									<div>
 										<div className="flex justify-between items-center mb-1">
-											<label className="text-xs font-semibold text-slate-500">Persentase</label>
-											<span className={`text-sm font-bold ${isAttendancePassed ? "text-emerald-600" : "text-rose-600"}`}>{attendancePercentage}%</span>
+											<label className="text-xs font-semibold text-slate-500">
+												Persentase
+											</label>
+											<span
+												className={`text-sm font-bold ${isAttendancePassed ? "text-emerald-600" : "text-rose-600"}`}
+											>
+												{attendancePercentage}%
+											</span>
 										</div>
-										<Progress value={attendancePercentage} className="h-3 bg-slate-200" indicatorClassName={isAttendancePassed ? "bg-emerald-500" : "bg-rose-500"} />
-										<p className="text-xs text-slate-400 mt-1">{isAttendancePassed ? "Memenuhi syarat min. 70%" : "Belum memenuhi syarat min. 70%"}</p>
+										<Progress
+											value={attendancePercentage}
+											className="h-3 bg-slate-200"
+											indicatorClassName={
+												isAttendancePassed ? "bg-emerald-500" : "bg-rose-500"
+											}
+										/>
+										<p className="text-xs text-slate-400 mt-1">
+											{isAttendancePassed
+												? "Memenuhi syarat min. 70%"
+												: "Belum memenuhi syarat min. 70%"}
+										</p>
 									</div>
 								</div>
 								<div className="flex flex-col">
-									<label className="text-xs font-semibold text-slate-500 mb-1 block">Keterangan Alpha / Izin</label>
-									<Textarea 
+									<label className="text-xs font-semibold text-slate-500 mb-1 block">
+										Keterangan Alpha / Izin
+									</label>
+									<Textarea
 										placeholder="Catat keterangan absensi jika diperlukan..."
 										value={attendance.attendanceAlphaNote}
-										onChange={e => setAttendance({...attendance, attendanceAlphaNote: e.target.value})}
+										onChange={(e) =>
+											setAttendance({
+												...attendance,
+												attendanceAlphaNote: e.target.value,
+											})
+										}
 										disabled={!canEdit}
 										className="flex-1 resize-none bg-white"
 									/>
@@ -463,8 +569,15 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 							</div>
 							{canEdit && (
 								<div className="mt-4 flex justify-end">
-									<Button variant="secondary" onClick={handleSaveAttendance} disabled={isSavingAttendance} className="text-[#0517B0] bg-[#0517B0]/10 hover:bg-[#0517B0]/20">
-										{isSavingAttendance && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+									<Button
+										variant="secondary"
+										onClick={handleSaveAttendance}
+										disabled={isSavingAttendance}
+										className="text-[#0517B0] bg-[#0517B0]/10 hover:bg-[#0517B0]/20"
+									>
+										{isSavingAttendance && (
+											<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+										)}
 										Simpan Kehadiran
 									</Button>
 								</div>
@@ -481,12 +594,15 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 							{checklist.map((item) => {
 								const itemDocs = documents[item.documentKey as string] || [];
 								return (
-									<div key={item.id} className="flex flex-col bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+									<div
+										key={item.id}
+										className="flex flex-col bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm"
+									>
 										<div
 											className={`flex items-center gap-4 p-4 transition-colors ${
 												item.checked
 													? "bg-emerald-50/50"
-													: item.auto 
+													: item.auto
 														? "bg-slate-50"
 														: "bg-white hover:bg-slate-50/50"
 											}`}
@@ -494,39 +610,51 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 											<Checkbox
 												id={item.id}
 												checked={item.checked}
-												onCheckedChange={(c) => !item.auto && handleCheckboxChange(item.id, c as boolean)}
-												disabled={!canEdit || item.auto || loadingItem === item.id}
+												onCheckedChange={(c) =>
+													!item.auto &&
+													handleCheckboxChange(item.id, c as boolean)
+												}
+												disabled={
+													!canEdit || item.auto || loadingItem === item.id
+												}
 												className={`w-6 h-6 rounded-md transition-all ${
 													item.checked
 														? "data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
 														: ""
 												}`}
 											/>
-											<div className="flex-1">
-												<label
-													htmlFor={item.id}
-													className={`text-base font-semibold flex items-center cursor-pointer ${
+											<label
+												htmlFor={item.id}
+												className={`flex-1 cursor-pointer block ${item.auto ? "cursor-default pointer-events-none" : ""}`}
+											>
+												<div
+													className={`text-base font-semibold flex items-center ${
 														item.checked ? "text-emerald-900" : "text-slate-700"
 													}`}
 												>
 													{item.label}
 													{item.auto && (
-														<Badge variant="outline" className="ml-2 text-[10px] text-slate-500 border-slate-300">
+														<Badge
+															variant="outline"
+															className="ml-2 text-[10px] text-slate-500 border-slate-300"
+														>
 															⚡ Otomatis
 														</Badge>
 													)}
 													{loadingItem === item.id && (
 														<Loader2 className="w-4 h-4 text-emerald-600 animate-spin ml-2" />
 													)}
-												</label>
+												</div>
 												<p
 													className={`text-sm ${
-														item.checked ? "text-emerald-700/80" : "text-slate-500"
+														item.checked
+															? "text-emerald-700/80"
+															: "text-slate-500"
 													}`}
 												>
 													{item.desc}
 												</p>
-											</div>
+											</label>
 											<div>
 												{item.checked ? (
 													<CheckCircle className="w-6 h-6 text-emerald-500" />
@@ -550,17 +678,29 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 												{itemDocs.length > 0 ? (
 													<div className="space-y-2">
 														{itemDocs.map((doc) => (
-															<div key={doc.id} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-md">
+															<div
+																key={doc.id}
+																className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-md"
+															>
 																<div className="flex items-center gap-3 overflow-hidden">
 																	<div className="flex flex-col">
-																		<span className="text-sm font-medium text-slate-700 truncate">{doc.fileName}</span>
+																		<span className="text-sm font-medium text-slate-700 truncate">
+																			{doc.fileName}
+																		</span>
 																		<span className="text-xs text-slate-400">
-																			Diunggah {new Date(doc.uploadedAt).toLocaleDateString('id-ID')}
+																			Diunggah{" "}
+																			{new Date(
+																				doc.uploadedAt,
+																			).toLocaleDateString("id-ID")}
 																		</span>
 																	</div>
 																	{doc.isVerified && (
-																		<Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none text-[10px] px-2 py-0 h-5">
-																			<CheckCircle className="w-3 h-3 mr-1" /> Terverifikasi
+																		<Badge
+																			variant="secondary"
+																			className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none text-[10px] px-2 py-0 h-5"
+																		>
+																			<CheckCircle className="w-3 h-3 mr-1" />{" "}
+																			Terverifikasi
 																		</Badge>
 																	)}
 																</div>
@@ -578,7 +718,9 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 																		<Button
 																			variant="ghost"
 																			size="sm"
-																			onClick={() => handleVerifyDocument(doc.id)}
+																			onClick={() =>
+																				handleVerifyDocument(doc.id)
+																			}
 																			className="h-8 w-8 p-0 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50"
 																			title="Verifikasi"
 																		>
@@ -589,7 +731,9 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 																		<Button
 																			variant="ghost"
 																			size="sm"
-																			onClick={() => handleDeleteDocument(doc.id)}
+																			onClick={() =>
+																				handleDeleteDocument(doc.id)
+																			}
 																			className="h-8 w-8 p-0 text-slate-500 hover:text-rose-600 hover:bg-rose-50"
 																			title="Hapus"
 																		>
@@ -602,7 +746,9 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 													</div>
 												) : (
 													<div className="text-center py-4 border-2 border-dashed border-slate-200 rounded-md bg-white">
-														<p className="text-sm text-slate-400">Belum ada dokumen yang diunggah mahasiswa.</p>
+														<p className="text-sm text-slate-400">
+															Belum ada dokumen yang diunggah mahasiswa.
+														</p>
 													</div>
 												)}
 											</div>
@@ -627,8 +773,14 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 						/>
 						{canEdit && (
 							<div className="flex justify-end">
-								<Button onClick={handleSaveNotes} disabled={isSavingNotes} className="bg-slate-800 hover:bg-slate-700 text-white">
-									{isSavingNotes && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+								<Button
+									onClick={handleSaveNotes}
+									disabled={isSavingNotes}
+									className="bg-slate-800 hover:bg-slate-700 text-white"
+								>
+									{isSavingNotes && (
+										<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+									)}
 									Simpan Catatan
 								</Button>
 							</div>
@@ -641,22 +793,70 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 			<Card className="bg-slate-50 border-slate-200 shadow-sm overflow-hidden">
 				<CardContent className="p-0">
 					<div className="flex flex-col sm:flex-row items-center justify-between p-6">
-						<div className="flex items-center gap-4 mb-4 sm:mb-0">
+						<div className="flex flex-1 items-center gap-4 mb-4 sm:mb-0 w-full">
 							{acadState?.isAcc ? (
-								<>
-									<div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
-										<CheckCircle className="w-6 h-6 text-emerald-600" />
+								<div className="flex-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
+									<div className="flex items-center gap-4">
+										<div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+											<CheckCircle className="w-6 h-6 text-emerald-600" />
+										</div>
+										<div>
+											<h4 className="text-emerald-700 font-bold text-lg">
+												✅ ACC Akademik Diberikan
+											</h4>
+											<p className="text-sm text-slate-600">
+												Oleh{" "}
+												<span className="font-semibold">
+													{acadState?.accBy?.fullName || "Admin Akademik"}
+												</span>{" "}
+												pada{" "}
+												{acadState?.accAt
+													? new Date(acadState.accAt).toLocaleString("id-ID", {
+															dateStyle: "medium",
+															timeStyle: "short",
+														})
+													: "Waktu tidak diketahui"}{" "}
+												WIB
+											</p>
+										</div>
 									</div>
-									<div>
-										<h4 className="text-emerald-700 font-bold text-lg">
-											✅ ACC Akademik Diberikan
-										</h4>
-										<p className="text-sm text-slate-600">
-											Oleh <span className="font-semibold">{acadState?.accBy?.fullName || "Admin Akademik"}</span> pada{" "}
-											{acadState?.accAt ? new Date(acadState.accAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : "Waktu tidak diketahui"} WIB
-										</p>
-									</div>
-								</>
+									{(isAkademikAdmin || isSuperadmin) && (
+										<AlertDialog>
+											<AlertDialogTrigger
+												render={
+													<Button
+														variant="outline"
+														className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 shrink-0"
+														disabled={isSavingNotes}
+													>
+														{isSavingNotes ? "Membatalkan..." : "Batalkan ACC"}
+													</Button>
+												}
+											/>
+											<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
+												<AlertDialogTitle>
+													Konfirmasi Pembatalan ACC Akademik
+												</AlertDialogTitle>
+												<AlertDialogDescription className="text-slate-500">
+													Apakah Anda yakin ingin membatalkan status ACC untuk
+													panel Akademik ini? Status mahasiswa akan kembali ke
+													tahap proses.
+												</AlertDialogDescription>
+												<div className="flex justify-end gap-3 mt-4">
+													<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50">
+														Batal
+													</AlertDialogCancel>
+													<AlertDialogAction
+														onClick={handleCancelAcc}
+														className="bg-rose-600 hover:bg-rose-700 text-white"
+													>
+														Ya, Batalkan ACC
+													</AlertDialogAction>
+												</div>
+											</AlertDialogContent>
+										</AlertDialog>
+									)}
+								</div>
 							) : (
 								<>
 									<div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center">
@@ -664,11 +864,13 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 									</div>
 									<div>
 										<h4 className="text-slate-700 font-bold text-lg">
-											{isReadyForProcess ? "⏳ Menunggu ACC Akademik" : `⏳ Menunggu ACC Akademik (${7 - completedCount} item belum selesai)`}
+											{isReadyForProcess
+												? "⏳ Menunggu ACC Akademik"
+												: `⏳ Menunggu ACC Akademik (${7 - completedCount} item belum selesai)`}
 										</h4>
 										<p className="text-sm text-slate-500 max-w-md">
-											{isReadyForProcess 
-												? "Status aman, siap untuk memberikan persetujuan." 
+											{isReadyForProcess
+												? "Status aman, siap untuk memberikan persetujuan."
 												: `Diharapkan semua persyaratan akademik terpenuhi sebelum memberikan ACC.`}
 										</p>
 									</div>
@@ -688,19 +890,23 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 											<div className="bg-amber-50 border border-amber-200 rounded p-3 mb-4 mt-2 flex items-start gap-2">
 												<AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
 												<p className="text-amber-800 font-medium">
-													Peringatan: Masih ada {7 - completedCount} item yang belum selesai. 
-													Apakah Anda yakin ingin tetap memberikan persetujuan (ACC)?
+													Peringatan: Masih ada {7 - completedCount} item yang
+													belum selesai. Apakah Anda yakin ingin tetap
+													memberikan persetujuan (ACC)?
 												</p>
 											</div>
 										) : (
 											<div className="mt-2 text-slate-600">
-												Anda akan memberikan persetujuan final untuk status akademik
-												mahasiswa ini. Pastikan semua data absensi dan kelulusan valid.
+												Anda akan memberikan persetujuan final untuk status
+												akademik mahasiswa ini. Pastikan semua data absensi dan
+												kelulusan valid.
 											</div>
 										)}
 									</AlertDialogDescription>
 									<div className="flex justify-end gap-3 mt-4">
-										<AlertDialogCancel className="border-slate-200">Batal</AlertDialogCancel>
+										<AlertDialogCancel className="border-slate-200">
+											Batal
+										</AlertDialogCancel>
 										<AlertDialogAction
 											onClick={handleAcc}
 											className="bg-[#0517B0] hover:bg-blue-800 text-white"

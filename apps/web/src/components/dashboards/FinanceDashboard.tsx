@@ -3,10 +3,10 @@
 import {
 	CheckCircle,
 	Clock,
-	Users,
-	XCircle,
 	Download,
 	LayoutDashboard,
+	Users,
+	XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -49,13 +49,23 @@ const STATUS_COLORS = {
 
 const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
 
-export function FinanceDashboard({ data, searchQuery, setSearchQuery, user }: any) {
+export function FinanceDashboard({
+	data,
+	searchQuery,
+	setSearchQuery,
+	user,
+}: any) {
 	const router = useRouter();
 
 	const totalStudents = data?.length || 0;
-	const countAman = data?.filter((s: any) => s.finance?.status === "AMAN").length || 0;
-	const countPerhatian = data?.filter((s: any) => s.finance?.status === "PERLU_PERHATIAN" || !s.finance?.status).length || 0;
-	const countTidakAman = data?.filter((s: any) => s.finance?.status === "TIDAK_AMAN").length || 0;
+	const countAman =
+		data?.filter((s: any) => s.finance?.status === "AMAN").length || 0;
+	const countPerhatian =
+		data?.filter(
+			(s: any) => s.finance?.status === "PERLU_PERHATIAN" || !s.finance?.status,
+		).length || 0;
+	const countTidakAman =
+		data?.filter((s: any) => s.finance?.status === "TIDAK_AMAN").length || 0;
 
 	const pieData = [
 		{ name: "Aman", value: countAman },
@@ -63,20 +73,33 @@ export function FinanceDashboard({ data, searchQuery, setSearchQuery, user }: an
 		{ name: "Tidak Aman", value: countTidakAman },
 	];
 
-	const filteredData = data?.filter(
-		(s: any) =>
-			s.student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			s.student.nim.includes(searchQuery),
-	) || [];
+	const filteredData =
+		data?.filter(
+			(s: any) =>
+				s.student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				s.student.nim.includes(searchQuery),
+		) || [];
 
 	const renderStatusBadge = (status: string | null | undefined) => {
 		if (status === "AMAN") {
-			return <Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/10">🟢 Aman</Badge>;
+			return (
+				<Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/10">
+					🟢 Aman
+				</Badge>
+			);
 		}
 		if (status === "TIDAK_AMAN") {
-			return <Badge className="bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/10">🔴 Tdk Aman</Badge>;
+			return (
+				<Badge className="bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/10">
+					🔴 Tdk Aman
+				</Badge>
+			);
 		}
-		return <Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/10">🟡 Perhatian</Badge>;
+		return (
+			<Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/10">
+				🟡 Perhatian
+			</Badge>
+		);
 	};
 
 	return (
@@ -88,7 +111,8 @@ export function FinanceDashboard({ data, searchQuery, setSearchQuery, user }: an
 						Dashboard Divisi Finance
 					</h1>
 					<p className="text-slate-500 mt-1 text-sm">
-						Selamat datang, {user.username}. Berikut ringkasan data keuangan mahasiswa.
+						Selamat datang, {user.username}. Berikut ringkasan data keuangan
+						mahasiswa.
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
@@ -110,8 +134,12 @@ export function FinanceDashboard({ data, searchQuery, setSearchQuery, user }: an
 							<Users className="h-6 w-6" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">Total Mahasiswa</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">{totalStudents}</p>
+							<p className="text-slate-500 text-sm font-medium">
+								Total Mahasiswa
+							</p>
+							<p className="text-3xl font-bold text-slate-900 mt-1">
+								{totalStudents}
+							</p>
 						</div>
 					</CardContent>
 				</Card>
@@ -121,8 +149,12 @@ export function FinanceDashboard({ data, searchQuery, setSearchQuery, user }: an
 							<CheckCircle className="h-6 w-6" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">Data Lengkap (Aman)</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">{countAman}</p>
+							<p className="text-slate-500 text-sm font-medium">
+								Data Lengkap (Aman)
+							</p>
+							<p className="text-3xl font-bold text-slate-900 mt-1">
+								{countAman}
+							</p>
 						</div>
 					</CardContent>
 				</Card>
@@ -132,8 +164,12 @@ export function FinanceDashboard({ data, searchQuery, setSearchQuery, user }: an
 							<Clock className="h-6 w-6" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">Proses (Perhatian)</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">{countPerhatian}</p>
+							<p className="text-slate-500 text-sm font-medium">
+								Proses (Perhatian)
+							</p>
+							<p className="text-3xl font-bold text-slate-900 mt-1">
+								{countPerhatian}
+							</p>
 						</div>
 					</CardContent>
 				</Card>
@@ -143,8 +179,12 @@ export function FinanceDashboard({ data, searchQuery, setSearchQuery, user }: an
 							<XCircle className="h-6 w-6" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">Kendala Finance</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">{countTidakAman}</p>
+							<p className="text-slate-500 text-sm font-medium">
+								Kendala Finance
+							</p>
+							<p className="text-3xl font-bold text-slate-900 mt-1">
+								{countTidakAman}
+							</p>
 						</div>
 					</CardContent>
 				</Card>
@@ -171,11 +211,18 @@ export function FinanceDashboard({ data, searchQuery, setSearchQuery, user }: an
 										dataKey="value"
 									>
 										{pieData.map((entry, index) => (
-											<Cell key={`cell-${entry.name}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+											<Cell
+												key={`cell-${entry.name}`}
+												fill={PIE_COLORS[index % PIE_COLORS.length]}
+											/>
 										))}
 									</Pie>
 									<RechartsTooltip
-										contentStyle={{ backgroundColor: "#ffffff", borderColor: "#e2e8f0", color: "#0f172a" }}
+										contentStyle={{
+											backgroundColor: "#ffffff",
+											borderColor: "#e2e8f0",
+											color: "#0f172a",
+										}}
 										itemStyle={{ color: "#0f172a" }}
 									/>
 									<Legend verticalAlign="bottom" height={36} />
@@ -184,11 +231,13 @@ export function FinanceDashboard({ data, searchQuery, setSearchQuery, user }: an
 						</div>
 					</CardContent>
 				</Card>
-				
+
 				{/* List Mahasiswa dengan Kendala */}
 				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-2">
 					<CardHeader>
-						<CardTitle className="text-slate-800">Tabel Kelengkapan Finance</CardTitle>
+						<CardTitle className="text-slate-800">
+							Tabel Kelengkapan Finance
+						</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<div className="mb-4">
@@ -203,11 +252,21 @@ export function FinanceDashboard({ data, searchQuery, setSearchQuery, user }: an
 							<Table>
 								<TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
 									<TableRow className="border-slate-200 hover:bg-slate-50">
-										<TableHead className="text-slate-500 font-semibold py-3">NIM</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3">Nama Lengkap</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3">Angkatan</TableHead>
-										<TableHead className="text-slate-500 font-semibold text-center py-3">Status Finance</TableHead>
-										<TableHead className="text-slate-500 font-semibold text-right py-3 pr-4">Aksi</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3">
+											NIM
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3">
+											Nama Lengkap
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3">
+											Angkatan
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold text-center py-3">
+											Status Finance
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold text-right py-3 pr-4">
+											Aksi
+										</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -216,10 +275,19 @@ export function FinanceDashboard({ data, searchQuery, setSearchQuery, user }: an
 											key={s.student.id}
 											className="border-slate-200 hover:bg-blue-50/50 transition-colors"
 										>
-											<TableCell className="font-medium text-slate-700">{s.student.nim}</TableCell>
-											<TableCell className="text-slate-900 font-semibold">{s.student.name}</TableCell>
+											<TableCell className="font-medium text-slate-700">
+												{s.student.nim}
+											</TableCell>
+											<TableCell className="text-slate-900 font-semibold">
+												{s.student.name}
+											</TableCell>
 											<TableCell>
-												<Badge variant="outline" className="text-slate-500 border-slate-200">{s.student.cohort}</Badge>
+												<Badge
+													variant="outline"
+													className="text-slate-500 border-slate-200"
+												>
+													{s.student.cohort}
+												</Badge>
 											</TableCell>
 											<TableCell className="text-center">
 												{renderStatusBadge(s.finance?.status)}
@@ -227,7 +295,9 @@ export function FinanceDashboard({ data, searchQuery, setSearchQuery, user }: an
 											<TableCell className="text-right pr-4">
 												<button
 													type="button"
-													onClick={() => router.push(`/dashboard/students/${s.student.id}`)}
+													onClick={() =>
+														router.push(`/dashboard/students/${s.student.id}`)
+													}
 													className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
 												>
 													Periksa
