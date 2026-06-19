@@ -1,7 +1,8 @@
 import { edenTreaty } from "@elysiajs/eden";
 import type { App } from "../../../api/src/index";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+export const API_URL =
+	process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 // Helper to get the current auth token from Zustand persisted storage
 function getToken(): string | null {

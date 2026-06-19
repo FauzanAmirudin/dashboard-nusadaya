@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import { Textarea } from "@/components/ui/textarea";
 import {
 	Tooltip,
@@ -232,7 +233,6 @@ export function PmbPanel({ studentId, pmbData, onUpdate }: PmbPanelProps) {
 	};
 
 	const handleViewDocument = (docId: number) => {
-		// Buka halaman review baru di tab baru
 		window.open(
 			`/dashboard/students/${studentId}/documents/${docId}`,
 			"_blank",
@@ -381,93 +381,26 @@ export function PmbPanel({ studentId, pmbData, onUpdate }: PmbPanelProps) {
 										</div>
 
 										{/* Area Dokumen */}
-										<div className="p-4 bg-white border-b border-slate-100 last:border-0">
-											<div className="flex items-center justify-between mb-3">
-												<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
-													Lampiran Dokumen
-												</span>
+										{[
+											"formReceived",
+											"documentsComplete",
+											"dataInputted",
+										].includes(item.id) && (
+											<div className="p-4 bg-white border-t border-slate-100">
+												<div className="flex items-center justify-between mb-2">
+													<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+														Lampiran Dokumen
+													</span>
+												</div>
+												<DocumentUpload
+													studentId={studentId}
+													panel="pmb"
+													documentKey={item.docKey}
+													canEdit={canEdit}
+													onUploadSuccess={fetchDocuments}
+												/>
 											</div>
-
-											{docs.length > 0 ? (
-												<div className="space-y-2">
-													{docs.map((doc) => (
-														<div
-															key={doc.id}
-															className="flex items-center justify-between bg-slate-50 p-2.5 rounded-md border border-slate-200"
-														>
-															<div className="flex items-center gap-3 overflow-hidden">
-																<div className="w-8 h-8 rounded bg-white flex items-center justify-center border border-slate-200 shrink-0">
-																	<FileText className="w-4 h-4 text-[#0517B0]" />
-																</div>
-																<div className="min-w-0">
-																	<p className="text-sm font-medium text-slate-700 truncate">
-																		{doc.fileName}
-																	</p>
-																	<div className="flex items-center gap-2 mt-0.5">
-																		{doc.isVerified ? (
-																			<Badge className="bg-emerald-100 hover:bg-emerald-100 text-emerald-700 px-1.5 py-0 text-[10px]">
-																				✅ Terverifikasi
-																			</Badge>
-																		) : (
-																			<Badge className="bg-amber-100 hover:bg-amber-100 text-amber-700 px-1.5 py-0 text-[10px]">
-																				⏳ Belum Diperiksa
-																			</Badge>
-																		)}
-																		<span className="text-[10px] text-slate-400">
-																			{new Date(
-																				doc.uploadedAt,
-																			).toLocaleDateString("id-ID")}
-																		</span>
-																	</div>
-																</div>
-															</div>
-															<div className="flex items-center gap-1.5 ml-4 shrink-0">
-																<Button
-																	variant="outline"
-																	size="sm"
-																	className="h-8 text-xs font-medium text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 gap-1.5"
-																	onClick={() => handleViewDocument(doc.id)}
-																	disabled={viewingDocId === doc.id}
-																>
-																	{viewingDocId === doc.id ? (
-																		<Loader2 className="w-3.5 h-3.5 animate-spin" />
-																	) : (
-																		<Eye className="w-3.5 h-3.5" />
-																	)}
-																	Review
-																</Button>
-																{canEdit && !doc.isVerified && (
-																	<Button
-																		variant="ghost"
-																		size="sm"
-																		className="h-8 w-8 p-0 text-slate-500 hover:text-emerald-600"
-																		onClick={() => handleVerifyDocument(doc.id)}
-																	>
-																		<CheckCircle className="w-4 h-4" />
-																	</Button>
-																)}
-																{canEdit && (
-																	<Button
-																		variant="ghost"
-																		size="sm"
-																		className="h-8 w-8 p-0 text-slate-500 hover:text-rose-600"
-																		onClick={() => handleDeleteDocument(doc.id)}
-																	>
-																		<Trash2 className="w-4 h-4" />
-																	</Button>
-																)}
-															</div>
-														</div>
-													))}
-												</div>
-											) : (
-												<div className="text-center py-4 bg-slate-50 rounded border border-dashed border-slate-300">
-													<p className="text-xs text-slate-500">
-														Belum ada dokumen yang diunggah.
-													</p>
-												</div>
-											)}
-										</div>
+										)}
 									</div>
 								);
 							})}

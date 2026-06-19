@@ -29,6 +29,7 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
@@ -38,6 +39,11 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 
@@ -189,6 +195,14 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 		setIsSaving(false);
 	};
 
+	const handleCancelAcc = async () => {
+		setIsSaving(true);
+		await api.students[studentId.toString()].internship.acc.delete();
+		await fetchInternshipData();
+		onUpdate();
+		setIsSaving(false);
+	};
+
 	const checks = [
 		data?.passportReady,
 		data?.interviewReady,
@@ -287,6 +301,19 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 									</CollapsibleTrigger>
 								</div>
 								<CollapsibleContent className="px-4 pb-4 pt-1 border-t border-slate-100 bg-slate-50">
+									<div className="pt-2 mb-3">
+										<div className="flex items-center justify-between mb-2">
+											<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+												Lampiran Dokumen
+											</span>
+										</div>
+										<DocumentUpload
+											studentId={studentId}
+											panel="magang"
+											documentKey="passport"
+											canEdit={canEdit}
+										/>
+									</div>
 									<div className="grid grid-cols-2 gap-3 mt-3">
 										<div className="space-y-1">
 											<label className="text-xs font-medium text-slate-500">
@@ -358,6 +385,19 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 									</CollapsibleTrigger>
 								</div>
 								<CollapsibleContent className="px-4 pb-4 pt-1 border-t border-slate-100 bg-slate-50">
+									<div className="pt-2 mb-3">
+										<div className="flex items-center justify-between mb-2">
+											<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+												Lampiran Dokumen
+											</span>
+										</div>
+										<DocumentUpload
+											studentId={studentId}
+											panel="magang"
+											documentKey="interview"
+											canEdit={canEdit}
+										/>
+									</div>
 									<div className="grid grid-cols-2 gap-3 mt-3">
 										<div className="space-y-1">
 											<label className="text-xs font-medium text-slate-500">
@@ -437,6 +477,19 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 									</CollapsibleTrigger>
 								</div>
 								<CollapsibleContent className="px-4 pb-4 pt-1 border-t border-slate-100 bg-slate-50">
+									<div className="pt-2 mb-3">
+										<div className="flex items-center justify-between mb-2">
+											<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+												Lampiran Dokumen
+											</span>
+										</div>
+										<DocumentUpload
+											studentId={studentId}
+											panel="magang"
+											documentKey="loa"
+											canEdit={canEdit}
+										/>
+									</div>
 									<div className="grid grid-cols-2 gap-3 mt-3">
 										<div className="space-y-1">
 											<label className="text-xs font-medium text-slate-500">
@@ -502,6 +555,19 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 									</CollapsibleTrigger>
 								</div>
 								<CollapsibleContent className="px-4 pb-4 pt-1 border-t border-slate-100 bg-slate-50">
+									<div className="pt-2 mb-3">
+										<div className="flex items-center justify-between mb-2">
+											<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+												Lampiran Dokumen
+											</span>
+										</div>
+										<DocumentUpload
+											studentId={studentId}
+											panel="magang"
+											documentKey="contract"
+											canEdit={canEdit}
+										/>
+									</div>
 									<div className="grid grid-cols-2 gap-3 mt-3">
 										<div className="space-y-1 col-span-2">
 											<label className="text-xs font-medium text-slate-500">
@@ -558,6 +624,19 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 									</CollapsibleTrigger>
 								</div>
 								<CollapsibleContent className="px-4 pb-4 pt-1 border-t border-slate-100 bg-slate-50">
+									<div className="pt-2 mb-3">
+										<div className="flex items-center justify-between mb-2">
+											<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+												Lampiran Dokumen
+											</span>
+										</div>
+										<DocumentUpload
+											studentId={studentId}
+											panel="magang"
+											documentKey="mcu"
+											canEdit={canEdit}
+										/>
+									</div>
 									<div className="grid grid-cols-2 gap-3 mt-3">
 										<div className="space-y-1 col-span-2">
 											<label className="text-xs font-medium text-slate-500">
@@ -648,6 +727,19 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 									</CollapsibleTrigger>
 								</div>
 								<CollapsibleContent className="px-4 pb-4 pt-1 border-t border-slate-100 bg-slate-50">
+									<div className="pt-2 mb-3">
+										<div className="flex items-center justify-between mb-2">
+											<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+												Lampiran Dokumen
+											</span>
+										</div>
+										<DocumentUpload
+											studentId={studentId}
+											panel="magang"
+											documentKey="visa"
+											canEdit={canEdit}
+										/>
+									</div>
 									<div className="grid grid-cols-2 gap-3 mt-3">
 										<div className="space-y-1">
 											<label className="text-xs font-medium text-slate-500">
@@ -739,6 +831,19 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 									</CollapsibleTrigger>
 								</div>
 								<CollapsibleContent className="px-4 pb-4 pt-1 border-t border-slate-100 bg-slate-50">
+									<div className="pt-2 mb-3">
+										<div className="flex items-center justify-between mb-2">
+											<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+												Lampiran Dokumen
+											</span>
+										</div>
+										<DocumentUpload
+											studentId={studentId}
+											panel="magang"
+											documentKey="ticket"
+											canEdit={canEdit}
+										/>
+									</div>
 									<div className="grid grid-cols-2 gap-3 mt-3">
 										<div className="space-y-1 col-span-2">
 											<label className="text-xs font-medium text-slate-500">
@@ -825,6 +930,19 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 									</CollapsibleTrigger>
 								</div>
 								<CollapsibleContent className="px-4 pb-4 pt-1 border-t border-slate-100 bg-slate-50">
+									<div className="pt-2 mb-3">
+										<div className="flex items-center justify-between mb-2">
+											<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+												Lampiran Dokumen
+											</span>
+										</div>
+										<DocumentUpload
+											studentId={studentId}
+											panel="magang"
+											documentKey="pdt"
+											canEdit={canEdit}
+										/>
+									</div>
 									<div className="grid grid-cols-2 gap-3 mt-3">
 										<div className="space-y-1">
 											<label className="text-xs font-medium text-slate-500">
@@ -1043,36 +1161,87 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 							)}
 						</div>
 
-						{isMagang && !data?.isAcc && (
+						{isMagang && data?.isAcc && (
 							<AlertDialog>
 								<AlertDialogTrigger
 									render={
 										<Button
-											disabled={completedCount < 8}
-											className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px]"
+											variant="outline"
+											className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 shrink-0"
+											disabled={isSaving}
 										>
-											Berikan ACC
+											{isSaving ? "Membatalkan..." : "Batalkan ACC"}
 										</Button>
 									}
 								/>
-								<AlertDialogContent>
-									<AlertDialogTitle>Konfirmasi ACC Magang</AlertDialogTitle>
-									<AlertDialogDescription>
-										Apakah Anda yakin ingin memberikan ACC? Tindakan ini
-										menandakan bahwa seluruh dokumen keberangkatan mahasiswa
-										telah valid dan lengkap.
+								<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
+									<AlertDialogTitle>
+										Konfirmasi Pembatalan ACC Magang
+									</AlertDialogTitle>
+									<AlertDialogDescription className="text-slate-500">
+										Apakah Anda yakin ingin membatalkan status ACC untuk panel
+										Tim Magang Internasional ini? Status mahasiswa akan kembali
+										ke tahap proses.
 									</AlertDialogDescription>
 									<div className="flex justify-end gap-3 mt-4">
-										<AlertDialogCancel>Batal</AlertDialogCancel>
+										<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50">
+											Batal
+										</AlertDialogCancel>
 										<AlertDialogAction
-											onClick={handleAcc}
-											className="bg-blue-600 hover:bg-blue-700"
+											onClick={handleCancelAcc}
+											className="bg-rose-600 hover:bg-rose-700 text-white"
 										>
-											Ya, Berikan ACC
+											Ya, Batalkan ACC
 										</AlertDialogAction>
 									</div>
 								</AlertDialogContent>
 							</AlertDialog>
+						)}
+
+						{isMagang && !data?.isAcc && (
+							<Tooltip>
+								<TooltipTrigger render={<span className="inline-block" />}>
+									<span>
+										<AlertDialog>
+											<AlertDialogTrigger
+												render={
+													<Button
+														disabled={completedCount < 8}
+														className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px] disabled:opacity-50 disabled:cursor-not-allowed"
+													>
+														Berikan ACC
+													</Button>
+												}
+											/>
+											<AlertDialogContent>
+												<AlertDialogTitle>
+													Konfirmasi ACC Magang
+												</AlertDialogTitle>
+												<AlertDialogDescription>
+													Apakah Anda yakin ingin memberikan ACC? Tindakan ini
+													menandakan bahwa seluruh dokumen keberangkatan
+													mahasiswa telah valid dan lengkap.
+												</AlertDialogDescription>
+												<div className="flex justify-end gap-3 mt-4">
+													<AlertDialogCancel>Batal</AlertDialogCancel>
+													<AlertDialogAction
+														onClick={handleAcc}
+														className="bg-blue-600 hover:bg-blue-700"
+													>
+														Ya, Berikan ACC
+													</AlertDialogAction>
+												</div>
+											</AlertDialogContent>
+										</AlertDialog>
+									</span>
+								</TooltipTrigger>
+								{completedCount < 8 && (
+									<TooltipContent>
+										Lengkapi semua {8 - completedCount} persyaratan dokumen
+										terlebih dahulu
+									</TooltipContent>
+								)}
+							</Tooltip>
 						)}
 					</div>
 				</CardContent>

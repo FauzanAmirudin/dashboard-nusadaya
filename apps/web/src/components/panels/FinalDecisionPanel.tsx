@@ -376,17 +376,18 @@ export function FinalDecisionPanel({
 						{isWarning && (
 							<Alert
 								variant="destructive"
-								className="mt-6 bg-amber-50 border-amber-500 text-amber-800"
+								className="mt-6 bg-rose-50 border-rose-500 text-rose-800"
 							>
 								<AlertTriangle className="h-4 w-4" />
-								<AlertTitle>Peringatan Konsistensi</AlertTitle>
+								<AlertTitle>Tidak Memenuhi Syarat</AlertTitle>
 								<AlertDescription>
 									Status Akhir mahasiswa ini adalah{" "}
 									<strong>
 										{data.student.overallStatus.replace("_", " ")}
 									</strong>
-									. Keputusan "Layak Berangkat" tidak disarankan dalam kondisi
-									ini kecuali Anda memiliki pertimbangan khusus.
+									. Keputusan "Layak Berangkat" tidak dapat diberikan karena
+									masih ada persyaratan divisi yang belum terpenuhi
+									(Tunggakan/Dokumen Belum ACC).
 								</AlertDescription>
 							</Alert>
 						)}
@@ -412,11 +413,12 @@ export function FinalDecisionPanel({
 												{...props}
 												disabled={
 													isSubmitting ||
+													isWarning ||
 													(selectedDecision ===
 														data.decision.evaluatorDecision &&
 														notes === data.decision.evaluatorNotes)
 												}
-												className="bg-[#0517B0] hover:bg-[#04128A] text-white"
+												className="bg-[#0517B0] hover:bg-[#04128A] text-white disabled:opacity-50 disabled:cursor-not-allowed"
 											>
 												Tetapkan Keputusan
 											</Button>
@@ -437,15 +439,6 @@ export function FinalDecisionPanel({
 													}
 												</strong>
 												. Tindakan ini akan tercatat permanen di audit log.
-												{isWarning && (
-													<div className="mt-4 p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-md flex items-start gap-2 text-sm text-left">
-														<AlertTriangle className="w-5 h-5 shrink-0" />
-														<p>
-															Mengabaikan peringatan inkonsistensi status.
-															Pastikan Anda memiliki wewenang untuk ini.
-														</p>
-													</div>
-												)}
 											</AlertDialogDescription>
 										</AlertDialogHeader>
 										<AlertDialogFooter>

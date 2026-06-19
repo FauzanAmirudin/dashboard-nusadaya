@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckCircle, Clock, Download, Search, XCircle } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { api } from "@/lib/eden";
+import { exportToCSV } from "@/lib/export";
 import { useAuthStore } from "@/store";
 
 type StudentData = {
@@ -88,6 +90,30 @@ export default function StudentsPage() {
 		);
 	}
 
+	const handleExport = () => {
+		const exportData = data.map((s: any) => ({
+			NIM: s.student.nim,
+			"Nama Mahasiswa": s.student.name,
+			"Status Keseluruhan":
+				s.student.overallStatus === "AMAN"
+					? "Aman"
+					: s.student.overallStatus === "TIDAK_AMAN"
+						? "Tidak Aman"
+						: "Perlu Perhatian",
+			"Status PMB": s.pmb?.status || "-",
+			"Status CRM": s.crm?.status || "-",
+			"Status Finance": s.finance?.status || "-",
+			"Status Akademik": s.academic?.status || "-",
+			"Status PA": s.pa?.status || "-",
+			"Status Magang": s.internship?.status || "-",
+			"Disetujui Direktur": s.decision?.isApprovedByDirector ? "Ya" : "Belum",
+		}));
+		exportToCSV(
+			exportData,
+			`Data_Semua_Mahasiswa_${new Date().toISOString().split("T")[0]}`,
+		);
+	};
+
 	const filteredData = data.filter(
 		(s) =>
 			s.student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -102,6 +128,9 @@ export default function StudentsPage() {
 		return <Clock className="h-4 w-4 text-amber-500 mx-auto" />;
 	};
 
+	const role = useAuthStore.getState().user?.role;
+	const isSuperOrEvaluator = role === "superadmin" || role === "evaluator";
+
 	return (
 		<div className="space-y-6 pb-10">
 			{/* Header */}
@@ -113,13 +142,34 @@ export default function StudentsPage() {
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
-					<button
-						type="button"
-						className="flex items-center gap-2 bg-[#0517B0] hover:bg-blue-800 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
-					>
-						<Download className="h-4 w-4" />
-						Export Data
-					</button>
+					{(useAuthStore.getState().user?.role === "superadmin" ||
+						useAuthStore.getState().user?.role === "pmb") && (
+						<Link
+							href="/dashboard/students/archive"
+							className="bg-amber-100 hover:bg-amber-200 text-amber-800 shadow-sm transition-all gap-2 inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background h-10 px-4 py-2"
+						>
+							Lihat Arsip
+						</Link>
+					)}
+					{useAuthStore.getState().user?.role === "superadmin" && (
+						<>
+							<Link
+								href="/dashboard/students/add"
+								className="bg-[#0517B0] hover:bg-blue-800 text-white shadow-md transition-all gap-2 inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background h-10 px-4 py-2"
+							>
+								<span className="text-lg leading-none mb-0.5">+</span>
+								Tambah Mahasiswa
+							</Link>
+							<button
+								type="button"
+								onClick={handleExport}
+								className="flex items-center gap-2 bg-[#0517B0] hover:bg-blue-800 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
+							>
+								<Download className="h-4 w-4" />
+								Export Data
+							</button>
+						</>
+					)}
 				</div>
 			</div>
 
@@ -149,25 +199,41 @@ export default function StudentsPage() {
 								<TableHead className="text-slate-500 text-center">
 									Status
 								</TableHead>
-								<TableHead className="text-slate-500 text-center">
-									PMB
-								</TableHead>
-								<TableHead className="text-slate-500 text-center">
-									CRM
-								</TableHead>
-								<TableHead className="text-slate-500 text-center">
-									Finance
-								</TableHead>
-								<TableHead className="text-slate-500 text-center">
-									Akademik
-								</TableHead>
-								<TableHead className="text-slate-500 text-center">PA</TableHead>
-								<TableHead className="text-slate-500 text-center">
-									Magang
-								</TableHead>
-								<TableHead className="text-slate-500 text-center">
-									Direktur
-								</TableHead>
+								{(isSuperOrEvaluator || role === "pmb") && (
+									<TableHead className="text-slate-500 text-center">
+										PMB
+									</TableHead>
+								)}
+								{(isSuperOrEvaluator || role === "crm") && (
+									<TableHead className="text-slate-500 text-center">
+										CRM
+									</TableHead>
+								)}
+								{(isSuperOrEvaluator || role === "finance") && (
+									<TableHead className="text-slate-500 text-center">
+										Finance
+									</TableHead>
+								)}
+								{(isSuperOrEvaluator || role === "akademik") && (
+									<TableHead className="text-slate-500 text-center">
+										Akademik
+									</TableHead>
+								)}
+								{(isSuperOrEvaluator || role === "pa") && (
+									<TableHead className="text-slate-500 text-center">
+										PA
+									</TableHead>
+								)}
+								{(isSuperOrEvaluator || role === "magang") && (
+									<TableHead className="text-slate-500 text-center">
+										Magang
+									</TableHead>
+								)}
+								{isSuperOrEvaluator && (
+									<TableHead className="text-slate-500 text-center">
+										Direktur
+									</TableHead>
+								)}
 								<TableHead className="text-slate-500 text-right">
 									Aksi
 								</TableHead>
@@ -214,39 +280,57 @@ export default function StudentsPage() {
 														: "🟡 Perhatian"}
 											</Badge>
 										</TableCell>
-										<TableCell>
-											{renderStatusIcon(s.pmb?.isAcc ? "AMAN" : s.pmb?.status)}
-										</TableCell>
-										<TableCell>
-											{renderStatusIcon(s.crm?.isAcc ? "AMAN" : s.crm?.status)}
-										</TableCell>
-										<TableCell>
-											{renderStatusIcon(
-												s.finance?.isAcc ? "AMAN" : s.finance?.status,
-											)}
-										</TableCell>
-										<TableCell>
-											{renderStatusIcon(
-												s.academic?.isAcc ? "AMAN" : s.academic?.status,
-											)}
-										</TableCell>
-										<TableCell>
-											{renderStatusIcon(s.pa?.isAcc ? "AMAN" : s.pa?.status)}
-										</TableCell>
-										<TableCell>
-											{renderStatusIcon(
-												s.internship?.isAcc ? "AMAN" : s.internship?.status,
-											)}
-										</TableCell>
-										<TableCell className="text-center">
-											{s.decision?.isApprovedByDirector ? (
-												<Badge className="bg-blue-100 text-[#0517B0] hover:bg-blue-100">
-													Sudah
-												</Badge>
-											) : (
-												<span className="text-xs text-slate-500">Belum</span>
-											)}
-										</TableCell>
+										{(isSuperOrEvaluator || role === "pmb") && (
+											<TableCell>
+												{renderStatusIcon(
+													s.pmb?.isAcc ? "AMAN" : s.pmb?.status,
+												)}
+											</TableCell>
+										)}
+										{(isSuperOrEvaluator || role === "crm") && (
+											<TableCell>
+												{renderStatusIcon(
+													s.crm?.isAcc ? "AMAN" : s.crm?.status,
+												)}
+											</TableCell>
+										)}
+										{(isSuperOrEvaluator || role === "finance") && (
+											<TableCell>
+												{renderStatusIcon(
+													s.finance?.isAcc ? "AMAN" : s.finance?.status,
+												)}
+											</TableCell>
+										)}
+										{(isSuperOrEvaluator || role === "akademik") && (
+											<TableCell>
+												{renderStatusIcon(
+													s.academic?.isAcc ? "AMAN" : s.academic?.status,
+												)}
+											</TableCell>
+										)}
+										{(isSuperOrEvaluator || role === "pa") && (
+											<TableCell>
+												{renderStatusIcon(s.pa?.isAcc ? "AMAN" : s.pa?.status)}
+											</TableCell>
+										)}
+										{(isSuperOrEvaluator || role === "magang") && (
+											<TableCell>
+												{renderStatusIcon(
+													s.internship?.isAcc ? "AMAN" : s.internship?.status,
+												)}
+											</TableCell>
+										)}
+										{isSuperOrEvaluator && (
+											<TableCell className="text-center">
+												{s.decision?.isApprovedByDirector ? (
+													<Badge className="bg-blue-100 text-[#0517B0] hover:bg-blue-100">
+														Sudah
+													</Badge>
+												) : (
+													<span className="text-xs text-slate-500">Belum</span>
+												)}
+											</TableCell>
+										)}
 										<TableCell className="text-right">
 											<button
 												type="button"

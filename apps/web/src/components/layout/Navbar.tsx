@@ -84,16 +84,7 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
 
 			{/* Right: Bell + Role Chip + Avatar Dropdown */}
 			<div className="flex items-center gap-3">
-				{/* Notification Bell */}
-				<Button
-					variant="ghost"
-					size="icon"
-					type="button"
-					className="relative text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-				>
-					<Bell className="h-5 w-5" />
-					<span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500" />
-				</Button>
+				{/* Notification Bell Removed */}
 
 				{/* Role Chip */}
 				{mounted && user?.role && (

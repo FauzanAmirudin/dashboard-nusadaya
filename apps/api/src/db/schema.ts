@@ -23,6 +23,13 @@ export const roleEnum = pgEnum("role", [
 	"evaluator",
 ]);
 
+export const studentStatusEnum = pgEnum("student_status", [
+	"aktif",
+	"cuti",
+	"alumni",
+	"keluar",
+]);
+
 export const statusEnum = pgEnum("status", [
 	"AMAN",
 	"PERLU_PERHATIAN",
@@ -64,7 +71,18 @@ export const students = pgTable("students", {
 	name: text("name").notNull(),
 	cohort: integer("cohort").notNull(),
 	program: text("program").notNull(),
+
+	// New fields
+	phone: text("phone"),
+	parentName: text("parent_name"),
+	paId: integer("pa_id").references(() => users.id),
+	studentStatus: studentStatusEnum("student_status").default("aktif"),
+	destinationCountry: text("destination_country"),
+	period: text("period"),
+	profilePhotoUrl: text("profile_photo_url"),
+
 	overallStatus: statusEnum("overall_status").default("AMAN"),
+	isArchived: boolean("is_archived").default(false),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -310,6 +328,23 @@ export const paData = pgTable("pa_data", {
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const paDocuments = pgTable("pa_documents", {
+	id: serial("id").primaryKey(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
+	documentKey: text("document_key").notNull(),
+	fileName: text("file_name").notNull(),
+	fileUrl: text("file_url").notNull(),
+	fileSize: integer("file_size"),
+	mimeType: text("mime_type"),
+	uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+	uploadedBy: integer("uploaded_by").references(() => users.id),
+	isVerified: boolean("is_verified").default(false),
+	verifiedAt: timestamp("verified_at"),
+	verifiedBy: integer("verified_by").references(() => users.id),
+});
+
 export const vocabLogs = pgTable("vocab_logs", {
 	id: serial("id").primaryKey(),
 	studentId: integer("student_id")
@@ -396,6 +431,23 @@ export const internshipData = pgTable("internship_data", {
 
 	status: statusEnum("status").default("PERLU_PERHATIAN"),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const internshipDocuments = pgTable("internship_documents", {
+	id: serial("id").primaryKey(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
+	documentKey: text("document_key").notNull(),
+	fileName: text("file_name").notNull(),
+	fileUrl: text("file_url").notNull(),
+	fileSize: integer("file_size"),
+	mimeType: text("mime_type"),
+	uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+	uploadedBy: integer("uploaded_by").references(() => users.id),
+	isVerified: boolean("is_verified").default(false),
+	verifiedAt: timestamp("verified_at"),
+	verifiedBy: integer("verified_by").references(() => users.id),
 });
 
 // 10. Final Decision
@@ -558,12 +610,37 @@ export const paDataRelations = relations(paData, ({ one }) => ({
 	}),
 }));
 
+export const paDocumentsRelations = relations(paDocuments, ({ one }) => ({
+	uploadedBy: one(users, {
+		fields: [paDocuments.uploadedBy],
+		references: [users.id],
+	}),
+	verifiedBy: one(users, {
+		fields: [paDocuments.verifiedBy],
+		references: [users.id],
+	}),
+}));
+
 export const internshipDataRelations = relations(internshipData, ({ one }) => ({
 	accBy: one(users, {
 		fields: [internshipData.accBy],
 		references: [users.id],
 	}),
 }));
+
+export const internshipDocumentsRelations = relations(
+	internshipDocuments,
+	({ one }) => ({
+		uploadedBy: one(users, {
+			fields: [internshipDocuments.uploadedBy],
+			references: [users.id],
+		}),
+		verifiedBy: one(users, {
+			fields: [internshipDocuments.verifiedBy],
+			references: [users.id],
+		}),
+	}),
+);
 
 export const internalNotesRelations = relations(internalNotes, ({ one }) => ({
 	author: one(users, {
@@ -573,5 +650,26 @@ export const internalNotesRelations = relations(internalNotes, ({ one }) => ({
 	student: one(students, {
 		fields: [internalNotes.studentId],
 		references: [students.id],
+	}),
+}));
+
+export const studentsRelations = relations(students, ({ one }) => ({
+	pa: one(users, {
+		fields: [students.paId],
+		references: [users.id],
+	}),
+}));
+
+export const finalDecisionRelations = relations(finalDecision, ({ one }) => ({
+	decidedBy: one(users, {
+		fields: [finalDecision.decidedBy],
+		references: [users.id],
+	}),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+	user: one(users, {
+		fields: [auditLogs.userId],
+		references: [users.id],
 	}),
 }));

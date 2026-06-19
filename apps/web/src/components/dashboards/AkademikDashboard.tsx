@@ -5,6 +5,7 @@ import {
 	Clock,
 	Download,
 	LayoutDashboard,
+	Search,
 	Users,
 	XCircle,
 } from "lucide-react";
@@ -28,6 +29,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { exportToCSV } from "@/lib/export";
 
 const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
 
@@ -49,6 +51,32 @@ export function AkademikDashboard({
 	const countTidakAman = data.filter(
 		(s: any) => s.academic?.status === "TIDAK_AMAN",
 	).length;
+
+	const handleExport = () => {
+		const exportData = data.map((s: any) => ({
+			NIM: s.student.nim,
+			"Nama Mahasiswa": s.student.name,
+			"Input PDDIKTI": s.academic?.pddiktiInput ? "Sudah" : "Belum",
+			"Total Kehadiran (Hadir)": s.academic?.attendancePresent || 0,
+			"Total Pertemuan (Target)": s.academic?.attendanceTotal || 0,
+			"Lulus UTS": s.academic?.utsPassed ? "Ya" : "Tidak",
+			"Lulus UAS": s.academic?.uasPassed ? "Ya" : "Tidak",
+			"Tugas Selesai": s.academic?.assignmentsCompleted ? "Ya" : "Tidak",
+			"Indikator Sikap": s.academic?.attitudeIndicator || "-",
+			"Komunikasi Akademik": s.academic?.academicCommunication || "-",
+			"Status Akademik":
+				s.academic?.status === "AMAN"
+					? "Aman"
+					: s.academic?.status === "TIDAK_AMAN"
+						? "Tidak Aman"
+						: "Perlu Perhatian",
+			"Disetujui Admin Akademik": s.academic?.isAcc ? "Sudah ACC" : "Belum",
+		}));
+		exportToCSV(
+			exportData,
+			`Data_Akademik_${new Date().toISOString().split("T")[0]}`,
+		);
+	};
 
 	const pieData = [
 		{ name: "Aman", value: countAman },
@@ -110,6 +138,7 @@ export function AkademikDashboard({
 				<div className="flex items-center gap-3">
 					<button
 						type="button"
+						onClick={handleExport}
 						className="flex items-center gap-2 bg-[#0517B0] hover:bg-blue-800 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
 					>
 						<Download className="h-4 w-4" />
@@ -221,25 +250,56 @@ export function AkademikDashboard({
 								</PieChart>
 							</ResponsiveContainer>
 						</div>
+						<div className="mt-4 w-full space-y-2">
+							<div className="flex justify-between text-sm">
+								<span className="flex items-center gap-2">
+									<div className="w-3 h-3 rounded-full bg-emerald-500" /> Aman
+								</span>
+								<span className="font-semibold text-slate-700">
+									{countAman}
+								</span>
+							</div>
+							<div className="flex justify-between text-sm">
+								<span className="flex items-center gap-2">
+									<div className="w-3 h-3 rounded-full bg-amber-500" /> Perlu
+									Perhatian
+								</span>
+								<span className="font-semibold text-slate-700">
+									{countPerhatian}
+								</span>
+							</div>
+							<div className="flex justify-between text-sm">
+								<span className="flex items-center gap-2">
+									<div className="w-3 h-3 rounded-full bg-rose-500" /> Tidak
+									Aman
+								</span>
+								<span className="font-semibold text-slate-700">
+									{countTidakAman}
+								</span>
+							</div>
+						</div>
 					</CardContent>
 				</Card>
 
 				{/* List Mahasiswa dengan Kendala */}
 				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-2">
-					<CardHeader>
-						<CardTitle className="text-slate-800">
-							Tabel Status Akademik Mahasiswa
-						</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<div className="mb-4">
-							<Input
-								placeholder="Cari NIM atau Nama Mahasiswa..."
-								className="max-w-md bg-white border-slate-200 text-slate-900"
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-							/>
+					<CardHeader className="border-b border-slate-200 pb-4 bg-slate-50/50">
+						<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+							<CardTitle className="text-slate-800 text-lg">
+								Tabel Status Akademik Mahasiswa
+							</CardTitle>
+							<div className="relative w-full md:w-72">
+								<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+								<Input
+									placeholder="Cari NIM atau Nama Mahasiswa..."
+									className="pl-9 bg-white"
+									value={searchQuery}
+									onChange={(e) => setSearchQuery(e.target.value)}
+								/>
+							</div>
 						</div>
+					</CardHeader>
+					<CardContent className="p-4 sm:p-6">
 						<div className="overflow-y-auto max-h-[300px] border border-slate-200 rounded-md">
 							<Table>
 								<TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">

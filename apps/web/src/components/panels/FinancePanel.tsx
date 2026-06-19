@@ -1,6 +1,7 @@
 "use client";
 
 import {
+	AlertCircle,
 	CheckCircle,
 	Clock,
 	DollarSign,
@@ -26,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -77,7 +79,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 		arrearsCleared: false,
 	});
 
-	const [amounts, setAmounts] = useState({
+	const [amounts, setAmounts] = useState<Record<string, number | string>>({
 		registrationAmount: 0,
 		semesterAmount: 0,
 		installmentAmount: 0,
@@ -253,7 +255,8 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 
 		const payload: Record<string, any> = {};
 		if (item.amountKey)
-			payload[item.amountKey] = amounts[item.amountKey as keyof typeof amounts];
+			payload[item.amountKey] =
+				Number(amounts[item.amountKey as keyof typeof amounts]) || 0;
 		if (item.dateKey && dates[item.dateKey as keyof typeof dates]) {
 			payload[item.dateKey] = new Date(
 				dates[item.dateKey as keyof typeof dates],
@@ -423,12 +426,12 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 							{renderSummaryCard(
 								"Registrasi Awal",
 								localChecks.registrationPaid,
-								amounts.registrationAmount,
+								Number(amounts.registrationAmount) || 0,
 							)}
 							{renderSummaryCard(
 								"Semester",
 								localChecks.semesterPaid,
-								amounts.semesterAmount,
+								Number(amounts.semesterAmount) || 0,
 							)}
 							<div
 								className={`p-4 rounded-xl border ${localChecks.installmentCleared ? "bg-emerald-950/10 border-emerald-500/30" : "bg-amber-950/10 border-amber-500/30"}`}
@@ -444,7 +447,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 								<p
 									className={`text-sm font-semibold ${localChecks.installmentCleared ? "text-emerald-700" : "text-amber-700"}`}
 								>
-									{formatRupiah(amounts.installmentAmount)}
+									{formatRupiah(Number(amounts.installmentAmount) || 0)}
 								</p>
 							</div>
 						</div>
@@ -512,142 +515,19 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 											)}
 										</div>
 									</div>
-
-									{item.hasAmount && (
-										<div className="p-4 bg-white border-b border-slate-100 flex flex-col sm:flex-row sm:items-end gap-4">
-											<div>
-												<label className="text-xs font-semibold text-slate-500 mb-1 block">
-													Nominal (Rp)
-												</label>
-												<Input
-													type="number"
-													value={
-														amounts[item.amountKey as keyof typeof amounts]
-													}
-													onChange={(e) =>
-														setAmounts({
-															...amounts,
-															[item.amountKey as string]: Number(
-																e.target.value,
-															),
-														})
-													}
-													disabled={!canEdit || finState?.isAcc}
-													className="w-36 font-bold text-slate-700"
-												/>
-											</div>
-											{item.dateKey && (
-												<div>
-													<label className="text-xs font-semibold text-slate-500 mb-1 block">
-														Tanggal
-													</label>
-													<Input
-														type="date"
-														value={dates[item.dateKey as keyof typeof dates]}
-														onChange={(e) =>
-															setDates({
-																...dates,
-																[item.dateKey as string]: e.target.value,
-															})
-														}
-														disabled={!canEdit}
-														className="w-40 font-bold text-slate-700"
-													/>
-												</div>
-											)}
-											{canEdit && (
-												<Button
-													variant="secondary"
-													onClick={() => handleSaveAmountDate(item.id)}
-													className="text-blue-700 bg-blue-50 hover:bg-blue-100"
-												>
-													Simpan Data
-												</Button>
-											)}
-										</div>
-									)}
-
-									<div className="p-4 bg-white">
-										<div className="flex items-center justify-between mb-3">
+									<div className="p-4 bg-white border-t border-slate-100">
+										<div className="flex items-center justify-between mb-2">
 											<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-2">
 												<FileText className="w-4 h-4" />
 												Lampiran Bukti Pembayaran
 											</span>
 										</div>
-										{documents[item.id] && documents[item.id].length > 0 ? (
-											<div className="space-y-2">
-												{documents[item.id].map((doc) => (
-													<div
-														key={doc.id}
-														className="flex items-center justify-between bg-slate-50 p-2.5 rounded-md border border-slate-200"
-													>
-														<div className="flex items-center gap-3">
-															<FileText className="w-5 h-5 text-slate-400" />
-															<div>
-																<p className="text-sm font-medium text-slate-700">
-																	{doc.fileName}
-																</p>
-																<div className="flex items-center gap-2 mt-1">
-																	{doc.isVerified ? (
-																		<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 py-0 text-[10px]">
-																			✅ Terverifikasi
-																		</Badge>
-																	) : (
-																		<Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 py-0 text-[10px]">
-																			⏳ Belum Diperiksa
-																		</Badge>
-																	)}
-																	<span className="text-[10px] text-slate-400">
-																		{new Date(
-																			doc.uploadedAt,
-																		).toLocaleDateString("id-ID")}
-																	</span>
-																</div>
-															</div>
-														</div>
-														<div className="flex items-center gap-1">
-															<Button
-																variant="ghost"
-																size="sm"
-																onClick={() => handleViewDocument(doc.id)}
-																className="h-8 w-8 p-0 text-blue-600"
-																title="Lihat"
-															>
-																<Eye className="w-4 h-4" />
-															</Button>
-															{canEdit && !doc.isVerified && (
-																<Button
-																	variant="ghost"
-																	size="sm"
-																	onClick={() => handleVerifyDocument(doc.id)}
-																	className="h-8 w-8 p-0 text-emerald-600"
-																	title="Verifikasi"
-																>
-																	<CheckCircle className="w-4 h-4" />
-																</Button>
-															)}
-															{canEdit && (
-																<Button
-																	variant="ghost"
-																	size="sm"
-																	onClick={() => handleDeleteDocument(doc.id)}
-																	className="h-8 w-8 p-0 text-rose-500 hover:text-rose-600 hover:bg-rose-50"
-																	title="Hapus"
-																>
-																	<Trash2 className="w-4 h-4" />
-																</Button>
-															)}
-														</div>
-													</div>
-												))}
-											</div>
-										) : (
-											<div className="text-center py-4 bg-slate-50 rounded border border-dashed border-slate-300">
-												<p className="text-xs text-slate-500">
-													Belum ada dokumen yang diunggah oleh mahasiswa.
-												</p>
-											</div>
-										)}
+										<DocumentUpload
+											studentId={studentId}
+											panel="finance"
+											documentKey={item.id}
+											canEdit={canEdit}
+										/>
 									</div>
 								</div>
 							))}
@@ -801,55 +681,49 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 							)}
 						</div>
 
-						{isFinanceAdmin && !finState?.isAcc && (
-							<AlertDialog>
-								<TooltipProvider>
-									<Tooltip>
-										<TooltipTrigger
-											render={
-												<span className="inline-block w-full sm:w-auto" />
-											}
-										>
+						{canEdit && !finState?.isAcc && (
+							<Tooltip>
+								<TooltipTrigger render={<span className="inline-block" />}>
+									<span>
+										<AlertDialog>
 											<AlertDialogTrigger
-												render={
-													<Button
-														disabled={!isReadyForProcess}
-														className="w-full sm:w-auto bg-[#0517B0] hover:bg-blue-800 text-white font-bold px-8 shadow-md"
+												disabled={!isReadyForProcess}
+												className="w-full sm:w-auto bg-[#0517B0] hover:bg-blue-800 text-white font-bold px-8 py-2 rounded-md shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+											>
+												✔ ACC Finance →
+											</AlertDialogTrigger>
+											<AlertDialogContent>
+												<AlertDialogTitle>
+													Konfirmasi ACC Finance
+												</AlertDialogTitle>
+												<AlertDialogDescription>
+													<span className="mt-2 text-slate-600 block">
+														Anda akan memberikan persetujuan final untuk status
+														keuangan mahasiswa ini. Pastikan semua bukti
+														pembayaran telah divalidasi.
+													</span>
+												</AlertDialogDescription>
+												<div className="flex justify-end gap-3 mt-4">
+													<AlertDialogCancel className="border-slate-200">
+														Batal
+													</AlertDialogCancel>
+													<AlertDialogAction
+														onClick={handleAcc}
+														className="bg-[#0517B0] hover:bg-blue-800 text-white"
 													>
-														✔ ACC Finance →
-													</Button>
-												}
-											/>
-										</TooltipTrigger>
-										{!isReadyForProcess && (
-											<TooltipContent>
-												Lengkapi semua{" "}
-												{4 - checklist.filter((c) => c.checked).length}{" "}
-												checklist terlebih dahulu
-											</TooltipContent>
-										)}
-									</Tooltip>
-								</TooltipProvider>
-								<AlertDialogContent>
-									<AlertDialogTitle>Konfirmasi ACC Finance</AlertDialogTitle>
-									<AlertDialogDescription>
-										Anda akan memberikan persetujuan final untuk status keuangan
-										mahasiswa ini. Pastikan semua bukti pembayaran telah
-										divalidasi.
-									</AlertDialogDescription>
-									<div className="flex justify-end gap-3 mt-4">
-										<AlertDialogCancel className="border-slate-200">
-											Batal
-										</AlertDialogCancel>
-										<AlertDialogAction
-											onClick={handleAcc}
-											className="bg-[#0517B0] hover:bg-blue-800 text-white"
-										>
-											Ya, ACC Sekarang
-										</AlertDialogAction>
-									</div>
-								</AlertDialogContent>
-							</AlertDialog>
+														Ya, Lanjut ACC
+													</AlertDialogAction>
+												</div>
+											</AlertDialogContent>
+										</AlertDialog>
+									</span>
+								</TooltipTrigger>
+								{!isReadyForProcess && (
+									<TooltipContent>
+										Selesaikan semua pembayaran/tunggakan terlebih dahulu
+									</TooltipContent>
+								)}
+							</Tooltip>
 						)}
 					</div>
 				</CardContent>

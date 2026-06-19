@@ -33,6 +33,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/eden";
+import { exportToCSV } from "@/lib/export";
 import { useAuthStore } from "@/store";
 
 // Data types inferred from Eden API
@@ -77,6 +78,7 @@ const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
 import { AkademikDashboard } from "@/components/dashboards/AkademikDashboard";
 import { CrmDashboard } from "@/components/dashboards/CrmDashboard";
 import { DosenDashboard } from "@/components/dashboards/DosenDashboard";
+import { EvaluatorDashboard } from "@/components/dashboards/EvaluatorDashboard";
 import { FinanceDashboard } from "@/components/dashboards/FinanceDashboard";
 import { MagangDashboard } from "@/components/dashboards/MagangDashboard";
 import { PaDashboard } from "@/components/dashboards/PaDashboard";
@@ -106,6 +108,28 @@ export default function DashboardPage() {
 
 		fetchStudents();
 	}, [isAuthenticated, hasHydrated, router, user]);
+
+	const handleExport = () => {
+		if (data.length > 0) {
+			const exportData = data.map((s) => ({
+				NIM: s.student.nim,
+				"Nama Mahasiswa": s.student.name,
+				"Program Studi": s.student.program,
+				Angkatan: s.student.cohort,
+				"Status PMB": s.pmb?.status || "-",
+				"Status CRM": s.crm?.status || "-",
+				"Status Finance": s.finance?.status || "-",
+				"Status Akademik": s.academic?.status || "-",
+				"Status PA": s.pa?.status || "-",
+				"Status Magang": s.internship?.status || "-",
+				"Status Keseluruhan": s.student.overallStatus || "-",
+			}));
+			exportToCSV(
+				exportData,
+				`Data_Evaluator_${new Date().toISOString().split("T")[0]}`,
+			);
+		}
+	};
 
 	if (!isAuthenticated || !user) {
 		return null;
@@ -160,6 +184,15 @@ export default function DashboardPage() {
 	if (user?.role === "finance")
 		return (
 			<FinanceDashboard
+				data={data}
+				searchQuery={searchQuery}
+				setSearchQuery={setSearchQuery}
+				user={user}
+			/>
+		);
+	if (user?.role === "evaluator")
+		return (
+			<EvaluatorDashboard
 				data={data}
 				searchQuery={searchQuery}
 				setSearchQuery={setSearchQuery}
@@ -249,6 +282,7 @@ export default function DashboardPage() {
 					</Select>
 					<button
 						type="button"
+						onClick={handleExport}
 						className="flex items-center gap-2 bg-[#0517B0] hover:bg-blue-800 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
 					>
 						<Download className="h-4 w-4" />

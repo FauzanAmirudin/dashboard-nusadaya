@@ -1,6 +1,7 @@
 import { cookie } from "@elysiajs/cookie";
 import { cors } from "@elysiajs/cors";
 import { jwt as elysiaJwt } from "@elysiajs/jwt";
+
 import { swagger } from "@elysiajs/swagger";
 import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
@@ -26,6 +27,16 @@ const app = new Elysia()
 			},
 		}),
 	)
+	.get("/uploads/*", async ({ params, set }) => {
+		const { join } = await import("node:path");
+		const filePath = join(process.cwd(), "uploads", params["*"]);
+		const file = Bun.file(filePath);
+		if (await file.exists()) {
+			return file;
+		}
+		set.status = 404;
+		return "Not found";
+	})
 	.use(cors({ origin: true, credentials: true }))
 	// JWT and cookie must be used before derive
 	.use(elysiaJwt({ name: "jwt", secret: JWT_SECRET }))
@@ -123,6 +134,17 @@ const app = new Elysia()
 				return { user };
 			}),
 	)
+	.get("/users", async ({ query }: any) => {
+		const { role } = query;
+		let q = db
+			.select({ id: users.id, fullName: users.fullName, role: users.role })
+			.from(users);
+		if (role) {
+			q = q.where(eq(users.role, role as any)) as any;
+		}
+		const result = await q;
+		return { success: true, data: result };
+	})
 
 	// studentsRouter inherits the derive context from root
 	.use(studentsRouter)

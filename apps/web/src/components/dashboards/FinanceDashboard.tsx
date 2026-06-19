@@ -5,6 +5,7 @@ import {
 	Clock,
 	Download,
 	LayoutDashboard,
+	Search,
 	Users,
 	XCircle,
 } from "lucide-react";
@@ -28,6 +29,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { exportToCSV } from "@/lib/export";
 
 const STATUS_COLORS = {
 	AMAN: {
@@ -66,6 +68,31 @@ export function FinanceDashboard({
 		).length || 0;
 	const countTidakAman =
 		data?.filter((s: any) => s.finance?.status === "TIDAK_AMAN").length || 0;
+
+	const handleExport = () => {
+		const exportData = data.map((s: any) => ({
+			NIM: s.student.nim,
+			"Nama Mahasiswa": s.student.name,
+			"Pendaftaran Dibayar": s.finance?.registrationPaid ? "Lunas" : "Belum",
+			"Nominal Pendaftaran": s.finance?.registrationAmount || 0,
+			"Semester Dibayar": s.finance?.semesterPaid ? "Lunas" : "Belum",
+			"Nominal Semester": s.finance?.semesterAmount || 0,
+			"Cicilan Lunas": s.finance?.installmentCleared ? "Ya" : "Tidak",
+			"Tunggakan Lunas": s.finance?.arrearsCleared ? "Ya" : "Tidak",
+			"Catatan Keuangan": s.finance?.notes || "-",
+			"Status Finance":
+				s.finance?.status === "AMAN"
+					? "Aman"
+					: s.finance?.status === "TIDAK_AMAN"
+						? "Tidak Aman"
+						: "Perlu Perhatian",
+			"Disetujui Admin Finance": s.finance?.isAcc ? "Sudah ACC" : "Belum",
+		}));
+		exportToCSV(
+			exportData,
+			`Data_Finance_${new Date().toISOString().split("T")[0]}`,
+		);
+	};
 
 	const pieData = [
 		{ name: "Aman", value: countAman },
@@ -118,6 +145,7 @@ export function FinanceDashboard({
 				<div className="flex items-center gap-3">
 					<button
 						type="button"
+						onClick={handleExport}
 						className="flex items-center gap-2 bg-[#0517B0] hover:bg-blue-800 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
 					>
 						<Download className="h-4 w-4" />
@@ -229,25 +257,56 @@ export function FinanceDashboard({
 								</PieChart>
 							</ResponsiveContainer>
 						</div>
+						<div className="mt-4 w-full space-y-2">
+							<div className="flex justify-between text-sm">
+								<span className="flex items-center gap-2">
+									<div className="w-3 h-3 rounded-full bg-emerald-500" /> Aman
+								</span>
+								<span className="font-semibold text-slate-700">
+									{countAman}
+								</span>
+							</div>
+							<div className="flex justify-between text-sm">
+								<span className="flex items-center gap-2">
+									<div className="w-3 h-3 rounded-full bg-amber-500" /> Perlu
+									Perhatian
+								</span>
+								<span className="font-semibold text-slate-700">
+									{countPerhatian}
+								</span>
+							</div>
+							<div className="flex justify-between text-sm">
+								<span className="flex items-center gap-2">
+									<div className="w-3 h-3 rounded-full bg-rose-500" /> Tidak
+									Aman
+								</span>
+								<span className="font-semibold text-slate-700">
+									{countTidakAman}
+								</span>
+							</div>
+						</div>
 					</CardContent>
 				</Card>
 
 				{/* List Mahasiswa dengan Kendala */}
 				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-2">
-					<CardHeader>
-						<CardTitle className="text-slate-800">
-							Tabel Kelengkapan Finance
-						</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<div className="mb-4">
-							<Input
-								placeholder="Cari NIM atau Nama Mahasiswa..."
-								className="max-w-md bg-white border-slate-200 text-slate-900"
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-							/>
+					<CardHeader className="border-b border-slate-200 pb-4 bg-slate-50/50">
+						<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+							<CardTitle className="text-slate-800 text-lg">
+								Tabel Kelengkapan Finance
+							</CardTitle>
+							<div className="relative w-full md:w-72">
+								<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+								<Input
+									placeholder="Cari NIM atau Nama Mahasiswa..."
+									className="pl-9 bg-white"
+									value={searchQuery}
+									onChange={(e) => setSearchQuery(e.target.value)}
+								/>
+							</div>
 						</div>
+					</CardHeader>
+					<CardContent className="p-4 sm:p-6">
 						<div className="overflow-y-auto max-h-[300px] border border-slate-200 rounded-md">
 							<Table>
 								<TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">

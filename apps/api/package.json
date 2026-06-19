@@ -9,15 +9,13 @@
 		"seed": "bun run seed.ts"
 	},
 	"dependencies": {
-		"elysia": "latest",
-		"@elysiajs/cors": "latest",
 		"@elysiajs/cookie": "latest",
+		"@elysiajs/cors": "latest",
 		"@elysiajs/jwt": "latest",
 		"@elysiajs/swagger": "latest",
-		"@elysiajs/eden": "latest",
-		"postgres": "latest",
 		"drizzle-orm": "latest",
-		"ioredis": "latest"
+		"elysia": "latest",
+		"postgres": "latest"
 	},
 	"devDependencies": {
 		"bun-types": "latest",

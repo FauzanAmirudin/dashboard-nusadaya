@@ -9,20 +9,24 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" }).get(
 		const user = (context as any).user;
 		const set = context.set;
 
-		if (!user || user.role !== "dosen") {
+		if (!user || (user.role !== "dosen" && user.role !== "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
 
-		// Fetch all course grades assigned to this dosen, joined with students
-		const grades = await db
+		let query = db
 			.select({
 				courseGrade: courseGrades,
 				student: students,
 			})
 			.from(courseGrades)
-			.innerJoin(students, eq(courseGrades.studentId, students.id))
-			.where(eq(courseGrades.dosenId, user.id));
+			.innerJoin(students, eq(courseGrades.studentId, students.id));
+
+		if (user.role !== "superadmin") {
+			query = query.where(eq(courseGrades.dosenId, user.id)) as any;
+		}
+
+		const grades = await query;
 
 		const totalStudentsSet = new Set<number>();
 		let pendingAcc = 0;

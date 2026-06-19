@@ -18,7 +18,9 @@ import {
 	financeDocuments,
 	internalNotes,
 	internshipData,
+	internshipDocuments,
 	paData,
+	paDocuments,
 	pmbData,
 	pmbDocuments,
 	students,
@@ -29,7 +31,8 @@ import { authSetup } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
 
 export const studentsRouter = new Elysia({ prefix: "/students" })
-	.get("/", async () => {
+	.get("/", async ({ query }) => {
+		const isArchived = query?.archived === "true";
 		const results = await db
 			.select({
 				student: students,
@@ -48,13 +51,237 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			.leftJoin(academicData, eq(students.id, academicData.studentId))
 			.leftJoin(paData, eq(students.id, paData.studentId))
 			.leftJoin(internshipData, eq(students.id, internshipData.studentId))
-			.leftJoin(finalDecision, eq(students.id, finalDecision.studentId));
+			.leftJoin(finalDecision, eq(students.id, finalDecision.studentId))
+			.where(eq(students.isArchived, isArchived));
 
 		return { success: true, data: results };
 	})
+	.post(
+		"/",
+		async ({ body, set, user }: any) => {
+			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			// Validate unique nim
+			const existing = await db.query.students.findFirst({
+				where: eq(students.nim, body.nim),
+			});
+			if (existing) {
+				set.status = 400;
+				return { success: false, message: "NIM sudah terdaftar" };
+			}
+
+			// Insert student
+			const [newStudent] = await db
+				.insert(students)
+				.values({
+					nim: body.nim,
+					name: body.name,
+					cohort: body.cohort,
+					program: body.program,
+					phone: body.phone,
+					parentName: body.parentName,
+					paId: body.paId,
+					studentStatus: body.studentStatus || "aktif",
+					destinationCountry: body.destinationCountry,
+					period: body.period,
+				})
+				.returning();
+
+			// Initialize related panels
+			const studentId = newStudent.id;
+			await Promise.all([
+				db.insert(pmbData).values({ studentId }),
+				db.insert(crmData).values({ studentId }),
+				db.insert(financeData).values({ studentId }),
+				db.insert(academicData).values({ studentId }),
+				db.insert(paData).values({ studentId }),
+				db.insert(internshipData).values({ studentId }),
+				db.insert(finalDecision).values({ studentId }),
+			]);
+
+			return { success: true, data: newStudent };
+		},
+		{
+			body: t.Object({
+				nim: t.String(),
+				name: t.String(),
+				cohort: t.Number(),
+				program: t.String(),
+				phone: t.Optional(t.String()),
+				parentName: t.Optional(t.String()),
+				paId: t.Optional(t.Number()),
+				studentStatus: t.Optional(t.String()),
+				destinationCountry: t.Optional(t.String()),
+				period: t.Optional(t.String()),
+			}),
+		},
+	)
+	.patch(
+		"/:id",
+		async ({ params, body, set, user }: any) => {
+			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const id = parseInt(params.id, 10);
+
+			// If nim changed, validate unique
+			if (body.nim) {
+				const existing = await db.query.students.findFirst({
+					where: eq(students.nim, body.nim),
+				});
+				if (existing && existing.id !== id) {
+					set.status = 400;
+					return { success: false, message: "NIM sudah terdaftar" };
+				}
+			}
+
+			await db
+				.update(students)
+				.set({
+					...body,
+					updatedAt: new Date(),
+				})
+				.where(eq(students.id, id));
+
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				nim: t.Optional(t.String()),
+				name: t.Optional(t.String()),
+				cohort: t.Optional(t.Number()),
+				program: t.Optional(t.String()),
+				phone: t.Optional(t.String()),
+				parentName: t.Optional(t.String()),
+				paId: t.Optional(t.Number()),
+				studentStatus: t.Optional(t.String()),
+				destinationCountry: t.Optional(t.String()),
+				period: t.Optional(t.String()),
+			}),
+		},
+	)
+	.post(
+		"/:id/profile-photo",
+		async ({ params, body, set, user }: any) => {
+			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const id = parseInt(params.id, 10);
+			const file = body.file as File;
+
+			if (!file) {
+				set.status = 400;
+				return { success: false, message: "Tidak ada file yang diupload" };
+			}
+
+			const uploadDir = join(process.cwd(), "uploads", "profile");
+			await mkdir(uploadDir, { recursive: true });
+
+			const fileName = `student_${id}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+			const filePath = join(uploadDir, fileName);
+
+			const fileBuffer = await file.arrayBuffer();
+			await Bun.write(filePath, fileBuffer);
+
+			const fileUrl = `/uploads/profile/${fileName}`;
+
+			await db
+				.update(students)
+				.set({ profilePhotoUrl: fileUrl, updatedAt: new Date() })
+				.where(eq(students.id, id));
+
+			return { success: true, url: fileUrl };
+		},
+		{
+			body: t.Object({
+				file: t.File(),
+			}),
+		},
+	)
+	.patch("/:id/archive", async ({ params, set, user }: any) => {
+		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+		const id = parseInt(params.id, 10);
+		await db
+			.update(students)
+			.set({ isArchived: true, updatedAt: new Date() })
+			.where(eq(students.id, id));
+		return { success: true, message: "Berhasil mengarsipkan mahasiswa" };
+	})
+	.patch("/:id/unarchive", async ({ params, set, user }: any) => {
+		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+		const id = parseInt(params.id, 10);
+		await db
+			.update(students)
+			.set({ isArchived: false, updatedAt: new Date() })
+			.where(eq(students.id, id));
+		return {
+			success: true,
+			message: "Berhasil memulihkan mahasiswa dari arsip",
+		};
+	})
+	.delete("/:id", async ({ params, set, user }: any) => {
+		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			set.status = 403;
+			return {
+				success: false,
+				message: "Forbidden: Only superadmin or pmb can delete",
+			};
+		}
+		const id = parseInt(params.id, 10);
+
+		// Hapus seluruh data relasional karena tidak memakai CASCADE di schema
+		await db.delete(pmbDocuments).where(eq(pmbDocuments.studentId, id));
+		await db.delete(pmbData).where(eq(pmbData.studentId, id));
+
+		await db.delete(crmDocuments).where(eq(crmDocuments.studentId, id));
+		await db.delete(crmLogs).where(eq(crmLogs.studentId, id));
+		await db.delete(crmData).where(eq(crmData.studentId, id));
+
+		await db.delete(financeDocuments).where(eq(financeDocuments.studentId, id));
+		await db.delete(financeData).where(eq(financeData.studentId, id));
+
+		await db
+			.delete(courseGradeDocuments)
+			.where(eq(courseGradeDocuments.studentId, id));
+		await db.delete(courseGrades).where(eq(courseGrades.studentId, id));
+		await db
+			.delete(academicDocuments)
+			.where(eq(academicDocuments.studentId, id));
+		await db.delete(academicData).where(eq(academicData.studentId, id));
+
+		await db.delete(vocabLogs).where(eq(vocabLogs.studentId, id));
+		await db.delete(counselingLogs).where(eq(counselingLogs.studentId, id));
+		await db.delete(paData).where(eq(paData.studentId, id));
+
+		await db.delete(internshipData).where(eq(internshipData.studentId, id));
+		await db.delete(finalDecision).where(eq(finalDecision.studentId, id));
+		await db.delete(internalNotes).where(eq(internalNotes.studentId, id));
+		await db
+			.delete(auditLogs)
+			.where(and(eq(auditLogs.entity, "student"), eq(auditLogs.entityId, id)));
+
+		// Hapus data utama
+		await db.delete(students).where(eq(students.id, id));
+
+		return {
+			success: true,
+			message: "Berhasil menghapus mahasiswa beserta seluruh data terkait",
+		};
+	})
 	.get("/:id", async ({ params, set }) => {
-		const id = parseInt(params.id);
-		if (isNaN(id)) {
+		const id = parseInt(params.id, 10);
+		if (Number.isNaN(id)) {
 			set.status = 400;
 			return { success: false, message: "Invalid ID" };
 		}
@@ -86,11 +313,23 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			return { success: false, message: "Student not found" };
 		}
 
-		return { success: true, data: results[0] };
+		const studentData = results[0];
+
+		const grades = await db.query.courseGrades.findMany({
+			where: eq(courseGrades.studentId, id),
+		});
+
+		return {
+			success: true,
+			data: {
+				...studentData,
+				courseGrades: grades,
+			},
+		};
 	})
 	.get("/:id/status", async ({ params, set }) => {
-		const id = parseInt(params.id);
-		if (isNaN(id)) {
+		const id = parseInt(params.id, 10);
+		if (Number.isNaN(id)) {
 			set.status = 400;
 			return { success: false, message: "Invalid ID" };
 		}
@@ -524,7 +763,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
-			const id = parseInt(params.id);
+			const id = parseInt(params.id, 10);
 
 			// Update pmbData
 			await db
@@ -576,15 +815,14 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
-		const id = parseInt(params.id);
+		const id = parseInt(params.id, 10);
 
 		// Verify that all 4 checklists are checked before ACC
 		const currentPmb = await db.query.pmbData.findFirst({
 			where: eq(pmbData.studentId, id),
 		});
 		if (
-			!currentPmb ||
-			!currentPmb.formReceived ||
+			!currentPmb?.formReceived ||
 			!currentPmb.documentsComplete ||
 			!currentPmb.dataInputted ||
 			!currentPmb.initialFollowUp
@@ -965,8 +1203,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			where: eq(crmData.studentId, id),
 		});
 		if (
-			!currentCrm ||
-			!currentCrm.odsActive ||
+			!currentCrm?.odsActive ||
 			!currentCrm.studentMonitoring ||
 			!currentCrm.parentFollowUp ||
 			!currentCrm.practiceAttendance ||
@@ -1295,8 +1532,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			where: eq(financeData.studentId, id),
 		});
 		if (
-			!currentFinance ||
-			!currentFinance.registrationPaid ||
+			!currentFinance?.registrationPaid ||
 			!currentFinance.semesterPaid ||
 			!currentFinance.installmentCleared ||
 			!currentFinance.arrearsCleared
@@ -1697,7 +1933,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (!user || user.role !== "superadmin") {
+		if (user?.role !== "superadmin") {
 			set.status = 403;
 			return {
 				success: false,
@@ -1853,6 +2089,41 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				isAcc: true,
 				accAt: new Date(),
 				accBy: user.id,
+			})
+			.where(eq(courseGrades.id, courseId));
+
+		return { success: true };
+	})
+	.post("/:id/course-grades/:courseId/unlock", async (context) => {
+		const { params, set } = context;
+		const user = (context as any).user;
+		const courseId = Number(params.courseId);
+
+		if (!user) {
+			set.status = 401;
+			return { success: false, message: "Unauthorized" };
+		}
+
+		if (user.role !== "superadmin") {
+			set.status = 403;
+			return { success: false, message: "Only Superadmin can unlock courses" };
+		}
+
+		const current = await db.query.courseGrades.findFirst({
+			where: eq(courseGrades.id, courseId),
+		});
+
+		if (!current) {
+			set.status = 404;
+			return { success: false, message: "Course not found" };
+		}
+
+		await db
+			.update(courseGrades)
+			.set({
+				isAcc: false,
+				accAt: null,
+				accBy: null,
 			})
 			.where(eq(courseGrades.id, courseId));
 
@@ -2169,6 +2440,27 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 
 		return { success: true };
 	})
+	.delete("/:id/pa/acc", async (context) => {
+		const { params, set } = context;
+		const user = (context as any).user;
+		const id = Number(params.id);
+
+		if (!user || (user.role !== "pa" && user.role !== "superadmin")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		await db
+			.update(paData)
+			.set({
+				isAcc: false,
+				accAt: null,
+				accBy: null,
+			})
+			.where(eq(paData.studentId, id));
+
+		return { success: true };
+	})
 
 	// --- INTERNSHIP ROUTES ---
 	.get("/:id/internship", async ({ params }) => {
@@ -2310,9 +2602,30 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 
 		return { success: true };
 	})
+	.delete("/:id/internship/acc", async (context) => {
+		const { params, set } = context;
+		const user = (context as any).user;
+		const id = Number(params.id);
+
+		if (!user || (user.role !== "magang" && user.role !== "superadmin")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		await db
+			.update(internshipData)
+			.set({
+				isAcc: false,
+				accAt: null,
+				accBy: null,
+			})
+			.where(eq(internshipData.studentId, id));
+
+		return { success: true };
+	})
 	.get("/:id/final-decision", async ({ params, set }) => {
 		const id = Number(params.id);
-		if (isNaN(id)) {
+		if (Number.isNaN(id)) {
 			set.status = 400;
 			return { success: false, message: "Invalid ID" };
 		}
@@ -2387,6 +2700,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 						from: prevDecision?.evaluatorDecision || "menunggu",
 						to: (body as any).evaluatorDecision,
 					},
+					createdAt: new Date(),
 				});
 			}
 
@@ -2407,7 +2721,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			const id = Number(params.id);
 
 			// Hanya superadmin yang bisa melakukan director approval
-			if (!user || user.role !== "superadmin") {
+			if (user?.role !== "superadmin") {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -2429,6 +2743,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				entity: "final_decision",
 				entityId: id,
 				details: null,
+				createdAt: new Date(),
 			});
 
 			return { success: true };
@@ -3244,4 +3559,271 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 		await db.delete(internalNotes).where(eq(internalNotes.id, noteId));
 
 		return { success: true };
+	})
+	// Generic Document Endpoints
+	.get("/:id/:panel/documents", async (context) => {
+		const { params } = context;
+		const studentId = Number(params.id);
+		const panel = params.panel as string;
+
+		let table: any;
+		switch (panel) {
+			case "pmb":
+				table = pmbDocuments;
+				break;
+			case "crm":
+				table = crmDocuments;
+				break;
+			case "finance":
+				table = financeDocuments;
+				break;
+			case "akademik":
+				table = academicDocuments;
+				break;
+			case "pa":
+				table = paDocuments;
+				break;
+			case "magang":
+				table = internshipDocuments;
+				break;
+			default:
+				return { success: false, message: "Invalid panel" };
+		}
+
+		const docs = await db
+			.select()
+			.from(table)
+			.where(eq(table.studentId, studentId));
+		return { success: true, data: docs };
+	})
+	.post(
+		"/:id/:panel/documents",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			const studentId = Number(params.id);
+			const panel = params.panel as string;
+			const documentKey = (body as any).documentKey;
+			const file = (body as any).file as File;
+
+			if (file?.type !== "application/pdf") {
+				set.status = 400;
+				return { success: false, message: "Harus berupa file PDF" };
+			}
+			if (file.size > 5 * 1024 * 1024) {
+				set.status = 400;
+				return { success: false, message: "Ukuran file maksimal 5MB" };
+			}
+
+			let table: any;
+			switch (panel) {
+				case "pmb":
+					table = pmbDocuments;
+					break;
+				case "crm":
+					table = crmDocuments;
+					break;
+				case "finance":
+					table = financeDocuments;
+					break;
+				case "akademik":
+					table = academicDocuments;
+					break;
+				case "pa":
+					table = paDocuments;
+					break;
+				case "magang":
+					table = internshipDocuments;
+					break;
+				default:
+					set.status = 400;
+					return { success: false, message: "Invalid panel" };
+			}
+
+			// Generate unique filename
+			const timestamp = Date.now();
+			const safeDocKey = documentKey.replace(/[^a-zA-Z0-9_-]/g, "");
+			const originalName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+			const filename = `${studentId}_${panel}_${safeDocKey}_${timestamp}_${originalName}`;
+
+			// Create directory if not exists
+			const uploadDir = join(process.cwd(), "uploads", "documents", panel);
+			await mkdir(uploadDir, { recursive: true });
+
+			// Write file to disk
+			const filePath = join(uploadDir, filename);
+			const fileBuffer = Buffer.from(await file.arrayBuffer());
+			await Bun.write(filePath, fileBuffer);
+
+			const fileUrl = `/uploads/documents/${panel}/${filename}`;
+
+			// Check if document exists for this key, if so delete from db (and replace)
+			// Actually we can just keep them or replace the exact row. Let's do upsert-like by deleting old one.
+			await db
+				.delete(table)
+				.where(
+					and(
+						eq(table.studentId, studentId),
+						eq(table.documentKey, documentKey),
+					),
+				);
+
+			await db.insert(table).values({
+				studentId,
+				documentKey,
+				fileName: originalName,
+				fileUrl,
+				fileSize: file.size,
+				mimeType: file.type,
+				uploadedBy: user.id,
+			});
+
+			return { success: true, message: "Dokumen berhasil diunggah", fileUrl };
+		},
+		{
+			body: t.Object({
+				documentKey: t.String(),
+				file: t.File(),
+			}),
+		},
+	)
+	.delete("/:id/:panel/documents/:documentKey", async (context) => {
+		const { params, set } = context;
+		const studentId = Number(params.id);
+		const panel = params.panel as string;
+		const documentKey = params.documentKey as string;
+
+		let table: any;
+		switch (panel) {
+			case "pmb":
+				table = pmbDocuments;
+				break;
+			case "crm":
+				table = crmDocuments;
+				break;
+			case "finance":
+				table = financeDocuments;
+				break;
+			case "akademik":
+				table = academicDocuments;
+				break;
+			case "pa":
+				table = paDocuments;
+				break;
+			case "magang":
+				table = internshipDocuments;
+				break;
+			default:
+				set.status = 400;
+				return { success: false, message: "Invalid panel" };
+		}
+
+		await db
+			.delete(table)
+			.where(
+				and(eq(table.studentId, studentId), eq(table.documentKey, documentKey)),
+			);
+		return { success: true, message: "Dokumen berhasil dihapus" };
+	})
+	.patch(
+		"/:id/final-decision/director-approval",
+		async ({ params, body, set, user }: any) => {
+			if (user?.role !== "superadmin") {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const studentId = parseInt(params.id, 10);
+
+			// Verify final decision row exists
+			let row = await db.query.finalDecision.findFirst({
+				where: eq(finalDecision.studentId, studentId),
+			});
+
+			if (!row) {
+				// Initialize it if it doesn't exist
+				await db.insert(finalDecision).values({ studentId });
+				row = await db.query.finalDecision.findFirst({
+					where: eq(finalDecision.studentId, studentId),
+				});
+			}
+
+			// Validate if eligible (needs to be layak_berangkat)
+			if (body.isApproved && row?.evaluatorDecision !== "layak_berangkat") {
+				set.status = 400;
+				return {
+					success: false,
+					message: "Mahasiswa belum dinyatakan layak berangkat oleh Evaluator",
+				};
+			}
+
+			const departureDate = body.departureDate
+				? new Date(body.departureDate)
+				: row?.departureDate;
+
+			await db
+				.update(finalDecision)
+				.set({
+					isApprovedByDirector: body.isApproved,
+					departureDate: departureDate,
+					notes: body.notes !== undefined ? body.notes : row?.notes,
+					updatedAt: new Date(),
+				})
+				.where(eq(finalDecision.studentId, studentId));
+
+			await db.insert(auditLogs).values({
+				entity: "student",
+				entityId: studentId,
+				userId: user.id,
+				action: body.isApproved
+					? "director_approval_granted"
+					: "director_approval_revoked",
+				details: body,
+			});
+
+			return {
+				success: true,
+				message: "Persetujuan direktur berhasil diperbarui",
+			};
+		},
+		{
+			body: t.Object({
+				isApproved: t.Boolean(),
+				departureDate: t.Optional(t.String()),
+				notes: t.Optional(t.String()),
+			}),
+		},
+	)
+	.get("/finalization", async ({ query, user, set }: any) => {
+		if (user?.role !== "superadmin") {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		const results = await db
+			.select({
+				student: students,
+				pmb: pmbData,
+				crm: crmData,
+				finance: financeData,
+				academic: academicData,
+				pa: paData,
+				internship: internshipData,
+				decision: finalDecision,
+			})
+			.from(students)
+			.leftJoin(pmbData, eq(students.id, pmbData.studentId))
+			.leftJoin(crmData, eq(students.id, crmData.studentId))
+			.leftJoin(financeData, eq(students.id, financeData.studentId))
+			.leftJoin(academicData, eq(students.id, academicData.studentId))
+			.leftJoin(paData, eq(students.id, paData.studentId))
+			.leftJoin(internshipData, eq(students.id, internshipData.studentId))
+			.leftJoin(finalDecision, eq(students.id, finalDecision.studentId))
+			.where(
+				and(
+					eq(students.isArchived, false),
+					eq(finalDecision.evaluatorDecision, "layak_berangkat"),
+				),
+			);
+
+		return { success: true, data: results };
 	});

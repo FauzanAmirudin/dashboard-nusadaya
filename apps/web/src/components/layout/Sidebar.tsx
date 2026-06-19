@@ -11,6 +11,7 @@ import {
 	PhoneCall,
 	Plane,
 	Settings,
+	ShieldCheck,
 	Users,
 	Wallet,
 	X,
@@ -18,12 +19,7 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
+
 import { api } from "@/lib/eden";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store";
@@ -117,9 +113,9 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 		roles: ["superadmin"],
 	},
 	{
-		icon: Settings,
-		label: "Pengaturan",
-		href: "/dashboard/settings",
+		icon: ShieldCheck,
+		label: "Panel Finalisasi",
+		href: "/dashboard/finalisasi",
 		roles: ["superadmin"],
 	},
 ];
@@ -204,79 +200,68 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 				</div>
 
 				{/* Nav Items */}
-				<TooltipProvider delay={0}>
-					<nav className="flex-1 overflow-y-auto py-4 space-y-1 px-2">
-						{/* Main items */}
-						{mainItems.length > 0 && (
-							<>
-								{!collapsed && (
-									<p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 px-2 mb-2">
-										Utama
-									</p>
-								)}
-								{mainItems.map((item) => (
-									<NavItem
-										key={item.href}
-										item={item}
-										pathname={pathname}
-										collapsed={collapsed}
-									/>
-								))}
-							</>
-						)}
-
-						{/* Module items */}
-						{moduleItems.length > 0 && (
-							<>
-								{!collapsed && (
-									<p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 px-2 mb-2 mt-4">
-										Modul
-									</p>
-								)}
-								{collapsed && (
-									<div className="my-3 border-t border-slate-200" />
-								)}
-								{moduleItems.map((item) => (
-									<NavItem
-										key={item.href}
-										item={item}
-										pathname={pathname}
-										collapsed={collapsed}
-									/>
-								))}
-							</>
-						)}
-					</nav>
-
-					{/* Footer Nav */}
-					<div className="border-t border-slate-200 py-3 px-2 space-y-1 shrink-0">
-						{settingsItem && (
-							<NavItem
-								item={settingsItem}
-								pathname={pathname}
-								collapsed={collapsed}
-							/>
-						)}
-						<Tooltip>
-							<TooltipTrigger
-								render={<button type="button" />}
-								className={cn(
-									"w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-all duration-150",
-									collapsed && "justify-center",
-								)}
-								onClick={handleLogout}
-							>
-								<LogOut className="h-5 w-5 shrink-0" />
-								{!collapsed && (
-									<span className="text-sm font-medium">Keluar</span>
-								)}
-							</TooltipTrigger>
-							{collapsed && (
-								<TooltipContent side="right">Keluar</TooltipContent>
+				<div className="flex-1 overflow-y-auto py-4 space-y-1 px-2 flex flex-col">
+					{/* Main items */}
+					{mainItems.length > 0 && (
+						<>
+							{!collapsed && (
+								<p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 px-2 mb-2">
+									Utama
+								</p>
 							)}
-						</Tooltip>
-					</div>
-				</TooltipProvider>
+							{mainItems.map((item) => (
+								<NavItem
+									key={item.href}
+									item={item}
+									pathname={pathname}
+									collapsed={collapsed}
+								/>
+							))}
+						</>
+					)}
+
+					{/* Module items */}
+					{moduleItems.length > 0 && (
+						<>
+							{!collapsed && (
+								<p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 px-2 mb-2 mt-4">
+									Modul
+								</p>
+							)}
+							{collapsed && <div className="my-3 border-t border-slate-200" />}
+							{moduleItems.map((item) => (
+								<NavItem
+									key={item.href}
+									item={item}
+									pathname={pathname}
+									collapsed={collapsed}
+								/>
+							))}
+						</>
+					)}
+				</div>
+
+				{/* Footer Nav */}
+				<div className="border-t border-slate-200 py-3 px-2 space-y-1 shrink-0">
+					{settingsItem && (
+						<NavItem
+							item={settingsItem}
+							pathname={pathname}
+							collapsed={collapsed}
+						/>
+					)}
+					<button
+						type="button"
+						className={cn(
+							"w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-all duration-150",
+							collapsed && "justify-center",
+						)}
+						onClick={handleLogout}
+					>
+						<LogOut className="h-5 w-5 shrink-0" />
+						{!collapsed && <span className="text-sm font-medium">Keluar</span>}
+					</button>
+				</div>
 			</aside>
 		</>
 	);
@@ -298,23 +283,18 @@ function NavItem({
 	const Icon = item.icon;
 
 	return (
-		<Tooltip>
-			<TooltipTrigger
-				render={<Link href={item.href} />}
-				className={cn(
-					"flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 group",
-					isActive
-						? "bg-blue-50 text-[#0517B0] border-l-[3px] border-[#0517B0] pl-[9px]"
-						: "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-					collapsed && "justify-center",
-				)}
-			>
-				<Icon className="h-5 w-5 shrink-0" />
-				{!collapsed && (
-					<span className="text-sm font-medium">{item.label}</span>
-				)}
-			</TooltipTrigger>
-			{collapsed && <TooltipContent side="right">{item.label}</TooltipContent>}
-		</Tooltip>
+		<Link
+			href={item.href}
+			className={cn(
+				"flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 group",
+				isActive
+					? "bg-blue-50 text-[#0517B0] border-l-[3px] border-[#0517B0] pl-[9px]"
+					: "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+				collapsed && "justify-center",
+			)}
+		>
+			<Icon className="h-5 w-5 shrink-0" />
+			{!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+		</Link>
 	);
 }

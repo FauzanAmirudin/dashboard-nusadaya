@@ -27,6 +27,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -37,6 +39,12 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 
@@ -50,6 +58,7 @@ interface PaData {
 	isAcc: boolean;
 	accAt: string | null;
 	accBy: { fullName: string } | null;
+	updatedAt?: string;
 }
 
 interface VocabLog {
@@ -81,6 +90,7 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 	const [counselingLogs, setCounselingLogs] = useState<CounselingLog[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSaving, setIsSaving] = useState(false);
+	const [loadingItem, setLoadingItem] = useState<string | null>(null);
 
 	const canEdit = (isPa || isSuperadmin) && !paData?.isAcc;
 
@@ -101,11 +111,11 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 	// Checklist Forms
 	const handleChecklistChange = async (field: string, value: boolean) => {
 		if (!canEdit) return;
-		setIsSaving(true);
+		setLoadingItem(field);
 		await api.students[studentId.toString()].pa.patch({ [field]: value });
 		await fetchPaData();
 		onUpdate();
-		setIsSaving(false);
+		setLoadingItem(null);
 	};
 
 	// Discipline Notes
@@ -140,17 +150,21 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 				? "bg-amber-500"
 				: "bg-rose-500";
 
-	const [vocabForm, setVocabForm] = useState({
+	const [vocabForm, setVocabForm] = useState<{
+		addedWords: number | string;
+		date: string;
+		notes: string;
+	}>({
 		addedWords: 0,
 		date: new Date().toISOString().split("T")[0],
 		notes: "",
 	});
 
 	const handleAddVocab = async () => {
-		if (vocabForm.addedWords <= 0) return;
+		if (Number(vocabForm.addedWords) <= 0) return;
 		setIsSaving(true);
 		await api.students[studentId.toString()].pa.vocabulary.post({
-			addedWords: vocabForm.addedWords,
+			addedWords: Number(vocabForm.addedWords) || 0,
 			date: vocabForm.date,
 			notes: vocabForm.notes,
 		});
@@ -217,6 +231,43 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 		setIsSaving(false);
 	};
 
+	const handleCancelAcc = async () => {
+		setIsSaving(true);
+		await api.students[studentId.toString()].pa.acc.delete();
+		await fetchPaData();
+		onUpdate();
+		setIsSaving(false);
+	};
+
+	const checklistItems = [
+		{
+			id: "counselingDone",
+			label: "Sesi Konseling",
+			desc: `${counselingLogs.length} sesi telah terlaksana`,
+			checked: !!paData?.counselingDone,
+			docKey: "counseling_done",
+			showBadge: counselingLogs.length >= 3 && !paData?.counselingDone,
+		},
+		{
+			id: "mentalStable",
+			label: "Kondisi Mental Stabil",
+			desc: "Tidak ada indikasi masalah psikologis",
+			checked: !!paData?.mentalStable,
+			docKey: "mental_stable",
+			showBadge: false,
+		},
+		{
+			id: "disciplineGood",
+			label: "Kedisiplinan Baik",
+			desc: "Berdasarkan pemantauan asrama/harian",
+			checked: !!paData?.disciplineGood,
+			docKey: "discipline_good",
+			showBadge: false,
+		},
+	];
+
+	const completedCount = checklistItems.filter((i) => i.checked).length;
+
 	if (isLoading) {
 		return (
 			<div className="flex justify-center items-center py-20 text-slate-500">
@@ -271,137 +322,82 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 							<h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">
 								CHECKLIST PA
 							</h3>
-							<div className="space-y-3">
-								<div
-									className={`w-full flex items-center justify-between p-4 rounded-lg border ${paData?.counselingDone ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200"}`}
-								>
-									<div className="flex items-center gap-3">
+							<div className="space-y-4">
+								{checklistItems.map((item) => (
+									<div
+										key={item.id}
+										className="flex flex-col rounded-lg border bg-white overflow-hidden border-slate-200"
+									>
 										<div
-											className="cursor-pointer"
-											onClick={() =>
-												canEdit &&
-												handleChecklistChange(
-													"counselingDone",
-													!paData?.counselingDone,
-												)
-											}
+											className={`flex items-center gap-4 p-4 transition-colors ${
+												item.checked
+													? "bg-emerald-50 border-b border-emerald-200"
+													: "bg-slate-50 border-b border-slate-200"
+											}`}
 										>
-											{paData?.counselingDone ? (
-												<CheckSquare className="w-5 h-5 text-emerald-600" />
-											) : (
-												<Square className="w-5 h-5 text-slate-400" />
-											)}
-										</div>
-										<div
-											className="text-left cursor-pointer"
-											onClick={() =>
-												canEdit &&
-												handleChecklistChange(
-													"counselingDone",
-													!paData?.counselingDone,
-												)
-											}
-										>
-											<p
-												className={`font-medium ${paData?.counselingDone ? "text-emerald-800" : "text-slate-700"}`}
+											<Checkbox
+												id={item.id}
+												checked={item.checked}
+												onCheckedChange={(checked) =>
+													handleChecklistChange(item.id, checked === true)
+												}
+												disabled={!canEdit || loadingItem === item.id}
+												className="w-5 h-5 data-[state=checked]:bg-emerald-500 data-[state=checked]:text-white data-[state=checked]:border-emerald-500 border-slate-300"
+											/>
+											<label
+												htmlFor={item.id}
+												className="flex-1 cursor-pointer block"
 											>
-												Sesi Konseling
-											</p>
-											<p className="text-xs text-slate-500 mt-0.5">
-												{counselingLogs.length} sesi telah terlaksana
-											</p>
+												<div className="text-sm font-bold text-slate-800 flex items-center gap-2">
+													{item.label}
+													{item.showBadge && (
+														<Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none ml-2">
+															Klik untuk Centang
+														</Badge>
+													)}
+													{loadingItem === item.id && (
+														<Loader2 className="w-3 h-3 text-emerald-600 animate-spin" />
+													)}
+												</div>
+												<p className="text-xs text-slate-500 mt-0.5">
+													{item.desc}
+												</p>
+											</label>
+											<div>
+												{item.checked ? (
+													<Tooltip>
+														<TooltipTrigger>
+															<CheckCircle className="w-5 h-5 text-emerald-500" />
+														</TooltipTrigger>
+														<TooltipContent>
+															Terakhir diperbarui:{" "}
+															{paData?.updatedAt
+																? new Date(paData.updatedAt).toLocaleString(
+																		"id-ID",
+																	)
+																: "-"}
+														</TooltipContent>
+													</Tooltip>
+												) : (
+													<Clock className="w-5 h-5 text-slate-400" />
+												)}
+											</div>
+										</div>
+										<div className="p-4 bg-white border-t border-slate-100">
+											<div className="flex items-center justify-between mb-2">
+												<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+													Lampiran Dokumen
+												</span>
+											</div>
+											<DocumentUpload
+												studentId={studentId}
+												panel="pa"
+												documentKey={item.docKey}
+												canEdit={canEdit}
+											/>
 										</div>
 									</div>
-									{counselingLogs.length >= 3 && !paData?.counselingDone && (
-										<Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none">
-											Klik untuk Centang
-										</Badge>
-									)}
-								</div>
-
-								<div
-									className={`w-full flex items-center justify-between p-4 rounded-lg border ${paData?.mentalStable ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200"}`}
-								>
-									<div className="flex items-center gap-3">
-										<div
-											className="cursor-pointer"
-											onClick={() =>
-												canEdit &&
-												handleChecklistChange(
-													"mentalStable",
-													!paData?.mentalStable,
-												)
-											}
-										>
-											{paData?.mentalStable ? (
-												<CheckSquare className="w-5 h-5 text-emerald-600" />
-											) : (
-												<Square className="w-5 h-5 text-slate-400" />
-											)}
-										</div>
-										<div
-											className="text-left cursor-pointer"
-											onClick={() =>
-												canEdit &&
-												handleChecklistChange(
-													"mentalStable",
-													!paData?.mentalStable,
-												)
-											}
-										>
-											<p
-												className={`font-medium ${paData?.mentalStable ? "text-emerald-800" : "text-slate-700"}`}
-											>
-												Kondisi Mental Stabil
-											</p>
-											<p className="text-xs text-slate-500 mt-0.5">
-												Tidak ada indikasi masalah psikologis
-											</p>
-										</div>
-									</div>
-								</div>
-
-								<div
-									className={`w-full flex items-center justify-between p-4 rounded-lg border ${paData?.disciplineGood ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200"}`}
-								>
-									<div className="flex items-center gap-3">
-										<div
-											className="cursor-pointer"
-											onClick={() =>
-												canEdit &&
-												handleChecklistChange(
-													"disciplineGood",
-													!paData?.disciplineGood,
-												)
-											}
-										>
-											{paData?.disciplineGood ? (
-												<CheckSquare className="w-5 h-5 text-emerald-600" />
-											) : (
-												<Square className="w-5 h-5 text-slate-400" />
-											)}
-										</div>
-										<div
-											className="text-left cursor-pointer"
-											onClick={() =>
-												canEdit &&
-												handleChecklistChange(
-													"disciplineGood",
-													!paData?.disciplineGood,
-												)
-											}
-										>
-											<p
-												className={`font-medium ${paData?.disciplineGood ? "text-emerald-800" : "text-slate-700"}`}
-											>
-												Kedisiplinan Baik
-											</p>
-											<p className="text-xs text-slate-500 mt-0.5">
-												Berdasarkan pemantauan asrama/harian
-											</p>
-										</div>
-									</div>
-								</div>
+								))}
 							</div>
 						</div>
 
@@ -501,7 +497,8 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 											onChange={(e) =>
 												setVocabForm({
 													...vocabForm,
-													addedWords: Number(e.target.value),
+													addedWords:
+														e.target.value === "" ? "" : Number(e.target.value),
 												})
 											}
 										/>
@@ -752,44 +749,98 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 									</div>
 									<div>
 										<h4 className="text-blue-900 font-bold text-lg">
-											ACC Panel Pendamping Akademik
+											{completedCount < 3
+												? `⏳ Menunggu ACC PA (${3 - completedCount} item belum selesai)`
+												: "ACC Panel Pendamping Akademik"}
 										</h4>
 										<p className="text-sm text-blue-700 max-w-md">
-											Tandai bahwa progres pendampingan mahasiswa telah selesai
-											atau mencapai target.
+											{completedCount < 3
+												? "Selesaikan semua checklist pendampingan sebelum memberikan ACC."
+												: "Tandai bahwa progres pendampingan mahasiswa telah selesai atau mencapai target."}
 										</p>
 									</div>
 								</>
 							)}
 						</div>
 
-						{isPa && !paData?.isAcc && (
+						{isPa && paData?.isAcc && (
 							<AlertDialog>
 								<AlertDialogTrigger
 									render={
-										<Button className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px]">
-											Berikan ACC
+										<Button
+											variant="outline"
+											className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 shrink-0"
+											disabled={isSaving}
+										>
+											{isSaving ? "Membatalkan..." : "Batalkan ACC"}
 										</Button>
 									}
 								/>
-								<AlertDialogContent>
-									<AlertDialogTitle>Konfirmasi ACC PA</AlertDialogTitle>
-									<AlertDialogDescription>
-										Apakah Anda yakin ingin memberikan ACC? Ini akan mengunci
-										seluruh data *Checklist*, Catatan, dan Setoran Vocabulary
-										agar tidak bisa diubah lagi.
+								<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
+									<AlertDialogTitle>
+										Konfirmasi Pembatalan ACC PA
+									</AlertDialogTitle>
+									<AlertDialogDescription className="text-slate-500">
+										Apakah Anda yakin ingin membatalkan status ACC untuk panel
+										Pendamping Akademik ini? Status mahasiswa akan kembali ke
+										tahap proses.
 									</AlertDialogDescription>
 									<div className="flex justify-end gap-3 mt-4">
-										<AlertDialogCancel>Batal</AlertDialogCancel>
+										<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50">
+											Batal
+										</AlertDialogCancel>
 										<AlertDialogAction
-											onClick={handleAcc}
-											className="bg-blue-600 hover:bg-blue-700"
+											onClick={handleCancelAcc}
+											className="bg-rose-600 hover:bg-rose-700 text-white"
 										>
-											Ya, Berikan ACC
+											Ya, Batalkan ACC
 										</AlertDialogAction>
 									</div>
 								</AlertDialogContent>
 							</AlertDialog>
+						)}
+
+						{isPa && !paData?.isAcc && (
+							<Tooltip>
+								<TooltipTrigger render={<span className="inline-block" />}>
+									<span>
+										<AlertDialog>
+											<AlertDialogTrigger
+												render={
+													<Button
+														disabled={completedCount < 3}
+														className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px] disabled:opacity-50 disabled:cursor-not-allowed"
+													>
+														Berikan ACC
+													</Button>
+												}
+											/>
+											<AlertDialogContent>
+												<AlertDialogTitle>Konfirmasi ACC PA</AlertDialogTitle>
+												<AlertDialogDescription>
+													Apakah Anda yakin ingin memberikan ACC? Ini akan
+													mengunci seluruh data *Checklist*, Catatan, dan
+													Setoran Vocabulary agar tidak bisa diubah lagi.
+												</AlertDialogDescription>
+												<div className="flex justify-end gap-3 mt-4">
+													<AlertDialogCancel>Batal</AlertDialogCancel>
+													<AlertDialogAction
+														onClick={handleAcc}
+														className="bg-blue-600 hover:bg-blue-700"
+													>
+														Ya, Berikan ACC
+													</AlertDialogAction>
+												</div>
+											</AlertDialogContent>
+										</AlertDialog>
+									</span>
+								</TooltipTrigger>
+								{completedCount < 3 && (
+									<TooltipContent>
+										Selesaikan semua persyaratan pendampingan terlebih dahulu
+									</TooltipContent>
+								)}
+							</Tooltip>
 						)}
 					</div>
 				</CardContent>

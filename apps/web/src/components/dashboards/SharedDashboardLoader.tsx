@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { AkademikDashboard } from "@/components/dashboards/AkademikDashboard";
 import { CrmDashboard } from "@/components/dashboards/CrmDashboard";
 import { DosenDashboard } from "@/components/dashboards/DosenDashboard";
+import { EvaluatorDashboard } from "@/components/dashboards/EvaluatorDashboard";
 import { FinanceDashboard } from "@/components/dashboards/FinanceDashboard";
 import { MagangDashboard } from "@/components/dashboards/MagangDashboard";
 import { PaDashboard } from "@/components/dashboards/PaDashboard";
@@ -95,6 +96,15 @@ export function SharedDashboardLoader({
 	if (module === "finance")
 		return (
 			<FinanceDashboard
+				data={data}
+				searchQuery={searchQuery}
+				setSearchQuery={setSearchQuery}
+				user={user}
+			/>
+		);
+	if (module === "evaluator")
+		return (
+			<EvaluatorDashboard
 				data={data}
 				searchQuery={searchQuery}
 				setSearchQuery={setSearchQuery}

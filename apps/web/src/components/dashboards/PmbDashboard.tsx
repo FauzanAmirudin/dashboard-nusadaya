@@ -5,9 +5,12 @@ import {
 	Clock,
 	Download,
 	LayoutDashboard,
+	Plus,
+	Search,
 	Users,
 	XCircle,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
 	Cell,
@@ -28,6 +31,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { exportToCSV } from "@/lib/export";
 
 const STATUS_COLORS = {
 	AMAN: {
@@ -60,6 +64,28 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 	const countTidakAman = data.filter(
 		(s: any) => s.pmb?.status === "TIDAK_AMAN",
 	).length;
+
+	const handleExport = () => {
+		const exportData = data.map((s: any) => ({
+			NIM: s.student.nim,
+			"Nama Mahasiswa": s.student.name,
+			"Formulir Masuk": s.pmb?.formReceived ? "Sudah" : "Belum",
+			"Dokumen Lengkap": s.pmb?.documentsComplete ? "Sudah" : "Belum",
+			"Data Terinput": s.pmb?.dataInputted ? "Sudah" : "Belum",
+			"Follow Up Awal": s.pmb?.initialFollowUp ? "Sudah" : "Belum",
+			"Status Checklist PMB":
+				s.pmb?.status === "AMAN"
+					? "Aman"
+					: s.pmb?.status === "TIDAK_AMAN"
+						? "Tidak Aman"
+						: "Perlu Perhatian",
+			"Disetujui Admin PMB": s.pmb?.isAcc ? "Sudah ACC" : "Belum",
+		}));
+		exportToCSV(
+			exportData,
+			`Data_PMB_${new Date().toISOString().split("T")[0]}`,
+		);
+	};
 
 	const pieData = [
 		{ name: "Aman", value: countAman },
@@ -109,8 +135,18 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
+					{(user?.role === "pmb" || user?.role === "superadmin") && (
+						<Link
+							href="/dashboard/students/add"
+							className="bg-[#0517B0] hover:bg-blue-800 text-white shadow-md transition-all gap-2 inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background h-10 px-4 py-2"
+						>
+							<Plus className="w-4 h-4" />
+							Tambah Mahasiswa
+						</Link>
+					)}
 					<button
 						type="button"
+						onClick={handleExport}
 						className="flex items-center gap-2 bg-[#0517B0] hover:bg-blue-800 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
 					>
 						<Download className="h-4 w-4" />
@@ -220,25 +256,56 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 								</PieChart>
 							</ResponsiveContainer>
 						</div>
+						<div className="mt-4 w-full space-y-2">
+							<div className="flex justify-between text-sm">
+								<span className="flex items-center gap-2">
+									<div className="w-3 h-3 rounded-full bg-emerald-500" /> Aman
+								</span>
+								<span className="font-semibold text-slate-700">
+									{countAman}
+								</span>
+							</div>
+							<div className="flex justify-between text-sm">
+								<span className="flex items-center gap-2">
+									<div className="w-3 h-3 rounded-full bg-amber-500" /> Perlu
+									Perhatian
+								</span>
+								<span className="font-semibold text-slate-700">
+									{countPerhatian}
+								</span>
+							</div>
+							<div className="flex justify-between text-sm">
+								<span className="flex items-center gap-2">
+									<div className="w-3 h-3 rounded-full bg-rose-500" /> Tidak
+									Aman
+								</span>
+								<span className="font-semibold text-slate-700">
+									{countTidakAman}
+								</span>
+							</div>
+						</div>
 					</CardContent>
 				</Card>
 
 				{/* List Mahasiswa dengan Kendala */}
 				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-2">
-					<CardHeader>
-						<CardTitle className="text-slate-800">
-							Tabel Kelengkapan Mahasiswa
-						</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<div className="mb-4">
-							<Input
-								placeholder="Cari NIM atau Nama Mahasiswa..."
-								className="max-w-md bg-white border-slate-200 text-slate-900"
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-							/>
+					<CardHeader className="border-b border-slate-200 pb-4 bg-slate-50/50">
+						<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+							<CardTitle className="text-slate-800 text-lg">
+								Tabel Kelengkapan Mahasiswa
+							</CardTitle>
+							<div className="relative w-full md:w-72">
+								<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+								<Input
+									placeholder="Cari NIM atau Nama Mahasiswa..."
+									className="pl-9 bg-white"
+									value={searchQuery}
+									onChange={(e) => setSearchQuery(e.target.value)}
+								/>
+							</div>
 						</div>
+					</CardHeader>
+					<CardContent className="p-4 sm:p-6">
 						<div className="overflow-y-auto max-h-[300px] border border-slate-200 rounded-md">
 							<Table>
 								<TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">

@@ -5,12 +5,21 @@ import {
 	ArrowRight,
 	BookOpen,
 	Clock,
+	LayoutDashboard,
 	Loader2,
 	Search,
 	Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+	Cell,
+	Legend,
+	Pie,
+	PieChart,
+	Tooltip as RechartsTooltip,
+	ResponsiveContainer,
+} from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +33,8 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { api } from "@/lib/eden";
+
+const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
 
 interface DosenDashboardProps {
 	user: { id: number; username: string; role: string; fullName?: string };
@@ -134,6 +145,20 @@ export function DosenDashboard({ user }: DosenDashboardProps) {
 
 	const groupedStudents = Array.from(studentsMap.values());
 
+	const countAman = groupedStudents.filter((s) => s.status === "AMAN").length;
+	const countPerhatian = groupedStudents.filter(
+		(s) => s.status === "PERLU_PERHATIAN",
+	).length;
+	const countTidakAman = groupedStudents.filter(
+		(s) => s.status === "TIDAK_AMAN",
+	).length;
+
+	const pieData = [
+		{ name: "Aman", value: countAman },
+		{ name: "Perlu Perhatian", value: countPerhatian },
+		{ name: "Tidak Aman", value: countTidakAman },
+	];
+
 	const renderStatusBadge = (status: string) => {
 		if (status === "AMAN") {
 			return (
@@ -234,98 +259,171 @@ export function DosenDashboard({ user }: DosenDashboardProps) {
 				</Card>
 			</div>
 
-			{/* Data Table Section */}
-			<Card className="bg-white border-slate-200 shadow-sm">
-				<CardHeader className="border-b border-slate-100 pb-4">
-					<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-						<CardTitle className="text-slate-800">
-							Tabel Status Mahasiswa
+			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+				{/* Donut Chart */}
+				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-1">
+					<CardHeader>
+						<CardTitle className="text-slate-800 flex items-center gap-2">
+							<LayoutDashboard className="h-5 w-5 text-slate-500" />
+							Distribusi Status Dosen
 						</CardTitle>
-						<div className="relative w-full md:w-72">
-							<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-							<Input
-								placeholder="Cari NIM atau Nama Mahasiswa..."
-								className="pl-9 bg-white border-slate-200 text-slate-900"
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-							/>
-						</div>
-					</div>
-				</CardHeader>
-				<CardContent className="p-0">
-					<div className="overflow-x-auto max-h-[400px]">
-						<Table>
-							<TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
-								<TableRow className="border-slate-200 hover:bg-slate-50">
-									<TableHead className="text-slate-500 font-semibold py-3 pl-6">
-										NIM
-									</TableHead>
-									<TableHead className="text-slate-500 font-semibold py-3">
-										Nama Mahasiswa
-									</TableHead>
-									<TableHead className="text-slate-500 font-semibold py-3 text-center">
-										Jumlah MK Diambil
-									</TableHead>
-									<TableHead className="text-slate-500 font-semibold py-3 text-center">
-										Status Keseluruhan
-									</TableHead>
-									<TableHead className="text-slate-500 font-semibold text-right py-3 pr-6">
-										Aksi
-									</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{groupedStudents.map((s) => (
-									<TableRow
-										key={s.id}
-										className="border-slate-200 hover:bg-blue-50/50 transition-colors"
+					</CardHeader>
+					<CardContent className="flex flex-col items-center">
+						<div className="h-64 w-full">
+							<ResponsiveContainer width="100%" height="100%">
+								<PieChart>
+									<Pie
+										data={pieData}
+										innerRadius={60}
+										outerRadius={80}
+										paddingAngle={5}
+										dataKey="value"
 									>
-										<TableCell className="pl-6 font-medium text-slate-700">
-											{s.nim}
-										</TableCell>
-										<TableCell>
-											<div className="text-slate-900 font-semibold">
-												{s.name}
-											</div>
-										</TableCell>
-										<TableCell className="text-center">
-											<span className="font-bold text-slate-700">
-												{s.courses.length} Mata Kuliah
-											</span>
-										</TableCell>
-										<TableCell className="text-center">
-											{renderStatusBadge(s.status)}
-										</TableCell>
-										<TableCell className="text-right pr-6">
-											<button
-												type="button"
-												className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
-												onClick={() =>
-													router.push(`/dashboard/students/${s.id}#panel-dosen`)
-												}
-											>
-												Periksa Detail
-											</button>
-										</TableCell>
+										{pieData.map((entry, index) => (
+											<Cell
+												key={`cell-${entry.name}`}
+												fill={PIE_COLORS[index % PIE_COLORS.length]}
+											/>
+										))}
+									</Pie>
+									<RechartsTooltip
+										contentStyle={{
+											backgroundColor: "#ffffff",
+											borderColor: "#e2e8f0",
+											color: "#0f172a",
+										}}
+										itemStyle={{ color: "#0f172a" }}
+									/>
+									<Legend verticalAlign="bottom" height={36} />
+								</PieChart>
+							</ResponsiveContainer>
+						</div>
+						<div className="mt-4 w-full space-y-2">
+							<div className="flex justify-between text-sm">
+								<span className="flex items-center gap-2">
+									<div className="w-3 h-3 rounded-full bg-emerald-500" /> Aman
+								</span>
+								<span className="font-semibold text-slate-700">
+									{countAman}
+								</span>
+							</div>
+							<div className="flex justify-between text-sm">
+								<span className="flex items-center gap-2">
+									<div className="w-3 h-3 rounded-full bg-amber-500" /> Perlu
+									Perhatian
+								</span>
+								<span className="font-semibold text-slate-700">
+									{countPerhatian}
+								</span>
+							</div>
+							<div className="flex justify-between text-sm">
+								<span className="flex items-center gap-2">
+									<div className="w-3 h-3 rounded-full bg-rose-500" /> Tidak
+									Aman
+								</span>
+								<span className="font-semibold text-slate-700">
+									{countTidakAman}
+								</span>
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+
+				{/* Data Table Section */}
+				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-2">
+					<CardHeader className="border-b border-slate-100 pb-4">
+						<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+							<CardTitle className="text-slate-800">
+								Tabel Status Mahasiswa
+							</CardTitle>
+							<div className="relative w-full md:w-72">
+								<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+								<Input
+									placeholder="Cari NIM atau Nama Mahasiswa..."
+									className="pl-9 bg-white border-slate-200 text-slate-900"
+									value={searchQuery}
+									onChange={(e) => setSearchQuery(e.target.value)}
+								/>
+							</div>
+						</div>
+					</CardHeader>
+					<CardContent className="p-0">
+						<div className="overflow-x-auto max-h-[400px]">
+							<Table>
+								<TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+									<TableRow className="border-slate-200 hover:bg-slate-50">
+										<TableHead className="text-slate-500 font-semibold py-3 pl-6">
+											NIM
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3">
+											Nama Mahasiswa
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3 text-center">
+											Jumlah MK Diambil
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3 text-center">
+											Status Keseluruhan
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold text-right py-3 pr-6">
+											Aksi
+										</TableHead>
 									</TableRow>
-								))}
-								{groupedStudents.length === 0 && (
-									<TableRow>
-										<TableCell
-											colSpan={5}
-											className="h-32 text-center text-slate-500"
+								</TableHeader>
+								<TableBody>
+									{groupedStudents.slice(0, 5).map((s) => (
+										<TableRow
+											key={s.id}
+											className="border-slate-200 hover:bg-blue-50/50 transition-colors"
 										>
-											{searchQuery
-												? "Tidak ada mahasiswa yang cocok dengan pencarian."
-												: "Belum ada mahasiswa yang ditugaskan ke Anda."}
-										</TableCell>
-									</TableRow>
-								)}
-							</TableBody>
-						</Table>
-					</div>
-				</CardContent>
-			</Card>
+											<TableCell className="pl-6 font-medium text-slate-700">
+												{s.nim}
+											</TableCell>
+											<TableCell>
+												<div className="text-slate-900 font-semibold">
+													{s.name}
+												</div>
+											</TableCell>
+											<TableCell className="text-center">
+												<span className="font-bold text-slate-700">
+													{s.courses.length} Mata Kuliah
+												</span>
+											</TableCell>
+											<TableCell className="text-center">
+												{renderStatusBadge(s.status)}
+											</TableCell>
+											<TableCell className="text-right pr-6">
+												<button
+													type="button"
+													className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
+													onClick={() =>
+														router.push(
+															`/dashboard/students/${s.id}#panel-dosen`,
+														)
+													}
+												>
+													Periksa
+												</button>
+											</TableCell>
+										</TableRow>
+									))}
+									{groupedStudents.length === 0 && (
+										<TableRow>
+											<TableCell
+												colSpan={5}
+												className="h-32 text-center text-slate-500"
+											>
+												{searchQuery
+													? "Tidak ada mahasiswa yang cocok dengan pencarian."
+													: "Belum ada mahasiswa yang ditugaskan ke Anda."}
+											</TableCell>
+										</TableRow>
+									)}
+								</TableBody>
+							</Table>
+						</div>
+					</CardContent>
+				</Card>
+			</div>
 		</div>
 	);
 }

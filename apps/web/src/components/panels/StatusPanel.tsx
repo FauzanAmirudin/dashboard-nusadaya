@@ -237,7 +237,7 @@ export function StatusPanel({
 							<div className="divide-y divide-slate-100">
 								{data.incompleteIndicators.map((ind, i) => (
 									<div
-										key={i}
+										key={ind}
 										className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
 									>
 										<div className="flex items-start gap-3">
