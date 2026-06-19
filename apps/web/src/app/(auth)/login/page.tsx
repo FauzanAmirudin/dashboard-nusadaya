@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertCircle, ArrowRight, Eye, EyeOff, Lock, User } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -64,8 +65,15 @@ export default function LoginPage() {
 			<div className="relative z-10 w-full max-w-md bg-white/80 backdrop-blur-2xl rounded-[2rem] shadow-[0_20px_60px_-15px_rgba(5,23,176,0.15)] border border-white/60 p-8 sm:p-10 animate-in fade-in zoom-in-95 duration-700 ease-out ring-1 ring-slate-900/5">
 				{/* Logo Header */}
 				<div className="flex flex-col items-center text-center mb-10">
-					<div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0517B0] to-blue-600 flex items-center justify-center shadow-[0_8px_20px_rgba(5,23,176,0.3)] mb-5 ring-4 ring-white/50">
-						<span className="font-bold text-white text-2xl">N</span>
+					<div className="w-20 h-20 flex items-center justify-center mb-5">
+						<Image
+							src="/logonusadaya.png"
+							alt="Logo Nusadaya"
+							width={80}
+							height={80}
+							className="object-contain"
+							priority
+						/>
 					</div>
 					<h1 className="text-2xl font-extrabold tracking-tight text-slate-900 mb-2">
 						Nusadaya Academy
