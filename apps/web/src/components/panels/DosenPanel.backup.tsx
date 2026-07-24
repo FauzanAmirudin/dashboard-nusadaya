@@ -16,9 +16,6 @@ import {
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { AttitudeLogs } from "@/components/panels/vokasi/AttitudeLogs";
-import { Entrepreneurship } from "@/components/panels/vokasi/Entrepreneurship";
-import { WeeklyEvents } from "@/components/panels/vokasi/WeeklyEvents";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -85,19 +82,11 @@ interface CourseGrade {
 	grade: string | null;
 	attendanceRate: number | null;
 	attitudeNote: string | null;
-	practicalScore: number | null;
-	theoryScore: number | null;
-	entrepreneurScore: number | null;
-	productPhotoUrl: string | null;
-	totalMeetings: number | null;
-	attendancePresent: number | null;
 	status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN";
 	isAcc: boolean;
 	accAt: string | null;
 	accBy: { fullName: string } | null;
 	dosen?: { fullName: string } | null;
-	hasKwu?: boolean;
-	kwuScore?: number | null;
 }
 
 interface DosenPanelProps {
@@ -123,20 +112,10 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 
 	const [editForm, setEditForm] = useState<{
 		attendanceRate: number | string;
-		attendancePresent: number | string;
-		totalMeetings: number | string;
-		practicalScore: number | string;
-		theoryScore: number | string;
-		kwuScore: number | string;
 		grade: string;
 		attitudeNote: string;
 	}>({
 		attendanceRate: 0,
-		attendancePresent: 0,
-		totalMeetings: 16,
-		practicalScore: 0,
-		theoryScore: 0,
-		kwuScore: 0,
 		grade: "E",
 		attitudeNote: "Buruk",
 	});
@@ -147,7 +126,6 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 		courseCode: "",
 		courseName: "",
 		dosenId: user?.id || 0,
-		hasKwu: true,
 	});
 
 	const fetchGrades = async () => {
@@ -247,11 +225,6 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 		setEditingId(g.id);
 		setEditForm({
 			attendanceRate: g.attendanceRate ?? 0,
-			attendancePresent: g.attendancePresent ?? 0,
-			totalMeetings: g.totalMeetings ?? 16,
-			practicalScore: g.practicalScore ?? 0,
-			theoryScore: g.theoryScore ?? 0,
-			kwuScore: g.kwuScore ?? 0,
 			grade: g.grade ?? "E",
 			attitudeNote: g.attitudeNote ?? "Buruk",
 		});
@@ -263,38 +236,11 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 
 	const handleSaveEdit = async (courseId: number) => {
 		setSavingId(courseId);
-
-		const practical = Number(editForm.practicalScore) || 0;
-		const theory = Number(editForm.theoryScore) || 0;
-		const kwu = Number(editForm.kwuScore) || 0;
-		const att =
-			((Number(editForm.attendancePresent) || 0) /
-				(Number(editForm.totalMeetings) || 16)) *
-			100;
-
-		const currentGrade = gradesData.find((gr) => gr.id === courseId);
-		let finalScore = 0;
-		if (currentGrade?.hasKwu) {
-			finalScore = practical * 0.5 + theory * 0.2 + kwu * 0.15 + att * 0.15;
-		} else {
-			finalScore = practical * 0.5 + theory * 0.35 + att * 0.15;
-		}
-
-		let calculatedGrade = "E";
-		if (finalScore >= 85) calculatedGrade = "A";
-		else if (finalScore >= 75) calculatedGrade = "B";
-		else if (finalScore >= 65) calculatedGrade = "C";
-		else if (finalScore >= 50) calculatedGrade = "D";
-
 		const { error } = await api.students[studentId.toString()]["course-grades"][
 			courseId.toString()
 		].patch({
-			attendancePresent: Number(editForm.attendancePresent) || 0,
-			totalMeetings: Number(editForm.totalMeetings) || 16,
-			practicalScore: practical,
-			theoryScore: theory,
-			kwuScore: kwu,
-			grade: calculatedGrade,
+			attendanceRate: Number(editForm.attendanceRate) || 0,
+			grade: editForm.grade,
 			attitudeNote: editForm.attitudeNote,
 		});
 
@@ -346,12 +292,7 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 			await api.students[studentId.toString()]["course-grades"].post(newMK);
 		if (!error) {
 			toast.success("Mata Kuliah berhasil ditambahkan");
-			setNewMK({
-				courseCode: "",
-				courseName: "",
-				dosenId: user?.id || 0,
-				hasKwu: true,
-			});
+			setNewMK({ courseCode: "", courseName: "", dosenId: user?.id || 0 });
 			setShowAddModal(false);
 			fetchGrades();
 		} else {
@@ -528,20 +469,6 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 											? "bg-amber-50 border-amber-200"
 											: "bg-rose-50 border-rose-200";
 
-								const p = g.practicalScore || 0;
-								const t = g.theoryScore || 0;
-								const isInputted = p > 0 || t > 0;
-								const finalScore = p * 0.8 + t * 0.2;
-								let displayGrade = "E";
-								if (finalScore >= 85) displayGrade = "A";
-								else if (finalScore >= 75) displayGrade = "B";
-								else if (finalScore >= 65) displayGrade = "C";
-								else if (finalScore >= 50) displayGrade = "D";
-
-								const finalScoreString = isInputted
-									? `${finalScore.toFixed(1)} (${displayGrade})`
-									: "-";
-
 								return (
 									<Collapsible
 										key={g.id}
@@ -585,54 +512,19 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 														<div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-md border border-slate-100/50">
 															<span className="text-slate-500">Kehadiran:</span>
 															<span className="font-semibold">
-																{g.attendanceRate}% (
-																{g.attendancePresent ||
-																	(g.attendanceRate
-																		? Math.round(
-																				(g.attendanceRate / 100) *
-																					(g.totalMeetings || 16),
-																			)
-																		: 0)}
-																/{g.totalMeetings || 16})
+																{g.attendanceRate}%
 															</span>
-															{(g.attendanceRate || 0) >= 90 ? (
+															{(g.attendanceRate || 0) >= 70 ? (
 																<CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
 															) : (
 																<XCircle className="w-3.5 h-3.5 text-rose-500" />
 															)}
 														</div>
 														<div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-md border border-slate-100/50">
-															<span className="text-slate-500">
-																Nilai Akhir:
-															</span>
+															<span className="text-slate-500">Grade:</span>
 															<span className="font-bold text-blue-700">
-																{finalScoreString}
+																{g.grade || "-"}
 															</span>
-														</div>
-														<div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-md border border-slate-100/50">
-															<span className="text-slate-500">Praktik:</span>
-															<span className="font-semibold text-slate-700">
-																{g.practicalScore || 0}
-															</span>
-														</div>
-														<div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-md border border-slate-100/50">
-															<span className="text-slate-500">Teori:</span>
-															<span className="font-semibold text-slate-700">
-																{g.theoryScore || 0}
-															</span>
-														</div>
-														<div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-md border border-slate-100/50">
-															<span className="text-slate-500">KWU:</span>
-															<span className="font-semibold text-slate-700">
-																{g.hasKwu
-																	? `Rp ${(g.entrepreneurScore || 0).toLocaleString("id-ID")}`
-																	: "-"}
-															</span>
-															{g.hasKwu && (
-																<span className="text-xs text-slate-400 font-medium ml-1">
-																	(Skor: {g.kwuScore || 0})
-																</span>
-															)}
 														</div>
 														<div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-md border border-slate-100/50">
 															<span className="text-slate-500">Catatan:</span>
@@ -684,109 +576,59 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 													<div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
 														<div className="space-y-1.5">
 															<label className="text-xs font-medium text-slate-500">
-																Hadir
+																Kehadiran (%)
 															</label>
-															<Input
-																type="number"
-																value={editForm.attendancePresent}
-																onChange={(e) =>
-																	setEditForm({
-																		...editForm,
-																		attendancePresent:
-																			e.target.value === ""
-																				? ""
-																				: Number(e.target.value),
-																	})
-																}
-																className="bg-white h-9"
-																min={0}
-															/>
-														</div>
-														<div className="space-y-1.5">
-															<label className="text-xs font-medium text-slate-500">
-																Total Pertemuan
-															</label>
-															<Input
-																type="number"
-																value={editForm.totalMeetings}
-																onChange={(e) =>
-																	setEditForm({
-																		...editForm,
-																		totalMeetings:
-																			e.target.value === ""
-																				? ""
-																				: Number(e.target.value),
-																	})
-																}
-																className="bg-white h-9"
-																min={1}
-															/>
-														</div>
-														<div className="space-y-1.5">
-															<label className="text-xs font-medium text-slate-500">
-																Nilai Praktik (0-100)
-															</label>
-															<Input
-																type="number"
-																value={editForm.practicalScore}
-																onChange={(e) =>
-																	setEditForm({
-																		...editForm,
-																		practicalScore:
-																			e.target.value === ""
-																				? ""
-																				: Number(e.target.value),
-																	})
-																}
-																className="bg-white h-9"
-																min={0}
-																max={100}
-															/>
-														</div>
-														<div className="space-y-1.5">
-															<label className="text-xs font-medium text-slate-500">
-																Nilai Teori (0-100)
-															</label>
-															<Input
-																type="number"
-																value={editForm.theoryScore}
-																onChange={(e) =>
-																	setEditForm({
-																		...editForm,
-																		theoryScore:
-																			e.target.value === ""
-																				? ""
-																				: Number(e.target.value),
-																	})
-																}
-																className="bg-white h-9"
-																min={0}
-																max={100}
-															/>
-														</div>
-														{g.hasKwu && (
-															<div className="space-y-1.5">
-																<label className="text-xs font-medium text-slate-500">
-																	Skor KWU (0-100)
-																</label>
+															<div className="relative">
 																<Input
 																	type="number"
-																	value={editForm.kwuScore}
+																	value={editForm.attendanceRate}
 																	onChange={(e) =>
 																		setEditForm({
 																			...editForm,
-																			kwuScore:
+																			attendanceRate:
 																				e.target.value === ""
 																					? ""
 																					: Number(e.target.value),
 																		})
 																	}
-																	className="bg-white h-9 border-amber-200 focus-visible:ring-amber-500"
+																	className="bg-white pr-8 h-9"
 																	min={0}
 																	max={100}
 																/>
+																<span className="absolute right-3 top-2.5 text-xs font-medium text-slate-400">
+																	%
+																</span>
 															</div>
-														)}
+														</div>
+														<div className="space-y-1.5">
+															<label className="text-xs font-medium text-slate-500">
+																Grade
+															</label>
+															<Select
+																value={editForm.grade ?? ""}
+																onValueChange={(val) =>
+																	setEditForm({
+																		...editForm,
+																		grade: val as string,
+																	})
+																}
+															>
+																<SelectTrigger className="bg-white h-9">
+																	<SelectValue placeholder="Pilih Grade" />
+																</SelectTrigger>
+																<SelectContent>
+																	<SelectItem value="A">A</SelectItem>
+																	<SelectItem value="A-">A-</SelectItem>
+																	<SelectItem value="B+">B+</SelectItem>
+																	<SelectItem value="B">B</SelectItem>
+																	<SelectItem value="B-">B-</SelectItem>
+																	<SelectItem value="C+">C+</SelectItem>
+																	<SelectItem value="C">C</SelectItem>
+																	<SelectItem value="D">D</SelectItem>
+																	<SelectItem value="E">E</SelectItem>
+																</SelectContent>
+															</Select>
+														</div>
 														<div className="space-y-1.5">
 															<label className="text-xs font-medium text-slate-500">
 																Catatan Sikap
@@ -896,38 +738,6 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																documentKey="dispensation"
 																canEdit={canEditThisRow && !g.isAcc}
 															/>
-														</div>
-
-														<div className="border border-slate-200 rounded-lg p-4 bg-white shadow-sm">
-															<div className="mb-3">
-																<span className="font-semibold text-slate-700 text-sm block">
-																	Foto Produk Praktik
-																</span>
-																<span className="text-xs text-slate-500">
-																	Wajib untuk penilaian praktik dan
-																	kewirausahaan
-																</span>
-															</div>
-															<DocumentUpload
-																studentId={studentId}
-																panel="dosen"
-																courseId={g.id}
-																documentKey="product_photo"
-																canEdit={canEditThisRow && !g.isAcc}
-															/>
-															{g.productPhotoUrl && (
-																<div className="mt-3">
-																	<a
-																		href={g.productPhotoUrl}
-																		target="_blank"
-																		rel="noreferrer"
-																		className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1"
-																	>
-																		<Eye className="w-3 h-3" /> Lihat Foto Saat
-																		Ini
-																	</a>
-																</div>
-															)}
 														</div>
 													</div>
 												</div>
@@ -1270,20 +1080,6 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 								}
 							/>
 						</div>
-						<div className="flex items-center gap-2 pt-2">
-							<input
-								type="checkbox"
-								id="hasKwuCheck"
-								checked={newMK.hasKwu}
-								onChange={(e) =>
-									setNewMK({ ...newMK, hasKwu: e.target.checked })
-								}
-								className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-							/>
-							<label htmlFor="hasKwuCheck" className="text-sm text-slate-700">
-								Mata Kuliah memiliki praktik PKWU?
-							</label>
-						</div>
 					</div>
 					<DialogFooter>
 						<Button variant="outline" onClick={() => setShowAddModal(false)}>
@@ -1298,15 +1094,6 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
-
-			{/* NEW VOKASI MODULES */}
-			<AttitudeLogs studentId={studentId} courseGrades={gradesData} />
-			<Entrepreneurship
-				studentId={studentId}
-				courseGrades={gradesData}
-				onUpdate={fetchGrades}
-			/>
-			<WeeklyEvents studentId={studentId} />
 		</div>
 	);
 }

@@ -154,59 +154,67 @@ export function StatusPanel({
 
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 				{/* TABEL RINGKASAN PANEL */}
-				<Card className="border-slate-200 shadow-sm">
-					<CardHeader className="border-b border-slate-100 pb-4">
-						<CardTitle className="text-slate-800 text-base">
+				<Card className="bg-white border-slate-200 shadow-sm col-span-1 md:col-span-2">
+					<CardHeader className="bg-slate-50/50 border-b border-slate-200">
+						<CardTitle className="text-slate-800 text-lg">
 							Ringkasan per Modul
 						</CardTitle>
 					</CardHeader>
 					<CardContent className="p-0">
 						<Table>
-							<TableHeader className="bg-slate-50/50">
+							<TableHeader className="bg-slate-50">
 								<TableRow>
 									<TableHead className="font-semibold text-slate-600">
 										Modul
 									</TableHead>
-									<TableHead className="text-center font-semibold text-slate-600">
+									<TableHead className="font-semibold text-slate-600 text-center">
 										Selesai
 									</TableHead>
-									<TableHead className="font-semibold text-slate-600">
+									<TableHead className="font-semibold text-slate-600 text-center">
 										Status
+									</TableHead>
+									<TableHead className="font-semibold text-slate-600 text-center">
+										Stamp ACC
 									</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{data.panels.map((p) => (
-									<TableRow
-										key={p.id}
-										className={
-											p.status === "TIDAK_AMAN"
-												? "bg-rose-50/30"
-												: p.status === "PERLU_PERHATIAN"
-													? "bg-amber-50/30"
-													: ""
-										}
-									>
+								{data.panels.map((panel) => (
+									<TableRow key={panel.id} className="hover:bg-slate-50/50">
 										<TableCell className="font-medium text-slate-700">
-											{p.name}
+											{panel.name}
 										</TableCell>
 										<TableCell className="text-center text-slate-600">
-											{p.completed} / {p.total}
+											<span className="font-semibold text-slate-700">
+												{panel.completed}
+											</span>
+											<span className="text-slate-400"> / {panel.total}</span>
 										</TableCell>
-										<TableCell>
-											{p.status === "AMAN" && (
+										<TableCell className="text-center">
+											{panel.status === "AMAN" && (
 												<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none">
 													Aman
 												</Badge>
 											)}
-											{p.status === "PERLU_PERHATIAN" && (
+											{panel.status === "PERLU_PERHATIAN" && (
 												<Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none">
 													Proses
 												</Badge>
 											)}
-											{p.status === "TIDAK_AMAN" && (
+											{panel.status === "TIDAK_AMAN" && (
 												<Badge className="bg-rose-100 text-rose-700 hover:bg-rose-100 border-none">
 													Kendala
+												</Badge>
+											)}
+										</TableCell>
+										<TableCell className="text-center">
+											{(panel as any).isAcc ? (
+												<Badge className="bg-emerald-50 text-emerald-600 border border-emerald-200">
+													✅ ACC
+												</Badge>
+											) : (
+												<Badge className="bg-slate-50 text-slate-500 border border-slate-200">
+													⏳ Belum
 												</Badge>
 											)}
 										</TableCell>

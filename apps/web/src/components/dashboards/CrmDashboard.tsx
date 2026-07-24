@@ -49,12 +49,20 @@ export function CrmDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 		const exportData = data.map((s: any) => ({
 			NIM: s.student.nim,
 			"Nama Mahasiswa": s.student.name,
-			"ODS Aktif": s.crm?.odsActive ? "Ya" : "Tidak",
-			"Monitoring Siswa": s.crm?.studentMonitoring ? "Selesai" : "Belum",
-			"Follow Up Orang Tua": s.crm?.parentFollowUp ? "Selesai" : "Belum",
-			"Dokumentasi ODS": s.crm?.odsDocumentation ? "Ada" : "Belum",
+			"Monitoring Ortu": s.crm?.isMonitoringParent ? "Selesai" : "Belum",
+			"Monitoring Industri": s.crm?.isMonitoringIndustry ? "Selesai" : "Belum",
+			"Kendali Vocab": s.crm?.isVocabComplete ? "Selesai" : "Belum",
+			"Surat Izin Belajar": s.crm?.hasStudyPermit ? "Ada" : "Tidak",
+			"Rekap Kehadiran": s.crm?.practiceAttendance ? "Selesai" : "Belum",
 			"Hari Hadir Praktik": s.crm?.practiceDaysPresent || 0,
 			"Total Hari Praktik": s.crm?.practiceDaysTotal || 0,
+			"Laporan ODS": s.crm?.isOdsReport ? "Selesai" : "Belum",
+			"Dokumentasi ODS": s.crm?.odsDocumentation ? "Selesai" : "Belum",
+			"Laporan Pramagang": s.crm?.isPrammagangReport ? "Selesai" : "Belum",
+			"Dokumentasi Pramagang": s.crm?.isPrammagangDocumentation
+				? "Selesai"
+				: "Belum",
+			"Ada Kasus/Masalah": s.crm?.hasActiveCase ? "Ya" : "Tidak",
 			"Status CRM":
 				s.crm?.status === "AMAN"
 					? "Aman"
@@ -327,7 +335,9 @@ export function CrmDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 												<button
 													type="button"
 													onClick={() =>
-														router.push(`/dashboard/students/${s.student.id}`)
+														router.push(
+															`/dashboard/students/${s.student.id}?context=crm`,
+														)
 													}
 													className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
 												>

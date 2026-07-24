@@ -90,24 +90,42 @@ export default function StudentsPage() {
 		);
 	}
 
+	const getRealtimeOverallStatus = (s: any) => {
+		const panels = [
+			s.pmb?.isAcc ? "AMAN" : s.pmb?.status || "PERLU_PERHATIAN",
+			s.crm?.isAcc ? "AMAN" : s.crm?.status || "PERLU_PERHATIAN",
+			s.finance?.isAcc ? "AMAN" : s.finance?.status || "PERLU_PERHATIAN",
+			s.academic?.isAcc ? "AMAN" : s.academic?.status || "PERLU_PERHATIAN",
+			s.pa?.isAcc ? "AMAN" : s.pa?.status || "PERLU_PERHATIAN",
+			s.internship?.isAcc ? "AMAN" : s.internship?.status || "PERLU_PERHATIAN",
+		];
+
+		if (panels.includes("TIDAK_AMAN")) return "TIDAK_AMAN";
+		if (panels.includes("PERLU_PERHATIAN")) return "PERLU_PERHATIAN";
+		return "AMAN";
+	};
+
 	const handleExport = () => {
-		const exportData = data.map((s: any) => ({
-			NIM: s.student.nim,
-			"Nama Mahasiswa": s.student.name,
-			"Status Keseluruhan":
-				s.student.overallStatus === "AMAN"
-					? "Aman"
-					: s.student.overallStatus === "TIDAK_AMAN"
-						? "Tidak Aman"
-						: "Perlu Perhatian",
-			"Status PMB": s.pmb?.status || "-",
-			"Status CRM": s.crm?.status || "-",
-			"Status Finance": s.finance?.status || "-",
-			"Status Akademik": s.academic?.status || "-",
-			"Status PA": s.pa?.status || "-",
-			"Status Magang": s.internship?.status || "-",
-			"Disetujui Direktur": s.decision?.isApprovedByDirector ? "Ya" : "Belum",
-		}));
+		const exportData = data.map((s: any) => {
+			const rtStatus = getRealtimeOverallStatus(s);
+			return {
+				NIM: s.student.nim,
+				"Nama Mahasiswa": s.student.name,
+				"Status Keseluruhan":
+					rtStatus === "AMAN"
+						? "Aman"
+						: rtStatus === "TIDAK_AMAN"
+							? "Tidak Aman"
+							: "Perlu Perhatian",
+				"Status PMB": s.pmb?.status || "-",
+				"Status CRM": s.crm?.status || "-",
+				"Status Finance": s.finance?.status || "-",
+				"Status Akademik": s.academic?.status || "-",
+				"Status PA": s.pa?.status || "-",
+				"Status Magang": s.internship?.status || "-",
+				"Disetujui Direktur": s.decision?.isApprovedByDirector ? "Ya" : "Belum",
+			};
+		});
 		exportToCSV(
 			exportData,
 			`Data_Semua_Mahasiswa_${new Date().toISOString().split("T")[0]}`,
@@ -241,12 +259,6 @@ export default function StudentsPage() {
 						</TableHeader>
 						<TableBody>
 							{filteredData.map((s) => {
-								const sColor = s.student.overallStatus
-									? STATUS_COLORS[
-											s.student.overallStatus as keyof typeof STATUS_COLORS
-										]
-									: STATUS_COLORS.PERLU_PERHATIAN;
-
 								return (
 									<TableRow
 										key={s.student.id}
@@ -270,15 +282,24 @@ export default function StudentsPage() {
 											</Badge>
 										</TableCell>
 										<TableCell className="text-center">
-											<Badge
-												className={`${sColor.bg} ${sColor.text} ${sColor.border} border hover:bg-transparent`}
-											>
-												{s.student.overallStatus === "AMAN"
-													? "🟢 Aman"
-													: s.student.overallStatus === "TIDAK_AMAN"
-														? "🔴 Tdk Aman"
-														: "🟡 Perhatian"}
-											</Badge>
+											{(() => {
+												const rtStatus = getRealtimeOverallStatus(s);
+												const sColor =
+													STATUS_COLORS[
+														rtStatus as keyof typeof STATUS_COLORS
+													] || STATUS_COLORS.PERLU_PERHATIAN;
+												return (
+													<Badge
+														className={`${sColor.bg} ${sColor.text} ${sColor.border} border hover:bg-transparent`}
+													>
+														{rtStatus === "AMAN"
+															? "🟢 Aman"
+															: rtStatus === "TIDAK_AMAN"
+																? "🔴 Tdk Aman"
+																: "🟡 Perhatian"}
+													</Badge>
+												);
+											})()}
 										</TableCell>
 										{(isSuperOrEvaluator || role === "pmb") && (
 											<TableCell>

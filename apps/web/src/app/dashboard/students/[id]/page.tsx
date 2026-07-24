@@ -10,8 +10,8 @@ import {
 	XCircle,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AkademikPanel } from "@/components/panels/AkademikPanel";
 import { CatatanPanel } from "@/components/panels/CatatanPanel";
@@ -54,6 +54,7 @@ type StudentDetail = {
 		name: string;
 		cohort: number;
 		program: string;
+		subProgram?: string | null;
 		phone?: string | null;
 		parentName?: string | null;
 		paId?: number | null;
@@ -67,26 +68,31 @@ type StudentDetail = {
 		status: string | null;
 		isAcc?: boolean | null;
 		accAt?: string | Date | null;
+		accByUser?: { fullName: string } | null;
 	} | null;
 	crm: {
 		status: string | null;
 		isAcc?: boolean | null;
 		accAt?: string | Date | null;
+		accByUser?: { fullName: string } | null;
 	} | null;
 	finance: {
 		status: string | null;
 		isAcc?: boolean | null;
 		accAt?: string | Date | null;
+		accByUser?: { fullName: string } | null;
 	} | null;
 	academic: {
 		status: string | null;
 		isAcc?: boolean | null;
 		accAt?: string | Date | null;
+		accByUser?: { fullName: string } | null;
 	} | null;
 	internship: {
 		status: string | null;
 		isAcc?: boolean | null;
 		accAt?: string | Date | null;
+		accByUser?: { fullName: string } | null;
 	} | null;
 	decision: {
 		isApprovedByDirector: boolean | null;
@@ -97,6 +103,7 @@ type StudentDetail = {
 		status: string | null;
 		isAcc?: boolean | null;
 		accAt?: string | Date | null;
+		accByUser?: { fullName: string } | null;
 	} | null;
 };
 
@@ -126,7 +133,7 @@ const NAV_LINKS = [
 	{ id: "crm", label: "CRM", roles: ["superadmin", "crm"] },
 	{ id: "finance", label: "Finance", roles: ["superadmin", "finance"] },
 	{ id: "akademik", label: "Akademik", roles: ["superadmin", "akademik"] },
-	{ id: "dosen", label: "Dosen per MK", roles: ["superadmin", "dosen"] },
+	{ id: "dosen", label: "Dosen per MK", roles: ["dosen"] },
 	{ id: "pa", label: "PA", roles: ["superadmin", "pa"] },
 	{ id: "magang", label: "Tim Magang", roles: ["superadmin", "magang"] },
 	{ id: "status", label: "Status Akhir", roles: ["superadmin"] },
@@ -152,8 +159,22 @@ const NAV_LINKS = [
 ];
 
 export default function StudentDetailPage() {
+	return (
+		<Suspense
+			fallback={
+				<div className="p-10 text-center text-slate-500">Memuat profil...</div>
+			}
+		>
+			<StudentDetailContent />
+		</Suspense>
+	);
+}
+
+function StudentDetailContent() {
 	const params = useParams();
 	const router = useRouter();
+	const searchParams = useSearchParams();
+	const context = searchParams.get("context");
 	const { isAuthenticated, user, hasHydrated } = useAuthStore();
 	const [data, setData] = useState<StudentDetail | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
@@ -303,23 +324,43 @@ export default function StudentDetailPage() {
 			.toUpperCase();
 	};
 
-	const visibleLinks = NAV_LINKS.filter(
-		(link) => mounted && user?.role && link.roles.includes(user.role),
-	);
+	const visibleLinks = NAV_LINKS.filter((link) => {
+		if (!mounted || !user?.role || !link.roles.includes(user.role))
+			return false;
+		if (context && context !== "all") {
+			return link.id === context;
+		}
+		return true;
+	});
 
 	const scrollToAnchor = (id: string) => {
 		setActiveTab(id);
 	};
 
-	const renderStamp = (title: string, isAcc: boolean, date?: string) => (
-		<div className="flex flex-col items-center p-3 border border-slate-200 rounded-md bg-slate-50 min-w-[120px]">
-			<span className="text-xs font-semibold text-slate-500 mb-2">{title}</span>
+	const renderStamp = (
+		title: string,
+		isAcc: boolean,
+		date?: string,
+		accBy?: string,
+	) => (
+		<div className="flex flex-col items-center p-3 border border-slate-200 rounded-md bg-slate-50 min-w-[120px] max-w-[150px]">
+			<span className="text-xs font-semibold text-slate-500 mb-2 truncate w-full text-center">
+				{title}
+			</span>
 			{isAcc ? (
 				<>
 					<CheckCircle className="w-6 h-6 text-emerald-500 mb-1" />
 					<span className="text-[10px] text-emerald-400">ACC</span>
 					{date && (
 						<span className="text-[10px] text-slate-500 mt-1">{date}</span>
+					)}
+					{accBy && (
+						<span
+							className="text-[10px] text-emerald-600 mt-0.5 truncate w-full text-center px-1"
+							title={accBy}
+						>
+							Oleh: {accBy.split(" ")[0]}
+						</span>
 					)}
 				</>
 			) : (
@@ -449,6 +490,7 @@ export default function StudentDetailPage() {
 								</div>
 								<div>
 									<span className="text-slate-500">Program:</span> {s.program}
+									{s.subProgram ? ` - ${s.subProgram}` : ""}
 								</div>
 								<div>
 									<span className="text-slate-500">HP:</span> {s.phone || "-"}
@@ -521,7 +563,11 @@ export default function StudentDetailPage() {
 								) : currentLink.id === "pa" ? (
 									<PaPanel studentId={s.id} onUpdate={refetchStudent} />
 								) : currentLink.id === "magang" ? (
-									<InternshipPanel studentId={s.id} onUpdate={refetchStudent} />
+									<InternshipPanel
+										studentId={s.id}
+										destinationCountry={s.destinationCountry}
+										onUpdate={refetchStudent}
+									/>
 								) : currentLink.id === "status" ? (
 									<StatusPanel
 										studentId={s.id}
@@ -584,6 +630,7 @@ export default function StudentDetailPage() {
 								data.pmb?.accAt
 									? new Date(data.pmb.accAt).toLocaleDateString("id-ID")
 									: undefined,
+								data.pmb?.accByUser?.fullName,
 							)}
 							{renderStamp(
 								"CRM",
@@ -591,6 +638,7 @@ export default function StudentDetailPage() {
 								data.crm?.accAt
 									? new Date(data.crm.accAt).toLocaleDateString("id-ID")
 									: undefined,
+								data.crm?.accByUser?.fullName,
 							)}
 							{renderStamp(
 								"Finance",
@@ -598,6 +646,7 @@ export default function StudentDetailPage() {
 								data.finance?.accAt
 									? new Date(data.finance.accAt).toLocaleDateString("id-ID")
 									: undefined,
+								data.finance?.accByUser?.fullName,
 							)}
 							{renderStamp(
 								"Akademik",
@@ -605,6 +654,7 @@ export default function StudentDetailPage() {
 								data.academic?.accAt
 									? new Date(data.academic.accAt).toLocaleDateString("id-ID")
 									: undefined,
+								data.academic?.accByUser?.fullName,
 							)}
 							{renderStamp(
 								"Dosen",
@@ -631,6 +681,7 @@ export default function StudentDetailPage() {
 								data.pa?.accAt
 									? new Date(data.pa.accAt).toLocaleDateString("id-ID")
 									: undefined,
+								data.pa?.accByUser?.fullName,
 							)}
 							{renderStamp(
 								"Magang",
@@ -638,6 +689,7 @@ export default function StudentDetailPage() {
 								data.internship?.accAt
 									? new Date(data.internship.accAt).toLocaleDateString("id-ID")
 									: undefined,
+								data.internship?.accByUser?.fullName,
 							)}
 						</div>
 

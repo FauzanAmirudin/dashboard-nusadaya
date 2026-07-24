@@ -83,25 +83,9 @@ export function SharedDashboardLoader({
 			/>
 		);
 	if (module === "dosen") return <DosenDashboard user={user!} />;
-	if (module === "pa")
-		return (
-			<PaDashboard
-				data={data}
-				searchQuery={searchQuery}
-				setSearchQuery={setSearchQuery}
-				user={user}
-			/>
-		);
+	if (module === "pa") return <PaDashboard user={user} />;
 	if (module === "magang") return <MagangDashboard />;
-	if (module === "finance")
-		return (
-			<FinanceDashboard
-				data={data}
-				searchQuery={searchQuery}
-				setSearchQuery={setSearchQuery}
-				user={user}
-			/>
-		);
+	if (module === "finance") return <FinanceDashboard user={user} />;
 	if (module === "evaluator")
 		return (
 			<EvaluatorDashboard

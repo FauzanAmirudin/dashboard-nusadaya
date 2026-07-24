@@ -4,6 +4,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
 import {
+	academicAttitudeLogs,
 	academicData,
 	academicDocuments,
 	auditLogs,
@@ -13,6 +14,7 @@ import {
 	crmData,
 	crmDocuments,
 	crmLogs,
+	entrepreneurshipRecords,
 	finalDecision,
 	financeData,
 	financeDocuments,
@@ -21,11 +23,17 @@ import {
 	internshipDocuments,
 	paData,
 	paDocuments,
+	paInterviewLogs,
+	paTripartiteLogs,
 	pmbData,
 	pmbDocuments,
+	pmbFeeDisbursements,
+	pmbPaymentPlan,
+	postInternshipDocs,
 	students,
 	users,
 	vocabLogs,
+	weeklyEvents,
 } from "../db/schema";
 import { authSetup } from "../middleware/auth";
 import { requireRole } from "../middleware/rbac";
@@ -53,8 +61,16 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			.leftJoin(internshipData, eq(students.id, internshipData.studentId))
 			.leftJoin(finalDecision, eq(students.id, finalDecision.studentId))
 			.where(eq(students.isArchived, isArchived));
+		const allCourseGrades = await db.select().from(courseGrades);
 
-		return { success: true, data: results };
+		const dataWithCourses = results.map((r) => {
+			const courses = allCourseGrades.filter(
+				(c) => c.studentId === r.student.id,
+			);
+			return { ...r, courseGrades: courses };
+		});
+
+		return { success: true, data: dataWithCourses };
 	})
 	.post(
 		"/",
@@ -81,6 +97,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 					name: body.name,
 					cohort: body.cohort,
 					program: body.program,
+					subProgram: body.subProgram,
 					phone: body.phone,
 					parentName: body.parentName,
 					paId: body.paId,
@@ -93,7 +110,16 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			// Initialize related panels
 			const studentId = newStudent.id;
 			await Promise.all([
-				db.insert(pmbData).values({ studentId }),
+				db.insert(pmbData).values({
+					studentId,
+					rekomendasi: body.rekomendasi,
+					timVisit: body.timVisit,
+					timSosialisasi: body.timSosialisasi,
+					roReferral: body.roReferral,
+					mitraSponsor: body.mitraSponsor,
+					koordinator: body.koordinator,
+				}),
+				db.insert(pmbPaymentPlan).values({ studentId }),
 				db.insert(crmData).values({ studentId }),
 				db.insert(financeData).values({ studentId }),
 				db.insert(academicData).values({ studentId }),
@@ -110,12 +136,19 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				name: t.String(),
 				cohort: t.Number(),
 				program: t.String(),
+				subProgram: t.Optional(t.String()),
 				phone: t.Optional(t.String()),
 				parentName: t.Optional(t.String()),
 				paId: t.Optional(t.Number()),
 				studentStatus: t.Optional(t.String()),
 				destinationCountry: t.Optional(t.String()),
 				period: t.Optional(t.String()),
+				rekomendasi: t.Optional(t.String()),
+				timVisit: t.Optional(t.String()),
+				timSosialisasi: t.Optional(t.String()),
+				roReferral: t.Optional(t.String()),
+				mitraSponsor: t.Optional(t.String()),
+				koordinator: t.Optional(t.String()),
 			}),
 		},
 	)
@@ -155,6 +188,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				name: t.Optional(t.String()),
 				cohort: t.Optional(t.Number()),
 				program: t.Optional(t.String()),
+				subProgram: t.Optional(t.String()),
 				phone: t.Optional(t.String()),
 				parentName: t.Optional(t.String()),
 				paId: t.Optional(t.Number()),
@@ -286,43 +320,73 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			return { success: false, message: "Invalid ID" };
 		}
 
-		const results = await db
-			.select({
-				student: students,
-				pmb: pmbData,
-				crm: crmData,
-				finance: financeData,
-				academic: academicData,
-				pa: paData,
-				internship: internshipData,
-				decision: finalDecision,
-			})
-			.from(students)
-			.leftJoin(pmbData, eq(students.id, pmbData.studentId))
-			.leftJoin(crmData, eq(students.id, crmData.studentId))
-			.leftJoin(financeData, eq(students.id, financeData.studentId))
-			.leftJoin(academicData, eq(students.id, academicData.studentId))
-			.leftJoin(paData, eq(students.id, paData.studentId))
-			.leftJoin(internshipData, eq(students.id, internshipData.studentId))
-			.leftJoin(finalDecision, eq(students.id, finalDecision.studentId))
-			.where(eq(students.id, id))
-			.limit(1);
+		const student = await db.query.students.findFirst({
+			where: eq(students.id, id),
+		});
 
-		if (results.length === 0) {
+		if (!student) {
 			set.status = 404;
 			return { success: false, message: "Student not found" };
 		}
 
-		const studentData = results[0];
-
-		const grades = await db.query.courseGrades.findMany({
-			where: eq(courseGrades.studentId, id),
-		});
+		const [
+			pmb,
+			pmbPayment,
+			crm,
+			finance,
+			academic,
+			pa,
+			internship,
+			decision,
+			grades,
+		] = await Promise.all([
+			db.query.pmbData.findFirst({
+				where: eq(pmbData.studentId, id),
+				with: { accBy: { columns: { fullName: true } } },
+			}),
+			db.query.pmbPaymentPlan.findFirst({
+				where: eq(pmbPaymentPlan.studentId, id),
+			}),
+			db.query.crmData.findFirst({
+				where: eq(crmData.studentId, id),
+				with: { accBy: { columns: { fullName: true } } },
+			}),
+			db.query.financeData.findFirst({
+				where: eq(financeData.studentId, id),
+				with: { accBy: { columns: { fullName: true } } },
+			}),
+			db.query.academicData.findFirst({
+				where: eq(academicData.studentId, id),
+				with: { accBy: { columns: { fullName: true } } },
+			}),
+			db.query.paData.findFirst({
+				where: eq(paData.studentId, id),
+				with: { accBy: { columns: { fullName: true } } },
+			}),
+			db.query.internshipData.findFirst({
+				where: eq(internshipData.studentId, id),
+				with: { accBy: { columns: { fullName: true } } },
+			}),
+			db.query.finalDecision.findFirst({
+				where: eq(finalDecision.studentId, id),
+			}),
+			db.query.courseGrades.findMany({
+				where: eq(courseGrades.studentId, id),
+				with: { accBy: { columns: { fullName: true } } },
+			}),
+		]);
 
 		return {
 			success: true,
 			data: {
-				...studentData,
+				student,
+				pmb: pmb ? { ...pmb, paymentPlan: pmbPayment } : null,
+				crm,
+				finance,
+				academic,
+				pa,
+				internship,
+				decision,
 				courseGrades: grades,
 			},
 		};
@@ -395,8 +459,16 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			academic?.assignmentsCompleted,
 			academic?.academicCommunication,
 		];
+
+		const attTotal = academic?.attendanceTotal || 0;
+		const attPresent = academic?.attendancePresent || 0;
+		const attendancePassed =
+			attTotal > 0 ? (attPresent / attTotal) * 100 >= 70 : false;
+
+		acdChecks.push(attendancePassed);
+
 		const acdCompleted = acdChecks.filter(Boolean).length;
-		const acdTotal = 6;
+		const acdTotal = 7;
 
 		const paChecks = [pa?.counselingDone, pa?.mentalStable, pa?.disciplineGood];
 		const paCompleted = paChecks.filter(Boolean).length;
@@ -482,17 +554,10 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			crmCompleted +
 			finCompleted +
 			acdCompleted +
-			courseCompleted +
 			paCompleted +
 			intCompleted;
 		const totalIndicators =
-			pmbTotal +
-			crmTotal +
-			finTotal +
-			acdTotal +
-			courseTotal +
-			paTotal +
-			intTotal;
+			pmbTotal + crmTotal + finTotal + acdTotal + paTotal + intTotal;
 
 		const incompleteIndicators: Array<{
 			panel: string;
@@ -599,6 +664,13 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				panel: "Akademik",
 				name: "Input PDDIKTI",
 				status: "TIDAK_AMAN",
+				link: "akademik",
+			});
+		if (!attendancePassed)
+			incompleteIndicators.push({
+				panel: "Akademik",
+				name: "Kehadiran >= 70%",
+				status: "PERLU_PERHATIAN",
 				link: "akademik",
 			});
 		if (!academic?.utsPassed)
@@ -774,6 +846,12 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 					dataInputted: body.dataInputted,
 					initialFollowUp: body.initialFollowUp,
 					notes: body.notes,
+					rekomendasi: body.rekomendasi,
+					timVisit: body.timVisit,
+					timSosialisasi: body.timSosialisasi,
+					roReferral: body.roReferral,
+					mitraSponsor: body.mitraSponsor,
+					koordinator: body.koordinator,
 					updatedAt: new Date(),
 				})
 				.where(eq(pmbData.studentId, id));
@@ -805,6 +883,12 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				dataInputted: t.Boolean(),
 				initialFollowUp: t.Boolean(),
 				notes: t.Optional(t.String()),
+				rekomendasi: t.Optional(t.String()),
+				timVisit: t.Optional(t.String()),
+				timSosialisasi: t.Optional(t.String()),
+				roReferral: t.Optional(t.String()),
+				mitraSponsor: t.Optional(t.String()),
+				koordinator: t.Optional(t.String()),
 			}),
 		},
 	)
@@ -874,13 +958,17 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			},
 		});
 
+		const paymentPlan = await db.query.pmbPaymentPlan.findFirst({
+			where: eq(pmbPaymentPlan.studentId, id),
+		});
+
 		if (!pmb) {
 			set.status = 404;
 			return { success: false, message: "PMB data not found" };
 		}
 
 		const { accBy: accByUser, ...rest } = pmb as any;
-		return { success: true, data: { ...rest, accByUser } };
+		return { success: true, data: { ...rest, accByUser, paymentPlan } };
 	})
 	.get("/:id/pmb/documents", async ({ params, set }) => {
 		const id = Number(params.id);
@@ -1061,6 +1149,156 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 		return { success: true };
 	})
 
+	.get("/:id/pmb/payment-plan", async ({ params, set }) => {
+		const id = parseInt(params.id, 10);
+		const plan = await db.query.pmbPaymentPlan.findFirst({
+			where: eq(pmbPaymentPlan.studentId, id),
+		});
+		if (!plan) return { success: false, message: "Not found" };
+		return { success: true, data: plan };
+	})
+	.put(
+		"/:id/pmb/payment-plan",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const id = parseInt(params.id, 10);
+
+			await db
+				.update(pmbPaymentPlan)
+				.set({
+					totalBiaya: body.totalBiaya,
+					pendaftaranDp: body.pendaftaranDp,
+					totalDp: body.totalDp,
+					pembayaranAwalDp: body.pembayaranAwalDp,
+					statusDp: body.statusDp,
+					janjiTahap2: body.janjiTahap2 ? new Date(body.janjiTahap2) : null,
+					janjiTahap2Nominal: body.janjiTahap2Nominal,
+					janjiTahap2Notes: body.janjiTahap2Notes,
+					janjiTahap3: body.janjiTahap3 ? new Date(body.janjiTahap3) : null,
+					janjiTahap3Nominal: body.janjiTahap3Nominal,
+					janjiTahap3Notes: body.janjiTahap3Notes,
+					pengajuanDanaTalangan: body.pengajuanDanaTalangan,
+					updatedAt: new Date(),
+				})
+				.where(eq(pmbPaymentPlan.studentId, id));
+
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				totalBiaya: t.Optional(t.Number()),
+				pendaftaranDp: t.Optional(t.Number()),
+				totalDp: t.Optional(t.Number()),
+				pembayaranAwalDp: t.Optional(t.Number()),
+				statusDp: t.Optional(t.Boolean()),
+				janjiTahap2: t.Optional(t.String()),
+				janjiTahap2Nominal: t.Optional(t.Number()),
+				janjiTahap2Notes: t.Optional(t.String()),
+				janjiTahap3: t.Optional(t.String()),
+				janjiTahap3Nominal: t.Optional(t.Number()),
+				janjiTahap3Notes: t.Optional(t.String()),
+				pengajuanDanaTalangan: t.Optional(t.String()),
+			}),
+		},
+	)
+	.get("/:id/pmb/fee-disbursements", async ({ params }) => {
+		const id = parseInt(params.id, 10);
+		const fees = await db.query.pmbFeeDisbursements.findMany({
+			where: eq(pmbFeeDisbursements.studentId, id),
+			orderBy: [desc(pmbFeeDisbursements.createdAt)],
+		});
+		return { success: true, data: fees };
+	})
+	.post(
+		"/:id/pmb/fee-disbursements",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const id = parseInt(params.id, 10);
+
+			const [newFee] = await db
+				.insert(pmbFeeDisbursements)
+				.values({
+					studentId: id,
+					channel: body.channel,
+					namaReferral: body.namaReferral,
+					nominalFee: body.nominalFee,
+					statusPencairan: body.statusPencairan || "belum",
+					tanggalCair: body.tanggalCair ? new Date(body.tanggalCair) : null,
+				})
+				.returning();
+
+			return { success: true, data: newFee };
+		},
+		{
+			body: t.Object({
+				channel: t.String(),
+				namaReferral: t.String(),
+				nominalFee: t.Optional(t.Number()),
+				statusPencairan: t.Optional(t.String()),
+				tanggalCair: t.Optional(t.String()),
+			}),
+		},
+	)
+	.patch(
+		"/:id/pmb/fee-disbursements/:feeId",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			const feeId = parseInt(params.feeId, 10);
+
+			await db
+				.update(pmbFeeDisbursements)
+				.set({
+					channel: body.channel,
+					namaReferral: body.namaReferral,
+					nominalFee: body.nominalFee,
+					statusPencairan: body.statusPencairan,
+					tanggalCair: body.tanggalCair ? new Date(body.tanggalCair) : null,
+					updatedAt: new Date(),
+				})
+				.where(eq(pmbFeeDisbursements.id, feeId));
+
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				channel: t.Optional(t.String()),
+				namaReferral: t.Optional(t.String()),
+				nominalFee: t.Optional(t.Number()),
+				statusPencairan: t.Optional(t.String()),
+				tanggalCair: t.Optional(t.String()),
+			}),
+		},
+	)
+	.delete("/:id/pmb/fee-disbursements/:feeId", async (context) => {
+		const { params, set } = context;
+		const user = (context as any).user;
+		if (!user || user.role !== "superadmin") {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+		const feeId = parseInt(params.feeId, 10);
+		await db
+			.delete(pmbFeeDisbursements)
+			.where(eq(pmbFeeDisbursements.id, feeId));
+		return { success: true };
+	})
+
 	// --- CRM ROUTES ---
 	.get("/:id/crm", async ({ params, set }) => {
 		const id = Number(params.id);
@@ -1135,19 +1373,26 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				where: eq(crmData.studentId, id),
 			});
 			if (updated) {
-				let checked = 0;
-				if (updated.odsActive) checked++;
-				if (updated.studentMonitoring) checked++;
-				if (updated.parentFollowUp) checked++;
-				if (updated.practiceAttendance) checked++;
-				if (updated.odsDocumentation) checked++;
+				const crmChecks = [
+					updated.isMonitoringParent,
+					updated.isMonitoringIndustry,
+					updated.isVocabComplete,
+					updated.practiceAttendance,
+					updated.isOdsReport,
+					updated.odsDocumentation,
+					updated.isPrammagangReport,
+					updated.isPrammagangDocumentation,
+				];
+
+				const checked = crmChecks.filter(Boolean).length;
+				const totalChecks = 8;
 
 				let status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
-				if (checked === 5) status = "AMAN";
-				else if (checked >= 3) status = "PERLU_PERHATIAN";
+				if (checked === totalChecks) status = "AMAN";
+				else if (checked >= 4) status = "PERLU_PERHATIAN";
 
 				const extraUpdates: any = { status };
-				if (checked < 5 && updated.isAcc) {
+				if (checked < totalChecks && updated.isAcc) {
 					extraUpdates.isAcc = false;
 					extraUpdates.accAt = null;
 					extraUpdates.accBy = null;
@@ -1171,7 +1416,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			const { params, body, set } = context;
 			const user = (context as any).user;
 			const id = Number(params.id);
-			const { logText } = body as { logText: string };
+			const payload = body as any;
 
 			if (!user) {
 				set.status = 401;
@@ -1181,13 +1426,29 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			await db.insert(crmLogs).values({
 				studentId: id,
 				authorId: user.id,
-				logText,
+				startTime: payload.startTime,
+				endTime: payload.endTime,
+				media: payload.media,
+				location: payload.location,
+				topic: payload.topic,
+				logText: payload.logText,
+				agreements: payload.agreements || [],
+				followUps: payload.followUps || [],
 			});
 
 			return { success: true };
 		},
 		{
-			body: t.Object({ logText: t.String() }),
+			body: t.Object({
+				startTime: t.Optional(t.String()),
+				endTime: t.Optional(t.String()),
+				media: t.Optional(t.String()),
+				location: t.Optional(t.String()),
+				topic: t.Optional(t.String()),
+				logText: t.String(),
+				agreements: t.Optional(t.Array(t.String())),
+				followUps: t.Optional(t.Array(t.Any())),
+			}),
 		},
 	)
 	.post("/:id/crm/acc", async (context) => {
@@ -1203,16 +1464,19 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			where: eq(crmData.studentId, id),
 		});
 		if (
-			!currentCrm?.odsActive ||
-			!currentCrm.studentMonitoring ||
-			!currentCrm.parentFollowUp ||
+			!currentCrm?.isMonitoringParent ||
+			!currentCrm.isMonitoringIndustry ||
+			!currentCrm.isVocabComplete ||
 			!currentCrm.practiceAttendance ||
-			!currentCrm.odsDocumentation
+			!currentCrm.isOdsReport ||
+			!currentCrm.odsDocumentation ||
+			!currentCrm.isPrammagangReport ||
+			!currentCrm.isPrammagangDocumentation
 		) {
 			set.status = 400;
 			return {
 				success: false,
-				message: "Semua checklist harus selesai sebelum ACC.",
+				message: "Semua checklist (8 item) harus selesai sebelum ACC.",
 			};
 		}
 
@@ -1444,17 +1708,61 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				return { success: false, message: "Unauthorized" };
 			}
 
-			if (
-				user.role !== "finance" &&
-				user.role !== "superadmin" &&
-				user.role !== "superadmin"
-			) {
+			const isFinance = user.role === "finance" || user.role === "superadmin";
+			const isMagang = user.role === "magang";
+
+			if (!isFinance && !isMagang) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
 
 			const id = Number(params.id);
 			const updates = body as Record<string, any>;
+
+			if (isMagang) {
+				const allowedKeys = [
+					"danaT1Amount",
+					"danaT1Date",
+					"danaT1Notes",
+					"isDanaT1Disbursed",
+					"danaT2Amount",
+					"danaT2Date",
+					"danaT2Notes",
+					"isDanaT2Disbursed",
+					"danaTalaganProvider",
+					"danaTalaganProviderType",
+				];
+				const hasForbiddenKey = Object.keys(updates).some(
+					(k) => !allowedKeys.includes(k),
+				);
+				if (hasForbiddenKey) {
+					set.status = 403;
+					return {
+						success: false,
+						message: "Tim Magang hanya dapat mengupdate data Dana Talangan",
+					};
+				}
+			}
+
+			// Only validate if they are actively trying to set Tahap 2 values
+			const isSettingTahap2 =
+				updates.isDanaT2Disbursed === true ||
+				(updates.danaT2Amount && Number(updates.danaT2Amount) > 0) ||
+				(updates.danaT2Date && updates.danaT2Date.trim() !== "");
+
+			if (isSettingTahap2) {
+				const internship = await db.query.internshipData.findFirst({
+					where: eq(internshipData.studentId, id),
+				});
+				if (!internship?.visaReady) {
+					set.status = 400;
+					return {
+						success: false,
+						message:
+							"Pencairan Tahap 2 hanya dapat dilakukan setelah Visa dinyatakan 'Turun' di Panel Magang.",
+					};
+				}
+			}
 
 			const current = await db.query.financeData.findFirst({
 				where: eq(financeData.studentId, id),
@@ -1476,6 +1784,10 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 					cleanUpdates.semesterDate = new Date(cleanUpdates.semesterDate);
 				if (cleanUpdates.installmentDate)
 					cleanUpdates.installmentDate = new Date(cleanUpdates.installmentDate);
+				if (cleanUpdates.danaT1Date)
+					cleanUpdates.danaT1Date = new Date(cleanUpdates.danaT1Date);
+				if (cleanUpdates.danaT2Date)
+					cleanUpdates.danaT2Date = new Date(cleanUpdates.danaT2Date);
 
 				await db
 					.update(financeData)
@@ -1570,6 +1882,103 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				isAcc: false,
 				accAt: null,
 				accBy: null,
+			})
+			.where(eq(financeData.studentId, id));
+
+		return { success: true };
+	})
+
+	// --- FINANCE INVOICE PMB ---
+	.post(
+		"/:id/finance/invoice",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const id = Number(params.id);
+			const file = (body as any).file as File;
+
+			if (!file) {
+				set.status = 400;
+				return { success: false, message: "File diperlukan" };
+			}
+
+			// Ensure directory exists
+			const uploadDir = `./uploads/finance/${id}`;
+			const fs = require("fs");
+			if (!fs.existsSync(uploadDir)) {
+				fs.mkdirSync(uploadDir, { recursive: true });
+			}
+
+			const filePath = `${uploadDir}/${file.name}`;
+			await Bun.write(filePath, file);
+
+			await db
+				.update(financeData)
+				.set({
+					invoiceFileUrl: filePath,
+					invoiceFileName: file.name,
+					invoiceUploadedAt: new Date(),
+					invoiceUploadedBy: user.id,
+				})
+				.where(eq(financeData.studentId, id));
+
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				file: t.File(),
+			}),
+		},
+	)
+	.get("/:id/finance/invoice/download", async (context) => {
+		const { params, set } = context;
+		const user = (context as any).user;
+		if (!user || !["finance", "pmb", "superadmin"].includes(user.role)) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+		const id = Number(params.id);
+		const finance = await db.query.financeData.findFirst({
+			where: eq(financeData.studentId, id),
+		});
+		if (!finance?.invoiceFileUrl) {
+			set.status = 404;
+			return { success: false, message: "Invoice belum diunggah" };
+		}
+
+		const file = Bun.file(finance.invoiceFileUrl);
+		if (!(await file.exists())) {
+			set.status = 404;
+			return { success: false, message: "File tidak ditemukan di server" };
+		}
+
+		return new Response(file, {
+			headers: {
+				"Content-Disposition": `attachment; filename="${finance.invoiceFileName}"`,
+				"Content-Type": "application/pdf",
+			},
+		});
+	})
+	.delete("/:id/finance/invoice", async (context) => {
+		const { params, set } = context;
+		const user = (context as any).user;
+		if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+		const id = Number(params.id);
+
+		await db
+			.update(financeData)
+			.set({
+				invoiceFileUrl: null,
+				invoiceFileName: null,
+				invoiceUploadedAt: null,
+				invoiceUploadedBy: null,
 			})
 			.where(eq(financeData.studentId, id));
 
@@ -1720,26 +2129,39 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			});
 			if (updated) {
 				let checked = 0;
+				let totalRequired = 6;
+
 				if (updated.pddiktiInput) checked++;
-
-				const total = updated.attendanceTotal ?? 0;
-				const present = updated.attendancePresent ?? 0;
-				const attRate = total > 0 ? (present / total) * 100 : 0;
-				if (attRate >= 70) checked++;
-
 				if (updated.utsPassed) checked++;
 				if (updated.uasPassed) checked++;
 				if (updated.attitudeIndicator) checked++;
 				if (updated.assignmentsCompleted) checked++;
 				if (updated.academicCommunication) checked++;
 
+				if (updated.taiwanCohort) {
+					totalRequired += 12;
+					if (updated.taiwanPasFotoChecked) checked++;
+					if (updated.taiwanCvChecked) checked++;
+					if (updated.taiwanKtmChecked) checked++;
+					if (updated.taiwanKhsChecked) checked++;
+					if (updated.taiwanSl21Checked) checked++;
+					if (updated.taiwanAktifChecked) checked++;
+					if (updated.taiwanGapYearChecked) checked++;
+					if (updated.taiwanPddiktiChecked) checked++;
+					if (updated.taiwanPribadiChecked) checked++;
+					if (updated.taiwanLolChecked) checked++;
+					if (updated.taiwanLoaChecked) checked++;
+					if (updated.taiwanSuhhanChecked) checked++;
+				}
+
 				let status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
-				if (checked === 7) status = "AMAN";
-				else if (checked >= 4) status = "PERLU_PERHATIAN";
+				if (checked === totalRequired) status = "AMAN";
+				else if (checked >= Math.floor(totalRequired / 2))
+					status = "PERLU_PERHATIAN";
 
 				const toUpdate: any = { status };
 
-				if (updated.isAcc && checked < 7) {
+				if (updated.isAcc && checked < totalRequired) {
 					toUpdate.isAcc = false;
 					toUpdate.accAt = null;
 					toUpdate.accBy = null;
@@ -1910,6 +2332,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				courseCode: string;
 				courseName: string;
 				dosenId: number;
+				hasKwu?: boolean;
 			};
 
 			await db.insert(courseGrades).values({
@@ -1917,6 +2340,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				courseCode: input.courseCode,
 				courseName: input.courseName,
 				dosenId: input.dosenId,
+				hasKwu: input.hasKwu ?? false,
 			});
 
 			return { success: true };
@@ -1926,6 +2350,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				courseCode: t.String(),
 				courseName: t.String(),
 				dosenId: t.Number(),
+				hasKwu: t.Optional(t.Boolean()),
 			}),
 		},
 	)
@@ -1982,35 +2407,74 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				...updates,
 				updatedAt: new Date(),
 			};
+
+			// If attendancePresent and totalMeetings are updated, calculate attendanceRate
+			if (
+				cleanUpdates.attendancePresent !== undefined ||
+				cleanUpdates.totalMeetings !== undefined
+			) {
+				const present =
+					cleanUpdates.attendancePresent ?? current.attendancePresent ?? 0;
+				const total = cleanUpdates.totalMeetings ?? current.totalMeetings ?? 16;
+				cleanUpdates.attendanceRate =
+					total > 0 ? Math.round((present / total) * 100) : 0;
+			}
+
 			await db
 				.update(courseGrades)
 				.set(cleanUpdates)
 				.where(eq(courseGrades.id, courseId));
 
-			// Recalculate status per MK
+			// Recalculate status and calculated grade per MK
 			const updated = await db.query.courseGrades.findFirst({
 				where: eq(courseGrades.id, courseId),
 			});
 			if (updated) {
 				let status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
 				const att = updated.attendanceRate || 0;
-				const grade = updated.grade || "E";
 				const attitude = updated.attitudeNote || "Buruk";
 
-				// Status logic from UI Plan
-				const isAmanGrade = ["A", "A-", "B+", "B"].includes(grade);
-				const isPerhatianGrade = grade === "B-";
+				// Vocation Grade Calculation
+				const practical = updated.practicalScore || 0;
+				const theory = updated.theoryScore || 0;
+				const kwu = updated.kwuScore || 0;
 
-				if (att >= 70 && isAmanGrade && attitude === "Baik") {
+				// Calculate final grade (100 scale)
+				// If no KWU, move the 15% weight to theory
+				let calculatedGrade = 0;
+				if (updated.hasKwu) {
+					calculatedGrade =
+						practical * 0.5 + theory * 0.2 + kwu * 0.15 + att * 0.15;
+				} else {
+					calculatedGrade = practical * 0.5 + theory * 0.35 + att * 0.15;
+				}
+
+				// Convert to letter grade
+				let letterGrade = "E";
+				if (calculatedGrade >= 85) letterGrade = "A";
+				else if (calculatedGrade >= 80) letterGrade = "A-";
+				else if (calculatedGrade >= 75) letterGrade = "B+";
+				else if (calculatedGrade >= 70) letterGrade = "B";
+				else if (calculatedGrade >= 65) letterGrade = "B-";
+				else if (calculatedGrade >= 60) letterGrade = "C+";
+				else if (calculatedGrade >= 55) letterGrade = "C";
+				else if (calculatedGrade >= 40) letterGrade = "D";
+
+				// Status logic from UI Plan v4.0
+				const isAmanGrade = ["A", "A-", "B+", "B"].includes(letterGrade);
+				const isPerhatianGrade = ["B-", "C+", "C"].includes(letterGrade);
+
+				// New threshold: 90%
+				if (att >= 90 && isAmanGrade && attitude === "Baik") {
 					status = "AMAN";
-				} else if (att >= 60 || isPerhatianGrade) {
+				} else if (att >= 90 && isPerhatianGrade) {
 					status = "PERLU_PERHATIAN";
 				}
-				// If att < 60 or grade <= C, it remains TIDAK_AMAN
+				// If att < 90, it auto locks and is TIDAK_AMAN
 
 				await db
 					.update(courseGrades)
-					.set({ status })
+					.set({ status, grade: letterGrade })
 					.where(eq(courseGrades.id, courseId));
 			}
 
@@ -2142,7 +2606,12 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 		const courseId = Number(params.courseId);
 		const documentKey = params.documentKey;
 
-		const allowedKeys = ["attendance_proof", "grade_card", "dispensation"];
+		const allowedKeys = [
+			"attendance_proof",
+			"grade_card",
+			"dispensation",
+			"product_photo",
+		];
 		if (!allowedKeys.includes(documentKey)) {
 			set.status = 400;
 			return { success: false, message: "Document key tidak valid" };
@@ -2190,7 +2659,18 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			uploadedBy: user.id,
 		});
 
-		return { success: true, message: "File berhasil diupload" };
+		if (documentKey === "product_photo") {
+			await db
+				.update(courseGrades)
+				.set({ productPhotoUrl: filePath })
+				.where(eq(courseGrades.id, courseId));
+		}
+
+		return {
+			success: true,
+			message: "File berhasil diunggah",
+			fileUrl: filePath,
+		};
 	})
 	.get("/:id/course-grades/:courseId/documents", async ({ params }) => {
 		const courseId = Number(params.courseId);
@@ -2282,6 +2762,142 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 		return { success: true };
 	})
 
+	// --- ACADEMIC V4 NEW MODULES ---
+	.get("/:id/attitude-logs", async ({ params }) => {
+		const id = Number(params.id);
+		const logs = await db.query.academicAttitudeLogs.findMany({
+			where: eq(academicAttitudeLogs.studentId, id),
+			with: { dosenId: { columns: { fullName: true } } },
+			orderBy: (t, { desc }) => [desc(t.date)],
+		});
+		return { success: true, data: logs };
+	})
+	.post(
+		"/:id/attitude-logs",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!user || (user.role !== "dosen" && user.role !== "superadmin")) {
+				set.status = 403;
+				return {
+					success: false,
+					message: "Only dosen or superadmin can post attitude logs",
+				};
+			}
+			const input = body as any;
+			await db.insert(academicAttitudeLogs).values({
+				studentId: Number(params.id),
+				courseGradeId: Number(input.courseGradeId),
+				dosenId: user.id,
+				disciplineScore: Number(input.disciplineScore),
+				activenessScore: Number(input.activenessScore),
+				date: new Date(input.date),
+				notes: input.notes,
+			});
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				courseGradeId: t.Any(),
+				disciplineScore: t.Any(),
+				activenessScore: t.Any(),
+				date: t.Any(),
+				notes: t.Optional(t.Any()),
+			}),
+		},
+	)
+	.get("/:id/entrepreneurship", async ({ params }) => {
+		const id = Number(params.id);
+		const logs = await db.query.entrepreneurshipRecords.findMany({
+			where: eq(entrepreneurshipRecords.studentId, id),
+			orderBy: (t, { desc }) => [desc(t.weekDate)],
+		});
+		return { success: true, data: logs };
+	})
+	.post(
+		"/:id/entrepreneurship",
+		async (context) => {
+			const { params, body, set } = context;
+			const input = body as any;
+
+			// Auto calculate profit sharing (simplified logic as per UI plan)
+			const revenue = Number(input.revenueTotal || 0);
+			const share = Math.floor(revenue / 3);
+
+			await db.insert(entrepreneurshipRecords).values({
+				studentId: Number(params.id),
+				courseGradeId: Number(input.courseGradeId),
+				businessType: input.businessType,
+				productionQty: Number(input.productionQty),
+				revenueTotal: revenue,
+				profitSharingStudent: share,
+				profitSharingDosen: share,
+				profitSharingLembaga: share,
+				weekDate: new Date(input.weekDate),
+				notes: input.notes,
+			});
+
+			// Calculate total kwu score for course grade
+			const records = await db.query.entrepreneurshipRecords.findMany({
+				where: eq(entrepreneurshipRecords.courseGradeId, input.courseGradeId),
+			});
+
+			// Sum up total revenue for the PKWU score
+			const totalRevenue = records.reduce(
+				(sum, r) => sum + (r.revenueTotal || 0),
+				0,
+			);
+
+			await db
+				.update(courseGrades)
+				.set({ entrepreneurScore: totalRevenue })
+				.where(eq(courseGrades.id, input.courseGradeId));
+
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				courseGradeId: t.Any(),
+				businessType: t.Any(),
+				productionQty: t.Any(),
+				revenueTotal: t.Any(),
+				weekDate: t.Any(),
+				notes: t.Optional(t.Any()),
+			}),
+		},
+	)
+	.get("/:id/weekly-events", async ({ params }) => {
+		const id = Number(params.id);
+		const logs = await db.query.weeklyEvents.findMany({
+			where: eq(weeklyEvents.studentId, id),
+			orderBy: (t, { desc }) => [desc(t.eventDate)],
+		});
+		return { success: true, data: logs };
+	})
+	.post(
+		"/:id/weekly-events",
+		async (context) => {
+			const { params, body } = context;
+			const input = body as any;
+			await db.insert(weeklyEvents).values({
+				studentId: Number(params.id),
+				eventType: input.eventType,
+				eventDate: new Date(input.eventDate),
+				description: input.description,
+				documentUrl: input.documentUrl,
+			});
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				eventType: t.Any(),
+				eventDate: t.Any(),
+				description: t.Optional(t.Any()),
+				documentUrl: t.Optional(t.Any()),
+			}),
+		},
+	)
+
 	// --- PA ROUTES ---
 	.get("/:id/pa", async ({ params }) => {
 		const id = Number(params.id);
@@ -2302,11 +2918,23 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			orderBy: (logs, { desc }) => [desc(logs.date)],
 		});
 
+		const tripartiteLogs = await db.query.paTripartiteLogs.findMany({
+			where: eq(paTripartiteLogs.studentId, id),
+			orderBy: (logs, { desc }) => [desc(logs.contactDate)],
+		});
+
+		const interviewLogs = await db.query.paInterviewLogs.findMany({
+			where: eq(paInterviewLogs.studentId, id),
+			orderBy: (logs, { desc }) => [desc(logs.interviewDate)],
+		});
+
 		return {
 			success: true,
 			data: paInfo || null,
 			vocabLogs: vocab || [],
 			counselingLogs: counseling || [],
+			tripartiteLogs: tripartiteLogs || [],
+			interviewLogs: interviewLogs || [],
 		};
 	})
 	.patch(
@@ -2429,6 +3057,33 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			return { success: false, message: "Forbidden" };
 		}
 
+		const paInfo = await db.query.paData.findFirst({
+			where: eq(paData.studentId, id),
+		});
+
+		if (!paInfo) {
+			set.status = 404;
+			return { success: false, message: "PA Data not found" };
+		}
+
+		const vocab = await db.query.vocabLogs.findMany({
+			where: eq(vocabLogs.studentId, id),
+		});
+
+		const totalVocab = vocab.reduce((sum, log) => sum + log.addedWords, 0);
+		const targetVocab = paInfo.vocabTarget ?? 500;
+		const isVocabComplete = totalVocab >= targetVocab;
+		const isChecklistComplete =
+			paInfo.counselingDone && paInfo.mentalStable && paInfo.disciplineGood;
+
+		if (!isChecklistComplete || !isVocabComplete) {
+			set.status = 422;
+			return {
+				success: false,
+				message: "Checklist dan target kosakata harus 100% sebelum ACC",
+			};
+		}
+
 		await db
 			.update(paData)
 			.set({
@@ -2461,6 +3116,92 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 
 		return { success: true };
 	})
+	.post(
+		"/:id/pa/tripartite",
+		async (context) => {
+			const { params, body, set } = context;
+			const id = Number(params.id);
+			const user = (context as any).user;
+			const input = body as any;
+
+			if (!user || (user.role !== "pa" && user.role !== "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			await db.insert(paTripartiteLogs).values({
+				studentId: id,
+				contactType: input.contactType,
+				contactName: input.contactName,
+				contactDate: new Date(input.contactDate),
+				summary: input.summary,
+				result: input.result,
+				createdBy: user.id,
+			});
+
+			return { success: true };
+		},
+		{
+			body: t.Record(t.String(), t.Any()),
+		},
+	)
+	.delete("/:id/pa/tripartite/:logId", async (context) => {
+		const { params, set } = context;
+		const user = (context as any).user;
+
+		if (!user || (user.role !== "pa" && user.role !== "superadmin")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		await db
+			.delete(paTripartiteLogs)
+			.where(eq(paTripartiteLogs.id, Number(params.logId)));
+		return { success: true };
+	})
+	.post(
+		"/:id/pa/interview",
+		async (context) => {
+			const { params, body, set } = context;
+			const id = Number(params.id);
+			const user = (context as any).user;
+			const input = body as any;
+
+			if (!user || (user.role !== "pa" && user.role !== "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			await db.insert(paInterviewLogs).values({
+				studentId: id,
+				interviewDate: new Date(input.interviewDate),
+				companyName: input.companyName,
+				country: input.country,
+				result: input.result,
+				notes: input.notes,
+				createdBy: user.id,
+			});
+
+			return { success: true };
+		},
+		{
+			body: t.Record(t.String(), t.Any()),
+		},
+	)
+	.delete("/:id/pa/interview/:logId", async (context) => {
+		const { params, set } = context;
+		const user = (context as any).user;
+
+		if (!user || (user.role !== "pa" && user.role !== "superadmin")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		await db
+			.delete(paInterviewLogs)
+			.where(eq(paInterviewLogs.id, Number(params.logId)));
+		return { success: true };
+	})
 
 	// --- INTERNSHIP ROUTES ---
 	.get("/:id/internship", async ({ params }) => {
@@ -2473,6 +3214,53 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 		});
 
 		return { success: true, data: info || null };
+	})
+	.get("/:id/passport-clearance", async ({ params }) => {
+		const id = Number(params.id);
+
+		const pmbDocs = await db
+			.select()
+			.from(pmbDocuments)
+			.where(eq(pmbDocuments.studentId, id));
+		const internshipDocs = await db
+			.select()
+			.from(internshipDocuments)
+			.where(eq(internshipDocuments.studentId, id));
+		const academicDocs = await db
+			.select()
+			.from(academicDocuments)
+			.where(eq(academicDocuments.studentId, id));
+
+		const pmbDataRow = await db.query.pmbData.findFirst({
+			where: eq(pmbData.studentId, id),
+		});
+		const academicDataRow = await db.query.academicData.findFirst({
+			where: eq(academicData.studentId, id),
+		});
+
+		const hasDoc = (docs: any[], key: string) =>
+			docs.some((d) => d.documentKey === key);
+
+		const checks = {
+			pasFoto: hasDoc(pmbDocs, "pas_foto"),
+			cv: hasDoc(pmbDocs, "cv") || hasDoc(internshipDocs, "cv"),
+			ktm: hasDoc(pmbDocs, "ktm"),
+			khs: hasDoc(academicDocs, "khs"),
+			sl21: hasDoc(pmbDocs, "sl21"),
+			skma: hasDoc(pmbDocs, "skma"),
+			gapYear: pmbDataRow?.isGapYear ? hasDoc(pmbDocs, "gap_year") : true,
+			pddikti: academicDataRow?.pddiktiInput === true,
+			ktpKkAkta: hasDoc(pmbDocs, "ktp_kk_akta"),
+		};
+
+		const isAllClear = Object.values(checks).every((v) => v === true);
+
+		return {
+			success: true,
+			checks,
+			isAllClear,
+			isGapYear: pmbDataRow?.isGapYear || false,
+		};
 	})
 	.patch(
 		"/:id/internship",
@@ -2495,6 +3283,8 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				"mcuDate",
 				"ticketDate",
 				"pdtDate",
+				"danaTahap1Date",
+				"danaTahap2Date",
 			];
 			for (const field of dateFields) {
 				if (updates[field]) {
@@ -2506,6 +3296,48 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				...updates,
 				updatedAt: new Date(),
 			};
+
+			// Validate LoL -> LoA -> MoA State Machine
+			if (cleanUpdates.loaConfirmed === true) {
+				const current = await db.query.internshipData.findFirst({
+					where: eq(internshipData.studentId, id),
+				});
+				if (!current?.lolReady && !cleanUpdates.lolReady) {
+					set.status = 400;
+					return {
+						success: false,
+						message: "LoL (Letter of Offer) harus diselesaikan sebelum LoA.",
+					};
+				}
+			}
+			if (cleanUpdates.moaReady === true) {
+				const current = await db.query.internshipData.findFirst({
+					where: eq(internshipData.studentId, id),
+				});
+				if (!current?.loaConfirmed && !cleanUpdates.loaConfirmed) {
+					set.status = 400;
+					return {
+						success: false,
+						message: "LoA harus dikonfirmasi sebelum memasukkan dokumen MoA.",
+					};
+				}
+			}
+
+			// Validate Dana Talangan Tahap 2
+			if (cleanUpdates.isDanaTahap2Disbursed === true) {
+				const current = await db.query.internshipData.findFirst({
+					where: eq(internshipData.studentId, id),
+				});
+				if (!current?.visaReady && !cleanUpdates.visaReady) {
+					set.status = 400;
+					return {
+						success: false,
+						message:
+							"Dana Talangan Tahap II hanya bisa dicairkan jika Visa sudah berstatus Ready.",
+					};
+				}
+			}
+
 			await db
 				.update(internshipData)
 				.set(cleanUpdates)
@@ -2519,7 +3351,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				const checks = [
 					current.passportReady,
 					current.interviewReady,
-					current.loaReady,
+					current.loaConfirmed,
 					current.contractReady,
 					current.mcuReady,
 					current.visaReady,
@@ -2630,7 +3462,19 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			return { success: false, message: "Invalid ID" };
 		}
 
-		const [decision, logs, student] = await Promise.all([
+		const [
+			decision,
+			logs,
+			student,
+			pmb,
+			crm,
+			finance,
+			academic,
+			pa,
+			internship,
+			courses,
+			academicDocs,
+		] = await Promise.all([
 			db.query.finalDecision.findFirst({
 				where: eq(finalDecision.studentId, id),
 				with: {
@@ -2650,18 +3494,91 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			db.query.students.findFirst({
 				where: eq(students.id, id),
 			}),
+			db.query.pmbData.findFirst({
+				where: eq(pmbData.studentId, id),
+				with: {
+					accBy: { columns: { fullName: true } },
+				},
+			}),
+			db.query.crmData.findFirst({
+				where: eq(crmData.studentId, id),
+				with: { accBy: { columns: { fullName: true } } },
+			}),
+			db.query.financeData.findFirst({
+				where: eq(financeData.studentId, id),
+				with: { accBy: { columns: { fullName: true } } },
+			}),
+			db.query.academicData.findFirst({
+				where: eq(academicData.studentId, id),
+				with: { accBy: { columns: { fullName: true } } },
+			}),
+			db.query.paData.findFirst({
+				where: eq(paData.studentId, id),
+				with: { accBy: { columns: { fullName: true } } },
+			}),
+			db.query.internshipData.findFirst({
+				where: eq(internshipData.studentId, id),
+				with: { accBy: { columns: { fullName: true } } },
+			}),
+			db.query.courseGrades.findMany({
+				where: eq(courseGrades.studentId, id),
+			}),
+			db.query.academicDocuments.findMany({
+				where: eq(academicDocuments.studentId, id),
+			}),
 		]);
 
-		if (!decision) {
+		let dec = decision;
+		if (!dec) {
 			// Create default if not exists
 			await db.insert(finalDecision).values({ studentId: id });
-			const newDecision = await db.query.finalDecision.findFirst({
+			dec = await db.query.finalDecision.findFirst({
 				where: eq(finalDecision.studentId, id),
+				with: {
+					decidedBy: true,
+				},
 			});
-			return { success: true, data: { decision: newDecision, logs, student } };
 		}
 
-		return { success: true, data: { decision, logs, student } };
+		const dosenIsAcc = courses.length > 0 && courses.every((c) => c.isAcc);
+		const dosenAccAt = dosenIsAcc
+			? new Date(
+					Math.max(...courses.map((c) => new Date(c.accAt || 0).getTime())),
+				)
+			: null;
+
+		return {
+			success: true,
+			data: {
+				decision: dec,
+				logs,
+				student,
+				academicData: academic,
+				academicDocs: academicDocs.filter((d) =>
+					["taiwan_lol", "taiwan_loa", "taiwan_suhhan"].includes(d.documentKey),
+				),
+				pmbAcc: { isAcc: pmb?.isAcc, accAt: pmb?.accAt, accBy: pmb?.accBy },
+				crmAcc: { isAcc: crm?.isAcc, accAt: crm?.accAt, accBy: crm?.accBy },
+				financeAcc: {
+					isAcc: finance?.isAcc,
+					accAt: finance?.accAt,
+					accBy: finance?.accBy,
+				},
+				academicAcc: {
+					isAcc: academic?.isAcc,
+					accAt: academic?.accAt,
+					accBy: academic?.accBy,
+				},
+				paAcc: { isAcc: pa?.isAcc, accAt: pa?.accAt, accBy: pa?.accBy },
+				internshipAcc: {
+					isAcc: internship?.isAcc,
+					accAt: internship?.accAt,
+					accBy: internship?.accBy,
+				},
+				dosenAcc: { isAcc: dosenIsAcc, accAt: dosenAccAt },
+				skDocumentUrl: dec?.skDocumentUrl || null,
+			},
+		};
 	})
 	.patch(
 		"/:id/final-decision",
@@ -2787,9 +3704,25 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			orderBy: [desc(counselingLogs.date)],
 		});
 
+		const tripartiteLogs = await db.query.paTripartiteLogs.findMany({
+			where: eq(paTripartiteLogs.studentId, id),
+			orderBy: (logs, { desc }) => [desc(logs.contactDate)],
+		});
+
+		const interviewLogs = await db.query.paInterviewLogs.findMany({
+			where: eq(paInterviewLogs.studentId, id),
+			orderBy: (logs, { desc }) => [desc(logs.interviewDate)],
+		});
+
 		return {
 			success: true,
-			data: { data: pa, vocabLogs: vLogs, counselingLogs: cLogs },
+			data: {
+				data: pa,
+				vocabLogs: vLogs,
+				counselingLogs: cLogs,
+				tripartiteLogs: tripartiteLogs,
+				interviewLogs: interviewLogs,
+			},
 		};
 	})
 	.patch(
@@ -3155,6 +4088,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 					: pmbCompleted >= 2
 						? "PERLU_PERHATIAN"
 						: "TIDAK_AMAN",
+			isAcc: pmb?.isAcc,
 		});
 		totalCompleted += pmbCompleted;
 		totalIndicators += 4;
@@ -3189,6 +4123,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 					: crmCompleted >= 3
 						? "PERLU_PERHATIAN"
 						: "TIDAK_AMAN",
+			isAcc: crm?.isAcc,
 		});
 		totalCompleted += crmCompleted;
 		totalIndicators += 5;
@@ -3222,6 +4157,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 					: financeCompleted >= 2
 						? "PERLU_PERHATIAN"
 						: "TIDAK_AMAN",
+			isAcc: finance?.isAcc,
 		});
 		totalCompleted += financeCompleted;
 		totalIndicators += 4;
@@ -3263,6 +4199,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 					: academicCompleted >= 4
 						? "PERLU_PERHATIAN"
 						: "TIDAK_AMAN",
+			isAcc: academic?.isAcc,
 		});
 		totalCompleted += academicCompleted;
 		totalIndicators += 7;
@@ -3312,6 +4249,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 						: dosenCompleted / dosenTotal >= 0.5
 							? "PERLU_PERHATIAN"
 							: "TIDAK_AMAN",
+			isAcc: courses.length > 0 && courses.every((c: any) => c.isAcc),
 		});
 		totalCompleted += dosenCompleted;
 		totalIndicators += dosenTotal;
@@ -3344,6 +4282,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 					: paCompleted >= 1
 						? "PERLU_PERHATIAN"
 						: "TIDAK_AMAN",
+			isAcc: pa?.isAcc,
 		});
 		totalCompleted += paCompleted;
 		totalIndicators += 3;
@@ -3384,6 +4323,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 					: magangCompleted >= 4
 						? "PERLU_PERHATIAN"
 						: "TIDAK_AMAN",
+			isAcc: internship?.isAcc,
 		});
 		totalCompleted += magangCompleted;
 		totalIndicators += 8;
@@ -3586,6 +4526,9 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			case "magang":
 				table = internshipDocuments;
 				break;
+			case "post-internship":
+				table = postInternshipDocs;
+				break;
 			default:
 				return { success: false, message: "Invalid panel" };
 		}
@@ -3635,6 +4578,9 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				case "magang":
 					table = internshipDocuments;
 					break;
+				case "post-internship":
+					table = postInternshipDocs;
+					break;
 				default:
 					set.status = 400;
 					return { success: false, message: "Invalid panel" };
@@ -3657,16 +4603,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 
 			const fileUrl = `/uploads/documents/${panel}/${filename}`;
 
-			// Check if document exists for this key, if so delete from db (and replace)
-			// Actually we can just keep them or replace the exact row. Let's do upsert-like by deleting old one.
-			await db
-				.delete(table)
-				.where(
-					and(
-						eq(table.studentId, studentId),
-						eq(table.documentKey, documentKey),
-					),
-				);
+			// Allow multiple files per documentKey by NOT deleting the old ones
 
 			await db.insert(table).values({
 				studentId,
@@ -3687,11 +4624,11 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			}),
 		},
 	)
-	.delete("/:id/:panel/documents/:documentKey", async (context) => {
+	.delete("/:id/:panel/documents/:docId", async (context) => {
 		const { params, set } = context;
 		const studentId = Number(params.id);
 		const panel = params.panel as string;
-		const documentKey = params.documentKey as string;
+		const docId = Number(params.docId);
 
 		let table: any;
 		switch (panel) {
@@ -3713,6 +4650,9 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			case "magang":
 				table = internshipDocuments;
 				break;
+			case "post-internship":
+				table = postInternshipDocs;
+				break;
 			default:
 				set.status = 400;
 				return { success: false, message: "Invalid panel" };
@@ -3720,9 +4660,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 
 		await db
 			.delete(table)
-			.where(
-				and(eq(table.studentId, studentId), eq(table.documentKey, documentKey)),
-			);
+			.where(and(eq(table.studentId, studentId), eq(table.id, docId)));
 		return { success: true, message: "Dokumen berhasil dihapus" };
 	})
 	.patch(
@@ -3747,13 +4685,28 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				});
 			}
 
-			// Validate if eligible (needs to be layak_berangkat)
-			if (body.isApproved && row?.evaluatorDecision !== "layak_berangkat") {
-				set.status = 400;
-				return {
-					success: false,
-					message: "Mahasiswa belum dinyatakan layak berangkat oleh Evaluator",
-				};
+			const student = await db.query.students.findFirst({
+				where: eq(students.id, studentId),
+			});
+
+			// Validate if eligible (needs to be layak_berangkat AND overallStatus AMAN)
+			if (body.isApproved) {
+				if (row?.evaluatorDecision !== "layak_berangkat") {
+					set.status = 400;
+					return {
+						success: false,
+						message:
+							"Mahasiswa belum dinyatakan layak berangkat oleh Evaluator",
+					};
+				}
+				if (student?.overallStatus !== "AMAN") {
+					set.status = 400;
+					return {
+						success: false,
+						message:
+							"Masih ada persyaratan divisi yang belum disetujui (TIDAK AMAN/PERLU PERHATIAN).",
+					};
+				}
 			}
 
 			const departureDate = body.departureDate
@@ -3766,6 +4719,10 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 					isApprovedByDirector: body.isApproved,
 					departureDate: departureDate,
 					notes: body.notes !== undefined ? body.notes : row?.notes,
+					skDocumentUrl:
+						body.skDocumentUrl !== undefined
+							? body.skDocumentUrl
+							: row?.skDocumentUrl,
 					updatedAt: new Date(),
 				})
 				.where(eq(finalDecision.studentId, studentId));
@@ -3790,7 +4747,144 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				isApproved: t.Boolean(),
 				departureDate: t.Optional(t.String()),
 				notes: t.Optional(t.String()),
+				skDocumentUrl: t.Optional(t.Union([t.String(), t.Null()])),
 			}),
+		},
+	)
+	.patch(
+		"/:id/final-decision/confidential-notes",
+		async ({ params, body, set, user }: any) => {
+			if (user?.role !== "superadmin") {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const studentId = parseInt(params.id, 10);
+
+			const row = await db.query.finalDecision.findFirst({
+				where: eq(finalDecision.studentId, studentId),
+			});
+			if (!row) {
+				await db.insert(finalDecision).values({ studentId });
+			}
+
+			await db
+				.update(finalDecision)
+				.set({
+					confidentialNotes: body.confidentialNotes,
+					updatedAt: new Date(),
+				})
+				.where(eq(finalDecision.studentId, studentId));
+
+			return { success: true, message: "Catatan internal berhasil disimpan" };
+		},
+		{
+			body: t.Object({
+				confidentialNotes: t.String(),
+			}),
+		},
+	)
+	.post(
+		"/:id/final-decision/sk-upload",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			const studentId = Number(params.id);
+			const file = (body as any).file as File;
+
+			console.log(
+				"[sk-upload] Hit with file:",
+				file?.name,
+				file?.type,
+				file?.size,
+			);
+
+			if (user?.role !== "superadmin") {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			if (file?.type !== "application/pdf") {
+				set.status = 400;
+				return { success: false, message: "Harus berupa file PDF" };
+			}
+			if (file.size > 5 * 1024 * 1024) {
+				set.status = 400;
+				return { success: false, message: "Ukuran file maksimal 5MB" };
+			}
+
+			// Verify final decision row exists
+			let row = await db.query.finalDecision.findFirst({
+				where: eq(finalDecision.studentId, studentId),
+			});
+
+			if (!row) {
+				await db.insert(finalDecision).values({ studentId });
+				row = await db.query.finalDecision.findFirst({
+					where: eq(finalDecision.studentId, studentId),
+				});
+			}
+
+			// Generate unique filename
+			const timestamp = Date.now();
+			const originalName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+			const filename = `${studentId}_sk_direktur_${timestamp}_${originalName}`;
+
+			// Create directory if not exists
+			const uploadDir = join(
+				process.cwd(),
+				"uploads",
+				"documents",
+				"final-decision",
+			);
+			await mkdir(uploadDir, { recursive: true });
+
+			// Write file to disk
+			const filePath = join(uploadDir, filename);
+			const fileBuffer = await file.arrayBuffer();
+			await Bun.write(filePath, fileBuffer);
+
+			const fileUrl = `/uploads/documents/final-decision/${filename}`;
+
+			// Update row in DB
+			await db
+				.update(finalDecision)
+				.set({
+					skDocumentUrl: fileUrl,
+					updatedAt: new Date(),
+				})
+				.where(eq(finalDecision.studentId, studentId));
+
+			return {
+				success: true,
+				message: "SK Direktur berhasil diunggah",
+				fileUrl,
+			};
+		},
+		{
+			type: "formdata",
+			body: t.Object({
+				file: t.File(),
+			}),
+		},
+	)
+	.delete(
+		"/:id/final-decision/sk-document",
+		async ({ params, set, user }: any) => {
+			if (user?.role !== "superadmin") {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const studentId = Number(params.id);
+
+			await db
+				.update(finalDecision)
+				.set({
+					skDocumentUrl: null,
+					updatedAt: new Date(),
+				})
+				.where(eq(finalDecision.studentId, studentId));
+
+			return { success: true, message: "SK Direktur berhasil dihapus" };
 		},
 	)
 	.get("/finalization", async ({ query, user, set }: any) => {
@@ -3825,5 +4919,14 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 				),
 			);
 
-		return { success: true, data: results };
+		const allCourseGrades = await db.select().from(courseGrades);
+
+		const dataWithCourses = results.map((r) => {
+			const courses = allCourseGrades.filter(
+				(c) => c.studentId === r.student.id,
+			);
+			return { ...r, courseGrades: courses };
+		});
+
+		return { success: true, data: dataWithCourses };
 	});

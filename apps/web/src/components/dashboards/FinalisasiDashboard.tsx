@@ -55,18 +55,14 @@ export function FinalisasiDashboard({
 	const [activeStudentId, setActiveStudentId] = useState<number | null>(null);
 	const [departureDate, setDepartureDate] = useState<string>("");
 	const [notes, setNotes] = useState<string>("");
+	const [confidentialNotes, setConfidentialNotes] = useState<string>("");
 
 	const totalKandidat = data?.length || 0;
 	const countDisetujui =
-		data?.filter(
-			(s: any) =>
-				s.decision?.isApprovedByDirector || s.student.overallStatus === "AMAN",
-		).length || 0;
+		data?.filter((s: any) => s.decision?.isApprovedByDirector === true)
+			.length || 0;
 	const countMenunggu =
-		data?.filter(
-			(s: any) =>
-				!s.decision?.isApprovedByDirector && s.student.overallStatus !== "AMAN",
-		).length || 0;
+		data?.filter((s: any) => !s.decision?.isApprovedByDirector).length || 0;
 	const countPerluPerhatian =
 		data?.filter((s: any) => s.student.overallStatus !== "AMAN").length || 0;
 
@@ -115,6 +111,13 @@ export function FinalisasiDashboard({
 				departureDate: departureDate || undefined,
 				notes: notes || undefined,
 			});
+
+			if (user?.role === "superadmin" && confidentialNotes) {
+				await api.students[id]["final-decision"]["confidential-notes"].patch({
+					confidentialNotes,
+				});
+			}
+
 			if (res.data?.success) {
 				toast.success(
 					isApproved ? "Mahasiswa disetujui" : "Persetujuan dicabut",
@@ -122,6 +125,7 @@ export function FinalisasiDashboard({
 				setActiveStudentId(null);
 				setDepartureDate("");
 				setNotes("");
+				setConfidentialNotes("");
 				onUpdate();
 			} else {
 				toast.error(res.data?.message || "Gagal memproses");
@@ -246,8 +250,11 @@ export function FinalisasiDashboard({
 									<TableHead className="text-slate-500 font-semibold py-3">
 										Program
 									</TableHead>
-									<TableHead className="text-slate-500 font-semibold text-center py-3">
+									<TableHead className="text-slate-500 font-semibold py-3">
 										Status Sistem
+									</TableHead>
+									<TableHead className="text-slate-500 font-semibold text-center py-3">
+										Tgl Keberangkatan
 									</TableHead>
 									<TableHead className="text-slate-500 font-semibold text-center py-3">
 										Persetujuan Direktur
@@ -282,7 +289,7 @@ export function FinalisasiDashboard({
 												</span>
 											</div>
 										</TableCell>
-										<TableCell className="text-center">
+										<TableCell>
 											{s.student.overallStatus === "AMAN" ? (
 												<Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
 													🟢 Aman
@@ -291,6 +298,23 @@ export function FinalisasiDashboard({
 												<Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20">
 													🟡 Perhatian
 												</Badge>
+											)}
+										</TableCell>
+										<TableCell className="text-center font-medium">
+											{s.decision?.departureDate ? (
+												<span className="text-slate-700">
+													{new Date(
+														s.decision.departureDate,
+													).toLocaleDateString("id-ID", {
+														day: "2-digit",
+														month: "short",
+														year: "numeric",
+													})}
+												</span>
+											) : (
+												<span className="text-slate-400 italic text-sm">
+													Belum Diatur
+												</span>
 											)}
 										</TableCell>
 										<TableCell className="text-center">
@@ -332,7 +356,7 @@ export function FinalisasiDashboard({
 																		variant="outline"
 																		size="sm"
 																		className="h-8 text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
-																		onClick={() => {
+																		onClick={(e) => {
 																			setDepartureDate(
 																				s.decision?.departureDate
 																					? new Date(s.decision.departureDate)
@@ -341,6 +365,10 @@ export function FinalisasiDashboard({
 																					: "",
 																			);
 																			setNotes(s.decision?.notes || "");
+																			setConfidentialNotes(
+																				s.decision?.confidentialNotes || "",
+																			);
+																			props.onClick?.(e);
 																		}}
 																	>
 																		Atur Keberangkatan
@@ -382,6 +410,26 @@ export function FinalisasiDashboard({
 																			onChange={(e) => setNotes(e.target.value)}
 																		/>
 																	</div>
+																	{user?.role === "superadmin" && (
+																		<div className="grid gap-2">
+																			<Label
+																				htmlFor="confidential-notes"
+																				className="text-rose-600 flex items-center gap-1"
+																			>
+																				<ShieldCheck className="w-4 h-4" />{" "}
+																				Catatan Rahasia Manajemen (Encrypted)
+																			</Label>
+																			<Textarea
+																				id="confidential-notes"
+																				placeholder="Instruksi rahasia khusus Direktur/Admin..."
+																				className="border-rose-200 bg-rose-50/30"
+																				value={confidentialNotes}
+																				onChange={(e) =>
+																					setConfidentialNotes(e.target.value)
+																				}
+																			/>
+																		</div>
+																	)}
 																</div>
 																<AlertDialogFooter>
 																	<AlertDialogCancel>Batal</AlertDialogCancel>
@@ -398,7 +446,13 @@ export function FinalisasiDashboard({
 														</AlertDialog>
 														<Button
 															size="sm"
-															className="h-8 bg-[#0517B0] hover:bg-blue-800 text-white gap-2"
+															disabled={!s.decision?.departureDate}
+															className="h-8 bg-[#0517B0] hover:bg-blue-800 text-white gap-2 disabled:bg-slate-300 disabled:text-slate-500"
+															title={
+																!s.decision?.departureDate
+																	? "Atur Tanggal Keberangkatan Terlebih Dahulu"
+																	: "Cetak SK Resmi"
+															}
 															onClick={() =>
 																router.push(
 																	`/dashboard/finalisasi/${s.student.id}/sk`,

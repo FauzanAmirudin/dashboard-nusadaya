@@ -77,26 +77,11 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
 						<Menu className="h-5 w-5" />
 					</Button>
 				)}
-				<span className="font-bold text-lg text-slate-900 tracking-tight hidden sm:block">
-					Nusadaya<span className="font-light text-[#0517B0]">Academy</span>
-				</span>
 			</div>
 
 			{/* Right: Bell + Role Chip + Avatar Dropdown */}
 			<div className="flex items-center gap-3">
 				{/* Notification Bell Removed */}
-
-				{/* Role Chip */}
-				{mounted && user?.role && (
-					<span
-						className={cn(
-							"hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border",
-							roleColorClass,
-						)}
-					>
-						{user.role}
-					</span>
-				)}
 
 				{/* User Dropdown */}
 				<DropdownMenu>

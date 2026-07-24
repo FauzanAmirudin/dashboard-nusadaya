@@ -6,6 +6,7 @@ import {
 	Download,
 	LayoutDashboard,
 	Search,
+	ShieldCheck,
 	Users,
 	XCircle,
 } from "lucide-react";
@@ -21,6 +22,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import {
 	Table,
 	TableBody,
@@ -29,6 +31,12 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { exportToCSV } from "@/lib/export";
 
 const PIE_COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#64748b"];
@@ -62,6 +70,24 @@ export function EvaluatorDashboard({
 				s.decision?.evaluatorDecision === "menunggu" ||
 				!s.decision?.evaluatorDecision,
 		).length || 0;
+
+	// Calculate ACC Lengkap
+	const countAccLengkap =
+		data?.filter((s: any) => {
+			const isDosenAcc =
+				s.courseGrades &&
+				s.courseGrades.length > 0 &&
+				s.courseGrades.every((g: any) => g.isAcc);
+			return (
+				s.pmb?.isAcc &&
+				s.crm?.isAcc &&
+				s.finance?.isAcc &&
+				s.academic?.isAcc &&
+				isDosenAcc &&
+				s.pa?.isAcc &&
+				s.internship?.isAcc
+			);
+		}).length || 0;
 
 	const handleExport = () => {
 		const exportData = data.map((s: any) => ({
@@ -134,6 +160,23 @@ export function EvaluatorDashboard({
 		}
 	};
 
+	const calculateProgress = (s: any) => {
+		let accCount = 0;
+		if (s.pmb?.isAcc) accCount++;
+		if (s.crm?.isAcc) accCount++;
+		if (s.finance?.isAcc) accCount++;
+		if (s.academic?.isAcc) accCount++;
+		if (s.pa?.isAcc) accCount++;
+		if (s.internship?.isAcc) accCount++;
+		if (
+			s.courseGrades &&
+			s.courseGrades.length > 0 &&
+			s.courseGrades.every((g: any) => g.isAcc)
+		)
+			accCount++;
+		return accCount;
+	};
+
 	return (
 		<div className="space-y-6 pb-10">
 			{/* Header */}
@@ -160,7 +203,7 @@ export function EvaluatorDashboard({
 			</div>
 
 			{/* KPI Cards */}
-			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+			<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
 				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
 					<CardContent className="p-5 flex items-start gap-4">
 						<div className="mt-0.5 text-[#0517B0]">
@@ -172,6 +215,19 @@ export function EvaluatorDashboard({
 							</p>
 							<p className="text-3xl font-bold text-slate-900 mt-1">
 								{totalStudents}
+							</p>
+						</div>
+					</CardContent>
+				</Card>
+				<Card className="bg-emerald-50 border-emerald-200 shadow-sm border-l-4 border-l-emerald-600">
+					<CardContent className="p-5 flex items-start gap-4">
+						<div className="mt-0.5 text-emerald-600">
+							<ShieldCheck className="h-6 w-6" />
+						</div>
+						<div>
+							<p className="text-emerald-700 text-sm font-bold">ACC Lengkap</p>
+							<p className="text-3xl font-bold text-emerald-900 mt-1">
+								{countAccLengkap}
 							</p>
 						</div>
 					</CardContent>
@@ -352,6 +408,12 @@ export function EvaluatorDashboard({
 										<TableHead className="text-slate-500 font-semibold py-3">
 											Angkatan
 										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3 text-center">
+											Progress
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3 text-center">
+											Blocking
+										</TableHead>
 										<TableHead className="text-slate-500 font-semibold text-center py-3">
 											Keputusan
 										</TableHead>
@@ -361,41 +423,78 @@ export function EvaluatorDashboard({
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{filteredData.map((s: any) => (
-										<TableRow
-											key={s.student.id}
-											className="border-slate-200 hover:bg-blue-50/50 transition-colors"
-										>
-											<TableCell className="font-medium text-slate-700">
-												{s.student.nim}
-											</TableCell>
-											<TableCell className="text-slate-900 font-semibold">
-												{s.student.name}
-											</TableCell>
-											<TableCell>
-												<Badge
-													variant="outline"
-													className="text-slate-500 border-slate-200"
-												>
-													{s.student.cohort}
-												</Badge>
-											</TableCell>
-											<TableCell className="text-center">
-												{renderStatusBadge(s.decision?.evaluatorDecision)}
-											</TableCell>
-											<TableCell className="text-right pr-4">
-												<button
-													type="button"
-													onClick={() =>
-														router.push(`/dashboard/students/${s.student.id}`)
-													}
-													className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
-												>
-													Periksa
-												</button>
-											</TableCell>
-										</TableRow>
-									))}
+									{filteredData.map((s: any) => {
+										const accCount = calculateProgress(s);
+										const isAman = s.student.overallStatus === "AMAN";
+										return (
+											<TableRow
+												key={s.student.id}
+												className="border-slate-200 hover:bg-blue-50/50 transition-colors"
+											>
+												<TableCell className="font-medium text-slate-700">
+													{s.student.nim}
+												</TableCell>
+												<TableCell className="text-slate-900 font-semibold">
+													{s.student.name}
+												</TableCell>
+												<TableCell>
+													<Badge
+														variant="outline"
+														className="text-slate-500 border-slate-200"
+													>
+														{s.student.cohort}
+													</Badge>
+												</TableCell>
+												<TableCell className="text-center w-32">
+													<TooltipProvider>
+														<Tooltip>
+															<TooltipTrigger className="w-full">
+																<div className="flex flex-col gap-1 items-center justify-center">
+																	<Progress
+																		value={(accCount / 7) * 100}
+																		className="h-2 w-20"
+																	/>
+																	<span className="text-xs text-slate-500 font-medium">
+																		{accCount}/7 ACC
+																	</span>
+																</div>
+															</TooltipTrigger>
+															<TooltipContent>
+																<p>Progress ACC: {accCount} dari 7 Modul</p>
+															</TooltipContent>
+														</Tooltip>
+													</TooltipProvider>
+												</TableCell>
+												<TableCell className="text-center">
+													{isAman ? (
+														<Badge className="bg-emerald-50 text-emerald-600 border border-emerald-200">
+															✅ Aman
+														</Badge>
+													) : (
+														<Badge className="bg-rose-50 text-rose-600 border border-rose-200">
+															⛔ Blocking
+														</Badge>
+													)}
+												</TableCell>
+												<TableCell className="text-center">
+													{renderStatusBadge(s.decision?.evaluatorDecision)}
+												</TableCell>
+												<TableCell className="text-right pr-4">
+													<button
+														type="button"
+														onClick={() =>
+															router.push(
+																`/dashboard/students/${s.student.id}?context=final-decision`,
+															)
+														}
+														className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
+													>
+														Periksa
+													</button>
+												</TableCell>
+											</TableRow>
+										);
+									})}
 								</TableBody>
 							</Table>
 							{filteredData.length === 0 && (

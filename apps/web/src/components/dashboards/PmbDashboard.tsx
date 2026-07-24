@@ -79,6 +79,9 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 					: s.pmb?.status === "TIDAK_AMAN"
 						? "Tidak Aman"
 						: "Perlu Perhatian",
+			Rekomendasi: s.pmb?.rekomendasi || "-",
+			"V Mitra": s.finance?.vMitra || 0,
+			"V Koordinator": s.finance?.vKoordinator || 0,
 			"Disetujui Admin PMB": s.pmb?.isAcc ? "Sudah ACC" : "Belum",
 		}));
 		exportToCSV(
@@ -119,6 +122,15 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 				🟡 Perhatian
 			</Badge>
 		);
+	};
+
+	const formatRupiah = (val: number) => {
+		return new Intl.NumberFormat("id-ID", {
+			style: "currency",
+			currency: "IDR",
+			minimumFractionDigits: 0,
+			maximumFractionDigits: 0,
+		}).format(val || 0);
 	};
 
 	return (
@@ -322,6 +334,15 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 										<TableHead className="text-slate-500 font-semibold text-center py-3">
 											Status PMB
 										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3">
+											Rekomendasi
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3 text-right">
+											V Mitra
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3 text-right">
+											V Koord
+										</TableHead>
 										<TableHead className="text-slate-500 font-semibold text-right py-3 pr-4">
 											Aksi
 										</TableHead>
@@ -350,11 +371,22 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 											<TableCell className="text-center">
 												{renderStatusBadge(s.pmb?.status)}
 											</TableCell>
+											<TableCell className="text-slate-600 font-medium text-sm">
+												{s.pmb?.rekomendasi || "-"}
+											</TableCell>
+											<TableCell className="text-right text-slate-700 font-medium">
+												{formatRupiah(s.finance?.vMitra || 0)}
+											</TableCell>
+											<TableCell className="text-right text-slate-700 font-medium">
+												{formatRupiah(s.finance?.vKoordinator || 0)}
+											</TableCell>
 											<TableCell className="text-right pr-4">
 												<button
 													type="button"
 													onClick={() =>
-														router.push(`/dashboard/students/${s.student.id}`)
+														router.push(
+															`/dashboard/students/${s.student.id}?context=pmb`,
+														)
 													}
 													className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
 												>

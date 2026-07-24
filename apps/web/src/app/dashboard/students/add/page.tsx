@@ -31,6 +31,7 @@ export default function AddStudentPage() {
 		name: "",
 		cohort: new Date().getFullYear().toString(),
 		program: "",
+		subProgram: "",
 		phone: "",
 		parentName: "",
 		paId: "",
@@ -38,6 +39,12 @@ export default function AddStudentPage() {
 		destinationCountry: "",
 		period: "",
 		profilePhoto: null as File | null,
+		rekomendasi: "",
+		timVisit: "",
+		timSosialisasi: "",
+		roReferral: "",
+		mitraSponsor: "",
+		koordinator: "",
 	});
 
 	// Restrict to superadmin & pmb
@@ -91,12 +98,19 @@ export default function AddStudentPage() {
 				name: formData.name,
 				cohort: parseInt(formData.cohort, 10),
 				program: formData.program,
+				subProgram: formData.subProgram || undefined,
 				phone: formData.phone || undefined,
 				parentName: formData.parentName || undefined,
 				paId: formData.paId ? parseInt(formData.paId, 10) : undefined,
 				studentStatus: formData.studentStatus || "aktif",
 				destinationCountry: formData.destinationCountry || undefined,
 				period: formData.period || undefined,
+				rekomendasi: formData.rekomendasi || undefined,
+				timVisit: formData.timVisit || undefined,
+				timSosialisasi: formData.timSosialisasi || undefined,
+				roReferral: formData.roReferral || undefined,
+				mitraSponsor: formData.mitraSponsor || undefined,
+				koordinator: formData.koordinator || undefined,
 			});
 
 			if (error || !resData?.success || !resData.data) {
@@ -296,9 +310,47 @@ export default function AddStudentPage() {
 											<SelectItem value="Hospitality">Hospitality</SelectItem>
 											<SelectItem value="Culinary">Culinary</SelectItem>
 											<SelectItem value="Cruise Line">Cruise Line</SelectItem>
+											<SelectItem value="D3 Perhotelan">
+												D3 Perhotelan
+											</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>
+
+								{formData.program === "D3 Perhotelan" && (
+									<div className="space-y-2">
+										<Label htmlFor="subProgram" className="text-slate-700">
+											Opsi Khusus D3 Perhotelan
+										</Label>
+										<Select
+											value={formData.subProgram}
+											onValueChange={(val) =>
+												setFormData({ ...formData, subProgram: val || "" })
+											}
+										>
+											<SelectTrigger className="h-10 w-full bg-slate-50 focus:bg-white border-blue-200">
+												<SelectValue placeholder="Pilih Opsi Khusus" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="Magang Taiwan">
+													Magang Taiwan
+												</SelectItem>
+												<SelectItem value="Magang Malaysia">
+													Magang Malaysia
+												</SelectItem>
+												<SelectItem value="Barista">Barista</SelectItem>
+												<SelectItem value="Timur Tengah">
+													Timur Tengah
+												</SelectItem>
+												<SelectItem value="LMS">LMS</SelectItem>
+												<SelectItem value="Kelas Karyawan">
+													Kelas Karyawan
+												</SelectItem>
+												<SelectItem value="Beasiswa">Beasiswa</SelectItem>
+											</SelectContent>
+										</Select>
+									</div>
+								)}
 							</div>
 
 							<div className="space-y-2">
@@ -423,6 +475,132 @@ export default function AddStudentPage() {
 										}
 										className="h-10 bg-slate-50 focus-visible:bg-white"
 									/>
+								</div>
+							</div>
+						</div>
+
+						{/* Kolom Penuh: Data Akuisisi PMB */}
+						<div className="lg:col-span-2 space-y-5 border-t border-slate-200 pt-6 mt-2">
+							<h3 className="font-semibold text-[#0517B0] border-b border-slate-100 pb-3 mb-2 flex items-center gap-2">
+								<span className="w-6 h-6 rounded bg-[#0517B0]/10 flex items-center justify-center text-sm">
+									3
+								</span>
+								Data Akuisisi PMB
+							</h3>
+
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+								<div className="space-y-2">
+									<Label htmlFor="rekomendasi" className="text-slate-700">
+										Channel Rekomendasi
+									</Label>
+									<Select
+										value={formData.rekomendasi}
+										onValueChange={(val) =>
+											setFormData({ ...formData, rekomendasi: val || "" })
+										}
+									>
+										<SelectTrigger className="h-10 w-full bg-slate-50 focus:bg-white">
+											<SelectValue placeholder="Pilih Channel" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="Pendamping">Pendamping</SelectItem>
+											<SelectItem value="MoU Sekolah">MoU Sekolah</SelectItem>
+											<SelectItem value="BKK">BKK</SelectItem>
+											<SelectItem value="FKKS">FKKS</SelectItem>
+											<SelectItem value="RO Alumni">RO Alumni</SelectItem>
+											<SelectItem value="Staff/Team">Staff/Team</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+
+								<div className="space-y-2">
+									<Label htmlFor="roReferral" className="text-slate-700">
+										RO Mahasiswa / Alumni / Staff
+									</Label>
+									<Input
+										id="roReferral"
+										placeholder="Nama referensi / RO"
+										value={formData.roReferral}
+										onChange={(e) =>
+											setFormData({ ...formData, roReferral: e.target.value })
+										}
+										className="h-10 bg-slate-50 focus-visible:bg-white"
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label htmlFor="timVisit" className="text-slate-700">
+										Tim Visit
+									</Label>
+									<Input
+										id="timVisit"
+										placeholder="Nama tim visit"
+										value={formData.timVisit}
+										onChange={(e) =>
+											setFormData({ ...formData, timVisit: e.target.value })
+										}
+										className="h-10 bg-slate-50 focus-visible:bg-white"
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label htmlFor="timSosialisasi" className="text-slate-700">
+										Tim Sosialisasi
+									</Label>
+									<Input
+										id="timSosialisasi"
+										placeholder="Nama tim sosialisasi"
+										value={formData.timSosialisasi}
+										onChange={(e) =>
+											setFormData({
+												...formData,
+												timSosialisasi: e.target.value,
+											})
+										}
+										className="h-10 bg-slate-50 focus-visible:bg-white"
+									/>
+								</div>
+							</div>
+
+							<div className="mt-4 pt-4 border-t border-slate-100">
+								<h4 className="font-semibold text-sm text-slate-600 mb-4 flex items-center gap-2">
+									Data Mitra (Opsional)
+								</h4>
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+									<div className="space-y-2">
+										<Label htmlFor="mitraSponsor" className="text-slate-700">
+											Mitra / Sponsor
+										</Label>
+										<Input
+											id="mitraSponsor"
+											placeholder="Nama mitra atau sponsor"
+											value={formData.mitraSponsor}
+											onChange={(e) =>
+												setFormData({
+													...formData,
+													mitraSponsor: e.target.value,
+												})
+											}
+											className="h-10 bg-slate-50 focus-visible:bg-white"
+										/>
+									</div>
+									<div className="space-y-2">
+										<Label htmlFor="koordinator" className="text-slate-700">
+											Koordinator
+										</Label>
+										<Input
+											id="koordinator"
+											placeholder="Nama koordinator mitra"
+											value={formData.koordinator}
+											onChange={(e) =>
+												setFormData({
+													...formData,
+													koordinator: e.target.value,
+												})
+											}
+											className="h-10 bg-slate-50 focus-visible:bg-white"
+										/>
+									</div>
 								</div>
 							</div>
 						</div>

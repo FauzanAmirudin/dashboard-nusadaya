@@ -17,7 +17,7 @@ import {
 	X,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { api } from "@/lib/eden";
@@ -86,13 +86,13 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 		icon: GraduationCap,
 		label: "Panel Akademik",
 		href: "/dashboard/akademik",
-		roles: ["superadmin"],
+		roles: ["superadmin", "akademik", "dosen"],
 	},
 	{
 		icon: BookOpen,
 		label: "Panel Dosen",
 		href: "/dashboard/dosen",
-		roles: ["superadmin"],
+		roles: ["dosen"],
 	},
 	{
 		icon: HeartHandshake,
@@ -129,6 +129,8 @@ interface SidebarProps {
 export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 	const pathname = usePathname();
 	const router = useRouter();
+	const searchParams = useSearchParams();
+	const context = searchParams.get("context");
 	const { user, logout } = useAuthStore();
 	const [mounted, setMounted] = useState(false);
 
@@ -179,7 +181,7 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 				<div className="flex items-center justify-between px-4 h-16 border-b border-slate-200 shrink-0">
 					{!collapsed && (
 						<span className="font-bold text-lg text-slate-900 tracking-tight">
-							Nusadaya<span className="font-light text-[#0517B0]">.</span>
+							Nusadaya<span className="font-light text-[#0517B0]">Academy</span>
 						</span>
 					)}
 					{collapsed && (
@@ -214,6 +216,7 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 									key={item.href}
 									item={item}
 									pathname={pathname}
+									context={context}
 									collapsed={collapsed}
 								/>
 							))}
@@ -234,6 +237,7 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 									key={item.href}
 									item={item}
 									pathname={pathname}
+									context={context}
 									collapsed={collapsed}
 								/>
 							))}
@@ -247,6 +251,7 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 						<NavItem
 							item={settingsItem}
 							pathname={pathname}
+							context={context}
 							collapsed={collapsed}
 						/>
 					)}
@@ -270,16 +275,35 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 function NavItem({
 	item,
 	pathname,
+	context,
 	collapsed,
 }: {
 	item: SidebarItem;
 	pathname: string;
+	context: string | null;
 	collapsed: boolean;
 }) {
-	const isActive =
-		item.href === "/dashboard"
-			? pathname === "/dashboard"
-			: pathname === item.href || pathname.startsWith(`${item.href}/`);
+	let isActive = false;
+
+	if (context && pathname.startsWith("/dashboard/students/")) {
+		if (item.href === "/dashboard/students") {
+			isActive = false;
+		} else if (item.href === `/dashboard/${context}`) {
+			isActive = true;
+		} else if (
+			context === "final-decision" &&
+			(item.href === "/dashboard/evaluator" ||
+				item.href === "/dashboard/finalisasi")
+		) {
+			isActive = true;
+		}
+	} else {
+		isActive =
+			item.href === "/dashboard"
+				? pathname === "/dashboard"
+				: pathname === item.href || pathname.startsWith(`${item.href}/`);
+	}
+
 	const Icon = item.icon;
 
 	return (

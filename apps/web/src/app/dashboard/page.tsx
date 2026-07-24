@@ -109,6 +109,21 @@ export default function DashboardPage() {
 		fetchStudents();
 	}, [isAuthenticated, hasHydrated, router, user]);
 
+	const getRealtimeOverallStatus = (s: any) => {
+		const panels = [
+			s.pmb?.isAcc ? "AMAN" : s.pmb?.status || "PERLU_PERHATIAN",
+			s.crm?.isAcc ? "AMAN" : s.crm?.status || "PERLU_PERHATIAN",
+			s.finance?.isAcc ? "AMAN" : s.finance?.status || "PERLU_PERHATIAN",
+			s.academic?.isAcc ? "AMAN" : s.academic?.status || "PERLU_PERHATIAN",
+			s.pa?.isAcc ? "AMAN" : s.pa?.status || "PERLU_PERHATIAN",
+			s.internship?.isAcc ? "AMAN" : s.internship?.status || "PERLU_PERHATIAN",
+		];
+
+		if (panels.includes("TIDAK_AMAN")) return "TIDAK_AMAN";
+		if (panels.includes("PERLU_PERHATIAN")) return "PERLU_PERHATIAN";
+		return "AMAN";
+	};
+
 	const handleExport = () => {
 		if (data.length > 0) {
 			const exportData = data.map((s) => ({
@@ -122,7 +137,7 @@ export default function DashboardPage() {
 				"Status Akademik": s.academic?.status || "-",
 				"Status PA": s.pa?.status || "-",
 				"Status Magang": s.internship?.status || "-",
-				"Status Keseluruhan": s.student.overallStatus || "-",
+				"Status Keseluruhan": getRealtimeOverallStatus(s),
 			}));
 			exportToCSV(
 				exportData,
@@ -170,7 +185,12 @@ export default function DashboardPage() {
 				user={user}
 			/>
 		);
-	if (user?.role === "dosen") return <DosenDashboard user={user!} />;
+	if (user?.role === "dosen") {
+		if (typeof window !== "undefined") {
+			router.push("/dashboard/akademik");
+		}
+		return null;
+	}
 	if (user?.role === "pa")
 		return (
 			<PaDashboard
@@ -203,13 +223,13 @@ export default function DashboardPage() {
 	// Calculate KPIs
 	const totalStudents = data.length;
 	const countAman = data.filter(
-		(s) => s.student.overallStatus === "AMAN",
+		(s) => getRealtimeOverallStatus(s) === "AMAN",
 	).length;
 	const countPerhatian = data.filter(
-		(s) => s.student.overallStatus === "PERLU_PERHATIAN",
+		(s) => getRealtimeOverallStatus(s) === "PERLU_PERHATIAN",
 	).length;
 	const countTidakAman = data.filter(
-		(s) => s.student.overallStatus === "TIDAK_AMAN",
+		(s) => getRealtimeOverallStatus(s) === "TIDAK_AMAN",
 	).length;
 
 	const pieData = [
@@ -239,7 +259,7 @@ export default function DashboardPage() {
 	];
 
 	const criticalAlerts = data.filter(
-		(s) => s.student.overallStatus === "TIDAK_AMAN",
+		(s) => getRealtimeOverallStatus(s) === "TIDAK_AMAN",
 	);
 
 	const filteredData = data.filter(

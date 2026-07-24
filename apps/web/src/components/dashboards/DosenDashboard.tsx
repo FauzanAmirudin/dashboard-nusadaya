@@ -397,7 +397,7 @@ export function DosenDashboard({ user }: DosenDashboardProps) {
 													className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
 													onClick={() =>
 														router.push(
-															`/dashboard/students/${s.id}#panel-dosen`,
+															`/dashboard/students/${s.id}?context=dosen`,
 														)
 													}
 												>

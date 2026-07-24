@@ -27,9 +27,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DocumentUpload } from "@/components/ui/DocumentUpload";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
 	Tooltip,
@@ -63,7 +78,19 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 	const canEdit = isCrmAdmin;
 
 	const [isSavingLog, setIsSavingLog] = useState(false);
-	const [logText, setLogText] = useState("");
+	const [logModalOpen, setLogModalOpen] = useState(false);
+	const [newLog, setNewLog] = useState({
+		startTime: "",
+		endTime: "",
+		media: "",
+		location: "",
+		topic: "",
+		logText: "",
+	});
+	const [agreements, setAgreements] = useState<string[]>([]);
+	const [followUps, setFollowUps] = useState<
+		{ task: string; date: string; assignee: string; status: string }[]
+	>([]);
 
 	const [crmState, setCrmState] = useState<{ crm: any; logs: any[] } | null>(
 		null,
@@ -80,12 +107,17 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 	const [attendanceTotal, setAttendanceTotal] = useState<number | string>(0);
 
 	const [localChecks, setLocalChecks] = useState({
-		odsActive: false,
-		studentMonitoring: false,
-		parentFollowUp: false,
+		isMonitoringParent: false,
+		isMonitoringIndustry: false,
+		isVocabComplete: false,
 		practiceAttendance: false,
+		isOdsReport: false,
 		odsDocumentation: false,
+		isPrammagangReport: false,
+		isPrammagangDocumentation: false,
 	});
+	const [hasActiveCase, setHasActiveCase] = useState(false);
+	const [caseNotes, setCaseNotes] = useState("");
 
 	const [documents, setDocuments] = useState<Record<string, DocFile[]>>({});
 	const [uploadingKey, setUploadingKey] = useState<string | null>(null);
@@ -136,12 +168,17 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 	useEffect(() => {
 		if (crm) {
 			setLocalChecks({
-				odsActive: !!crm.odsActive,
-				studentMonitoring: !!crm.studentMonitoring,
-				parentFollowUp: !!crm.parentFollowUp,
+				isMonitoringParent: !!crm.isMonitoringParent,
+				isMonitoringIndustry: !!crm.isMonitoringIndustry,
+				isVocabComplete: !!crm.isVocabComplete,
 				practiceAttendance: !!crm.practiceAttendance,
+				isOdsReport: !!crm.isOdsReport,
 				odsDocumentation: !!crm.odsDocumentation,
+				isPrammagangReport: !!crm.isPrammagangReport,
+				isPrammagangDocumentation: !!crm.isPrammagangDocumentation,
 			});
+			setHasActiveCase(!!crm.hasActiveCase);
+			setCaseNotes(crm.caseNotes || "");
 			setAttendancePresent(crm.practiceDaysPresent || 0);
 			setAttendanceTotal(crm.practiceDaysTotal || 0);
 		}
@@ -190,6 +227,22 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 			toast.error("Gagal menyimpan perubahan");
 		} finally {
 			setLoadingItem(null);
+		}
+	};
+
+	const handleCaseSave = async () => {
+		if (!canEdit) return;
+		try {
+			const { error } = await api.students[studentId.toString()].crm.patch({
+				hasActiveCase,
+				caseNotes,
+			});
+			if (error) throw new Error("Gagal menyimpan data case");
+			toast.success("Catatan kasus berhasil disimpan");
+			fetchCrmData();
+			onUpdate();
+		} catch (error) {
+			toast.error("Gagal menyimpan catatan kasus");
 		}
 	};
 
@@ -302,20 +355,35 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 	};
 
 	const handleSaveLog = async () => {
-		if (!logText.trim() || !canEdit) return;
+		if (!newLog.logText.trim() || !canEdit) return;
 		setIsSavingLog(true);
 
 		try {
-			const { error } = await api.students[studentId.toString()].crm.log.post({
-				logText,
-			});
+			const payload = {
+				...newLog,
+				agreements: agreements.filter((a) => a.trim() !== ""),
+				followUps: followUps.filter((f) => f.task.trim() !== ""),
+			};
+
+			const { error } =
+				await api.students[studentId.toString()].crm.log.post(payload);
 
 			if (error) {
 				throw new Error("Gagal menambah log");
 			}
 
 			toast.success("Log komunikasi berhasil ditambahkan");
-			setLogText("");
+			setLogModalOpen(false);
+			setNewLog({
+				startTime: "",
+				endTime: "",
+				media: "",
+				location: "",
+				topic: "",
+				logText: "",
+			});
+			setAgreements([]);
+			setFollowUps([]);
 			fetchCrmData();
 			onUpdate();
 		} catch (error) {
@@ -324,6 +392,28 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 			setIsSavingLog(false);
 		}
 	};
+
+	const handleAddAgreement = () => setAgreements([...agreements, ""]);
+	const handleUpdateAgreement = (index: number, val: string) => {
+		const newArr = [...agreements];
+		newArr[index] = val;
+		setAgreements(newArr);
+	};
+	const handleRemoveAgreement = (index: number) =>
+		setAgreements(agreements.filter((_, i) => i !== index));
+
+	const handleAddFollowUp = () =>
+		setFollowUps([
+			...followUps,
+			{ task: "", date: "", assignee: "", status: "Proses" },
+		]);
+	const handleUpdateFollowUp = (index: number, field: string, val: string) => {
+		const newArr = [...followUps];
+		newArr[index] = { ...newArr[index], [field]: val };
+		setFollowUps(newArr);
+	};
+	const handleRemoveFollowUp = (index: number) =>
+		setFollowUps(followUps.filter((_, i) => i !== index));
 
 	const handleAcc = async () => {
 		if (!isCrmAdmin) return;
@@ -359,52 +449,123 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 		}
 	};
 
-	const checklist = [
+	const CHECKLIST_CATEGORIES = [
 		{
-			id: "odsActive",
-			label: "ODS Aktif",
-			desc: "Mahasiswa sedang mengikuti program ODS",
-			checked: localChecks.odsActive,
+			category: "Modul Monitoring",
+			icon: "📡",
+			items: [
+				{
+					id: "isMonitoringParent",
+					label: "Monitoring Orang Tua",
+					desc: "Catatan komunikasi orang tua/wali mahasiswa",
+					docKey: "parent_follow_up",
+					checked: localChecks.isMonitoringParent,
+				},
+				{
+					id: "isMonitoringIndustry",
+					label: "Monitoring Industri",
+					desc: "Catatan kesiapan dan penyesuaian dengan industri",
+					docKey: "industry_monitoring",
+					checked: localChecks.isMonitoringIndustry,
+				},
+			],
 		},
 		{
-			id: "studentMonitoring",
-			label: "Monitoring Mahasiswa",
-			desc: "Pemantauan rutin mahasiswa berjalan",
-			checked: localChecks.studentMonitoring,
+			category: "Modul Vocab",
+			icon: "📖",
+			items: [
+				{
+					id: "isVocabComplete",
+					label: "Buku Kendali Vocab",
+					desc: "Penguasaan kosakata/bahasa asing",
+					docKey: "vocab_book",
+					checked: localChecks.isVocabComplete,
+				},
+			],
 		},
 		{
-			id: "parentFollowUp",
-			label: "Follow Up Orang Tua",
-			desc: "Komunikasi & update progress ke orang tua",
-			checked: localChecks.parentFollowUp,
+			category: "Modul Kehadiran",
+			icon: "📅",
+			items: [
+				{
+					id: "practiceAttendance",
+					label: "Rekap Kehadiran Praktik",
+					desc: "Catatan kehadiran kelas harian",
+					docKey: "practice_attendance",
+					checked: localChecks.practiceAttendance,
+				},
+			],
 		},
 		{
-			id: "practiceAttendance",
-			label: "Update Kehadiran Praktik",
-			desc: "Kehadiran praktik harian terdokumentasi",
-			checked: localChecks.practiceAttendance,
+			category: "Modul ODS (One Day Service)",
+			icon: "🏫",
+			items: [
+				{
+					id: "isOdsReport",
+					label: "Laporan ODS",
+					desc: "Laporan pelaksanaan kegiatan ODS",
+					docKey: "ods_report",
+					checked: localChecks.isOdsReport,
+				},
+				{
+					id: "odsDocumentation",
+					label: "Dokumentasi ODS",
+					desc: "Foto/video kegiatan ODS",
+					docKey: "ods_documentation",
+					checked: localChecks.odsDocumentation,
+				},
+			],
 		},
 		{
-			id: "odsDocumentation",
-			label: "Dokumentasi ODS",
-			desc: "Foto/video dokumentasi ODS tersedia",
-			checked: localChecks.odsDocumentation,
+			category: "Modul Pramagang",
+			icon: "💼",
+			items: [
+				{
+					id: "isPrammagangReport",
+					label: "Laporan Pramagang",
+					desc: "Laporan pelaksanaan kegiatan Pramagang",
+					docKey: "pramagang_report",
+					checked: localChecks.isPrammagangReport,
+				},
+				{
+					id: "isPrammagangDocumentation",
+					label: "Dokumentasi Pramagang",
+					desc: "Foto/video kegiatan Pramagang",
+					docKey: "pramagang_documentation",
+					checked: localChecks.isPrammagangDocumentation,
+				},
+			],
 		},
 	];
 
-	const completedCount = checklist.filter((item) => item.checked).length;
+	const ALL_CHECKLIST_IDS = [
+		"isMonitoringParent",
+		"isMonitoringIndustry",
+		"isVocabComplete",
+		"practiceAttendance",
+		"isOdsReport",
+		"odsDocumentation",
+		"isPrammagangReport",
+		"isPrammagangDocumentation",
+	];
+
+	const completedCount = ALL_CHECKLIST_IDS.filter(
+		(id) => localChecks[id as keyof typeof localChecks],
+	).length;
+	const totalChecks = 8;
+
 	let statusBadge = (
 		<Badge className="bg-rose-50 text-rose-600 border-rose-200">
 			🔴 TIDAK AMAN
 		</Badge>
 	);
-	if (completedCount === 5) {
+	if (completedCount === totalChecks) {
 		statusBadge = (
 			<Badge className="bg-emerald-50 text-emerald-600 border-emerald-200">
 				🟢 AMAN
 			</Badge>
 		);
-	} else if (completedCount >= 3) {
+	} else if (completedCount >= 4) {
 		statusBadge = (
 			<Badge className="bg-amber-50 text-amber-600 border-amber-200">
 				🟡 PERLU PERHATIAN
@@ -428,16 +589,16 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 	return (
 		<TooltipProvider>
 			<div className="space-y-6">
-				<Card className="bg-white border-slate-200 shadow-sm">
-					<CardHeader className="border-b border-slate-200 pb-4">
+				<div>
+					<div className="border-b border-slate-200 pb-4 mb-6">
 						<div className="flex justify-between items-center">
-							<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
+							<h2 className="text-slate-800 text-lg font-bold flex items-center gap-2">
 								<span className="text-xl">📞</span> CRM — Customer Relationship
 								Management
 								<span className="ml-2 text-sm font-normal text-slate-500">
-									[{completedCount}/5]
+									[{completedCount}/{totalChecks}]
 								</span>
-							</CardTitle>
+							</h2>
 							<div className="flex items-center gap-3">
 								{isSuperadmin && !isCrmAdmin && (
 									<Badge
@@ -456,151 +617,212 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 								{statusBadge}
 							</div>
 						</div>
-					</CardHeader>
-					<CardContent className="pt-6">
+					</div>
+					<div>
 						<div className="mb-6">
-							<h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">
-								STATUS ODS & MONITORING
-							</h3>
-							<div className="space-y-3">
-								{checklist.map((item) => (
-									<div
-										key={item.id}
-										className="flex flex-col rounded-lg border bg-white overflow-hidden border-slate-200 mb-3"
-									>
-										<div
-											className={`flex items-center gap-4 p-4 transition-colors ${
-												item.checked
-													? "bg-emerald-50 border-b border-emerald-200"
-													: "bg-slate-50 border-b border-slate-200"
-											}`}
-										>
-											<Checkbox
-												id={item.id}
-												checked={item.checked}
-												onCheckedChange={(c) =>
-													handleCheckboxChange(item.id, c === true)
-												}
-												disabled={!canEdit || loadingItem === item.id}
-												className={`w-6 h-6 rounded-md ${
-													item.checked
-														? "data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
-														: ""
-												}`}
-											/>
-											<label
-												htmlFor={item.id}
-												className="flex-1 cursor-pointer block"
+							{CHECKLIST_CATEGORIES.map((category, catIdx) => (
+								<div
+									key={catIdx}
+									className="mb-8 last:mb-0 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden"
+								>
+									<div className="bg-slate-50 border-b border-slate-200 px-5 py-4">
+										<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+											<span>{category.icon}</span>
+											{category.category}
+										</h3>
+									</div>
+									<div className="p-5 space-y-4">
+										{category.items.map((item) => (
+											<div
+												key={item.id}
+												className="flex flex-col rounded-lg border bg-white overflow-hidden border-slate-200"
 											>
 												<div
-													className={`text-base font-semibold block ${
-														item.checked ? "text-emerald-900" : "text-slate-700"
+													className={`flex items-center gap-4 p-4 transition-colors ${
+														item.checked
+															? "bg-emerald-50 border-b border-emerald-200"
+															: "bg-slate-50 border-b border-slate-200"
 													}`}
 												>
-													{item.label}
-													{loadingItem === item.id && (
-														<Loader2 className="w-3 h-3 text-emerald-600 animate-spin ml-2 inline" />
-													)}
-												</div>
-												<p
-													className={`text-sm mt-1 ${
-														item.checked ? "text-emerald-700" : "text-slate-500"
-													}`}
-												>
-													{item.desc}
-												</p>
-											</label>
-											<div>
-												{item.checked ? (
-													<CheckCircle className="w-6 h-6 text-emerald-500" />
-												) : (
-													<div className="w-6 h-6 rounded-full border-2 border-slate-300" />
-												)}
-											</div>
-										</div>
-
-										{/* Sub-component for Kehadiran Praktik */}
-										{item.id === "practiceAttendance" && item.checked && (
-											<div className="p-4 bg-white border-b border-slate-100">
-												<div className="flex flex-col sm:flex-row sm:items-end gap-4 mb-4">
-													<div>
-														<label className="text-xs font-semibold text-slate-500 mb-1 block">
-															Hadir
-														</label>
-														<Input
-															type="number"
-															value={attendancePresent}
-															onChange={(e) =>
-																setAttendancePresent(
-																	e.target.value === ""
-																		? ""
-																		: Number(e.target.value),
-																)
-															}
-															disabled={!canEdit}
-															className="w-24 text-center font-bold text-slate-700"
-														/>
-													</div>
-													<div className="text-slate-400 font-medium pb-2">
-														dari
-													</div>
-													<div>
-														<label className="text-xs font-semibold text-slate-500 mb-1 block">
-															Total Hari
-														</label>
-														<Input
-															type="number"
-															value={attendanceTotal}
-															onChange={(e) =>
-																setAttendanceTotal(
-																	e.target.value === ""
-																		? ""
-																		: Number(e.target.value),
-																)
-															}
-															disabled={!canEdit}
-															className="w-24 text-center font-bold text-slate-700"
-														/>
-													</div>
-													{canEdit && (
-														<Button
-															variant="secondary"
-															onClick={handleAttendanceSave}
-															className="ml-auto text-blue-700 bg-blue-50 hover:bg-blue-100"
+													<Checkbox
+														id={item.id}
+														checked={item.checked}
+														onCheckedChange={(c) =>
+															handleCheckboxChange(item.id, c === true)
+														}
+														disabled={!canEdit || loadingItem === item.id}
+														className={`w-6 h-6 rounded-md ${
+															item.checked
+																? "data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+																: ""
+														}`}
+													/>
+													<label
+														htmlFor={item.id}
+														className="flex-1 cursor-pointer block"
+													>
+														<div
+															className={`text-base font-semibold block ${
+																item.checked
+																	? "text-emerald-900"
+																	: "text-slate-700"
+															}`}
 														>
-															Simpan
-														</Button>
-													)}
+															{item.label}
+															{loadingItem === item.id && (
+																<Loader2 className="w-3 h-3 text-emerald-600 animate-spin ml-2 inline" />
+															)}
+														</div>
+														<p
+															className={`text-sm mt-1 ${
+																item.checked
+																	? "text-emerald-700"
+																	: "text-slate-500"
+															}`}
+														>
+															{item.desc}
+														</p>
+													</label>
+													<div>
+														{item.checked ? (
+															<CheckCircle className="w-6 h-6 text-emerald-500" />
+														) : (
+															<div className="w-6 h-6 rounded-full border-2 border-slate-300" />
+														)}
+													</div>
 												</div>
-												<div className="flex items-center gap-3 mt-2">
-													<span className="text-sm font-semibold text-slate-600 min-w-[100px]">
-														Persentase: {attendancePercentage}%
-													</span>
-													<Progress
-														value={attendancePercentage}
-														className="h-2.5 bg-slate-100 flex-1"
-														indicatorClassName="bg-blue-600"
+
+												{/* Sub-component for Kehadiran Praktik */}
+												{item.id === "practiceAttendance" && item.checked && (
+													<div className="p-4 bg-white border-b border-slate-100">
+														<div className="flex flex-col sm:flex-row sm:items-end gap-4 mb-4">
+															<div>
+																<label className="text-xs font-semibold text-slate-500 mb-1 block">
+																	Hadir
+																</label>
+																<Input
+																	type="number"
+																	value={attendancePresent}
+																	onChange={(e) =>
+																		setAttendancePresent(
+																			e.target.value === ""
+																				? ""
+																				: Number(e.target.value),
+																		)
+																	}
+																	disabled={!canEdit}
+																	className="w-24 text-center font-bold text-slate-700"
+																/>
+															</div>
+															<div className="text-slate-400 font-medium pb-2">
+																dari
+															</div>
+															<div>
+																<label className="text-xs font-semibold text-slate-500 mb-1 block">
+																	Total Hari
+																</label>
+																<Input
+																	type="number"
+																	value={attendanceTotal}
+																	onChange={(e) =>
+																		setAttendanceTotal(
+																			e.target.value === ""
+																				? ""
+																				: Number(e.target.value),
+																		)
+																	}
+																	disabled={!canEdit}
+																	className="w-24 text-center font-bold text-slate-700"
+																/>
+															</div>
+															{canEdit && (
+																<Button
+																	variant="secondary"
+																	onClick={handleAttendanceSave}
+																	className="ml-auto text-blue-700 bg-blue-50 hover:bg-blue-100"
+																>
+																	Simpan
+																</Button>
+															)}
+														</div>
+														<div className="flex items-center gap-3 mt-2">
+															<span className="text-sm font-semibold text-slate-600 min-w-[100px]">
+																Persentase: {attendancePercentage}%
+															</span>
+															<Progress
+																value={attendancePercentage}
+																className="h-2.5 bg-slate-100 flex-1"
+																indicatorClassName="bg-blue-600"
+															/>
+														</div>
+													</div>
+												)}
+
+												{/* Area Dokumen CRM (sekarang selalu tampil di bawah checklist) */}
+												<div className="p-4 bg-white border-t border-slate-100 last:border-0">
+													<div className="flex items-center justify-between mb-2">
+														<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+															Lampiran Dokumen CRM
+														</span>
+													</div>
+													<DocumentUpload
+														studentId={studentId}
+														panel="crm"
+														documentKey={item.docKey}
+														canEdit={canEdit}
 													/>
 												</div>
 											</div>
-										)}
-
-										{/* Area Dokumen CRM */}
-										<div className="p-4 bg-white border-t border-slate-100 last:border-0">
-											<div className="flex items-center justify-between mb-2">
-												<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
-													Lampiran Dokumen CRM
-												</span>
-											</div>
-											<DocumentUpload
-												studentId={studentId}
-												panel="crm"
-												documentKey={item.id}
-												canEdit={canEdit}
-											/>
-										</div>
+										))}
 									</div>
-								))}
+								</div>
+							))}
+						</div>
+
+						{/* Section Case/Masalah */}
+						<div className="mt-8 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+							<div className="bg-slate-50 border-b border-slate-200 px-5 py-4">
+								<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+									<span className="text-xl">⚠️</span> CASE / MASALAH
+								</h3>
+							</div>
+							<div className="p-5">
+								<div className="flex items-center gap-3 mb-4">
+									<Checkbox
+										id="hasActiveCase"
+										checked={hasActiveCase}
+										onCheckedChange={(checked) =>
+											setHasActiveCase(checked === true)
+										}
+										disabled={!canEdit}
+										className="w-5 h-5"
+									/>
+									<label
+										htmlFor="hasActiveCase"
+										className="text-sm font-semibold text-slate-700 cursor-pointer"
+									>
+										Tandai mahasiswa memiliki masalah (Active Case)
+									</label>
+								</div>
+								{hasActiveCase && (
+									<div className="mt-3">
+										<label className="text-xs font-semibold text-slate-500 mb-2 block">
+											Catatan Masalah (Kendala)
+										</label>
+										<Textarea
+											value={caseNotes}
+											onChange={(e) => setCaseNotes(e.target.value)}
+											disabled={!canEdit}
+											placeholder="Tuliskan kendala yang dihadapi mahasiswa..."
+											className="min-h-[100px] mb-3"
+										/>
+									</div>
+								)}
+								{canEdit && (
+									<Button onClick={handleCaseSave} className="w-full sm:w-auto">
+										Simpan Catatan Kasus
+									</Button>
+								)}
 							</div>
 						</div>
 
@@ -610,25 +832,356 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 							</h3>
 
 							{canEdit && !crm?.isAcc && (
-								<div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
-									<Textarea
-										placeholder="Tambah catatan komunikasi..."
-										value={logText}
-										onChange={(e) => setLogText(e.target.value)}
-										className="min-h-[80px] bg-white resize-none mb-3 border-slate-200 focus-visible:ring-blue-500"
-									/>
-									<div className="flex justify-end">
-										<Button
-											onClick={handleSaveLog}
-											disabled={isSavingLog || !logText.trim()}
-											className="bg-[#0517B0] hover:bg-blue-800 text-white"
-										>
-											{isSavingLog && (
-												<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-											)}
-											+ Tambah Log
-										</Button>
-									</div>
+								<div className="flex justify-end mb-6">
+									<Button
+										onClick={() => setLogModalOpen(true)}
+										className="bg-[#0517B0] hover:bg-blue-800 text-white"
+									>
+										+ Tambah Log Komunikasi
+									</Button>
+									<Dialog open={logModalOpen} onOpenChange={setLogModalOpen}>
+										<DialogContent className="w-[95vw] sm:max-w-[90vw] md:max-w-[85vw] lg:max-w-5xl xl:max-w-6xl max-h-[90vh] overflow-y-auto bg-slate-50 p-0 border-0 shadow-2xl">
+											<div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
+												<DialogTitle className="text-xl font-bold text-[#0517B0] flex items-center gap-2">
+													<FileText className="w-5 h-5" /> Tambah Notulensi
+													Komunikasi
+												</DialogTitle>
+											</div>
+
+											<div className="p-6 space-y-6">
+												{/* Info Percakapan */}
+												<Card className="border-slate-200 shadow-sm">
+													<CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+														<CardTitle className="text-base font-bold text-slate-700 flex items-center gap-2">
+															<Clock className="w-4 h-4 text-blue-500" />{" "}
+															Informasi Percakapan
+														</CardTitle>
+													</CardHeader>
+													<CardContent className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+														<div className="space-y-1.5">
+															<label className="text-sm font-semibold text-slate-700">
+																Media Komunikasi
+															</label>
+															<Select
+																value={newLog.media}
+																onValueChange={(val) =>
+																	setNewLog({ ...newLog, media: val || "" })
+																}
+															>
+																<SelectTrigger className="bg-white border-slate-200 shadow-sm h-10">
+																	<SelectValue placeholder="Pilih Media Komunikasi" />
+																</SelectTrigger>
+																<SelectContent>
+																	<SelectItem value="WhatsApp">
+																		WhatsApp
+																	</SelectItem>
+																	<SelectItem value="Telepon">
+																		Telepon
+																	</SelectItem>
+																	<SelectItem value="Email">Email</SelectItem>
+																	<SelectItem value="Tatap Muka">
+																		Tatap Muka
+																	</SelectItem>
+																	<SelectItem value="Zoom/Google Meet">
+																		Zoom/Google Meet
+																	</SelectItem>
+																	<SelectItem value="Lainnya">
+																		Lainnya
+																	</SelectItem>
+																</SelectContent>
+															</Select>
+														</div>
+														<div className="space-y-1.5">
+															<label className="text-sm font-semibold text-slate-700">
+																Topik Pembahasan
+															</label>
+															<Select
+																value={newLog.topic}
+																onValueChange={(val) =>
+																	setNewLog({ ...newLog, topic: val || "" })
+																}
+															>
+																<SelectTrigger className="bg-white border-slate-200 shadow-sm h-10">
+																	<SelectValue placeholder="Pilih Topik Utama" />
+																</SelectTrigger>
+																<SelectContent>
+																	<SelectItem value="Akademik">
+																		Akademik
+																	</SelectItem>
+																	<SelectItem value="Kehadiran">
+																		Kehadiran
+																	</SelectItem>
+																	<SelectItem value="Pelanggaran Disiplin">
+																		Pelanggaran Disiplin
+																	</SelectItem>
+																	<SelectItem value="Konseling">
+																		Konseling
+																	</SelectItem>
+																	<SelectItem value="Lainnya">
+																		Lainnya
+																	</SelectItem>
+																</SelectContent>
+															</Select>
+														</div>
+														<div className="grid grid-cols-2 gap-4">
+															<div className="space-y-1.5">
+																<label className="text-sm font-semibold text-slate-700">
+																	Jam Mulai
+																</label>
+																<Input
+																	type="time"
+																	value={newLog.startTime}
+																	onChange={(e) =>
+																		setNewLog({
+																			...newLog,
+																			startTime: e.target.value,
+																		})
+																	}
+																	className="bg-white border-slate-200 shadow-sm h-10"
+																/>
+															</div>
+															<div className="space-y-1.5">
+																<label className="text-sm font-semibold text-slate-700">
+																	Jam Selesai
+																</label>
+																<Input
+																	type="time"
+																	value={newLog.endTime}
+																	onChange={(e) =>
+																		setNewLog({
+																			...newLog,
+																			endTime: e.target.value,
+																		})
+																	}
+																	className="bg-white border-slate-200 shadow-sm h-10"
+																/>
+															</div>
+														</div>
+														{newLog.media === "Tatap Muka" && (
+															<div className="space-y-1.5">
+																<label className="text-sm font-semibold text-slate-700">
+																	Lokasi Pertemuan
+																</label>
+																<Input
+																	value={newLog.location}
+																	onChange={(e) =>
+																		setNewLog({
+																			...newLog,
+																			location: e.target.value,
+																		})
+																	}
+																	placeholder="Contoh: Ruang Rapat Akademik"
+																	className="bg-white border-slate-200 shadow-sm h-10"
+																/>
+															</div>
+														)}
+													</CardContent>
+												</Card>
+
+												{/* Ringkasan */}
+												<Card className="border-slate-200 shadow-sm">
+													<CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+														<CardTitle className="text-base font-bold text-slate-700 flex items-center gap-2">
+															<FileText className="w-4 h-4 text-purple-500" />{" "}
+															Ringkasan Percakapan (Notulensi)
+														</CardTitle>
+													</CardHeader>
+													<CardContent className="pt-4">
+														<Textarea
+															placeholder="Tuliskan intisari atau ringkasan percakapan secara detail dan jelas..."
+															value={newLog.logText}
+															onChange={(e) =>
+																setNewLog({
+																	...newLog,
+																	logText: e.target.value,
+																})
+															}
+															className="min-h-[120px] bg-white border-slate-200 shadow-sm focus-visible:ring-[#0517B0] text-sm leading-relaxed"
+														/>
+													</CardContent>
+												</Card>
+
+												{/* Hasil Kesepakatan */}
+												<Card className="border-slate-200 shadow-sm overflow-hidden">
+													<CardHeader className="bg-emerald-50/50 border-b border-emerald-100 pb-4 flex flex-row items-center justify-between space-y-0">
+														<CardTitle className="text-base font-bold text-emerald-800 flex items-center gap-2">
+															<CheckCircle className="w-4 h-4" /> Hasil
+															Kesepakatan
+														</CardTitle>
+														<Button
+															type="button"
+															variant="outline"
+															size="sm"
+															onClick={handleAddAgreement}
+															className="h-8 bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+														>
+															+ Tambah Kesepakatan
+														</Button>
+													</CardHeader>
+													<CardContent className="pt-4 bg-white">
+														{agreements.length === 0 ? (
+															<p className="text-sm text-slate-400 italic text-center py-4 bg-slate-50 rounded border border-dashed border-slate-200">
+																Belum ada kesepakatan yang dicatat.
+															</p>
+														) : (
+															<div className="space-y-3">
+																{agreements.map((agr, idx) => (
+																	<div
+																		key={idx}
+																		className="flex gap-3 items-center group"
+																	>
+																		<div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+																			<CheckCircle className="w-4 h-4" />
+																		</div>
+																		<Input
+																			value={agr}
+																			onChange={(e) =>
+																				handleUpdateAgreement(
+																					idx,
+																					e.target.value,
+																				)
+																			}
+																			placeholder="Tulis rincian kesepakatan di sini..."
+																			className="flex-1 h-10 border-slate-200 focus-visible:ring-emerald-500 shadow-sm"
+																		/>
+																		<Button
+																			type="button"
+																			variant="ghost"
+																			size="icon"
+																			onClick={() => handleRemoveAgreement(idx)}
+																			className="h-10 w-10 text-slate-400 hover:text-red-600 hover:bg-red-50 shrink-0"
+																		>
+																			<Trash2 className="w-4 h-4" />
+																		</Button>
+																	</div>
+																))}
+															</div>
+														)}
+													</CardContent>
+												</Card>
+
+												{/* Tindak Lanjut */}
+												<Card className="border-slate-200 shadow-sm overflow-hidden">
+													<CardHeader className="bg-amber-50/50 border-b border-amber-100 pb-4 flex flex-row items-center justify-between space-y-0">
+														<CardTitle className="text-base font-bold text-amber-800 flex items-center gap-2">
+															<User className="w-4 h-4" /> Tindak Lanjut (Follow
+															Up)
+														</CardTitle>
+														<Button
+															type="button"
+															variant="outline"
+															size="sm"
+															onClick={handleAddFollowUp}
+															className="h-8 bg-white border-amber-200 text-amber-700 hover:bg-amber-50"
+														>
+															+ Tambah Penugasan
+														</Button>
+													</CardHeader>
+													<CardContent className="pt-4 bg-white">
+														{followUps.length === 0 ? (
+															<p className="text-sm text-slate-400 italic text-center py-4 bg-slate-50 rounded border border-dashed border-slate-200">
+																Belum ada penugasan atau tindak lanjut.
+															</p>
+														) : (
+															<div className="space-y-4">
+																{followUps.map((fu, idx) => (
+																	<div
+																		key={idx}
+																		className="grid grid-cols-12 gap-4 bg-slate-50/80 p-4 rounded-lg border border-slate-200 relative group"
+																	>
+																		<div className="col-span-12 md:col-span-5 space-y-1.5">
+																			<label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+																				Tugas / Target
+																			</label>
+																			<Input
+																				value={fu.task}
+																				onChange={(e) =>
+																					handleUpdateFollowUp(
+																						idx,
+																						"task",
+																						e.target.value,
+																					)
+																				}
+																				placeholder="Deskripsi tugas..."
+																				className="h-9 bg-white border-slate-200 shadow-sm"
+																			/>
+																		</div>
+																		<div className="col-span-6 md:col-span-3 space-y-1.5">
+																			<label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+																				Tgl. Target
+																			</label>
+																			<Input
+																				type="date"
+																				value={fu.date}
+																				onChange={(e) =>
+																					handleUpdateFollowUp(
+																						idx,
+																						"date",
+																						e.target.value,
+																					)
+																				}
+																				className="h-9 bg-white border-slate-200 shadow-sm"
+																			/>
+																		</div>
+																		<div className="col-span-6 md:col-span-3 space-y-1.5">
+																			<label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+																				Penanggung Jawab
+																			</label>
+																			<Input
+																				value={fu.assignee}
+																				onChange={(e) =>
+																					handleUpdateFollowUp(
+																						idx,
+																						"assignee",
+																						e.target.value,
+																					)
+																				}
+																				placeholder="Nama PIC..."
+																				className="h-9 bg-white border-slate-200 shadow-sm"
+																			/>
+																		</div>
+																		<div className="col-span-12 md:col-span-1 flex items-end justify-end">
+																			<Button
+																				type="button"
+																				variant="ghost"
+																				size="icon"
+																				onClick={() =>
+																					handleRemoveFollowUp(idx)
+																				}
+																				className="h-9 w-9 text-slate-400 hover:text-red-600 hover:bg-red-50"
+																			>
+																				<Trash2 className="w-4 h-4" />
+																			</Button>
+																		</div>
+																	</div>
+																))}
+															</div>
+														)}
+													</CardContent>
+												</Card>
+											</div>
+
+											<DialogFooter className="sticky bottom-0 z-10 bg-white p-4 border-t border-slate-200 flex items-center justify-end gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+												<Button
+													variant="outline"
+													onClick={() => setLogModalOpen(false)}
+													className="h-10 px-6 font-semibold"
+												>
+													Batal
+												</Button>
+												<Button
+													onClick={handleSaveLog}
+													disabled={isSavingLog || !newLog.logText.trim()}
+													className="h-10 px-8 bg-[#0517B0] hover:bg-blue-800 text-white font-bold shadow-md"
+												>
+													{isSavingLog && (
+														<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+													)}
+													Simpan Log Percakapan
+												</Button>
+											</DialogFooter>
+										</DialogContent>
+									</Dialog>
 								</div>
 							)}
 
@@ -641,25 +1194,151 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 									logs.map((log: any) => (
 										<div key={log.id} className="relative">
 											<div className="absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-full bg-blue-500 border-[3px] border-white ring-1 ring-slate-200" />
-											<div className="text-xs text-slate-500 font-medium mb-1 flex items-center gap-2">
+											<div className="text-xs text-slate-500 font-medium mb-2 flex items-center gap-2">
 												<span>
 													📅{" "}
 													{new Date(log.createdAt).toLocaleString("id-ID", {
-														dateStyle: "medium",
-														timeStyle: "short",
-													})}{" "}
+														dateStyle: "full",
+													})}
+												</span>
+												<span className="text-slate-300">|</span>
+												<span className="flex items-center gap-1">
+													<Clock className="w-3.5 h-3.5" />{" "}
+													{log.startTime || "--:--"} - {log.endTime || "--:--"}{" "}
 													WIB
 												</span>
-											</div>
-											<p className="text-slate-700 bg-white border border-slate-200 p-3 rounded-lg shadow-sm">
-												"{log.logText}"
-											</p>
-											<div className="text-xs text-slate-400 mt-2 flex items-center gap-1.5">
-												<User className="w-3 h-3" />
-												oleh:{" "}
-												<span className="font-medium text-slate-600">
-													{log.author?.fullName || "Admin CRM"}
+												<span className="text-slate-300">|</span>
+												<span className="flex items-center gap-1">
+													<User className="w-3.5 h-3.5" /> oleh:{" "}
+													<strong className="text-slate-700">
+														{log.author?.fullName || "Admin CRM"}
+													</strong>
 												</span>
+											</div>
+
+											<div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+												<div className="bg-slate-50 border-b border-slate-200 p-3 flex flex-wrap gap-4 items-center">
+													{log.media && (
+														<div>
+															<span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">
+																Media
+															</span>
+															<Badge
+																variant="outline"
+																className="bg-white font-semibold text-[#0517B0]"
+															>
+																{log.media}
+															</Badge>
+														</div>
+													)}
+													{log.topic && (
+														<div>
+															<span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">
+																Topik
+															</span>
+															<Badge
+																variant="outline"
+																className="bg-white font-semibold text-rose-600"
+															>
+																{log.topic}
+															</Badge>
+														</div>
+													)}
+													{log.location && (
+														<div>
+															<span className="text-[10px] uppercase font-bold text-slate-500 block mb-0.5">
+																Lokasi
+															</span>
+															<span className="text-sm font-medium text-slate-700">
+																{log.location}
+															</span>
+														</div>
+													)}
+												</div>
+												<div className="p-4 space-y-4">
+													<div>
+														<h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+															Ringkasan Percakapan
+														</h5>
+														<p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+															{log.logText}
+														</p>
+													</div>
+
+													{log.agreements &&
+														Array.isArray(log.agreements) &&
+														log.agreements.length > 0 && (
+															<div className="bg-emerald-50/50 p-3 rounded border border-emerald-100">
+																<h5 className="text-xs font-bold text-emerald-800 uppercase tracking-wider mb-2 flex items-center gap-2">
+																	<CheckCircle className="w-4 h-4" /> Hasil
+																	Kesepakatan
+																</h5>
+																<ul className="space-y-1.5">
+																	{log.agreements.map(
+																		(agr: string, i: number) => (
+																			<li
+																				key={i}
+																				className="text-sm text-emerald-900 flex items-start gap-2"
+																			>
+																				<span className="text-emerald-500 font-bold mt-0.5">
+																					✓
+																				</span>{" "}
+																				{agr}
+																			</li>
+																		),
+																	)}
+																</ul>
+															</div>
+														)}
+
+													{log.followUps &&
+														Array.isArray(log.followUps) &&
+														log.followUps.length > 0 && (
+															<div>
+																<h5 className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2 flex items-center gap-2">
+																	⚡ Tindak Lanjut
+																</h5>
+																<div className="overflow-x-auto border border-slate-200 rounded">
+																	<table className="w-full text-left text-sm">
+																		<thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
+																			<tr>
+																				<th className="p-2 border-b">
+																					Tugas / Target
+																				</th>
+																				<th className="p-2 border-b w-32">
+																					Batas Waktu
+																				</th>
+																				<th className="p-2 border-b w-32">
+																					PIC
+																				</th>
+																			</tr>
+																		</thead>
+																		<tbody className="divide-y divide-slate-100">
+																			{log.followUps.map(
+																				(fu: any, i: number) => (
+																					<tr key={i} className="bg-white">
+																						<td className="p-2 font-medium text-slate-700">
+																							{fu.task}
+																						</td>
+																						<td className="p-2 text-slate-600">
+																							{fu.date
+																								? new Date(
+																										fu.date,
+																									).toLocaleDateString("id-ID")
+																								: "-"}
+																						</td>
+																						<td className="p-2 text-slate-600">
+																							{fu.assignee || "-"}
+																						</td>
+																					</tr>
+																				),
+																			)}
+																		</tbody>
+																	</table>
+																</div>
+															</div>
+														)}
+												</div>
 											</div>
 										</div>
 									))
@@ -674,8 +1353,8 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 								)}
 							</div>
 						</div>
-					</CardContent>
-				</Card>
+					</div>
+				</div>
 
 				{/* Status ACC Card */}
 				<Card className="bg-slate-50 border-slate-200 shadow-sm overflow-hidden">
@@ -767,7 +1446,7 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 										<span>
 											<AlertDialog>
 												<AlertDialogTrigger
-													disabled={completedCount < 5}
+													disabled={completedCount < totalChecks}
 													className="w-full sm:w-auto bg-[#0517B0] hover:bg-blue-800 text-white font-bold px-8 py-2 rounded-md shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
 												>
 													✔ ACC CRM →
@@ -797,10 +1476,10 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 											</AlertDialog>
 										</span>
 									</TooltipTrigger>
-									{completedCount < 5 && (
+									{completedCount < totalChecks && (
 										<TooltipContent>
-											Lengkapi semua {5 - completedCount} checklist terlebih
-											dahulu
+											Lengkapi semua {totalChecks - completedCount} checklist
+											terlebih dahulu
 										</TooltipContent>
 									)}
 								</Tooltip>

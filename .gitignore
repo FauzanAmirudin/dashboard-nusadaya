@@ -106,3 +106,6 @@ id_ed25519.pub
 
 # UI Plans Documentation
 /ui-plans/
+/adjustments/
+/adjustment/
+apps/api/uploads/

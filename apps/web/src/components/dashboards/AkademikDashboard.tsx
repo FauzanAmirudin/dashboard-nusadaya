@@ -10,6 +10,7 @@ import {
 	XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import {
 	Cell,
 	Legend,
@@ -40,6 +41,7 @@ export function AkademikDashboard({
 	user,
 }: any) {
 	const router = useRouter();
+	const [filterTaiwan, setFilterTaiwan] = useState(false);
 
 	const totalStudents = data.length;
 	const countAman = data.filter(
@@ -84,11 +86,13 @@ export function AkademikDashboard({
 		{ name: "Tidak Aman", value: countTidakAman },
 	];
 
-	const filteredData = data.filter(
-		(s: any) =>
+	const filteredData = data.filter((s: any) => {
+		const matchSearch =
 			s.student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			s.student.nim.includes(searchQuery),
-	);
+			s.student.nim.includes(searchQuery);
+		const matchTaiwan = filterTaiwan ? s.academic?.taiwanCohort : true;
+		return matchSearch && matchTaiwan;
+	});
 
 	const renderStatusBadge = (status: string | null | undefined) => {
 		if (status === "AMAN") {
@@ -288,14 +292,22 @@ export function AkademikDashboard({
 							<CardTitle className="text-slate-800 text-lg">
 								Tabel Status Akademik Mahasiswa
 							</CardTitle>
-							<div className="relative w-full md:w-72">
-								<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-								<Input
-									placeholder="Cari NIM atau Nama Mahasiswa..."
-									className="pl-9 bg-white"
-									value={searchQuery}
-									onChange={(e) => setSearchQuery(e.target.value)}
-								/>
+							<div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+								<div className="relative w-full md:w-72">
+									<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+									<Input
+										placeholder="Cari NIM atau Nama..."
+										className="pl-9 bg-white"
+										value={searchQuery}
+										onChange={(e) => setSearchQuery(e.target.value)}
+									/>
+								</div>
+								<button
+									onClick={() => setFilterTaiwan(!filterTaiwan)}
+									className={`px-4 py-2 rounded-md text-sm font-medium transition-colors border ${filterTaiwan ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}
+								>
+									{filterTaiwan ? "Hanya Taiwan" : "Semua Angkatan"}
+								</button>
 							</div>
 						</div>
 					</CardHeader>
@@ -314,7 +326,7 @@ export function AkademikDashboard({
 											Kehadiran
 										</TableHead>
 										<TableHead className="text-slate-500 font-semibold py-3 text-center">
-											IPK / Grade
+											IPK Vokasi
 										</TableHead>
 										<TableHead className="text-slate-500 font-semibold text-center py-3">
 											Status
@@ -335,7 +347,7 @@ export function AkademikDashboard({
 														(attendancePresent / attendanceTotal) * 100,
 													)
 												: 0;
-										const isPassed = attPct >= 70;
+										const isPassed = attPct >= 90;
 
 										const gpa = s.academic?.gpa || 0;
 										const gpaStr = (gpa / 100).toFixed(2);
@@ -351,6 +363,11 @@ export function AkademikDashboard({
 												</TableCell>
 												<TableCell className="text-slate-900 font-semibold">
 													{s.student.name}
+													{s.academic?.taiwanCohort && (
+														<Badge className="ml-2 bg-blue-100 text-blue-700 hover:bg-blue-100 border-none px-1.5 h-5 text-[10px]">
+															Taiwan
+														</Badge>
+													)}
 												</TableCell>
 												<TableCell className="text-center">
 													{attendanceTotal > 0 ? (
@@ -380,7 +397,7 @@ export function AkademikDashboard({
 														type="button"
 														onClick={() =>
 															router.push(
-																`/dashboard/students/${s.student.id}#panel-akademik`,
+																`/dashboard/students/${s.student.id}?context=akademik`,
 															)
 														}
 														className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"

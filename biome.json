@@ -18,7 +18,8 @@
 			"recommended": true,
 			"suspicious": {
 				"noExplicitAny": "off",
-				"useIterableCallbackReturn": "off"
+				"useIterableCallbackReturn": "off",
+				"noArrayIndexKey": "off"
 			},
 			"correctness": {
 				"useExhaustiveDependencies": "off",

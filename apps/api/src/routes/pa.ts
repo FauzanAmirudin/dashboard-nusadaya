@@ -1,21 +1,33 @@
 import { eq, ilike, or } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { db } from "../db";
-import { paData, students } from "../db/schema";
+import { paData, students, users } from "../db/schema";
 import { requireRole } from "../middleware/rbac";
 
 export const paRouter = new Elysia({ prefix: "/pa" })
 	.use(requireRole(["pa", "superadmin"]))
-	.get("/dashboard", async ({ query }) => {
+	.get("/dashboard", async (context) => {
+		const { query } = context;
+		const user = (context as any).user;
 		const searchQuery = query.q || "";
 
-		let allStudents = await db
+		let allStudentsQuery = db
 			.select({
 				student: students,
 				pa: paData,
+				paUser: users,
 			})
 			.from(students)
-			.leftJoin(paData, eq(students.id, paData.studentId));
+			.leftJoin(paData, eq(students.id, paData.studentId))
+			.leftJoin(users, eq(students.paId, users.id));
+
+		if (user && user.role !== "superadmin") {
+			allStudentsQuery = allStudentsQuery.where(
+				eq(students.paId, user.id),
+			) as any;
+		}
+
+		let allStudents = await allStudentsQuery;
 
 		if (searchQuery) {
 			const lowerQuery = searchQuery.toLowerCase();
@@ -35,17 +47,15 @@ export const paRouter = new Elysia({ prefix: "/pa" })
 			vocabLow: 0,
 		};
 
-		const formattedStudents = allStudents.map(({ student, pa }) => {
+		const formattedStudents = allStudents.map(({ student, pa, paUser }) => {
 			if (pa?.status === "AMAN") kpi.aman++;
-			if (pa?.status === "PERLU_PERHATIAN" || pa?.status === "TIDAK_AMAN")
+			if (
+				!pa?.status ||
+				pa?.status === "PERLU_PERHATIAN" ||
+				pa?.status === "TIDAK_AMAN"
+			)
 				kpi.perhatian++;
 
-			// We don't have vocabLogs directly attached, but we could fetch them.
-			// For simplicity and performance, vocabLow is calculated based on disciplineGood
-			// as a mock. In a real scenario we'd do a subquery or join for vocabLogs sum.
-			// Let's assume if it's TIDAK_AMAN, we mark vocabLow as a placeholder metric for now,
-			// or we can fetch vocab logs if we want to be exact.
-			// To be perfectly accurate we'd join vocabLogs, but this is a start.
 			if (pa?.status === "TIDAK_AMAN") kpi.vocabLow++;
 
 			return {
@@ -53,7 +63,8 @@ export const paRouter = new Elysia({ prefix: "/pa" })
 				nim: student.nim,
 				name: student.name,
 				program: student.program,
-				status: pa?.status || "TIDAK_AMAN",
+				paName: paUser?.fullName || "-",
+				status: pa?.status || "PERLU_PERHATIAN",
 				counselingDone: pa?.counselingDone || false,
 				isAcc: pa?.isAcc || false,
 			};

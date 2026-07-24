@@ -10,6 +10,7 @@ import {
 	XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
 	Cell,
 	Legend,
@@ -29,6 +30,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { api } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 
 const STATUS_COLORS = {
@@ -51,35 +53,45 @@ const STATUS_COLORS = {
 
 const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
 
-export function PaDashboard({ data, searchQuery, setSearchQuery, user }: any) {
+export function PaDashboard({ user }: any) {
 	const router = useRouter();
+	const [data, setData] = useState<any[]>([]);
+	const [kpi, setKpi] = useState<any>({});
+	const [searchQuery, setSearchQuery] = useState("");
+	const [isLoading, setIsLoading] = useState(true);
 
-	const totalStudents = data?.length || 0;
-	const countAman =
-		data?.filter((s: any) => s.pa?.status === "AMAN").length || 0;
-	const countPerhatian =
-		data?.filter(
-			(s: any) => s.pa?.status === "PERLU_PERHATIAN" || !s.pa?.status,
-		).length || 0;
-	const countTidakAman =
-		data?.filter((s: any) => s.pa?.status === "TIDAK_AMAN").length || 0;
+	useEffect(() => {
+		const fetchData = async () => {
+			const { data: resData, error } = await api.pa.dashboard.get({
+				$query: { q: searchQuery },
+			});
+			if (!error && resData?.data) {
+				setData(resData.data.students);
+				setKpi(resData.data.kpi);
+			}
+			setIsLoading(false);
+		};
+		fetchData();
+	}, [searchQuery]);
+
+	const totalStudents = kpi.totalStudents || 0;
+	const countAman = kpi.aman || 0;
+	const countPerhatian = kpi.perhatian || 0;
+	const countTidakAman = kpi.vocabLow || 0;
 
 	const handleExport = () => {
 		const exportData = data.map((s: any) => ({
-			NIM: s.student.nim,
-			"Nama Mahasiswa": s.student.name,
-			"Konseling Dilakukan": s.pa?.counselingDone ? "Sudah" : "Belum",
-			"Mental Stabil": s.pa?.mentalStable ? "Ya" : "Tidak",
-			"Kedisiplinan Baik": s.pa?.disciplineGood ? "Ya" : "Tidak",
-			"Target Kosakata": s.pa?.vocabTarget || "-",
-			"Catatan PA": s.pa?.notes || "-",
+			NIM: s.nim,
+			"Nama Mahasiswa": s.name,
+			"Dosen PA": s.paName,
+			"Konseling Dilakukan": s.counselingDone ? "Sudah" : "Belum",
 			"Status PA":
-				s.pa?.status === "AMAN"
+				s.status === "AMAN"
 					? "Aman"
-					: s.pa?.status === "TIDAK_AMAN"
+					: s.status === "TIDAK_AMAN"
 						? "Tidak Aman"
 						: "Perlu Perhatian",
-			"Disetujui Admin PA": s.pa?.isAcc ? "Sudah ACC" : "Belum",
+			"Disetujui Admin PA": s.isAcc ? "Sudah ACC" : "Belum",
 		}));
 		exportToCSV(
 			exportData,
@@ -93,12 +105,7 @@ export function PaDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 		{ name: "Tidak Aman", value: countTidakAman },
 	];
 
-	const filteredData =
-		data?.filter(
-			(s: any) =>
-				s.student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				s.student.nim.includes(searchQuery),
-		) || [];
+	const filteredData = data;
 
 	const renderStatusBadge = (status: string | null | undefined) => {
 		if (status === "AMAN") {
@@ -311,6 +318,9 @@ export function PaDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 										<TableHead className="text-slate-500 font-semibold py-3">
 											Angkatan
 										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3">
+											Dosen PA
+										</TableHead>
 										<TableHead className="text-slate-500 font-semibold text-center py-3">
 											Status PA
 										</TableHead>
@@ -320,41 +330,57 @@ export function PaDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{filteredData.map((s: any) => (
-										<TableRow
-											key={s.student.id}
-											className="border-slate-200 hover:bg-blue-50/50 transition-colors"
-										>
-											<TableCell className="font-medium text-slate-700">
-												{s.student.nim}
-											</TableCell>
-											<TableCell className="text-slate-900 font-semibold">
-												{s.student.name}
-											</TableCell>
-											<TableCell>
-												<Badge
-													variant="outline"
-													className="text-slate-500 border-slate-200"
-												>
-													{s.student.cohort}
-												</Badge>
-											</TableCell>
-											<TableCell className="text-center">
-												{renderStatusBadge(s.pa?.status)}
-											</TableCell>
-											<TableCell className="text-right pr-4">
-												<button
-													type="button"
-													onClick={() =>
-														router.push(`/dashboard/students/${s.student.id}`)
-													}
-													className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
-												>
-													Periksa
-												</button>
+									{isLoading ? (
+										<TableRow>
+											<TableCell
+												colSpan={6}
+												className="text-center py-8 text-slate-500"
+											>
+												Memuat data...
 											</TableCell>
 										</TableRow>
-									))}
+									) : (
+										filteredData.map((s: any) => (
+											<TableRow
+												key={s.id}
+												className="border-slate-200 hover:bg-blue-50/50 transition-colors"
+											>
+												<TableCell className="font-medium text-slate-700">
+													{s.nim}
+												</TableCell>
+												<TableCell className="text-slate-900 font-semibold">
+													{s.name}
+												</TableCell>
+												<TableCell>
+													<Badge
+														variant="outline"
+														className="text-slate-500 border-slate-200"
+													>
+														{s.program}
+													</Badge>
+												</TableCell>
+												<TableCell className="text-slate-600 font-medium text-sm">
+													{s.paName}
+												</TableCell>
+												<TableCell className="text-center">
+													{renderStatusBadge(s.status)}
+												</TableCell>
+												<TableCell className="text-right pr-4">
+													<button
+														type="button"
+														onClick={() =>
+															router.push(
+																`/dashboard/students/${s.id}?context=pa`,
+															)
+														}
+														className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
+													>
+														Periksa
+													</button>
+												</TableCell>
+											</TableRow>
+										))
+									)}
 								</TableBody>
 							</Table>
 							{filteredData.length === 0 && (

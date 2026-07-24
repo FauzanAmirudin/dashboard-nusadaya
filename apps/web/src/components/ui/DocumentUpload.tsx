@@ -25,11 +25,20 @@ import { useAuthStore } from "@/store";
 
 interface DocumentUploadProps {
 	studentId: number;
-	panel: "pmb" | "crm" | "finance" | "akademik" | "pa" | "magang" | "dosen";
+	panel:
+		| "pmb"
+		| "crm"
+		| "finance"
+		| "akademik"
+		| "pa"
+		| "magang"
+		| "dosen"
+		| "post-internship";
 	documentKey: string;
 	courseId?: number;
 	canEdit: boolean;
 	onUploadSuccess?: () => void;
+	hideLabel?: boolean;
 }
 
 export function DocumentUpload({
@@ -39,13 +48,14 @@ export function DocumentUpload({
 	courseId,
 	canEdit,
 	onUploadSuccess,
+	hideLabel = false,
 }: DocumentUploadProps) {
 	const { token } = useAuthStore();
 	const [isUploading, setIsUploading] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
-	const [document, setDocument] = useState<any>(null);
+	const [documents, setDocuments] = useState<any[]>([]);
 
-	const fetchDocument = async () => {
+	const fetchDocuments = async () => {
 		try {
 			const fetchUrl =
 				panel === "dosen"
@@ -60,29 +70,30 @@ export function DocumentUpload({
 			if (res.ok) {
 				const data = await res.json();
 				if (data.success && data.data) {
-					let doc = null;
+					let docs: any[] = [];
 					if (Array.isArray(data.data)) {
-						// Format array (misal dari panel PA atau Magang)
-						doc = data.data.find((d: any) => d.documentKey === documentKey);
+						docs = data.data.filter((d: any) => d.documentKey === documentKey);
 					} else {
-						// Format objek berdasar key (misal dari PMB, CRM, Finance)
-						const docs = data.data[documentKey];
-						if (docs && docs.length > 0) {
-							doc = docs[0]; // Ambil dokumen pertama/terbaru
-						}
+						docs = data.data[documentKey] || [];
 					}
-					setDocument(doc || null);
+					// Urutkan dari yang terbaru (uploadedAt descending)
+					docs.sort(
+						(a, b) =>
+							new Date(b.uploadedAt).getTime() -
+							new Date(a.uploadedAt).getTime(),
+					);
+					setDocuments(docs);
 				}
 			}
 		} catch (error) {
-			console.error("Failed to fetch document", error);
+			console.error("Failed to fetch documents", error);
 		} finally {
 			setIsLoading(false);
 		}
 	};
 
 	useEffect(() => {
-		fetchDocument();
+		fetchDocuments();
 	}, [studentId, panel, documentKey]);
 
 	const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -124,7 +135,7 @@ export function DocumentUpload({
 			const data = await res.json();
 			if (data.success) {
 				toast.success("Dokumen berhasil diunggah");
-				fetchDocument();
+				fetchDocuments();
 				if (onUploadSuccess) onUploadSuccess();
 			} else {
 				toast.error(data.message || "Gagal mengunggah dokumen");
@@ -138,14 +149,14 @@ export function DocumentUpload({
 		}
 	};
 
-	const handleDelete = async () => {
-		if (!canEdit || !document) return;
+	const handleDelete = async (docId: number) => {
+		if (!canEdit) return;
 
 		try {
 			const deleteUrl =
 				panel === "dosen"
-					? `${API_URL}/students/${studentId}/course-grades/${courseId}/documents/${document.id}`
-					: `${API_URL}/students/${studentId}/${panel}/documents/${documentKey}`;
+					? `${API_URL}/students/${studentId}/course-grades/${courseId}/documents/${docId}`
+					: `${API_URL}/students/${studentId}/${panel}/documents/${docId}`;
 
 			const res = await fetch(deleteUrl, {
 				method: "DELETE",
@@ -156,7 +167,7 @@ export function DocumentUpload({
 			const data = await res.json();
 			if (data.success) {
 				toast.success("Dokumen dihapus");
-				setDocument(null);
+				setDocuments((prev) => prev.filter((d) => d.id !== docId));
 			} else {
 				toast.error(data.message || "Gagal menghapus");
 			}
@@ -170,22 +181,36 @@ export function DocumentUpload({
 	}
 
 	return (
-		<div className="w-full mt-2">
-			{document ? (
-				<div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-md border border-slate-200 w-full">
+		<div className="w-full mt-2 space-y-3">
+			{documents.map((doc, index) => (
+				<div
+					key={doc.id}
+					className="flex items-center justify-between bg-slate-50 p-2.5 rounded-md border border-slate-200 w-full"
+				>
 					<div className="flex items-center gap-3 overflow-hidden">
 						<div className="w-8 h-8 rounded bg-white flex items-center justify-center border border-slate-200 shrink-0">
 							<FileText className="w-4 h-4 text-[#0517B0]" />
 						</div>
 						<div className="min-w-0 flex flex-col items-start">
 							<p className="text-sm font-medium text-slate-700 truncate max-w-[150px] sm:max-w-[200px]">
-								{document.fileName}
+								{doc.fileName}
 							</p>
 							<span className="text-[10px] text-slate-400">
 								Diunggah{" "}
-								{document.uploadedAt
-									? new Date(document.uploadedAt).toLocaleDateString("id-ID")
+								{doc.uploadedAt
+									? new Date(doc.uploadedAt.replace("Z", "")).toLocaleString(
+											"id-ID",
+											{
+												dateStyle: "medium",
+												timeStyle: "short",
+											},
+										)
 									: "-"}
+								{index === 0 && (
+									<span className="ml-2 text-emerald-600 font-medium">
+										(Terbaru)
+									</span>
+								)}
 							</span>
 						</div>
 					</div>
@@ -197,7 +222,7 @@ export function DocumentUpload({
 							title="Review Dokumen"
 							onClick={() =>
 								window.open(
-									`/dashboard/students/${studentId}/documents/${document.id}?url=${encodeURIComponent(document.fileUrl)}&name=${encodeURIComponent(document.fileName)}`,
+									`/dashboard/students/${studentId}/documents/${doc.id}?url=${encodeURIComponent(doc.fileUrl)}&name=${encodeURIComponent(doc.fileName)}`,
 									"_blank",
 								)
 							}
@@ -230,7 +255,7 @@ export function DocumentUpload({
 											Batal
 										</AlertDialogCancel>
 										<AlertDialogAction
-											onClick={handleDelete}
+											onClick={() => handleDelete(doc.id)}
 											className="bg-rose-600 hover:bg-rose-700 text-white"
 										>
 											Ya, Hapus
@@ -241,32 +266,50 @@ export function DocumentUpload({
 						)}
 					</div>
 				</div>
-			) : (
-				canEdit && (
-					<label
-						className="flex items-center justify-center gap-2 w-full h-10 rounded border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-500 cursor-pointer transition-colors"
-						title="Upload PDF (Maks 5MB)"
-					>
-						{isUploading ? (
-							<>
-								<Loader2 className="w-4 h-4 animate-spin" />
-								<span className="text-xs font-medium">Mengunggah...</span>
-							</>
-						) : (
-							<>
-								<UploadCloud className="w-4 h-4" />
-								<span className="text-xs font-medium">Unggah Berkas PDF</span>
-							</>
-						)}
-						<input
-							type="file"
-							accept="application/pdf"
-							className="hidden"
-							onChange={handleUpload}
-							disabled={isUploading}
-						/>
-					</label>
-				)
+			))}
+
+			{canEdit && (
+				<div className="relative">
+					{!hideLabel && (
+						<label
+							htmlFor={`file-upload-${documentKey}`}
+							className="flex items-center justify-center gap-2 w-full h-10 rounded border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-500 cursor-pointer transition-colors"
+							title="Upload PDF (Maks 5MB)"
+						>
+							{isUploading ? (
+								<>
+									<Loader2 className="w-4 h-4 animate-spin" />
+									<span className="text-xs font-medium">Mengunggah...</span>
+								</>
+							) : (
+								<>
+									<UploadCloud className="w-4 h-4" />
+									<span className="text-xs font-medium">
+										{documents.length > 0
+											? "Unggah File Tambahan (Versi Baru)"
+											: "Unggah Berkas PDF"}
+									</span>
+								</>
+							)}
+						</label>
+					)}
+					{hideLabel && (
+						<label
+							htmlFor={`file-upload-${documentKey}`}
+							className={`cursor-pointer absolute inset-0 z-10 w-full h-full opacity-0 ${
+								!canEdit || isUploading ? "cursor-not-allowed" : ""
+							}`}
+						></label>
+					)}
+					<input
+						id={`file-upload-${documentKey}`}
+						type="file"
+						accept="application/pdf"
+						className="hidden"
+						onChange={handleUpload}
+						disabled={isUploading || !canEdit}
+					/>
+				</div>
 			)}
 		</div>
 	);

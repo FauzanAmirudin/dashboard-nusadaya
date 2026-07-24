@@ -8,9 +8,12 @@ import { Elysia, t } from "elysia";
 import { db } from "./db";
 import { users } from "./db/schema";
 import { dosenRouter } from "./routes/dosen";
+import { financeRouter } from "./routes/finance";
 import { magangRouter } from "./routes/magang";
 import { paRouter } from "./routes/pa";
+import { settingsRoutes } from "./routes/settings";
 import { studentsRouter } from "./routes/students";
+import { vocationalRouter } from "./routes/vocational";
 
 const JWT_SECRET =
 	process.env.JWT_SECRET || "super_secret_jwt_key_nusadaya_2026";
@@ -146,11 +149,14 @@ const app = new Elysia()
 		return { success: true, data: result };
 	})
 
-	// studentsRouter inherits the derive context from root
+	// Module Routers
 	.use(studentsRouter)
 	.use(dosenRouter)
 	.use(paRouter)
-	.use(magangRouter);
+	.use(magangRouter)
+	.use(financeRouter)
+	.use(settingsRoutes)
+	.use(vocationalRouter);
 
 app.listen(process.env.PORT || 3001, () => {
 	console.log(

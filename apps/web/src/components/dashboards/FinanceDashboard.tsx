@@ -10,6 +10,7 @@ import {
 	XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
 	Cell,
 	Legend,
@@ -29,6 +30,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { api } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 
 const STATUS_COLORS = {
@@ -51,42 +53,55 @@ const STATUS_COLORS = {
 
 const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
 
-export function FinanceDashboard({
-	data,
-	searchQuery,
-	setSearchQuery,
-	user,
-}: any) {
+export function FinanceDashboard({ user }: any) {
 	const router = useRouter();
+	const [data, setData] = useState<any[]>([]);
+	const [kpi, setKpi] = useState<any>({});
+	const [searchQuery, setSearchQuery] = useState("");
+	const [isLoading, setIsLoading] = useState(true);
 
-	const totalStudents = data?.length || 0;
-	const countAman =
-		data?.filter((s: any) => s.finance?.status === "AMAN").length || 0;
-	const countPerhatian =
-		data?.filter(
-			(s: any) => s.finance?.status === "PERLU_PERHATIAN" || !s.finance?.status,
-		).length || 0;
-	const countTidakAman =
-		data?.filter((s: any) => s.finance?.status === "TIDAK_AMAN").length || 0;
+	useEffect(() => {
+		const fetchData = async () => {
+			try {
+				const { data: resData, error } = await api.finance.dashboard.get();
+				if (!error && resData?.success) {
+					setData(resData.data.students);
+					setKpi(resData.data.kpi);
+				}
+			} catch (err) {
+				console.error(err);
+			} finally {
+				setIsLoading(false);
+			}
+		};
+		fetchData();
+		const interval = setInterval(fetchData, 15000);
+		return () => clearInterval(interval);
+	}, []);
+
+	const totalStudents = kpi.totalStudents || 0;
+	const countAman = kpi.aman || 0;
+	const countPerhatian = kpi.perhatian || 0;
+	const countTidakAman = kpi.tidakAman || 0;
 
 	const handleExport = () => {
 		const exportData = data.map((s: any) => ({
-			NIM: s.student.nim,
-			"Nama Mahasiswa": s.student.name,
-			"Pendaftaran Dibayar": s.finance?.registrationPaid ? "Lunas" : "Belum",
-			"Nominal Pendaftaran": s.finance?.registrationAmount || 0,
-			"Semester Dibayar": s.finance?.semesterPaid ? "Lunas" : "Belum",
-			"Nominal Semester": s.finance?.semesterAmount || 0,
-			"Cicilan Lunas": s.finance?.installmentCleared ? "Ya" : "Tidak",
-			"Tunggakan Lunas": s.finance?.arrearsCleared ? "Ya" : "Tidak",
-			"Catatan Keuangan": s.finance?.notes || "-",
+			NIM: s.nim,
+			"Nama Mahasiswa": s.name,
+			"Pendaftaran Dibayar": s.registrationPaid ? "Lunas" : "Belum",
+			"Semester Dibayar": s.semesterPaid ? "Lunas" : "Belum",
+			"Cicilan Lunas": s.installmentCleared ? "Ya" : "Tidak",
+			"Tunggakan Lunas": s.arrearsCleared ? "Ya" : "Tidak",
+			"V Mitra": s.vMitra || 0,
+			"V Koordinator": s.vKoordinator || 0,
+			"Invoice PMB": s.hasInvoice ? "Ada" : "Belum",
 			"Status Finance":
-				s.finance?.status === "AMAN"
+				s.status === "AMAN"
 					? "Aman"
-					: s.finance?.status === "TIDAK_AMAN"
+					: s.status === "TIDAK_AMAN"
 						? "Tidak Aman"
 						: "Perlu Perhatian",
-			"Disetujui Admin Finance": s.finance?.isAcc ? "Sudah ACC" : "Belum",
+			"Disetujui Admin Finance": s.isAcc ? "Sudah ACC" : "Belum",
 		}));
 		exportToCSV(
 			exportData,
@@ -103,9 +118,18 @@ export function FinanceDashboard({
 	const filteredData =
 		data?.filter(
 			(s: any) =>
-				s.student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				s.student.nim.includes(searchQuery),
+				s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				s.nim.includes(searchQuery),
 		) || [];
+
+	const formatRupiah = (val: number) => {
+		return new Intl.NumberFormat("id-ID", {
+			style: "currency",
+			currency: "IDR",
+			minimumFractionDigits: 0,
+			maximumFractionDigits: 0,
+		}).format(val || 0);
+	};
 
 	const renderStatusBadge = (status: string | null | undefined) => {
 		if (status === "AMAN") {
@@ -323,6 +347,12 @@ export function FinanceDashboard({
 										<TableHead className="text-slate-500 font-semibold text-center py-3">
 											Status Finance
 										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3 text-right">
+											V Mitra
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3 text-center">
+											Invoice PMB
+										</TableHead>
 										<TableHead className="text-slate-500 font-semibold text-right py-3 pr-4">
 											Aksi
 										</TableHead>
@@ -331,31 +361,47 @@ export function FinanceDashboard({
 								<TableBody>
 									{filteredData.map((s: any) => (
 										<TableRow
-											key={s.student.id}
+											key={s.id}
 											className="border-slate-200 hover:bg-blue-50/50 transition-colors"
 										>
 											<TableCell className="font-medium text-slate-700">
-												{s.student.nim}
+												{s.nim}
 											</TableCell>
 											<TableCell className="text-slate-900 font-semibold">
-												{s.student.name}
+												{s.name}
 											</TableCell>
 											<TableCell>
 												<Badge
 													variant="outline"
 													className="text-slate-500 border-slate-200"
 												>
-													{s.student.cohort}
+													{s.cohort}
 												</Badge>
 											</TableCell>
 											<TableCell className="text-center">
-												{renderStatusBadge(s.finance?.status)}
+												{renderStatusBadge(s.status)}
+											</TableCell>
+											<TableCell className="text-right text-slate-700 font-medium">
+												{formatRupiah(s.vMitra)}
+											</TableCell>
+											<TableCell className="text-center">
+												{s.hasInvoice ? (
+													<Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
+														Ada
+													</Badge>
+												) : (
+													<Badge className="bg-slate-100 text-slate-500 border-slate-200">
+														Belum
+													</Badge>
+												)}
 											</TableCell>
 											<TableCell className="text-right pr-4">
 												<button
 													type="button"
 													onClick={() =>
-														router.push(`/dashboard/students/${s.student.id}`)
+														router.push(
+															`/dashboard/students/${s.id}?context=finance`,
+														)
 													}
 													className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
 												>

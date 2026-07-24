@@ -51,6 +51,11 @@ interface DashboardData {
 		name: string;
 		program: string;
 		destinationCity: string;
+		internshipCompany: string;
+		estDepartureDate?: string;
+		passportReady?: boolean;
+		visaReady?: boolean;
+		mcuReady?: boolean;
 		completedDocs: number;
 		status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN";
 	}>;
@@ -89,12 +94,15 @@ export function MagangDashboard() {
 				Visa: s.internship?.visaReady ? "Selesai" : "Belum",
 				MCU: s.internship?.mcuReady ? "Selesai" : "Belum",
 				Tiket: s.internship?.ticketReady ? "Selesai" : "Belum",
-				LoA: s.internship?.loaReady ? "Selesai" : "Belum",
+				LoA: s.internship?.loaConfirmed ? "Selesai" : "Belum",
 				"Kontrak Kerja": s.internship?.contractReady ? "Selesai" : "Belum",
 				Interview: s.internship?.interviewReady ? "Selesai" : "Belum",
-				"Estimasi Keberangkatan": s.decision?.departureDate
-					? new Date(s.decision.departureDate).toLocaleDateString()
-					: "-",
+				"Hotel/Perusahaan": s.internship?.internshipCompany || "-",
+				"Estimasi Keberangkatan": s.internship?.estDepartureDate
+					? new Date(s.internship.estDepartureDate).toLocaleDateString()
+					: s.decision?.departureDate
+						? new Date(s.decision.departureDate).toLocaleDateString()
+						: "-",
 				"Disetujui Admin Magang": s.internship?.isAcc ? "Sudah ACC" : "Belum",
 			}));
 			exportToCSV(
@@ -351,6 +359,9 @@ export function MagangDashboard() {
 										Tujuan
 									</TableHead>
 									<TableHead className="font-semibold text-slate-600">
+										Est. Keberangkatan
+									</TableHead>
+									<TableHead className="font-semibold text-slate-600">
 										Progres Dokumen
 									</TableHead>
 									<TableHead className="font-semibold text-slate-600">
@@ -363,7 +374,7 @@ export function MagangDashboard() {
 							</TableHeader>
 							<TableBody>
 								{filteredStudents.length > 0 ? (
-									filteredStudents.slice(0, 5).map((s) => (
+									filteredStudents.map((s) => (
 										<TableRow key={s.id} className="hover:bg-slate-50/50">
 											<TableCell>
 												<div className="font-medium text-slate-900">
@@ -375,7 +386,19 @@ export function MagangDashboard() {
 												{s.program}
 											</TableCell>
 											<TableCell className="text-slate-600">
-												{s.destinationCity || "-"}
+												<div>{s.destinationCity || "-"}</div>
+												<div className="text-xs text-slate-500">
+													{s.internshipCompany !== "-"
+														? s.internshipCompany
+														: ""}
+												</div>
+											</TableCell>
+											<TableCell className="text-slate-600">
+												{s.estDepartureDate
+													? new Date(s.estDepartureDate).toLocaleDateString(
+															"id-ID",
+														)
+													: "-"}
 											</TableCell>
 											<TableCell>
 												<div className="flex items-center gap-2">
@@ -399,7 +422,7 @@ export function MagangDashboard() {
 													className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
 													onClick={() =>
 														router.push(
-															`/dashboard/students/${s.id}#panel-magang`,
+															`/dashboard/students/${s.id}?context=magang`,
 														)
 													}
 												>

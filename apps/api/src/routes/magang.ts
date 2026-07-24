@@ -1,7 +1,11 @@
 import { desc, eq } from "drizzle-orm";
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import { db } from "../db";
-import { internshipData, students } from "../db/schema";
+import {
+	internshipData,
+	internshipMonitoringSchedule,
+	students,
+} from "../db/schema";
 import { requireRole } from "../middleware/rbac";
 
 export const magangRouter = new Elysia({ prefix: "/magang" })
@@ -26,7 +30,7 @@ export const magangRouter = new Elysia({ prefix: "/magang" })
 			const checks = [
 				internship?.passportReady,
 				internship?.interviewReady,
-				internship?.loaReady,
+				internship?.loaConfirmed, // updated to use loaConfirmed
 				internship?.contractReady,
 				internship?.mcuReady,
 				internship?.visaReady,
@@ -56,8 +60,13 @@ export const magangRouter = new Elysia({ prefix: "/magang" })
 				name: student.name,
 				program: student.program,
 				destinationCity: internship?.destinationCity || "-",
+				internshipCompany: internship?.internshipCompany || "-",
 				completedDocs: completedCount,
 				status: internship?.status || status,
+				estDepartureDate: internship?.estDepartureDate,
+				passportReady: internship?.passportReady,
+				visaReady: internship?.visaReady,
+				mcuReady: internship?.mcuReady,
 			};
 		});
 
@@ -73,4 +82,64 @@ export const magangRouter = new Elysia({ prefix: "/magang" })
 				students: mappedStudents,
 			},
 		};
-	});
+	})
+	.get("/monitoring/student/:studentId", async ({ params: { studentId } }) => {
+		const results = await db
+			.select()
+			.from(internshipMonitoringSchedule)
+			.where(eq(internshipMonitoringSchedule.studentId, Number(studentId)))
+			.orderBy(desc(internshipMonitoringSchedule.scheduledDate));
+		return { success: true, data: results };
+	})
+	.post(
+		"/monitoring",
+		async (context) => {
+			const { body } = context;
+			const user = (context as any).user;
+			const b = body as any;
+			await db.insert(internshipMonitoringSchedule).values({
+				studentId: b.studentId,
+				scheduledDate: new Date(b.scheduledDate),
+				monitoringNotes: b.monitoringNotes,
+				condition: b.condition,
+				conductedBy: user?.userId,
+				completedAt: b.condition ? new Date() : null,
+			});
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				studentId: t.Number(),
+				scheduledDate: t.String(),
+				monitoringNotes: t.Optional(t.String()),
+				condition: t.Optional(t.String()),
+			}),
+		},
+	)
+	.patch(
+		"/monitoring/:id",
+		async (context) => {
+			const {
+				params: { id },
+				body,
+			} = context;
+			const user = (context as any).user;
+			const b = body as any;
+			await db
+				.update(internshipMonitoringSchedule)
+				.set({
+					monitoringNotes: b.monitoringNotes,
+					condition: b.condition,
+					conductedBy: user?.userId,
+					completedAt: new Date(),
+				})
+				.where(eq(internshipMonitoringSchedule.id, Number(id)));
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				monitoringNotes: t.Optional(t.String()),
+				condition: t.Optional(t.String()),
+			}),
+		},
+	);
