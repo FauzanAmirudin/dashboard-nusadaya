@@ -92,8 +92,8 @@ export function FinanceDashboard({ user }: any) {
 			"Semester Dibayar": s.semesterPaid ? "Lunas" : "Belum",
 			"Cicilan Lunas": s.installmentCleared ? "Ya" : "Tidak",
 			"Tunggakan Lunas": s.arrearsCleared ? "Ya" : "Tidak",
-			"V Mitra": s.vMitra || 0,
-			"V Koordinator": s.vKoordinator || 0,
+			"Fee Mitra": s.vMitra || 0,
+			"Fee Koord": s.vKoordinator || 0,
 			"Invoice PMB": s.hasInvoice ? "Ada" : "Belum",
 			"Status Finance":
 				s.status === "AMAN"
@@ -162,7 +162,7 @@ export function FinanceDashboard({ user }: any) {
 						Dashboard Divisi Finance
 					</h1>
 					<p className="text-slate-500 mt-1 text-sm">
-						Selamat datang, {user.username}. Berikut ringkasan data keuangan
+						Selamat datang, {user?.username}. Berikut ringkasan data keuangan
 						mahasiswa.
 					</p>
 				</div>
@@ -348,7 +348,7 @@ export function FinanceDashboard({ user }: any) {
 											Status Finance
 										</TableHead>
 										<TableHead className="text-slate-500 font-semibold py-3 text-right">
-											V Mitra
+											Fee Mitra
 										</TableHead>
 										<TableHead className="text-slate-500 font-semibold py-3 text-center">
 											Invoice PMB

@@ -138,7 +138,7 @@ export function PaDashboard({ user }: any) {
 						Dashboard Divisi Pembimbing Akademik (PA)
 					</h1>
 					<p className="text-slate-500 mt-1 text-sm">
-						Selamat datang, {user.username}. Berikut ringkasan data bimbingan
+						Selamat datang, {user?.username}. Berikut ringkasan data bimbingan
 						akademik mahasiswa.
 					</p>
 				</div>

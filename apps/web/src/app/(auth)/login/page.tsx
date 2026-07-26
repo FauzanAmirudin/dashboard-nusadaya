@@ -41,7 +41,11 @@ export default function LoginPage() {
 			// The token is needed for cross-origin API calls (Authorization: Bearer)
 			const rawToken = data.token as string | undefined;
 			login(data.user, rawToken || "");
-			router.push("/dashboard");
+			if (data.user.role === "mahasiswa") {
+				router.push("/mahasiswa/dashboard");
+			} else {
+				router.push("/dashboard");
+			}
 		} catch (_err) {
 			setError("Terjadi kesalahan sistem. Silakan coba lagi.");
 		} finally {

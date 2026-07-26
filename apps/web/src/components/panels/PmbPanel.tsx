@@ -259,24 +259,28 @@ export function PmbPanel({ studentId, pmbData, onUpdate }: PmbPanelProps) {
 	const checklist = [
 		{
 			id: "formReceived",
+			documentKey: "form_received",
 			label: "Formulir Masuk",
 			desc: "Formulir pendaftaran telah diterima",
 			checked: localChecks.formReceived,
 		},
 		{
 			id: "documentsComplete",
+			documentKey: "documents_complete",
 			label: "Berkas Lengkap",
 			desc: "Semua dokumen fisik tersedia",
 			checked: localChecks.documentsComplete,
 		},
 		{
 			id: "dataInputted",
+			documentKey: "data_inputted",
 			label: "Input Data Awal",
 			desc: "Data mahasiswa telah diinput ke sistem",
 			checked: localChecks.dataInputted,
 		},
 		{
 			id: "initialFollowUp",
+			documentKey: "initial_follow_up",
 			label: "Follow Up Awal",
 			desc: "Kontak awal dengan mahasiswa/orang tua selesai",
 			checked: localChecks.initialFollowUp,
@@ -741,6 +745,20 @@ export function PmbPanel({ studentId, pmbData, onUpdate }: PmbPanelProps) {
 												) : (
 													<Clock className="w-5 h-5 text-slate-400" />
 												)}
+											</div>
+										</div>
+										<div className="bg-slate-50/50 p-4 border-t border-slate-100 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+											<p className="text-xs text-slate-500 font-medium whitespace-nowrap mt-2">
+												Dokumen Terkait:
+											</p>
+											<div className="w-full">
+												<DocumentUpload
+													studentId={studentId}
+													panel="pmb"
+													documentKey={item.documentKey}
+													canEdit={canEdit}
+													onUploadSuccess={fetchDocuments}
+												/>
 											</div>
 										</div>
 									</div>

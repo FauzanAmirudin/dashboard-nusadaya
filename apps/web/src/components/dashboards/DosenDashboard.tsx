@@ -188,8 +188,8 @@ export function DosenDashboard({ user }: DosenDashboardProps) {
 				<div>
 					<h1 className="text-2xl font-bold text-slate-900">Dashboard Dosen</h1>
 					<p className="text-slate-500 mt-1 text-sm">
-						Selamat datang, {user.fullName || user.username}. Berikut ringkasan
-						mata kuliah yang Anda ampu.
+						Selamat datang, {user?.fullName || user?.username}. Berikut
+						ringkasan mata kuliah yang Anda ampu.
 					</p>
 				</div>
 			</div>

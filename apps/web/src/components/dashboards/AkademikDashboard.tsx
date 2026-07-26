@@ -135,7 +135,7 @@ export function AkademikDashboard({
 						Dashboard Divisi Akademik
 					</h1>
 					<p className="text-slate-500 mt-1 text-sm">
-						Selamat datang, {user.username}. Berikut ringkasan status akademik
+						Selamat datang, {user?.username}. Berikut ringkasan status akademik
 						dan kehadiran mahasiswa.
 					</p>
 				</div>

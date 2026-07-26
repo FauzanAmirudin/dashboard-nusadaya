@@ -24,6 +24,7 @@ export const roleEnum = pgEnum("role", [
 	"pa",
 	"magang",
 	"evaluator",
+	"mahasiswa",
 ]);
 
 export const studentStatusEnum = pgEnum("student_status", [
@@ -77,8 +78,19 @@ export const students = pgTable("students", {
 	subProgram: text("sub_program"),
 
 	// New fields
+	nik: text("nik"),
+	nisn: text("nisn"),
+	birthPlace: text("birth_place"),
+	birthDate: timestamp("birth_date"),
+	gender: text("gender"), // Laki-laki / Perempuan
+	address: text("address"),
+	schoolOrigin: text("school_origin"),
+
 	phone: text("phone"),
 	parentName: text("parent_name"),
+	parentJob: text("parent_job"),
+	parentIncome: text("parent_income"),
+	parentPhone: text("parent_phone"),
 	paId: integer("pa_id").references(() => users.id),
 	studentStatus: studentStatusEnum("student_status").default("aktif"),
 	destinationCountry: text("destination_country"),
@@ -87,6 +99,7 @@ export const students = pgTable("students", {
 
 	overallStatus: statusEnum("overall_status").default("AMAN"),
 	isArchived: boolean("is_archived").default(false),
+	studentUserId: integer("student_user_id").references(() => users.id),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

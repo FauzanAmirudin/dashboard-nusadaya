@@ -120,8 +120,8 @@ export function CrmDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 						Dashboard Divisi CRM
 					</h1>
 					<p className="text-slate-500 mt-1 text-sm">
-						Selamat datang, {user.username}. Berikut ringkasan data relasi
-						mahasiswa.
+						Selamat datang, {user?.username}. Berikut ringkasan data relasi dan
+						kontrak mahasiswa.
 					</p>
 				</div>
 				<div className="flex items-center gap-3">

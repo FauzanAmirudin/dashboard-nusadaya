@@ -80,8 +80,8 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 						? "Tidak Aman"
 						: "Perlu Perhatian",
 			Rekomendasi: s.pmb?.rekomendasi || "-",
-			"V Mitra": s.finance?.vMitra || 0,
-			"V Koordinator": s.finance?.vKoordinator || 0,
+			"Fee Mitra": s.finance?.vMitra || 0,
+			"Fee Koord": s.finance?.vKoordinator || 0,
 			"Disetujui Admin PMB": s.pmb?.isAcc ? "Sudah ACC" : "Belum",
 		}));
 		exportToCSV(
@@ -142,7 +142,7 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 						Dashboard Divisi PMB
 					</h1>
 					<p className="text-slate-500 mt-1 text-sm">
-						Selamat datang, {user.username}. Berikut ringkasan data penerimaan
+						Selamat datang, {user?.username}. Berikut ringkasan data penerimaan
 						mahasiswa.
 					</p>
 				</div>
@@ -338,10 +338,10 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 											Rekomendasi
 										</TableHead>
 										<TableHead className="text-slate-500 font-semibold py-3 text-right">
-											V Mitra
+											Fee Mitra
 										</TableHead>
 										<TableHead className="text-slate-500 font-semibold py-3 text-right">
-											V Koord
+											Fee Koord
 										</TableHead>
 										<TableHead className="text-slate-500 font-semibold text-right py-3 pr-4">
 											Aksi

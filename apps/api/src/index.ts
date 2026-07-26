@@ -10,6 +10,7 @@ import { users } from "./db/schema";
 import { dosenRouter } from "./routes/dosen";
 import { financeRouter } from "./routes/finance";
 import { magangRouter } from "./routes/magang";
+import { mahasiswaRouter } from "./routes/mahasiswa";
 import { paRouter } from "./routes/pa";
 import { settingsRoutes } from "./routes/settings";
 import { studentsRouter } from "./routes/students";
@@ -156,7 +157,8 @@ const app = new Elysia()
 	.use(magangRouter)
 	.use(financeRouter)
 	.use(settingsRoutes)
-	.use(vocationalRouter);
+	.use(vocationalRouter)
+	.use(mahasiswaRouter);
 
 app.listen(process.env.PORT || 3001, () => {
 	console.log(

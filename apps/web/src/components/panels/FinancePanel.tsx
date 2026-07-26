@@ -77,7 +77,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 	const [loadingItem, setLoadingItem] = useState<string | null>(null);
 
 	const [activeTab, setActiveTab] = useState<
-		"keuangan" | "dana-talangan" | "fee-mitra" | "anggaran-vokasi"
+		"keuangan" | "dana-talangan" | "fee-mitra" | "dokumen" | "anggaran-vokasi"
 	>("keuangan");
 
 	const [localChecks, setLocalChecks] = useState({
@@ -100,7 +100,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 		installmentDate: "",
 	});
 
-	// V Mitra & V Koordinator
+	// Fee Mitra & Fee Koordinator
 	const [vMitra, setVMitra] = useState(0);
 	const [vKoordinator, setVKoordinator] = useState(0);
 
@@ -575,7 +575,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 						}
 						onClick={() => setActiveTab("keuangan")}
 					>
-						Keuangan Mahasiswa
+						Tagihan Pokok
 					</Button>
 
 					<Button
@@ -599,7 +599,19 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 						}
 						onClick={() => setActiveTab("fee-mitra")}
 					>
-						Fee Mitra & Invoice
+						Distribusi Fee
+					</Button>
+
+					<Button
+						variant={activeTab === "dokumen" ? "default" : "outline"}
+						className={
+							activeTab === "dokumen"
+								? "bg-slate-800 text-white hover:bg-slate-700"
+								: "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+						}
+						onClick={() => setActiveTab("dokumen")}
+					>
+						Dokumen & Invoice
 					</Button>
 
 					<Button
@@ -932,7 +944,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 								{pmbPaymentData && (
 									<div className="bg-slate-50 border-b border-slate-200 p-4 mx-5 mt-5 rounded-lg border">
 										<h4 className="text-xs font-bold text-slate-500 uppercase mb-3">
-											📋 Konteks PMB — Skema Keuangan Awal (Read-Only)
+											📋 Referensi dari PMB (Sebagai Acuan)
 										</h4>
 										<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
 											<div>
@@ -1009,72 +1021,6 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 										)}
 									</div>
 								)}
-
-								{/* SUMMARY KEUANGAN DANA TALANGAN (READ-ONLY) */}
-								<div className="bg-blue-50/30 border border-blue-200 p-4 mx-5 mt-5 rounded-lg">
-									<h4 className="text-[11px] font-bold text-blue-700 uppercase mb-3">
-										💳 Ringkasan Dana Talangan Tersimpan (Read-Only)
-									</h4>
-									<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-										<div>
-											<span className="text-[10px] text-blue-500 block uppercase font-bold tracking-wider mb-0.5">
-												Total Dana Terpakai
-											</span>
-											<span className="text-sm font-bold text-slate-800">
-												{formatRupiah(
-													(finState?.danaT1Amount || 0) +
-														(finState?.danaT2Amount || 0),
-												)}
-											</span>
-										</div>
-										<div>
-											<span className="text-[10px] text-blue-500 block uppercase font-bold tracking-wider mb-0.5">
-												Penyedia Dana
-											</span>
-											<span className="text-sm font-bold text-slate-800">
-												{finState?.danaTalaganProvider || "-"}
-											</span>
-										</div>
-										<div>
-											<span className="text-[10px] text-blue-500 block uppercase font-bold tracking-wider mb-0.5">
-												Tahap 1 (Pendidikan)
-											</span>
-											<div className="flex items-center gap-1.5 mt-0.5">
-												<span className="text-sm font-bold text-slate-800">
-													{formatRupiah(finState?.danaT1Amount || 0)}
-												</span>
-												{finState?.isDanaT1Disbursed ? (
-													<Badge className="bg-emerald-100 text-emerald-700 text-[10px] py-0 px-1.5 border-0 rounded">
-														Cair
-													</Badge>
-												) : (
-													<Badge className="bg-amber-100 text-amber-700 text-[10px] py-0 px-1.5 border-0 rounded">
-														Pending
-													</Badge>
-												)}
-											</div>
-										</div>
-										<div>
-											<span className="text-[10px] text-blue-500 block uppercase font-bold tracking-wider mb-0.5">
-												Tahap 2 (Pemagangan)
-											</span>
-											<div className="flex items-center gap-1.5 mt-0.5">
-												<span className="text-sm font-bold text-slate-800">
-													{formatRupiah(finState?.danaT2Amount || 0)}
-												</span>
-												{finState?.isDanaT2Disbursed ? (
-													<Badge className="bg-emerald-100 text-emerald-700 text-[10px] py-0 px-1.5 border-0 rounded">
-														Cair
-													</Badge>
-												) : (
-													<Badge className="bg-amber-100 text-amber-700 text-[10px] py-0 px-1.5 border-0 rounded">
-														Pending
-													</Badge>
-												)}
-											</div>
-										</div>
-									</div>
-								</div>
 
 								<div className="p-5 space-y-5">
 									{/* Penyedia */}
@@ -1203,35 +1149,15 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 									</div>
 
 									{/* Tahap 2 */}
-									<div
-										className={`p-4 rounded-xl border transition-all ${
-											visaReady
-												? "bg-emerald-50 border-emerald-200"
-												: "bg-slate-100 border-slate-200"
-										}`}
-									>
+									<div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
 										<div className="flex flex-wrap items-center gap-2 mb-3">
-											<span
-												className={`text-sm font-bold ${visaReady ? "text-emerald-800" : "text-slate-500"}`}
-											>
+											<span className="text-sm font-bold text-emerald-800">
 												Tahap II — Biaya Pemagangan
 											</span>
-											{!visaReady ? (
-												<Badge className="bg-rose-100 hover:bg-rose-100 text-rose-600 text-xs">
-													🔒 Terkunci — Visa Belum Turun
-												</Badge>
-											) : (
-												<Badge className="bg-emerald-100 hover:bg-emerald-100 text-emerald-700 text-xs">
-													✅ Terbuka — Visa Sudah Turun
-												</Badge>
-											)}
+											<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-xs">
+												Selalu Tersedia
+											</Badge>
 										</div>
-										{!visaReady && (
-											<p className="text-xs text-slate-400 mb-3 italic">
-												Field ini hanya dapat diisi setelah status Visa di Panel
-												Magang dinyatakan "Turun".
-											</p>
-										)}
 										<div className="grid grid-cols-2 gap-3">
 											<div>
 												<label className="text-xs font-semibold block mb-1">
@@ -1246,7 +1172,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 															danaT2Amount: Number(e.target.value),
 														})
 													}
-													disabled={!visaReady || (!canEdit && !isMagang)}
+													disabled={!canEdit && !isMagang}
 													className="bg-white"
 												/>
 											</div>
@@ -1263,7 +1189,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 															danaT2Date: e.target.value,
 														})
 													}
-													disabled={!visaReady || (!canEdit && !isMagang)}
+													disabled={!canEdit && !isMagang}
 													className="bg-white"
 												/>
 											</div>
@@ -1277,7 +1203,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 														})
 													}
 													placeholder="Catatan pencairan tahap 2..."
-													disabled={!visaReady || (!canEdit && !isMagang)}
+													disabled={!canEdit && !isMagang}
 													className="bg-white"
 												/>
 											</div>
@@ -1290,7 +1216,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 															isDanaT2Disbursed: c as boolean,
 														})
 													}
-													disabled={!visaReady || (!canEdit && !isMagang)}
+													disabled={!canEdit && !isMagang}
 												/>
 												<label className="text-sm font-semibold">
 													Tahap II Sudah Dicairkan
@@ -1327,7 +1253,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 									<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
 										<div>
 											<label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">
-												V Mitra (Biaya Reseller)
+												Fee Mitra (Biaya Reseller)
 											</label>
 											<Input
 												type="number"
@@ -1343,7 +1269,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 										</div>
 										<div>
 											<label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">
-												V Koordinator
+												Fee Koord
 											</label>
 											<Input
 												type="number"
@@ -1373,7 +1299,12 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 									)}
 								</div>
 							</div>
+						</>
+					)}
 
+					{/* TAB 4: DOKUMEN & INVOICE */}
+					{activeTab === "dokumen" && (
+						<>
 							{/* INVOICE PMB SECTION */}
 							<div className="mb-8 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
 								<div className="bg-slate-50 border-b border-slate-200 px-5 py-4 flex items-center justify-between">

@@ -249,6 +249,51 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 			.where(eq(students.id, id));
 		return { success: true, message: "Berhasil mengarsipkan mahasiswa" };
 	})
+	.post("/:id/generate-account", async ({ params, set, user }: any) => {
+		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+		const id = parseInt(params.id, 10);
+
+		const studentData = await db.query.students.findFirst({
+			where: eq(students.id, id),
+		});
+
+		if (!studentData) {
+			set.status = 404;
+			return { success: false, message: "Mahasiswa tidak ditemukan" };
+		}
+
+		if (studentData.studentUserId) {
+			set.status = 400;
+			return { success: false, message: "Mahasiswa sudah memiliki akun" };
+		}
+
+		// Generate account
+		const passwordHash = await Bun.password.hash("password");
+
+		const [newUser] = await db
+			.insert(users)
+			.values({
+				username: studentData.nim,
+				passwordHash,
+				fullName: studentData.name,
+				role: "mahasiswa",
+			})
+			.returning();
+
+		await db
+			.update(students)
+			.set({ studentUserId: newUser.id, updatedAt: new Date() })
+			.where(eq(students.id, id));
+
+		return {
+			success: true,
+			message:
+				"Akun mahasiswa berhasil dibuat dengan password default: password",
+		};
+	})
 	.patch("/:id/unarchive", async ({ params, set, user }: any) => {
 		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
 			set.status = 403;

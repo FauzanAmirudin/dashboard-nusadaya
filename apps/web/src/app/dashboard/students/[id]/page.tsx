@@ -56,13 +56,24 @@ type StudentDetail = {
 		program: string;
 		subProgram?: string | null;
 		phone?: string | null;
+		nik?: string | null;
+		nisn?: string | null;
+		birthPlace?: string | null;
+		birthDate?: string | Date | null;
+		gender?: string | null;
+		address?: string | null;
+		schoolOrigin?: string | null;
 		parentName?: string | null;
+		parentJob?: string | null;
+		parentIncome?: string | null;
+		parentPhone?: string | null;
 		paId?: number | null;
 		studentStatus?: string | null;
 		destinationCountry?: string | null;
 		period?: string | null;
 		profilePhotoUrl?: string | null;
 		overallStatus: string | null;
+		studentUserId?: number | null;
 	};
 	pmb: {
 		status: string | null;
@@ -184,6 +195,7 @@ function StudentDetailContent() {
 	const [activeTab, setActiveTab] = useState("");
 	const [mounted, setMounted] = useState(false);
 	const [updateTrigger, setUpdateTrigger] = useState(0);
+	const [isGenerating, setIsGenerating] = useState(false);
 
 	useEffect(() => {
 		setMounted(true);
@@ -207,6 +219,25 @@ function StudentDetailContent() {
 
 		fetchStudent();
 	}, [params.id, isAuthenticated, hasHydrated, router]);
+
+	const handleGenerateAccount = async () => {
+		if (!data?.student?.id) return;
+		setIsGenerating(true);
+		try {
+			const res =
+				await api.students[data.student.id]["generate-account"].post();
+			if (res.data?.success) {
+				toast.success(res.data.message);
+				refetchStudent();
+			} else {
+				toast.error(res.data?.message || "Gagal membuat akun.");
+			}
+		} catch (err) {
+			toast.error("Terjadi kesalahan sistem saat menghubungi server.");
+		} finally {
+			setIsGenerating(false);
+		}
+	};
 
 	const handleArchive = async () => {
 		if (!data?.student?.id) return;
@@ -414,6 +445,20 @@ function StudentDetailContent() {
 					Kembali ke Daftar
 				</Link>
 				<div className="flex gap-3">
+					{user?.role === "superadmin" && (
+						<Button
+							variant="outline"
+							onClick={handleGenerateAccount}
+							disabled={isGenerating || !!data?.student?.studentUserId}
+							className="bg-[#0517B0]/5 text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 hover:text-[#04128A]"
+						>
+							{isGenerating
+								? "Memproses..."
+								: data?.student?.studentUserId
+									? "Akun Sudah Dibuat"
+									: "Buat Akun Mahasiswa"}
+						</Button>
+					)}
 					{(user?.role === "superadmin" || user?.role === "pmb") && (
 						<>
 							<Button
@@ -481,27 +526,87 @@ function StudentDetailContent() {
 									</Badge>
 								)}
 							</div>
-							<div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1 text-sm text-slate-600">
+							<div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-sm text-slate-600 mt-3 border-t border-slate-100 pt-3">
 								<div>
-									<span className="text-slate-500">NIM:</span> {s.nim}
-								</div>
-								<div>
-									<span className="text-slate-500">Angkatan:</span> {s.cohort}
+									<span className="text-slate-500 block text-xs">NIM</span>{" "}
+									<span className="font-medium">{s.nim}</span>
 								</div>
 								<div>
-									<span className="text-slate-500">Program:</span> {s.program}
-									{s.subProgram ? ` - ${s.subProgram}` : ""}
+									<span className="text-slate-500 block text-xs">Angkatan</span>{" "}
+									<span className="font-medium">{s.cohort}</span>
 								</div>
 								<div>
-									<span className="text-slate-500">HP:</span> {s.phone || "-"}
+									<span className="text-slate-500 block text-xs">Program</span>{" "}
+									<span className="font-medium">
+										{s.program}
+										{s.subProgram ? ` - ${s.subProgram}` : ""}
+									</span>
 								</div>
-								<div className="col-span-2">
-									<span className="text-slate-500">Orang Tua:</span>{" "}
-									{s.parentName || "-"}
+								<div>
+									<span className="text-slate-500 block text-xs">Tujuan</span>{" "}
+									<span className="font-medium">
+										{s.destinationCountry || "-"} ({s.period || "-"})
+									</span>
 								</div>
-								<div className="col-span-2">
-									<span className="text-slate-500">Tujuan:</span>{" "}
-									{s.destinationCountry || "-"} ({s.period || "-"})
+
+								<div>
+									<span className="text-slate-500 block text-xs">
+										NIK / NISN
+									</span>{" "}
+									<span className="font-medium">
+										{s.nik || "-"} / {s.nisn || "-"}
+									</span>
+								</div>
+								<div>
+									<span className="text-slate-500 block text-xs">TTL</span>{" "}
+									<span className="font-medium">
+										{s.birthPlace || "-"},{" "}
+										{s.birthDate
+											? new Date(s.birthDate).toLocaleDateString("id-ID")
+											: "-"}
+									</span>
+								</div>
+								<div>
+									<span className="text-slate-500 block text-xs">Kelamin</span>{" "}
+									<span className="font-medium">{s.gender || "-"}</span>
+								</div>
+								<div>
+									<span className="text-slate-500 block text-xs">
+										Kontak (HP)
+									</span>{" "}
+									<span className="font-medium">{s.phone || "-"}</span>
+								</div>
+
+								<div className="col-span-2 md:col-span-4">
+									<span className="text-slate-500 block text-xs">Alamat</span>{" "}
+									<span className="font-medium">{s.address || "-"}</span>
+								</div>
+
+								<div>
+									<span className="text-slate-500 block text-xs">
+										Asal Sekolah
+									</span>{" "}
+									<span className="font-medium">{s.schoolOrigin || "-"}</span>
+								</div>
+								<div>
+									<span className="text-slate-500 block text-xs">
+										Nama Ortu
+									</span>{" "}
+									<span className="font-medium">{s.parentName || "-"}</span>
+								</div>
+								<div>
+									<span className="text-slate-500 block text-xs">
+										Pekerjaan / Penghasilan Ortu
+									</span>{" "}
+									<span className="font-medium">
+										{s.parentJob || "-"} / {s.parentIncome || "-"}
+									</span>
+								</div>
+								<div>
+									<span className="text-slate-500 block text-xs">
+										No HP Ortu
+									</span>{" "}
+									<span className="font-medium">{s.parentPhone || "-"}</span>
 								</div>
 							</div>
 						</div>
