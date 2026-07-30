@@ -130,6 +130,9 @@ export const pmbData = pgTable("pmb_data", {
 	mitraSponsor: text("mitra_sponsor"),
 	koordinator: text("koordinator"),
 
+	// Finance Integration
+	rumahJuang: boolean("rumah_juang").default(false),
+
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -285,46 +288,145 @@ export const financeData = pgTable("finance_data", {
 		.references(() => students.id)
 		.notNull()
 		.unique(),
-	registrationPaid: boolean("registration_paid").default(false),
-	registrationAmount: integer("registration_amount").default(0),
-	registrationDate: timestamp("registration_date"),
-	semesterPaid: boolean("semester_paid").default(false),
-	semesterAmount: integer("semester_amount").default(0),
-	semesterDate: timestamp("semester_date"),
-	installmentCleared: boolean("installment_cleared").default(false),
-	installmentAmount: integer("installment_amount").default(0),
-	installmentDate: timestamp("installment_date"),
-	arrearsCleared: boolean("arrears_cleared").default(false),
-	arrearsAmount: integer("arrears_amount").default(0),
 
-	// Fee Sharing
-	vMitra: integer("v_mitra").default(0),
-	vKoordinator: integer("v_koordinator").default(0),
+	// Data Induk dari PMB
+	totalBiayaPendidikan: integer("total_biaya_pendidikan").default(0),
 
-	// Invoice PMB
-	invoiceFileUrl: text("invoice_file_url"),
-	invoiceFileName: text("invoice_file_name"),
-	invoiceUploadedAt: timestamp("invoice_uploaded_at"),
-	invoiceUploadedBy: integer("invoice_uploaded_by").references(() => users.id),
+	// Registrasi Awal
+	registrasiNominal: integer("registrasi_nominal").default(0),
+	registrasiPaidDate: timestamp("registrasi_paid_date"),
+	registrasiBuktiBayarUrl: text("registrasi_bukti_bayar_url"),
+	registrasiStatus: boolean("registrasi_status").default(false),
 
-	// Dana Talangan 2-Tahap
-	danaTalaganProvider: text("dana_talangan_provider"),
-	danaTalaganProviderType: text("dana_talangan_provider_type"),
-	danaT1Amount: integer("dana_t1_amount").default(0),
-	danaT1Date: timestamp("dana_t1_date"),
-	danaT1Notes: text("dana_t1_notes"),
-	isDanaT1Disbursed: boolean("is_dana_t1_disbursed").default(false),
-	danaT2Amount: integer("dana_t2_amount").default(0),
-	danaT2Date: timestamp("dana_t2_date"),
-	danaT2Notes: text("dana_t2_notes"),
-	isDanaT2Disbursed: boolean("is_dana_t2_disbursed").default(false),
+	// Metode Pembayaran Lanjutan
+	metodePembayaran: text("metode_pembayaran"), // "mandiri" | "dana_talangan"
 
+	// Dana Mandiri
+	mandiriSemesterNominal: integer("mandiri_semester_nominal").default(0),
+	mandiriSemesterStatus: boolean("mandiri_semester_status").default(false),
+	mandiriSemesterBuktiBayarUrl: text("mandiri_semester_bukti_bayar_url"),
+	mandiriInterviewNominal: integer("mandiri_interview_nominal").default(0),
+	mandiriInterviewStatus: boolean("mandiri_interview_status").default(false),
+	mandiriInterviewBuktiBayarUrl: text("mandiri_interview_bukti_bayar_url"),
+	mandiriKeberangkatanNominal: integer("mandiri_keberangkatan_nominal").default(
+		0,
+	),
+	mandiriKeberangkatanStatus: boolean("mandiri_keberangkatan_status").default(
+		false,
+	),
+	mandiriKeberangkatanBuktiBayarUrl: text(
+		"mandiri_keberangkatan_bukti_bayar_url",
+	),
+
+	// Dana Talangan Tahap 1 — Semester
+	t1SemesterNominalTotal: integer("t1_semester_nominal_total").default(0),
+	t1SemesterNominalDibayar: integer("t1_semester_nominal_dibayar").default(0),
+	t1SemesterNominalTalangan: integer("t1_semester_nominal_talangan").default(0),
+	t1SemesterJumlahCicilan: integer("t1_semester_jumlah_cicilan").default(0),
+	t1SemesterCicilanKe: integer("t1_semester_cicilan_ke").default(0),
+	t1SemesterStatus: boolean("t1_semester_status").default(false),
+
+	// Dana Talangan Tahap 1 — Interview Magang
+	t1InterviewNominal: integer("t1_interview_nominal").default(0),
+	t1InterviewStatus: boolean("t1_interview_status").default(false),
+	t1InterviewBuktiBayarUrl: text("t1_interview_bukti_bayar_url"),
+
+	// Dana Talangan Tahap 2 — Keberangkatan
+	t2KeberangkatanNominal: integer("t2_keberangkatan_nominal").default(0),
+	t2KeberangkatanStatus: boolean("t2_keberangkatan_status").default(false),
+	t2KeberangkatanBuktiBayarUrl: text("t2_keberangkatan_bukti_bayar_url"),
+
+	// Biaya Administrasi Talangan
+	adminTalaganNominal: integer("admin_talagan_nominal").default(0),
+	adminTalaganMetode: text("admin_talagan_metode"), // "cash" | "transfer"
+	adminTalaganBankTujuan: text("admin_talagan_bank_tujuan"),
+	adminTalaganBuktiBayarUrl: text("admin_talagan_bukti_bayar_url"),
+	adminTalaganStatus: boolean("admin_talagan_status").default(false),
+
+	// Biaya Tambahan Standar
+	toeicNominal: integer("toeic_nominal").default(0),
+	toeicStatus: boolean("toeic_status").default(false),
+	toeicBuktiBayarUrl: text("toeic_bukti_bayar_url"),
+	pasporNominal: integer("paspor_nominal").default(0),
+	pasporStatus: boolean("paspor_status").default(false),
+	pasporBuktiBayarUrl: text("paspor_bukti_bayar_url"),
+	rumahJuangAktif: boolean("rumah_juang_aktif").default(false),
+	rumahJuangNominal: integer("rumah_juang_nominal").default(0),
+	rumahJuangStatus: boolean("rumah_juang_status").default(false),
+	rumahJuangBuktiBayarUrl: text("rumah_juang_bukti_bayar_url"),
+
+	// Kontrol
 	notes: text("notes"),
 	isAcc: boolean("is_acc").default(false),
 	accAt: timestamp("acc_at"),
 	accBy: integer("acc_by").references(() => users.id),
 	status: statusEnum("status").default("PERLU_PERHATIAN"),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const financeCustomFields = pgTable("finance_custom_fields", {
+	id: serial("id").primaryKey(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
+	fieldType: text("field_type").notNull(), // "pembayaran_utama" | "biaya_tambahan"
+	label: text("label").notNull(),
+	nominal: integer("nominal").default(0),
+	status: boolean("status").default(false),
+	notes: text("notes"),
+	buktiBayarUrl: text("bukti_bayar_url"),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const feeShareRecipients = pgTable("fee_share_recipients", {
+	id: serial("id").primaryKey(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
+	namaReferral: text("nama_referral").notNull(),
+	kategori: text("kategori").notNull(), // "Mitra" | "Koordinator" | "Tim Visit" | "Sekolah" | "BKK/FKKS" | "Tim Nusadaya"
+	noRekening: text("no_rekening"),
+	namaBank: text("nama_bank"),
+	noHp: text("no_hp"),
+	nominalFee: integer("nominal_fee").default(0),
+	invoiceFileUrl: text("invoice_file_url"),
+	statusPencairan: text("status_pencairan").default("belum_dibayarkan"), // "belum_dibayarkan" | "sudah_dibayarkan"
+	tanggalCair: timestamp("tanggal_cair"),
+	createdBy: integer("created_by").references(() => users.id),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const practicesBudgetRequests = pgTable("practices_budget_requests", {
+	id: serial("id").primaryKey(),
+	dosenId: integer("dosen_id")
+		.references(() => users.id)
+		.notNull(),
+	mataKuliah: text("mata_kuliah").notNull(),
+	daftarKebutuhan: jsonb("daftar_kebutuhan").notNull(), // array of { namaItem, jumlah, satuanHarga }
+	totalNominal: integer("total_nominal").default(0),
+	status: text("status").default("menunggu"), // "menunggu" | "disetujui" | "ditolak"
+	catatanFinance: text("catatan_finance"),
+	approvedBy: integer("approved_by").references(() => users.id),
+	approvedAt: timestamp("approved_at"),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const practicesMaterialReports = pgTable("practices_material_reports", {
+	id: serial("id").primaryKey(),
+	budgetRequestId: integer("budget_request_id")
+		.references(() => practicesBudgetRequests.id)
+		.notNull(),
+	dosenId: integer("dosen_id")
+		.references(() => users.id)
+		.notNull(),
+	daftarSisaBahan: jsonb("daftar_sisa_bahan").notNull(), // array of { namaItem, jumlahSisa }
+	catatanDosen: text("catatan_dosen"),
+	fileUrl: text("file_url"),
+	fileName: text("file_name"),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // 6. Academic Data
@@ -852,10 +954,6 @@ export const crmDocumentsRelations = relations(crmDocuments, ({ one }) => ({
 export const financeDataRelations = relations(financeData, ({ one }) => ({
 	accBy: one(users, {
 		fields: [financeData.accBy],
-		references: [users.id],
-	}),
-	invoiceUploadedBy: one(users, {
-		fields: [financeData.invoiceUploadedBy],
 		references: [users.id],
 	}),
 }));

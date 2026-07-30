@@ -1,11 +1,17 @@
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { eq } from "drizzle-orm";
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import { db } from "../db";
-import { courseGrades, students } from "../db/schema";
+import {
+	courseGrades,
+	practicesBudgetRequests,
+	practicesMaterialReports,
+	students,
+} from "../db/schema";
 
-export const dosenRouter = new Elysia({ prefix: "/dosen" }).get(
-	"/dashboard",
-	async (context) => {
+export const dosenRouter = new Elysia({ prefix: "/dosen" })
+	.get("/dashboard", async (context) => {
 		const user = (context as any).user;
 		const set = context.set;
 
@@ -67,5 +73,93 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" }).get(
 				courseGrades: mappedGrades,
 			},
 		};
-	},
-);
+	})
+	// ====================
+	// ANGGARAN PRAKTIK
+	// ====================
+	.post(
+		"/anggaran-praktik",
+		async ({ body, user, set }: any) => {
+			if (
+				!user ||
+				(user.role !== "dosen" &&
+					user.role !== "akademik" &&
+					user.role !== "superadmin")
+			) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			await db.insert(practicesBudgetRequests).values({
+				dosenId: user.id,
+				mataKuliah: body.mataKuliah,
+				daftarKebutuhan: body.daftarKebutuhan,
+				totalNominal: body.totalNominal,
+				status: "menunggu",
+			});
+
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				mataKuliah: t.String(),
+				daftarKebutuhan: t.Array(t.Any()),
+				totalNominal: t.Number(),
+			}),
+		},
+	)
+	.get("/anggaran-praktik", async ({ user, set }: any) => {
+		if (
+			!user ||
+			(user.role !== "dosen" &&
+				user.role !== "akademik" &&
+				user.role !== "superadmin")
+		) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		let query = db.select().from(practicesBudgetRequests);
+		if (user.role === "dosen") {
+			query = query.where(eq(practicesBudgetRequests.dosenId, user.id)) as any;
+		}
+
+		const requests = await query;
+		return { success: true, data: requests };
+	})
+	.post("/laporan-sisa-bahan", async ({ body, user, set }: any) => {
+		if (
+			!user ||
+			(user.role !== "dosen" &&
+				user.role !== "akademik" &&
+				user.role !== "superadmin")
+		) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		const file = body.file as File;
+		let fileUrl = "";
+		let fileName = "";
+
+		if (file) {
+			const uploadDir = join(process.cwd(), "uploads", "practices");
+			await mkdir(uploadDir, { recursive: true });
+
+			fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+			fileUrl = join(uploadDir, fileName);
+
+			await Bun.write(fileUrl, await file.arrayBuffer());
+		}
+
+		await db.insert(practicesMaterialReports).values({
+			budgetRequestId: Number(body.budgetRequestId),
+			dosenId: user.id,
+			daftarSisaBahan: JSON.parse(body.daftarSisaBahan),
+			catatanDosen: body.catatanDosen || "",
+			fileUrl: fileUrl,
+			fileName: fileName,
+		});
+
+		return { success: true };
+	});

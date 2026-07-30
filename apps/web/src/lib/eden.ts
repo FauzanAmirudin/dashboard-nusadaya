@@ -5,7 +5,7 @@ export const API_URL =
 	process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 // Helper to get the current auth token from Zustand persisted storage
-function getToken(): string | null {
+export function getToken(): string | null {
 	try {
 		const raw = localStorage.getItem("auth-storage");
 		if (!raw) return null;
@@ -24,6 +24,7 @@ export const api = edenTreaty<App>(API_URL, {
 		if (token) {
 			headers.set("Authorization", `Bearer ${token}`);
 		}
+		console.log("Eden fetcher URL:", url);
 		return fetch(url, { ...options, headers });
 	}) as unknown as typeof fetch,
 });

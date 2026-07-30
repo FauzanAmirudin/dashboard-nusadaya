@@ -65,8 +65,16 @@ export function FinanceDashboard({ user }: any) {
 			try {
 				const { data: resData, error } = await api.finance.dashboard.get();
 				if (!error && resData?.success) {
-					setData(resData.data.students);
-					setKpi(resData.data.kpi);
+					setData(resData.data?.students || []);
+					setKpi(
+						resData.data?.kpi || {
+							unpaidRegistrations: 0,
+							unpaidInstallments: 0,
+							unpaidArrears: 0,
+							pendingBudgetRequests: 0,
+							activeRumahJuang: 0,
+						},
+					);
 				}
 			} catch (err) {
 				console.error(err);

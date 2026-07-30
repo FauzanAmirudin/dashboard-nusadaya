@@ -58,7 +58,7 @@ export function StatusPanel({
 
 	const fetchStatus = async () => {
 		setIsLoading(true);
-		const res = await api.students[studentId.toString()].status.get();
+		const res = await api.students[studentId.toString()].progress.get();
 		if (res.data?.success && res.data.data) {
 			setData(res.data.data as StatusData);
 			setLastUpdated(new Date());

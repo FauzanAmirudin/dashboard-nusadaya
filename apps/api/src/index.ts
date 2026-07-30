@@ -13,7 +13,7 @@ import { magangRouter } from "./routes/magang";
 import { mahasiswaRouter } from "./routes/mahasiswa";
 import { paRouter } from "./routes/pa";
 import { settingsRoutes } from "./routes/settings";
-import { studentsRouter } from "./routes/students";
+import { studentsRouter } from "./routes/student";
 import { vocationalRouter } from "./routes/vocational";
 
 const JWT_SECRET =

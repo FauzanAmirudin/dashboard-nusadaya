@@ -116,10 +116,10 @@ async function seed() {
 	});
 	await db.insert(financeData).values({
 		studentId: newStudents[0].id,
-		registrationPaid: false,
-		semesterPaid: false,
-		installmentCleared: false,
-		arrearsCleared: false,
+		// 		registrationPaid: false,
+		// 		semesterPaid: false,
+		// 		installmentCleared: false,
+		// 		arrearsCleared: false,
 		status: "TIDAK_AMAN",
 	});
 	await db.insert(academicData).values({
@@ -185,10 +185,10 @@ async function seed() {
 	});
 	await db.insert(financeData).values({
 		studentId: newStudents[1].id,
-		registrationPaid: true,
-		semesterPaid: true,
-		installmentCleared: true,
-		arrearsCleared: true,
+		// 		registrationPaid: true,
+		// 		semesterPaid: true,
+		// 		installmentCleared: true,
+		// 		arrearsCleared: true,
 		isAcc: true,
 		accAt: new Date(),
 		status: "AMAN",
@@ -244,10 +244,10 @@ async function seed() {
 	});
 	await db.insert(financeData).values({
 		studentId: newStudents[2].id,
-		registrationPaid: true,
-		semesterPaid: true,
-		installmentCleared: true,
-		arrearsCleared: true,
+		// 		registrationPaid: true,
+		// 		semesterPaid: true,
+		// 		installmentCleared: true,
+		// 		arrearsCleared: true,
 		isAcc: true,
 		accAt: new Date(),
 		status: "AMAN",

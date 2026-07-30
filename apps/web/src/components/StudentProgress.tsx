@@ -16,7 +16,7 @@ export function StudentProgress({
 
 	useEffect(() => {
 		const fetchStatus = async () => {
-			const res = await api.students[studentId.toString()].status.get();
+			const res = await api.students[studentId.toString()].progress.get();
 			if (res.data?.success && res.data.data) {
 				setTotal(res.data.data.totalIndicators);
 				setCompleted(res.data.data.totalCompleted);

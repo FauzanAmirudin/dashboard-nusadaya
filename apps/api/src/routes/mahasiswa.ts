@@ -371,26 +371,27 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				}),
 			]);
 			data = {
-				registrationPaid: finance?.registrationPaid,
-				registrationAmount: finance?.registrationAmount,
-				registrationDate: finance?.registrationDate,
-				semesterPaid: finance?.semesterPaid,
-				semesterAmount: finance?.semesterAmount,
-				semesterDate: finance?.semesterDate,
-				installmentCleared: finance?.installmentCleared,
-				installmentAmount: finance?.installmentAmount,
-				installmentDate: finance?.installmentDate,
-				arrearsCleared: finance?.arrearsCleared,
-				arrearsAmount: finance?.arrearsAmount,
+				registrationPaid: finance?.registrasiStatus,
+				registrasiNominal: finance?.registrasiNominal,
 
-				danaTalaganProvider: finance?.danaTalaganProvider,
-				danaTalaganProviderType: finance?.danaTalaganProviderType,
-				danaT1Amount: finance?.danaT1Amount,
-				danaT1Date: finance?.danaT1Date,
-				isDanaT1Disbursed: finance?.isDanaT1Disbursed,
-				danaT2Amount: finance?.danaT2Amount,
-				danaT2Date: finance?.danaT2Date,
-				isDanaT2Disbursed: finance?.isDanaT2Disbursed,
+				semesterPaid:
+					finance?.mandiriSemesterStatus || finance?.t1SemesterStatus,
+				mandiriSemesterNominal: finance?.mandiriSemesterNominal,
+
+				installmentCleared: finance?.toeicStatus,
+				toeicNominal: finance?.toeicNominal,
+
+				arrearsCleared: finance?.pasporStatus,
+				pasporNominal: finance?.pasporNominal,
+
+				adminTalaganBankTujuan: finance?.adminTalaganBankTujuan,
+				adminTalaganMetode: finance?.adminTalaganMetode,
+				t1SemesterNominalTotal: finance?.t1SemesterNominalTotal,
+
+				t1SemesterStatus: finance?.t1SemesterStatus,
+				t2KeberangkatanNominal: finance?.t2KeberangkatanNominal,
+
+				t2KeberangkatanStatus: finance?.t2KeberangkatanStatus,
 
 				documents: documents.map((d) => ({
 					documentKey: d.documentKey,

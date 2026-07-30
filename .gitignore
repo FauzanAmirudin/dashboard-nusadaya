@@ -104,8 +104,14 @@ id_ed25519.pub
 *.sl3
 *.rdb
 
-# UI Plans Documentation
+# UI Plans & Project Plans Documentation
 /ui-plans/
 /adjustments/
 /adjustment/
+plan.md
+*.plan.md
+finance.md
+finance_modification.md
+demo-accounts.md
 apps/api/uploads/
+/.agents
