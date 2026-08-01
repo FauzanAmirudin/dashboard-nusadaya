@@ -1,6 +1,13 @@
 "use client";
 
-import { Building2, CheckCircle, FileText, Loader2, Save } from "lucide-react";
+import {
+	Building2,
+	CheckCircle,
+	Edit2,
+	FileText,
+	Loader2,
+	Save,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +56,7 @@ export function TabChecklist({
 	onUpdate,
 }: TabChecklistProps) {
 	const [isSaving, setIsSaving] = useState(false);
+	const [isEditingAcquisition, setIsEditingAcquisition] = useState(false);
 	const [notes, setNotes] = useState(pmbData?.notes || "");
 	const [loadingItem, setLoadingItem] = useState<string | null>(null);
 
@@ -129,6 +137,18 @@ export function TabChecklist({
 		setLoadingItem(null);
 	};
 
+	const handleCancelEditAcquisition = () => {
+		setAcquisition({
+			rekomendasi: pmbData?.rekomendasi || "",
+			timVisit: pmbData?.timVisit || "",
+			timSosialisasi: pmbData?.timSosialisasi || "",
+			roReferral: pmbData?.roReferral || "",
+			mitraSponsor: pmbData?.mitraSponsor || "",
+			koordinator: pmbData?.koordinator || "",
+		});
+		setIsEditingAcquisition(false);
+	};
+
 	const saveAcquisitionAndNotes = async () => {
 		if (!canEdit) return;
 		setIsSaving(true);
@@ -146,7 +166,8 @@ export function TabChecklist({
 		if (error) {
 			toast.error("Gagal menyimpan data");
 		} else {
-			toast.success("Data berhasil disimpan");
+			toast.success("Data Akuisisi & Catatan berhasil disimpan");
+			setIsEditingAcquisition(false);
 			onUpdate();
 		}
 		setIsSaving(false);
@@ -236,11 +257,50 @@ export function TabChecklist({
 			{/* Akuisisi & Catatan Section */}
 			<div className="space-y-4">
 				<Card className="border border-slate-200 shadow-sm">
-					<CardHeader className="bg-slate-50 border-b border-slate-100 py-3.5 px-4">
+					<CardHeader className="bg-slate-50 border-b border-slate-100 py-3 px-4 flex flex-row items-center justify-between">
 						<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
 							<Building2 className="w-4 h-4 text-emerald-600" />
 							Data Akuisisi & Referral
 						</CardTitle>
+						{canEdit && (
+							<div className="flex items-center gap-2">
+								{!isEditingAcquisition ? (
+									<Button
+										onClick={() => setIsEditingAcquisition(true)}
+										size="sm"
+										className="bg-[#0517B0] hover:bg-[#04128d] text-white text-xs gap-1.5 h-8"
+									>
+										<Edit2 className="w-3.5 h-3.5" />
+										Edit Data
+									</Button>
+								) : (
+									<>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={handleCancelEditAcquisition}
+											disabled={isSaving}
+											className="text-xs h-8"
+										>
+											Batal
+										</Button>
+										<Button
+											onClick={saveAcquisitionAndNotes}
+											disabled={isSaving}
+											size="sm"
+											className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5 h-8"
+										>
+											{isSaving ? (
+												<Loader2 className="w-3.5 h-3.5 animate-spin" />
+											) : (
+												<Save className="w-3.5 h-3.5" />
+											)}
+											Simpan Data
+										</Button>
+									</>
+								)}
+							</div>
+						)}
 					</CardHeader>
 					<CardContent className="p-4 space-y-3">
 						<div>
@@ -248,7 +308,7 @@ export function TabChecklist({
 								Rekomendasi / Channel
 							</Label>
 							<Select
-								disabled={!canEdit}
+								disabled={!isEditingAcquisition || !canEdit}
 								value={acquisition.rekomendasi}
 								onValueChange={(val) => {
 									if (val) setAcquisition({ ...acquisition, rekomendasi: val });
@@ -273,7 +333,7 @@ export function TabChecklist({
 								Tim Visit
 							</Label>
 							<Input
-								disabled={!canEdit}
+								disabled={!isEditingAcquisition || !canEdit}
 								value={acquisition.timVisit}
 								onChange={(e) =>
 									setAcquisition({ ...acquisition, timVisit: e.target.value })
@@ -288,7 +348,7 @@ export function TabChecklist({
 								Tim Sosialisasi
 							</Label>
 							<Input
-								disabled={!canEdit}
+								disabled={!isEditingAcquisition || !canEdit}
 								value={acquisition.timSosialisasi}
 								onChange={(e) =>
 									setAcquisition({
@@ -306,7 +366,7 @@ export function TabChecklist({
 								RO Referral (Alumni)
 							</Label>
 							<Input
-								disabled={!canEdit}
+								disabled={!isEditingAcquisition || !canEdit}
 								value={acquisition.roReferral}
 								onChange={(e) =>
 									setAcquisition({ ...acquisition, roReferral: e.target.value })
@@ -321,7 +381,7 @@ export function TabChecklist({
 								Mitra / Sponsor
 							</Label>
 							<Input
-								disabled={!canEdit}
+								disabled={!isEditingAcquisition || !canEdit}
 								value={acquisition.mitraSponsor}
 								onChange={(e) =>
 									setAcquisition({
@@ -339,7 +399,7 @@ export function TabChecklist({
 								Koordinator
 							</Label>
 							<Input
-								disabled={!canEdit}
+								disabled={!isEditingAcquisition || !canEdit}
 								value={acquisition.koordinator}
 								onChange={(e) =>
 									setAcquisition({

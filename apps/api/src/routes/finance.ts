@@ -432,6 +432,24 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 		},
 		{ body: t.Object({ catatanFinance: t.String() }) },
 	)
+	.patch(
+		"/anggaran-praktik/:requestId/reset",
+		async ({ params: { requestId }, user }: any) => {
+			if (!user || (user.role !== "finance" && user.role !== "superadmin"))
+				return { success: false, message: "Forbidden" };
+			await db
+				.update(practicesBudgetRequests)
+				.set({
+					status: "menunggu",
+					catatanFinance: null,
+					approvedBy: null,
+					approvedAt: null,
+					updatedAt: new Date(),
+				})
+				.where(eq(practicesBudgetRequests.id, parseInt(requestId)));
+			return { success: true };
+		},
+	)
 
 	.post(
 		"/laporan-sisa-bahan",

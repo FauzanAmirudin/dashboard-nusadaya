@@ -38,9 +38,14 @@ export function TabSkemaKeuangan({
 	const [isEditing, setIsEditing] = useState(false);
 
 	const initialTotalBiaya =
-		pmbData?.paymentPlan?.totalBiaya ||
-		pmbData?.finance?.totalBiayaPendidikan ||
-		0;
+		pmbData?.paymentPlan?.totalBiaya && pmbData.paymentPlan.totalBiaya > 0
+			? pmbData.paymentPlan.totalBiaya
+			: pmbData?.finance?.totalBiayaPendidikan &&
+					pmbData.finance.totalBiayaPendidikan > 0
+				? pmbData.finance.totalBiayaPendidikan
+				: (pmbData?.paymentPlan?.totalBiaya ??
+					pmbData?.finance?.totalBiayaPendidikan ??
+					0);
 
 	const [totalBiaya, setTotalBiaya] = useState<number>(initialTotalBiaya);
 	const [financeState, setFinanceState] = useState<any>(
@@ -54,8 +59,13 @@ export function TabSkemaKeuangan({
 			});
 			if (res.ok) {
 				const json = await res.json();
-				if (json.success) {
+				if (json.success && json.data) {
 					setFinanceState(json.data);
+					if (json.data.totalBiayaPendidikan > 0) {
+						setTotalBiaya((prev) =>
+							prev === 0 ? json.data.totalBiayaPendidikan : prev,
+						);
+					}
 				}
 			}
 		} catch (error) {
@@ -64,11 +74,20 @@ export function TabSkemaKeuangan({
 	};
 
 	useEffect(() => {
-		if (pmbData?.paymentPlan?.totalBiaya !== undefined) {
-			setTotalBiaya(pmbData.paymentPlan.totalBiaya);
-		} else if (pmbData?.finance?.totalBiayaPendidikan !== undefined) {
-			setTotalBiaya(pmbData.finance.totalBiayaPendidikan);
+		const planVal = pmbData?.paymentPlan?.totalBiaya;
+		const finVal = pmbData?.finance?.totalBiayaPendidikan;
+		const stateVal = financeState?.totalBiayaPendidikan;
+
+		if (planVal && planVal > 0) {
+			setTotalBiaya(planVal);
+		} else if (finVal && finVal > 0) {
+			setTotalBiaya(finVal);
+		} else if (stateVal && stateVal > 0) {
+			setTotalBiaya(stateVal);
+		} else if (planVal !== undefined) {
+			setTotalBiaya(planVal);
 		}
+
 		if (pmbData?.finance) {
 			setFinanceState(pmbData.finance);
 		} else {
@@ -228,7 +247,7 @@ export function TabSkemaKeuangan({
 									type="number"
 									min={0}
 									disabled={!isEditing || !canEdit}
-									value={totalBiaya}
+									value={totalBiaya === 0 && !isEditing ? "" : totalBiaya}
 									onKeyDown={(e) => {
 										if (e.key === "-" || e.key === "e" || e.key === "E")
 											e.preventDefault();
@@ -237,11 +256,14 @@ export function TabSkemaKeuangan({
 										setTotalBiaya(Math.max(0, Number(e.target.value) || 0))
 									}
 									className="pl-9 font-bold text-base bg-white h-10 border-indigo-200 focus:border-indigo-500 disabled:bg-slate-100 disabled:text-slate-700"
-									placeholder="Contoh: 15000000"
+									placeholder="Belum diinputkan"
 								/>
 							</div>
 							<span className="text-xs font-semibold text-indigo-700 mt-1.5 block">
-								Terbilang: {formatRupiah(totalBiaya)}
+								Terbilang:{" "}
+								{totalBiaya > 0
+									? formatRupiah(totalBiaya)
+									: "Belum ada biaya terinput"}
 							</span>
 						</div>
 

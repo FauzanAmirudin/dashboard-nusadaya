@@ -403,6 +403,7 @@ export const practicesBudgetRequests = pgTable("practices_budget_requests", {
 	dosenId: integer("dosen_id")
 		.references(() => users.id)
 		.notNull(),
+	namaKelas: text("nama_kelas"),
 	mataKuliah: text("mata_kuliah").notNull(),
 	daftarKebutuhan: jsonb("daftar_kebutuhan").notNull(), // array of { namaItem, jumlah, satuanHarga }
 	totalNominal: integer("total_nominal").default(0),

@@ -425,7 +425,7 @@ export const coreRoutes = new Elysia()
 			success: true,
 			data: {
 				student,
-				pmb: pmb ? { ...pmb, paymentPlan: pmbPayment } : null,
+				pmb: pmb ? { ...pmb, paymentPlan: pmbPayment, finance } : null,
 				crm,
 				finance,
 				academic,

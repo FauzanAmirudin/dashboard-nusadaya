@@ -55,7 +55,18 @@ export const crmRoutes = new Elysia()
 			limit: 5,
 		});
 
-		return { success: true, data: { crm, logs } };
+		const finance = await db.query.financeData.findFirst({
+			where: eq(financeData.studentId, id),
+		});
+
+		const pmb = await db.query.pmbData.findFirst({
+			where: eq(pmbData.studentId, id),
+			with: {
+				accBy: { columns: { fullName: true } },
+			},
+		});
+
+		return { success: true, data: { crm, logs, finance, pmb } };
 	})
 	.get("/:id/crm/logs", async ({ params, query, set }) => {
 		const id = Number(params.id);

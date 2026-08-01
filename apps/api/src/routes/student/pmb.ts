@@ -378,24 +378,46 @@ export const pmbRoutes = new Elysia()
 			}
 			const id = parseInt(params.id, 10);
 
-			await db
-				.update(pmbPaymentPlan)
-				.set({
-					totalBiaya: body.totalBiaya,
-					pendaftaranDp: body.pendaftaranDp,
-					totalDp: body.totalDp,
-					pembayaranAwalDp: body.pembayaranAwalDp,
-					statusDp: body.statusDp,
+			const existingPlan = await db.query.pmbPaymentPlan.findFirst({
+				where: eq(pmbPaymentPlan.studentId, id),
+			});
+
+			if (existingPlan) {
+				await db
+					.update(pmbPaymentPlan)
+					.set({
+						totalBiaya: body.totalBiaya,
+						pendaftaranDp: body.pendaftaranDp,
+						totalDp: body.totalDp,
+						pembayaranAwalDp: body.pembayaranAwalDp,
+						statusDp: body.statusDp,
+						janjiTahap2: body.janjiTahap2 ? new Date(body.janjiTahap2) : null,
+						janjiTahap2Nominal: body.janjiTahap2Nominal,
+						janjiTahap2Notes: body.janjiTahap2Notes,
+						janjiTahap3: body.janjiTahap3 ? new Date(body.janjiTahap3) : null,
+						janjiTahap3Nominal: body.janjiTahap3Nominal,
+						janjiTahap3Notes: body.janjiTahap3Notes,
+						pengajuanDanaTalangan: body.pengajuanDanaTalangan,
+						updatedAt: new Date(),
+					})
+					.where(eq(pmbPaymentPlan.studentId, id));
+			} else {
+				await db.insert(pmbPaymentPlan).values({
+					studentId: id,
+					totalBiaya: body.totalBiaya || 0,
+					pendaftaranDp: body.pendaftaranDp || 0,
+					totalDp: body.totalDp || 0,
+					pembayaranAwalDp: body.pembayaranAwalDp || 0,
+					statusDp: body.statusDp || false,
 					janjiTahap2: body.janjiTahap2 ? new Date(body.janjiTahap2) : null,
-					janjiTahap2Nominal: body.janjiTahap2Nominal,
-					janjiTahap2Notes: body.janjiTahap2Notes,
+					janjiTahap2Nominal: body.janjiTahap2Nominal || 0,
+					janjiTahap2Notes: body.janjiTahap2Notes || null,
 					janjiTahap3: body.janjiTahap3 ? new Date(body.janjiTahap3) : null,
-					janjiTahap3Nominal: body.janjiTahap3Nominal,
-					janjiTahap3Notes: body.janjiTahap3Notes,
-					pengajuanDanaTalangan: body.pengajuanDanaTalangan,
-					updatedAt: new Date(),
-				})
-				.where(eq(pmbPaymentPlan.studentId, id));
+					janjiTahap3Nominal: body.janjiTahap3Nominal || 0,
+					janjiTahap3Notes: body.janjiTahap3Notes || null,
+					pengajuanDanaTalangan: body.pengajuanDanaTalangan || null,
+				});
+			}
 
 			if (body.totalBiaya !== undefined) {
 				const existingFin = await db.query.financeData.findFirst({

@@ -3,8 +3,10 @@
 import {
 	CheckCircle,
 	Clock,
+	DollarSign,
 	Eye,
 	FileText,
+	Globe,
 	Loader2,
 	Trash2,
 	UploadCloud,
@@ -45,6 +47,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
 	Tooltip,
@@ -54,6 +57,7 @@ import {
 } from "@/components/ui/tooltip";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
+import { formatRupiah } from "@/utils/format";
 
 interface DocFile {
 	id: number;
@@ -92,9 +96,12 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 		{ task: string; date: string; assignee: string; status: string }[]
 	>([]);
 
-	const [crmState, setCrmState] = useState<{ crm: any; logs: any[] } | null>(
-		null,
-	);
+	const [crmState, setCrmState] = useState<{
+		crm: any;
+		logs: any[];
+		finance?: any;
+		pmb?: any;
+	} | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [loadingItem, setLoadingItem] = useState<string | null>(null);
 
@@ -618,166 +625,405 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 							</div>
 						</div>
 					</div>
-					<div>
-						<div className="mb-6">
-							{CHECKLIST_CATEGORIES.map((category, catIdx) => (
-								<div
-									key={catIdx}
-									className="mb-8 last:mb-0 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden"
-								>
-									<div className="bg-slate-50 border-b border-slate-200 px-5 py-4">
-										<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-											<span>{category.icon}</span>
-											{category.category}
-										</h3>
+				</div>
+
+				<Tabs defaultValue="registrasi-awal" className="w-full">
+					<TabsList className="mb-6 grid w-full grid-cols-2 bg-slate-100 p-1 rounded-lg">
+						<TabsTrigger
+							value="registrasi-awal"
+							className="data-[state=active]:bg-white data-[state=active]:text-slate-800 data-[state=active]:shadow-sm rounded-md py-2 transition-all flex items-center justify-center gap-2 font-bold"
+						>
+							<span>💳</span> 1. Monitoring Registrasi Awal
+						</TabsTrigger>
+						<TabsTrigger
+							value="modul-crm"
+							className="data-[state=active]:bg-white data-[state=active]:text-slate-800 data-[state=active]:shadow-sm rounded-md py-2 transition-all flex items-center justify-center gap-2 font-bold"
+						>
+							<span>📞</span> 2. Monitoring & Modul Evaluasi CRM
+						</TabsTrigger>
+					</TabsList>
+
+					<TabsContent value="registrasi-awal" className="space-y-6">
+						{/* Status Pelunasan Registrasi Awal (Finance Real-Time) */}
+						<Card className="border border-slate-200 shadow-sm">
+							<CardHeader className="bg-slate-50 border-b border-slate-100 py-3.5 px-4 flex flex-row items-center justify-between">
+								<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
+									<DollarSign className="w-4 h-4 text-emerald-600" />
+									Status Pelunasan Registrasi Awal (Sinkronisasi Finance)
+								</CardTitle>
+								{crmState?.finance?.registrasiStatus ? (
+									<Badge className="bg-emerald-500 text-white hover:bg-emerald-600 text-xs font-bold gap-1">
+										<CheckCircle className="w-3.5 h-3.5" />
+										LUNAS REGISTRASI
+									</Badge>
+								) : (
+									<Badge
+										variant="destructive"
+										className="text-xs font-bold gap-1"
+									>
+										<XCircle className="w-3.5 h-3.5" />
+										BELUM LUNAS
+									</Badge>
+								)}
+							</CardHeader>
+							<CardContent className="p-5 space-y-4">
+								<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+									<div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+										<span className="text-[11px] font-semibold text-slate-500 block uppercase">
+											Nominal Pembayaran Registrasi
+										</span>
+										<span className="text-base font-bold text-slate-800 mt-1 block">
+											{formatRupiah(crmState?.finance?.registrasiNominal || 0)}
+										</span>
 									</div>
-									<div className="p-5 space-y-4">
-										{category.items.map((item) => (
-											<div
-												key={item.id}
-												className="flex flex-col rounded-lg border bg-white overflow-hidden border-slate-200"
+									<div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+										<span className="text-[11px] font-semibold text-slate-500 block uppercase">
+											Tanggal Pembayaran Registrasi
+										</span>
+										<span className="text-sm font-bold text-slate-800 mt-1 block">
+											{crmState?.finance?.registrasiPaidDate
+												? new Date(
+														crmState.finance.registrasiPaidDate,
+													).toLocaleDateString("id-ID", {
+														day: "numeric",
+														month: "long",
+														year: "numeric",
+													})
+												: "Belum dibayar"}
+										</span>
+									</div>
+									<div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between">
+										<span className="text-[11px] font-semibold text-slate-500 block uppercase">
+											Bukti Pembayaran Registrasi (PDF)
+										</span>
+										{crmState?.finance?.registrasiBuktiBayarUrl ? (
+											<a
+												href={`${API_URL}/uploads/${crmState.finance.registrasiBuktiBayarUrl}`}
+												target="_blank"
+												rel="noreferrer"
+												className="inline-flex items-center gap-1.5 text-xs text-[#0517B0] font-bold hover:underline mt-1"
 											>
-												<div
-													className={`flex items-center gap-4 p-4 transition-colors ${
-														item.checked
-															? "bg-emerald-50 border-b border-emerald-200"
-															: "bg-slate-50 border-b border-slate-200"
-													}`}
-												>
-													<Checkbox
-														id={item.id}
-														checked={item.checked}
-														onCheckedChange={(c) =>
-															handleCheckboxChange(item.id, c === true)
-														}
-														disabled={!canEdit || loadingItem === item.id}
-														className={`w-6 h-6 rounded-md ${
-															item.checked
-																? "data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
-																: ""
-														}`}
-													/>
-													<label
-														htmlFor={item.id}
-														className="flex-1 cursor-pointer block"
-													>
-														<div
-															className={`text-base font-semibold block ${
-																item.checked
-																	? "text-emerald-900"
-																	: "text-slate-700"
-															}`}
-														>
-															{item.label}
-															{loadingItem === item.id && (
-																<Loader2 className="w-3 h-3 text-emerald-600 animate-spin ml-2 inline" />
-															)}
-														</div>
-														<p
-															className={`text-sm mt-1 ${
-																item.checked
-																	? "text-emerald-700"
-																	: "text-slate-500"
-															}`}
-														>
-															{item.desc}
-														</p>
-													</label>
-													<div>
-														{item.checked ? (
-															<CheckCircle className="w-6 h-6 text-emerald-500" />
-														) : (
-															<div className="w-6 h-6 rounded-full border-2 border-slate-300" />
-														)}
-													</div>
-												</div>
-
-												{/* Sub-component for Kehadiran Praktik */}
-												{item.id === "practiceAttendance" && item.checked && (
-													<div className="p-4 bg-white border-b border-slate-100">
-														<div className="flex flex-col sm:flex-row sm:items-end gap-4 mb-4">
-															<div>
-																<label className="text-xs font-semibold text-slate-500 mb-1 block">
-																	Hadir
-																</label>
-																<Input
-																	type="number"
-																	value={attendancePresent}
-																	onChange={(e) =>
-																		setAttendancePresent(
-																			e.target.value === ""
-																				? ""
-																				: Number(e.target.value),
-																		)
-																	}
-																	disabled={!canEdit}
-																	className="w-24 text-center font-bold text-slate-700"
-																/>
-															</div>
-															<div className="text-slate-400 font-medium pb-2">
-																dari
-															</div>
-															<div>
-																<label className="text-xs font-semibold text-slate-500 mb-1 block">
-																	Total Hari
-																</label>
-																<Input
-																	type="number"
-																	value={attendanceTotal}
-																	onChange={(e) =>
-																		setAttendanceTotal(
-																			e.target.value === ""
-																				? ""
-																				: Number(e.target.value),
-																		)
-																	}
-																	disabled={!canEdit}
-																	className="w-24 text-center font-bold text-slate-700"
-																/>
-															</div>
-															{canEdit && (
-																<Button
-																	variant="secondary"
-																	onClick={handleAttendanceSave}
-																	className="ml-auto text-blue-700 bg-blue-50 hover:bg-blue-100"
-																>
-																	Simpan
-																</Button>
-															)}
-														</div>
-														<div className="flex items-center gap-3 mt-2">
-															<span className="text-sm font-semibold text-slate-600 min-w-[100px]">
-																Persentase: {attendancePercentage}%
-															</span>
-															<Progress
-																value={attendancePercentage}
-																className="h-2.5 bg-slate-100 flex-1"
-																indicatorClassName="bg-blue-600"
-															/>
-														</div>
-													</div>
-												)}
-
-												{/* Area Dokumen CRM (sekarang selalu tampil di bawah checklist) */}
-												<div className="p-4 bg-white border-t border-slate-100 last:border-0">
-													<div className="flex items-center justify-between mb-2">
-														<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
-															Lampiran Dokumen CRM
-														</span>
-													</div>
-													<DocumentUpload
-														studentId={studentId}
-														panel="crm"
-														documentKey={item.docKey}
-														canEdit={canEdit}
-													/>
-												</div>
-											</div>
-										))}
+												<Eye className="w-4 h-4" />
+												Lihat Bukti Bayar PDF
+											</a>
+										) : (
+											<span className="text-xs text-slate-400 font-medium mt-1">
+												Belum ada bukti bayar PDF
+											</span>
+										)}
 									</div>
 								</div>
-							))}
-						</div>
+							</CardContent>
+						</Card>
+
+						{/* Checklist Berkas & ACC PMB */}
+						<Card className="border border-slate-200 shadow-sm">
+							<CardHeader className="bg-slate-50 border-b border-slate-100 py-3.5 px-4 flex flex-row items-center justify-between">
+								<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
+									<FileText className="w-4 h-4 text-indigo-600" />
+									Checklist Berkas & ACC PMB (Registrasi Awal)
+								</CardTitle>
+								{crmState?.pmb?.isAcc ? (
+									<Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs font-bold">
+										🟢 ACC PMB: {crmState?.pmb?.accBy?.fullName || "Admin PMB"}
+									</Badge>
+								) : (
+									<Badge
+										variant="outline"
+										className="text-slate-500 border-slate-300 text-xs"
+									>
+										🟡 Menunggu ACC PMB
+									</Badge>
+								)}
+							</CardHeader>
+							<CardContent className="p-5 space-y-4">
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+									<div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
+										<div>
+											<span className="text-xs font-bold text-slate-800 block">
+												Formulir Masuk
+											</span>
+											<span className="text-[11px] text-slate-500">
+												Pendaftaran Awal
+											</span>
+										</div>
+										{crmState?.pmb?.formReceived ? (
+											<Badge className="bg-emerald-500 text-white text-[10px]">
+												Selesai
+											</Badge>
+										) : (
+											<Badge
+												variant="outline"
+												className="text-slate-400 text-[10px]"
+											>
+												Belum
+											</Badge>
+										)}
+									</div>
+
+									<div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
+										<div>
+											<span className="text-xs font-bold text-slate-800 block">
+												Berkas Lengkap
+											</span>
+											<span className="text-[11px] text-slate-500">
+												Fisik Berkas
+											</span>
+										</div>
+										{crmState?.pmb?.documentsComplete ? (
+											<Badge className="bg-emerald-500 text-white text-[10px]">
+												Selesai
+											</Badge>
+										) : (
+											<Badge
+												variant="outline"
+												className="text-slate-400 text-[10px]"
+											>
+												Belum
+											</Badge>
+										)}
+									</div>
+
+									<div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
+										<div>
+											<span className="text-xs font-bold text-slate-800 block">
+												Input Data Awal
+											</span>
+											<span className="text-[11px] text-slate-500">
+												Entri Sistem
+											</span>
+										</div>
+										{crmState?.pmb?.dataInputted ? (
+											<Badge className="bg-emerald-500 text-white text-[10px]">
+												Selesai
+											</Badge>
+										) : (
+											<Badge
+												variant="outline"
+												className="text-slate-400 text-[10px]"
+											>
+												Belum
+											</Badge>
+										)}
+									</div>
+
+									<div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
+										<div>
+											<span className="text-xs font-bold text-slate-800 block">
+												Follow Up Awal
+											</span>
+											<span className="text-[11px] text-slate-500">
+												Kontak Awal
+											</span>
+										</div>
+										{crmState?.pmb?.initialFollowUp ? (
+											<Badge className="bg-emerald-500 text-white text-[10px]">
+												Selesai
+											</Badge>
+										) : (
+											<Badge
+												variant="outline"
+												className="text-slate-400 text-[10px]"
+											>
+												Belum
+											</Badge>
+										)}
+									</div>
+								</div>
+
+								{/* Data Akuisisi & Referral info */}
+								<div className="pt-3 border-t border-slate-200/60 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+									<div className="p-2.5 bg-indigo-50/50 rounded-lg border border-indigo-100">
+										<span className="text-[11px] font-bold text-indigo-900 block">
+											Jalur Rekomendasi / Referral
+										</span>
+										<span className="text-xs font-semibold text-indigo-700 mt-0.5 block">
+											{crmState?.pmb?.rekomendasi || "-"}
+										</span>
+									</div>
+									<div className="p-2.5 bg-indigo-50/50 rounded-lg border border-indigo-100">
+										<span className="text-[11px] font-bold text-indigo-900 block">
+											Tim Visit / Sosialisasi
+										</span>
+										<span className="text-xs font-semibold text-indigo-700 mt-0.5 block">
+											{crmState?.pmb?.timVisit ||
+												crmState?.pmb?.timSosialisasi ||
+												"-"}
+										</span>
+									</div>
+									<div className="p-2.5 bg-indigo-50/50 rounded-lg border border-indigo-100">
+										<span className="text-[11px] font-bold text-indigo-900 block">
+											RO Referral / Koordinator
+										</span>
+										<span className="text-xs font-semibold text-indigo-700 mt-0.5 block">
+											{crmState?.pmb?.roReferral ||
+												crmState?.pmb?.koordinator ||
+												"-"}
+										</span>
+									</div>
+								</div>
+							</CardContent>
+						</Card>
+					</TabsContent>
+
+					<TabsContent value="modul-crm" className="space-y-6">
+						{CHECKLIST_CATEGORIES.map((category, catIdx) => (
+							<div
+								key={catIdx}
+								className="mb-8 last:mb-0 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden"
+							>
+								<div className="bg-slate-50 border-b border-slate-200 px-5 py-4">
+									<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+										<span>{category.icon}</span>
+										{category.category}
+									</h3>
+								</div>
+								<div className="p-5 space-y-4">
+									{category.items.map((item) => (
+										<div
+											key={item.id}
+											className="flex flex-col rounded-lg border bg-white overflow-hidden border-slate-200"
+										>
+											<div
+												className={`flex items-center gap-4 p-4 transition-colors ${
+													item.checked
+														? "bg-emerald-50 border-b border-emerald-200"
+														: "bg-slate-50 border-b border-slate-200"
+												}`}
+											>
+												<Checkbox
+													id={item.id}
+													checked={item.checked}
+													onCheckedChange={(c) =>
+														handleCheckboxChange(item.id, c === true)
+													}
+													disabled={!canEdit || loadingItem === item.id}
+													className={`w-6 h-6 rounded-md ${
+														item.checked
+															? "data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+															: ""
+													}`}
+												/>
+												<label
+													htmlFor={item.id}
+													className="flex-1 cursor-pointer block"
+												>
+													<div
+														className={`text-base font-semibold block ${
+															item.checked
+																? "text-emerald-900"
+																: "text-slate-700"
+														}`}
+													>
+														{item.label}
+														{loadingItem === item.id && (
+															<Loader2 className="w-3 h-3 text-emerald-600 animate-spin ml-2 inline" />
+														)}
+													</div>
+													<p
+														className={`text-sm mt-1 ${
+															item.checked
+																? "text-emerald-700"
+																: "text-slate-500"
+														}`}
+													>
+														{item.desc}
+													</p>
+												</label>
+												<div>
+													{item.checked ? (
+														<CheckCircle className="w-6 h-6 text-emerald-500" />
+													) : (
+														<div className="w-6 h-6 rounded-full border-2 border-slate-300" />
+													)}
+												</div>
+											</div>
+
+											{/* Sub-component for Kehadiran Praktik */}
+											{item.id === "practiceAttendance" && item.checked && (
+												<div className="p-4 bg-white border-b border-slate-100">
+													<div className="flex flex-col sm:flex-row sm:items-end gap-4 mb-4">
+														<div>
+															<label className="text-xs font-semibold text-slate-500 mb-1 block">
+																Hadir
+															</label>
+															<Input
+																type="number"
+																value={attendancePresent}
+																onChange={(e) =>
+																	setAttendancePresent(
+																		e.target.value === ""
+																			? ""
+																			: Number(e.target.value),
+																	)
+																}
+																disabled={!canEdit}
+																className="w-24 text-center font-bold text-slate-700"
+															/>
+														</div>
+														<div className="text-slate-400 font-medium pb-2">
+															dari
+														</div>
+														<div>
+															<label className="text-xs font-semibold text-slate-500 mb-1 block">
+																Total Hari
+															</label>
+															<Input
+																type="number"
+																value={attendanceTotal}
+																onChange={(e) =>
+																	setAttendanceTotal(
+																		e.target.value === ""
+																			? ""
+																			: Number(e.target.value),
+																	)
+																}
+																disabled={!canEdit}
+																className="w-24 text-center font-bold text-slate-700"
+															/>
+														</div>
+														{canEdit && (
+															<Button
+																variant="secondary"
+																onClick={handleAttendanceSave}
+																className="ml-auto text-blue-700 bg-blue-50 hover:bg-blue-100"
+															>
+																Simpan
+															</Button>
+														)}
+													</div>
+													<div className="flex items-center gap-3 mt-2">
+														<span className="text-sm font-semibold text-slate-600 min-w-[100px]">
+															Persentase: {attendancePercentage}%
+														</span>
+														<Progress
+															value={attendancePercentage}
+															className="h-2.5 bg-slate-100 flex-1"
+															indicatorClassName="bg-blue-600"
+														/>
+													</div>
+												</div>
+											)}
+
+											{/* Area Dokumen CRM (sekarang selalu tampil di bawah checklist) */}
+											<div className="p-4 bg-white border-t border-slate-100 last:border-0">
+												<div className="flex items-center justify-between mb-2">
+													<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+														Lampiran Dokumen CRM
+													</span>
+												</div>
+												<DocumentUpload
+													studentId={studentId}
+													panel="crm"
+													documentKey={item.docKey}
+													canEdit={canEdit}
+												/>
+											</div>
+										</div>
+									))}
+								</div>
+							</div>
+						))}
 
 						{/* Section Case/Masalah */}
 						<div className="mt-8 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
@@ -1353,140 +1599,144 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 								)}
 							</div>
 						</div>
-					</div>
-				</div>
 
-				{/* Status ACC Card */}
-				<Card className="bg-slate-50 border-slate-200 shadow-sm overflow-hidden">
-					<CardContent className="p-0">
-						<div className="flex flex-col sm:flex-row items-center justify-between p-6">
-							<div className="flex flex-1 items-center gap-4 mb-4 sm:mb-0 w-full">
-								{crm?.isAcc ? (
-									<div className="flex-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
-										<div className="flex items-center gap-4">
-											<div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-												<CheckCircle className="w-6 h-6 text-emerald-600" />
-											</div>
-											<div>
-												<h4 className="text-emerald-700 font-bold text-lg">
-													✅ ACC CRM Diberikan
-												</h4>
-												<p className="text-sm text-slate-600">
-													Oleh{" "}
-													<span className="font-semibold">
-														{crm?.accBy?.fullName || "Admin CRM"}
-													</span>{" "}
-													pada{" "}
-													{new Date(crm.accAt).toLocaleString("id-ID", {
-														dateStyle: "medium",
-														timeStyle: "short",
-													})}{" "}
-													WIB
-												</p>
-											</div>
-										</div>
-										{isCrmAdmin && (
-											<AlertDialog>
-												<AlertDialogTrigger
-													render={
-														<Button
-															variant="outline"
-															className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 shrink-0"
-															disabled={isSavingLog}
-														>
-															{isSavingLog ? "Membatalkan..." : "Batalkan ACC"}
-														</Button>
-													}
-												/>
-												<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
-													<AlertDialogTitle>
-														Konfirmasi Pembatalan ACC CRM
-													</AlertDialogTitle>
-													<AlertDialogDescription className="text-slate-500">
-														Apakah Anda yakin ingin membatalkan status ACC untuk
-														panel CRM ini? Status mahasiswa akan kembali ke
-														tahap proses.
-													</AlertDialogDescription>
-													<div className="flex justify-end gap-3 mt-4">
-														<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50">
-															Batal
-														</AlertDialogCancel>
-														<AlertDialogAction
-															onClick={handleCancelAcc}
-															className="bg-rose-600 hover:bg-rose-700 text-white"
-														>
-															Ya, Batalkan ACC
-														</AlertDialogAction>
+						{/* Status ACC Card */}
+						<Card className="bg-slate-50 border-slate-200 shadow-sm overflow-hidden">
+							<CardContent className="p-0">
+								<div className="flex flex-col sm:flex-row items-center justify-between p-6">
+									<div className="flex flex-1 items-center gap-4 mb-4 sm:mb-0 w-full">
+										{crm?.isAcc ? (
+											<div className="flex-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
+												<div className="flex items-center gap-4">
+													<div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+														<CheckCircle className="w-6 h-6 text-emerald-600" />
 													</div>
-												</AlertDialogContent>
-											</AlertDialog>
+													<div>
+														<h4 className="text-emerald-700 font-bold text-lg">
+															✅ ACC CRM Diberikan
+														</h4>
+														<p className="text-sm text-slate-600">
+															Oleh{" "}
+															<span className="font-semibold">
+																{crm?.accBy?.fullName || "Admin CRM"}
+															</span>{" "}
+															pada{" "}
+															{new Date(crm.accAt).toLocaleString("id-ID", {
+																dateStyle: "medium",
+																timeStyle: "short",
+															})}{" "}
+															WIB
+														</p>
+													</div>
+												</div>
+												{isCrmAdmin && (
+													<AlertDialog>
+														<AlertDialogTrigger
+															render={
+																<Button
+																	variant="outline"
+																	className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 shrink-0"
+																	disabled={isSavingLog}
+																>
+																	{isSavingLog
+																		? "Membatalkan..."
+																		: "Batalkan ACC"}
+																</Button>
+															}
+														/>
+														<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
+															<AlertDialogTitle>
+																Konfirmasi Pembatalan ACC CRM
+															</AlertDialogTitle>
+															<AlertDialogDescription className="text-slate-500">
+																Apakah Anda yakin ingin membatalkan status ACC
+																untuk panel CRM ini? Status mahasiswa akan
+																kembali ke tahap proses.
+															</AlertDialogDescription>
+															<div className="flex justify-end gap-3 mt-4">
+																<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50">
+																	Batal
+																</AlertDialogCancel>
+																<AlertDialogAction
+																	onClick={handleCancelAcc}
+																	className="bg-rose-600 hover:bg-rose-700 text-white"
+																>
+																	Ya, Batalkan ACC
+																</AlertDialogAction>
+															</div>
+														</AlertDialogContent>
+													</AlertDialog>
+												)}
+											</div>
+										) : (
+											<>
+												<div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center">
+													<Clock className="w-6 h-6 text-slate-500" />
+												</div>
+												<div>
+													<h4 className="text-slate-700 font-bold text-lg">
+														⏳ Menunggu ACC CRM
+													</h4>
+													<p className="text-sm text-slate-500">
+														Belum ada persetujuan. Selesaikan semua checklist
+														untuk memberikan ACC.
+													</p>
+												</div>
+											</>
 										)}
 									</div>
-								) : (
-									<>
-										<div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center">
-											<Clock className="w-6 h-6 text-slate-500" />
-										</div>
-										<div>
-											<h4 className="text-slate-700 font-bold text-lg">
-												⏳ Menunggu ACC CRM
-											</h4>
-											<p className="text-sm text-slate-500">
-												Belum ada persetujuan. Selesaikan semua checklist untuk
-												memberikan ACC.
-											</p>
-										</div>
-									</>
-								)}
-							</div>
 
-							{isCrmAdmin && !crm?.isAcc && (
-								<Tooltip>
-									<TooltipTrigger render={<span className="inline-block" />}>
-										<span>
-											<AlertDialog>
-												<AlertDialogTrigger
-													disabled={completedCount < totalChecks}
-													className="w-full sm:w-auto bg-[#0517B0] hover:bg-blue-800 text-white font-bold px-8 py-2 rounded-md shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-												>
-													✔ ACC CRM →
-												</AlertDialogTrigger>
-												<AlertDialogContent>
-													<AlertDialogTitle>
-														Konfirmasi ACC CRM
-													</AlertDialogTitle>
-													<AlertDialogDescription>
-														Anda akan memberikan persetujuan final untuk tahap
-														CRM mahasiswa ini. Tindakan ini akan dicatat beserta
-														nama dan waktu persetujuan Anda. Pastikan semua data
-														sudah valid.
-													</AlertDialogDescription>
-													<div className="flex justify-end gap-3 mt-4">
-														<AlertDialogCancel className="border-slate-200">
-															Batal
-														</AlertDialogCancel>
-														<AlertDialogAction
-															onClick={handleAcc}
-															className="bg-[#0517B0] hover:bg-blue-800 text-white"
+									{isCrmAdmin && !crm?.isAcc && (
+										<Tooltip>
+											<TooltipTrigger
+												render={<span className="inline-block" />}
+											>
+												<span>
+													<AlertDialog>
+														<AlertDialogTrigger
+															disabled={completedCount < totalChecks}
+															className="w-full sm:w-auto bg-[#0517B0] hover:bg-blue-800 text-white font-bold px-8 py-2 rounded-md shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
 														>
-															Ya, ACC Sekarang
-														</AlertDialogAction>
-													</div>
-												</AlertDialogContent>
-											</AlertDialog>
-										</span>
-									</TooltipTrigger>
-									{completedCount < totalChecks && (
-										<TooltipContent>
-											Lengkapi semua {totalChecks - completedCount} checklist
-											terlebih dahulu
-										</TooltipContent>
+															✔ ACC CRM →
+														</AlertDialogTrigger>
+														<AlertDialogContent>
+															<AlertDialogTitle>
+																Konfirmasi ACC CRM
+															</AlertDialogTitle>
+															<AlertDialogDescription>
+																Anda akan memberikan persetujuan final untuk
+																tahap CRM mahasiswa ini. Tindakan ini akan
+																dicatat beserta nama dan waktu persetujuan Anda.
+																Pastikan semua data sudah valid.
+															</AlertDialogDescription>
+															<div className="flex justify-end gap-3 mt-4">
+																<AlertDialogCancel className="border-slate-200">
+																	Batal
+																</AlertDialogCancel>
+																<AlertDialogAction
+																	onClick={handleAcc}
+																	className="bg-[#0517B0] hover:bg-blue-800 text-white"
+																>
+																	Ya, ACC Sekarang
+																</AlertDialogAction>
+															</div>
+														</AlertDialogContent>
+													</AlertDialog>
+												</span>
+											</TooltipTrigger>
+											{completedCount < totalChecks && (
+												<TooltipContent>
+													Lengkapi semua {totalChecks - completedCount}{" "}
+													checklist terlebih dahulu
+												</TooltipContent>
+											)}
+										</Tooltip>
 									)}
-								</Tooltip>
-							)}
-						</div>
-					</CardContent>
-				</Card>
+								</div>
+							</CardContent>
+						</Card>
+					</TabsContent>
+				</Tabs>
 			</div>
 		</TooltipProvider>
 	);

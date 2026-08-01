@@ -92,6 +92,7 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" })
 
 			await db.insert(practicesBudgetRequests).values({
 				dosenId: user.id,
+				namaKelas: body.namaKelas || "",
 				mataKuliah: body.mataKuliah,
 				daftarKebutuhan: body.daftarKebutuhan,
 				totalNominal: body.totalNominal,
@@ -102,6 +103,44 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" })
 		},
 		{
 			body: t.Object({
+				namaKelas: t.Optional(t.String()),
+				mataKuliah: t.String(),
+				daftarKebutuhan: t.Array(t.Any()),
+				totalNominal: t.Number(),
+			}),
+		},
+	)
+	.put(
+		"/anggaran-praktik/:requestId",
+		async ({ params, body, user, set }: any) => {
+			if (
+				!user ||
+				(user.role !== "dosen" &&
+					user.role !== "akademik" &&
+					user.role !== "superadmin")
+			) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const requestId = Number(params.requestId);
+
+			await db
+				.update(practicesBudgetRequests)
+				.set({
+					namaKelas: body.namaKelas || "",
+					mataKuliah: body.mataKuliah,
+					daftarKebutuhan: body.daftarKebutuhan,
+					totalNominal: body.totalNominal,
+					status: "menunggu",
+					updatedAt: new Date(),
+				})
+				.where(eq(practicesBudgetRequests.id, requestId));
+
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				namaKelas: t.Optional(t.String()),
 				mataKuliah: t.String(),
 				daftarKebutuhan: t.Array(t.Any()),
 				totalNominal: t.Number(),
@@ -155,11 +194,122 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" })
 		await db.insert(practicesMaterialReports).values({
 			budgetRequestId: Number(body.budgetRequestId),
 			dosenId: user.id,
-			daftarSisaBahan: JSON.parse(body.daftarSisaBahan),
+			daftarSisaBahan:
+				typeof body.daftarSisaBahan === "string"
+					? JSON.parse(body.daftarSisaBahan)
+					: body.daftarSisaBahan,
 			catatanDosen: body.catatanDosen || "",
 			fileUrl: fileUrl,
 			fileName: fileName,
 		});
 
 		return { success: true };
-	});
+	})
+	.get("/laporan-sisa-bahan", async ({ user, set }: any) => {
+		if (
+			!user ||
+			(user.role !== "dosen" &&
+				user.role !== "akademik" &&
+				user.role !== "superadmin")
+		) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		const reports = await db.query.practicesMaterialReports.findMany({
+			orderBy: (practicesMaterialReports, { desc }) => [
+				desc(practicesMaterialReports.createdAt),
+			],
+		});
+		return { success: true, data: reports };
+	})
+	.put(
+		"/laporan-sisa-bahan/:reportId",
+		async ({ params, body, user, set }: any) => {
+			if (
+				!user ||
+				(user.role !== "dosen" &&
+					user.role !== "akademik" &&
+					user.role !== "superadmin")
+			) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const reportId = Number(params.reportId);
+			const file = body.file as File;
+
+			const updateData: any = {
+				budgetRequestId: Number(body.budgetRequestId),
+				daftarSisaBahan:
+					typeof body.daftarSisaBahan === "string"
+						? JSON.parse(body.daftarSisaBahan)
+						: body.daftarSisaBahan,
+				catatanDosen: body.catatanDosen || "",
+			};
+
+			if (file) {
+				const uploadDir = join(process.cwd(), "uploads", "practices");
+				await mkdir(uploadDir, { recursive: true });
+
+				const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+				const fileUrl = join(uploadDir, fileName);
+
+				await Bun.write(fileUrl, await file.arrayBuffer());
+				updateData.fileUrl = fileUrl;
+				updateData.fileName = fileName;
+			}
+
+			await db
+				.update(practicesMaterialReports)
+				.set(updateData)
+				.where(eq(practicesMaterialReports.id, reportId));
+
+			return { success: true };
+		},
+	)
+	.delete(
+		"/anggaran-praktik/:requestId",
+		async ({ params, user, set }: any) => {
+			if (
+				!user ||
+				(user.role !== "dosen" &&
+					user.role !== "akademik" &&
+					user.role !== "superadmin")
+			) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const requestId = Number(params.requestId);
+
+			await db
+				.delete(practicesMaterialReports)
+				.where(eq(practicesMaterialReports.budgetRequestId, requestId));
+
+			await db
+				.delete(practicesBudgetRequests)
+				.where(eq(practicesBudgetRequests.id, requestId));
+
+			return { success: true };
+		},
+	)
+	.delete(
+		"/laporan-sisa-bahan/:reportId",
+		async ({ params, user, set }: any) => {
+			if (
+				!user ||
+				(user.role !== "dosen" &&
+					user.role !== "akademik" &&
+					user.role !== "superadmin")
+			) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const reportId = Number(params.reportId);
+
+			await db
+				.delete(practicesMaterialReports)
+				.where(eq(practicesMaterialReports.id, reportId));
+
+			return { success: true };
+		},
+	);

@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/tooltip";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
+import { TabAnggaranPraktik } from "./akademik/TabAnggaranPraktik";
 
 interface DocFile {
 	id: number;
@@ -527,6 +528,12 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 					>
 						Penilaian Vokasi & Dosen
 					</button>
+					<button
+						onClick={() => setActiveTab("anggaran_praktik")}
+						className={`px-4 py-2 font-medium text-sm ${activeTab === "anggaran_praktik" ? "border-b-2 border-[#0517B0] text-[#0517B0]" : "text-slate-500 hover:text-slate-700"}`}
+					>
+						Anggaran Praktik
+					</button>
 				</div>
 
 				{activeTab === "dokumen" && (
@@ -825,6 +832,12 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 							Modul Vokasi & Penilaian Dosen
 						</h3>
 						<DosenPanel studentId={studentId} onUpdate={onUpdate} />
+					</div>
+				)}
+
+				{activeTab === "anggaran_praktik" && (
+					<div className="mt-2">
+						<TabAnggaranPraktik canEdit={canEdit} studentId={studentId} />
 					</div>
 				)}
 			</div>

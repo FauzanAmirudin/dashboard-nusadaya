@@ -1,6 +1,13 @@
 "use client";
 
-import { CheckCircle, Loader2, XCircle } from "lucide-react";
+import {
+	CheckCircle,
+	CheckCircle2,
+	Edit2,
+	Loader2,
+	RotateCcw,
+	XCircle,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +43,7 @@ export function TabAnggaran({ canEdit }: TabAnggaranProps) {
 
 	const [rejectId, setRejectId] = useState<number | null>(null);
 	const [rejectReason, setRejectReason] = useState("");
+	const [editStatusReq, setEditStatusReq] = useState<any | null>(null);
 
 	const fetchData = async () => {
 		try {
@@ -86,6 +94,20 @@ export function TabAnggaran({ canEdit }: TabAnggaranProps) {
 		}
 	};
 
+	const handleResetStatus = async (id: number) => {
+		if (!canEdit) return;
+		try {
+			const { error } =
+				await api.finance["anggaran-praktik"][id.toString()].reset.patch();
+			if (!error) {
+				toast.success("Status anggaran dikembalikan ke Menunggu");
+				fetchData();
+			} else toast.error("Gagal mereset status anggaran");
+		} catch (e) {
+			toast.error("Gagal mereset status anggaran");
+		}
+	};
+
 	return (
 		<div className="space-y-6">
 			{/* Pengajuan Anggaran */}
@@ -120,17 +142,31 @@ export function TabAnggaran({ canEdit }: TabAnggaranProps) {
 									<TableRow key={r.id}>
 										<TableCell className="font-medium">
 											{r.mataKuliah}
+											{r.namaKelas && (
+												<div className="text-xs text-indigo-600 font-semibold">
+													Kelas: {r.namaKelas}
+												</div>
+											)}
 											<div className="text-xs text-slate-500">
 												Oleh: Dosen ID {r.dosenId}
 											</div>
 										</TableCell>
 										<TableCell>
-											<ul className="list-disc pl-4 text-xs text-slate-600">
-												{(r.daftarKebutuhan || []).map((k: any, i: number) => (
-													<li key={i}>
-														{k.name} ({k.qty} {k.unit})
-													</li>
-												))}
+											<ul className="list-disc pl-4 text-xs text-slate-700 space-y-0.5">
+												{(r.daftarKebutuhan || []).map((k: any, i: number) => {
+													const itemName = k.namaItem || k.name || "Item";
+													const qty = k.jumlah ?? k.qty ?? 1;
+													const unit = k.satuan || k.unit || "pcs";
+													const price = k.satuanHarga
+														? ` @ ${formatRupiah(k.satuanHarga)}`
+														: "";
+													return (
+														<li key={i}>
+															<span className="font-semibold">{itemName}</span>{" "}
+															({qty} {unit}){price}
+														</li>
+													);
+												})}
 											</ul>
 										</TableCell>
 										<TableCell className="font-bold">
@@ -162,28 +198,43 @@ export function TabAnggaran({ canEdit }: TabAnggaranProps) {
 												</Badge>
 											)}
 											{r.catatanFinance && (
-												<div className="text-xs text-rose-500 mt-1 mt-1">
+												<div className="text-xs text-rose-500 mt-1">
 													Catatan: {r.catatanFinance}
 												</div>
 											)}
 										</TableCell>
 										<TableCell>
-											{canEdit && r.status === "menunggu" && (
-												<div className="flex gap-2">
-													<Button
-														size="sm"
-														className="bg-emerald-600 hover:bg-emerald-700"
-														onClick={() => handleApprove(r.id)}
-													>
-														Setujui
-													</Button>
-													<Button
-														size="sm"
-														variant="destructive"
-														onClick={() => setRejectId(r.id)}
-													>
-														Tolak
-													</Button>
+											{canEdit && (
+												<div className="flex items-center gap-2">
+													{r.status === "menunggu" ? (
+														<>
+															<Button
+																size="sm"
+																className="bg-emerald-600 hover:bg-emerald-700 text-xs h-8"
+																onClick={() => handleApprove(r.id)}
+															>
+																Setujui
+															</Button>
+															<Button
+																size="sm"
+																variant="destructive"
+																className="text-xs h-8"
+																onClick={() => setRejectId(r.id)}
+															>
+																Tolak
+															</Button>
+														</>
+													) : (
+														<Button
+															size="sm"
+															variant="outline"
+															className="text-xs h-8 gap-1.5 border-slate-300 hover:bg-slate-100 font-semibold text-slate-700"
+															onClick={() => setEditStatusReq(r)}
+														>
+															<Edit2 className="w-3.5 h-3.5 text-slate-600" />
+															Ubah Status
+														</Button>
+													)}
 												</div>
 											)}
 										</TableCell>
@@ -226,12 +277,22 @@ export function TabAnggaran({ canEdit }: TabAnggaranProps) {
 									<TableRow key={r.id}>
 										<TableCell>#{r.budgetRequestId}</TableCell>
 										<TableCell>
-											<ul className="list-disc pl-4 text-xs text-slate-600">
-												{(r.daftarSisaBahan || []).map((k: any, i: number) => (
-													<li key={i}>
-														{k.name} ({k.qty} {k.unit}) - {k.condition}
-													</li>
-												))}
+											<ul className="list-disc pl-4 text-xs text-slate-700 space-y-0.5">
+												{(r.daftarSisaBahan || []).map((k: any, i: number) => {
+													const itemName = k.namaItem || k.name || "Material";
+													const qty = k.jumlahSisa ?? k.jumlah ?? k.qty ?? 0;
+													const unit = k.satuan || k.unit || "pcs";
+													const condition = k.kondisi || k.condition || "Baik";
+													return (
+														<li key={i}>
+															<span className="font-semibold">{itemName}</span>{" "}
+															({qty} {unit}) -{" "}
+															<span className="italic text-slate-500">
+																{condition}
+															</span>
+														</li>
+													);
+												})}
 											</ul>
 										</TableCell>
 										<TableCell className="text-xs">
@@ -272,7 +333,7 @@ export function TabAnggaran({ canEdit }: TabAnggaranProps) {
 						<Textarea
 							value={rejectReason}
 							onChange={(e) => setRejectReason(e.target.value)}
-							placeholder="Jelaskan alasan penolakan..."
+							placeholder="Jelaskan alasan penolakan agar dosen dapat merevisi..."
 						/>
 					</div>
 					<DialogFooter>
@@ -285,6 +346,123 @@ export function TabAnggaran({ canEdit }: TabAnggaranProps) {
 							disabled={!rejectReason}
 						>
 							Tolak Pengajuan
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Edit Status Dialog */}
+			<Dialog
+				open={editStatusReq !== null}
+				onOpenChange={(open) => !open && setEditStatusReq(null)}
+			>
+				<DialogContent className="max-w-md">
+					<DialogHeader>
+						<DialogTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+							<Edit2 className="w-4 h-4 text-indigo-600" />
+							Ubah Status Pengajuan Anggaran
+						</DialogTitle>
+					</DialogHeader>
+
+					{editStatusReq && (
+						<div className="space-y-4 py-2">
+							<div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
+								<div className="text-xs text-slate-500 font-medium">
+									Mata Kuliah / Kelas:
+								</div>
+								<div className="text-sm font-bold text-slate-800">
+									{editStatusReq.mataKuliah}{" "}
+									{editStatusReq.namaKelas
+										? `(${editStatusReq.namaKelas})`
+										: ""}
+								</div>
+								<div className="text-xs text-slate-500">
+									Total Nominal:{" "}
+									<span className="font-bold text-indigo-700">
+										{formatRupiah(editStatusReq.totalNominal)}
+									</span>
+								</div>
+								<div className="text-xs text-slate-500 flex items-center gap-1.5 pt-1">
+									Status Saat Ini:
+									<Badge
+										variant="outline"
+										className={
+											editStatusReq.status === "disetujui"
+												? "bg-emerald-50 text-emerald-700 border-emerald-200"
+												: editStatusReq.status === "ditolak"
+													? "bg-rose-50 text-rose-700 border-rose-200"
+													: "bg-amber-50 text-amber-700 border-amber-200"
+										}
+									>
+										{editStatusReq.status === "disetujui"
+											? "Disetujui"
+											: editStatusReq.status === "ditolak"
+												? "Ditolak"
+												: "Menunggu"}
+									</Badge>
+								</div>
+							</div>
+
+							<div className="space-y-2 pt-1">
+								<span className="text-xs font-bold text-slate-700 block">
+									Pilih Aksi Perbaikan Status:
+								</span>
+
+								{editStatusReq.status !== "disetujui" && (
+									<Button
+										type="button"
+										onClick={() => {
+											const id = editStatusReq.id;
+											setEditStatusReq(null);
+											handleApprove(id);
+										}}
+										className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-9 justify-start px-4 gap-2"
+									>
+										<CheckCircle2 className="w-4 h-4" />
+										Setujui Anggaran Ini
+									</Button>
+								)}
+
+								{editStatusReq.status !== "ditolak" && (
+									<Button
+										type="button"
+										onClick={() => {
+											const id = editStatusReq.id;
+											setEditStatusReq(null);
+											setRejectId(id);
+										}}
+										className="w-full bg-rose-600 hover:bg-rose-700 text-white text-xs h-9 justify-start px-4 gap-2"
+									>
+										<XCircle className="w-4 h-4" />
+										Tolak & Minta Revisi
+									</Button>
+								)}
+
+								<Button
+									type="button"
+									variant="outline"
+									onClick={() => {
+										const id = editStatusReq.id;
+										setEditStatusReq(null);
+										handleResetStatus(id);
+									}}
+									className="w-full border-slate-300 text-slate-700 hover:bg-slate-100 text-xs h-9 justify-start px-4 gap-2"
+								>
+									<RotateCcw className="w-4 h-4 text-slate-500" />
+									Kembalikan ke Status &quot;Menunggu&quot;
+								</Button>
+							</div>
+						</div>
+					)}
+
+					<DialogFooter>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => setEditStatusReq(null)}
+							className="text-xs h-8"
+						>
+							Batal
 						</Button>
 					</DialogFooter>
 				</DialogContent>
