@@ -34,7 +34,7 @@ export const paRouter = new Elysia({ prefix: "/pa" })
 			allStudents = allStudents.filter(
 				(s) =>
 					s.student.name.toLowerCase().includes(lowerQuery) ||
-					s.student.nim.toLowerCase().includes(lowerQuery) ||
+					(s.student.nim && s.student.nim.toLowerCase().includes(lowerQuery)) ||
 					s.student.program.toLowerCase().includes(lowerQuery),
 			);
 		}

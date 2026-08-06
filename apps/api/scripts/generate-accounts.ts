@@ -24,7 +24,7 @@ async function run() {
 		const [newUser] = await db
 			.insert(users)
 			.values({
-				username: s.nim,
+				username: s.nim || s.email || `mhs_${s.id}`,
 				passwordHash,
 				fullName: s.name,
 				role: "mahasiswa",

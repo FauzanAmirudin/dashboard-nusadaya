@@ -31,6 +31,8 @@ import {
 	pmbFeeDisbursements,
 	pmbPaymentPlan,
 	postInternshipDocs,
+	studentHealth,
+	studentParents,
 	students,
 	users,
 	vocabLogs,
@@ -80,35 +82,115 @@ export const coreRoutes = new Elysia()
 				return { success: false, message: "Forbidden" };
 			}
 
-			// Validate unique nim
-			const existing = await db.query.students.findFirst({
-				where: eq(students.nim, body.nim),
-			});
-			if (existing) {
-				set.status = 400;
-				return { success: false, message: "NIM sudah terdaftar" };
+			// 1. Validasi email & nim
+			if (body.nim) {
+				const existingNim = await db.query.students.findFirst({
+					where: eq(students.nim, body.nim),
+				});
+				if (existingNim) {
+					set.status = 400;
+					return { success: false, message: "NIM sudah terdaftar" };
+				}
+			}
+			if (body.email) {
+				const existingEmail = await db.query.students.findFirst({
+					where: eq(students.email, body.email),
+				});
+				if (existingEmail) {
+					set.status = 400;
+					return { success: false, message: "Email sudah terdaftar" };
+				}
 			}
 
-			// Insert student
+			// 2. Buat User Account untuk Mahasiswa
+			const passwordHash = await Bun.password.hash("nusadaya123"); // Default password
+			const [newUser] = await db
+				.insert(users)
+				.values({
+					username: body.nim || body.email, // Username pakai NIM atau Email jika kosong
+					passwordHash,
+					fullName: body.name,
+					role: "mahasiswa",
+				})
+				.returning();
+
+			// 3. Insert student
 			const [newStudent] = await db
 				.insert(students)
 				.values({
-					nim: body.nim,
+					nim: body.nim || null,
 					name: body.name,
+					nickname: body.nickname,
 					cohort: body.cohort,
 					program: body.program,
 					subProgram: body.subProgram,
+					birthPlace: body.birthPlace,
+					birthDate: body.birthDate ? new Date(body.birthDate) : null,
+					gender: body.gender,
+					religion: body.religion,
+					nationality: body.nationality,
+					addressStreet: body.addressStreet,
+					addressRt: body.addressRt,
+					addressRw: body.addressRw,
+					addressNo: body.addressNo,
+					addressVillage: body.addressVillage,
+					addressDistrict: body.addressDistrict,
+					addressCity: body.addressCity,
+					addressProvince: body.addressProvince,
+					livingWith: body.livingWith,
+					schoolOrigin: body.schoolOrigin,
+					schoolAddress: body.schoolAddress,
+					schoolMajor: body.schoolMajor,
+					graduationYear: body.graduationYear,
+					classType: body.classType,
+					academicYear: body.academicYear,
+					batch: body.batch,
 					phone: body.phone,
-					parentName: body.parentName,
+					email: body.email,
+					profilePhotoUrl: body.profilePhotoUrl,
 					paId: body.paId,
 					studentStatus: body.studentStatus || "aktif",
 					destinationCountry: body.destinationCountry,
 					period: body.period,
+					studentUserId: newUser.id, // Relasi ke akun login
 				})
 				.returning();
 
-			// Initialize related panels
 			const studentId = newStudent.id;
+
+			// 4. Insert Student Health
+			await db.insert(studentHealth).values({
+				studentId,
+				bloodType: body.bloodType,
+				diseaseHistory: body.diseaseHistory,
+				congenitalDisease: body.congenitalDisease,
+				height: body.height,
+				weight: body.weight,
+				clothingSize: body.clothingSize,
+			});
+
+			// 5. Insert Student Parents (Ayah, Ibu, Wali)
+			if (body.parents && body.parents.length > 0) {
+				const parentInserts = body.parents.map((p: any) => ({
+					studentId,
+					type: p.type,
+					name: p.name,
+					birthPlace: p.birthPlace,
+					birthDate: p.birthDate ? new Date(p.birthDate) : null,
+					religion: p.religion,
+					nationality: p.nationality,
+					education: p.education,
+					job: p.job,
+					address: p.address,
+					phone: p.phone,
+					email: p.email,
+					status: p.status,
+					guardianRelation: p.guardianRelation,
+				}));
+				await db.insert(studentParents).values(parentInserts);
+			}
+
+			// 6. Initialize related panels
 			await Promise.all([
 				db.insert(pmbData).values({
 					studentId,
@@ -128,17 +210,82 @@ export const coreRoutes = new Elysia()
 				db.insert(finalDecision).values({ studentId }),
 			]);
 
+			// 7. Catat di auditLogs
+			await db.insert(auditLogs).values({
+				userId: user.id,
+				action: "CREATE_STUDENT",
+				entity: "students",
+				entityId: studentId,
+				details: { nim: newStudent.nim, name: newStudent.name },
+			});
+
 			return { success: true, data: newStudent };
 		},
 		{
 			body: t.Object({
-				nim: t.String(),
+				// Tab 1
+				nim: t.Optional(t.String()),
 				name: t.String(),
-				cohort: t.Number(),
+				nickname: t.Optional(t.String()),
+				gender: t.Optional(t.String()),
+				birthPlace: t.Optional(t.String()),
+				birthDate: t.Optional(t.String()), // ISO string
+				religion: t.Optional(t.String()),
+				nationality: t.Optional(t.String()),
+				addressStreet: t.Optional(t.String()),
+				addressRt: t.Optional(t.String()),
+				addressRw: t.Optional(t.String()),
+				addressNo: t.Optional(t.String()),
+				addressVillage: t.Optional(t.String()),
+				addressDistrict: t.Optional(t.String()),
+				addressCity: t.Optional(t.String()),
+				addressProvince: t.Optional(t.String()),
+				livingWith: t.Optional(t.String()),
+				phone: t.Optional(t.String()),
+				email: t.Optional(t.String()),
+				profilePhotoUrl: t.Optional(t.String()),
+
+				// Tab 2
+				schoolOrigin: t.Optional(t.String()),
+				schoolAddress: t.Optional(t.String()),
+				schoolMajor: t.Optional(t.String()),
+				graduationYear: t.Optional(t.Number()),
 				program: t.String(),
 				subProgram: t.Optional(t.String()),
-				phone: t.Optional(t.String()),
-				parentName: t.Optional(t.String()),
+				classType: t.Optional(t.String()),
+				batch: t.Optional(t.Number()),
+				academicYear: t.Optional(t.String()),
+				cohort: t.Number(),
+
+				// Tab 3
+				bloodType: t.Optional(t.String()),
+				diseaseHistory: t.Optional(t.String()),
+				congenitalDisease: t.Optional(t.String()),
+				height: t.Optional(t.Number()),
+				weight: t.Optional(t.Number()),
+				clothingSize: t.Optional(t.String()),
+
+				// Tab 4, 5, 6
+				parents: t.Optional(
+					t.Array(
+						t.Object({
+							type: t.String(), // "ayah" | "ibu" | "wali"
+							name: t.Optional(t.String()),
+							birthPlace: t.Optional(t.String()),
+							birthDate: t.Optional(t.String()), // ISO string
+							religion: t.Optional(t.String()),
+							nationality: t.Optional(t.String()),
+							education: t.Optional(t.String()),
+							job: t.Optional(t.String()),
+							address: t.Optional(t.String()),
+							phone: t.Optional(t.String()),
+							email: t.Optional(t.String()),
+							status: t.Optional(t.String()),
+							guardianRelation: t.Optional(t.String()),
+						}),
+					),
+				),
+
 				paId: t.Optional(t.Number()),
 				studentStatus: t.Optional(t.String()),
 				destinationCountry: t.Optional(t.String()),
@@ -276,7 +423,8 @@ export const coreRoutes = new Elysia()
 		const [newUser] = await db
 			.insert(users)
 			.values({
-				username: studentData.nim,
+				username:
+					studentData.nim || studentData.email || `mhs_${studentData.id}`,
 				passwordHash,
 				fullName: studentData.name,
 				role: "mahasiswa",
@@ -435,4 +583,18 @@ export const coreRoutes = new Elysia()
 				courseGrades: grades,
 			},
 		};
+	})
+	.get("/:id/health", async ({ params, set, user }: any) => {
+		const id = parseInt(params.id, 10);
+		const data = await db.query.studentHealth.findFirst({
+			where: eq(studentHealth.studentId, id),
+		});
+		return { success: true, data };
+	})
+	.get("/:id/parents", async ({ params, set, user }: any) => {
+		const id = parseInt(params.id, 10);
+		const data = await db.query.studentParents.findMany({
+			where: eq(studentParents.studentId, id),
+		});
+		return { success: true, data };
 	});

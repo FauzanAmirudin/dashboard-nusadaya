@@ -35,12 +35,9 @@ export default function MahasiswaProfil() {
 
 	// Form states
 	const [phone, setPhone] = useState("");
-	const [nik, setNik] = useState("");
-	const [nisn, setNisn] = useState("");
 	const [birthPlace, setBirthPlace] = useState("");
 	const [birthDate, setBirthDate] = useState("");
 	const [gender, setGender] = useState("");
-	const [address, setAddress] = useState("");
 	const [schoolOrigin, setSchoolOrigin] = useState("");
 
 	const [parentName, setParentName] = useState("");
@@ -64,12 +61,9 @@ export default function MahasiswaProfil() {
 
 				// Populate form
 				setPhone(data?.phone || "");
-				setNik(data?.nik || "");
-				setNisn(data?.nisn || "");
 				setBirthPlace(data?.birthPlace || "");
 				setBirthDate(data?.birthDate ? data.birthDate.split("T")[0] : "");
 				setGender(data?.gender || "");
-				setAddress(data?.address || "");
 				setSchoolOrigin(data?.schoolOrigin || "");
 
 				setParentName(data?.parentName || "");
@@ -87,12 +81,9 @@ export default function MahasiswaProfil() {
 		try {
 			const res = await api.mahasiswa.profil.patch({
 				phone,
-				nik,
-				nisn,
 				birthPlace,
 				birthDate: birthDate ? new Date(birthDate).toISOString() : undefined,
 				gender,
-				address,
 				schoolOrigin,
 				parentName,
 				parentJob,
@@ -276,24 +267,7 @@ export default function MahasiswaProfil() {
 							Informasi Pribadi
 						</h3>
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-							<div className="space-y-2">
-								<Label>Nomor Induk Kependudukan (NIK)</Label>
-								<Input
-									value={nik}
-									onChange={(e) => setNik(e.target.value)}
-									placeholder="16 digit NIK KTP"
-									maxLength={16}
-								/>
-							</div>
-							<div className="space-y-2">
-								<Label>NISN (Nomor Induk Siswa Nasional)</Label>
-								<Input
-									value={nisn}
-									onChange={(e) => setNisn(e.target.value)}
-									placeholder="NISN Anda"
-								/>
-							</div>
-							<div className="grid grid-cols-2 gap-4">
+							<div className="grid grid-cols-2 gap-4 md:col-span-2">
 								<div className="space-y-2">
 									<Label>Tempat Lahir</Label>
 									<Input
@@ -340,15 +314,6 @@ export default function MahasiswaProfil() {
 									value={schoolOrigin}
 									onChange={(e) => setSchoolOrigin(e.target.value)}
 									placeholder="Nama sekolah asal"
-								/>
-							</div>
-							<div className="md:col-span-2 space-y-2">
-								<Label>Alamat Lengkap Sesuai KTP</Label>
-								<Textarea
-									value={address}
-									onChange={(e) => setAddress(e.target.value)}
-									placeholder="Jalan, RT/RW, Desa/Kelurahan, Kecamatan, Kota/Kabupaten, Provinsi, Kode Pos"
-									className="resize-none h-20"
 								/>
 							</div>
 						</div>

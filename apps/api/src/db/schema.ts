@@ -71,22 +71,40 @@ export const users = pgTable("users", {
 // 2. Students
 export const students = pgTable("students", {
 	id: serial("id").primaryKey(),
-	nim: text("nim").unique().notNull(),
+	nim: text("nim").unique(),
 	name: text("name").notNull(),
+	nickname: text("nickname"), // Nama panggilan
 	cohort: integer("cohort").notNull(),
 	program: text("program").notNull(),
 	subProgram: text("sub_program"),
 
 	// New fields
-	nik: text("nik"),
-	nisn: text("nisn"),
 	birthPlace: text("birth_place"),
 	birthDate: timestamp("birth_date"),
 	gender: text("gender"), // Laki-laki / Perempuan
-	address: text("address"),
+	religion: text("religion"),
+	nationality: text("nationality"), // Indonesia / Lainnya
+
+	// Alamat Granular
+	addressStreet: text("address_street"),
+	addressRt: text("address_rt"),
+	addressRw: text("address_rw"),
+	addressNo: text("address_no"),
+	addressVillage: text("address_village"),
+	addressDistrict: text("address_district"),
+	addressCity: text("address_city"),
+	addressProvince: text("address_province"),
+	livingWith: text("living_with"), // Orang tua / Wali / Sendiri (Kos)
 	schoolOrigin: text("school_origin"),
+	schoolAddress: text("school_address"),
+	schoolMajor: text("school_major"),
+	graduationYear: integer("graduation_year"),
+	classType: text("class_type"), // Online-LMS / Offline
+	academicYear: text("academic_year"),
+	batch: integer("batch"),
 
 	phone: text("phone"),
+	email: text("email"),
 	parentName: text("parent_name"),
 	parentJob: text("parent_job"),
 	parentIncome: text("parent_income"),
@@ -100,6 +118,45 @@ export const students = pgTable("students", {
 	overallStatus: statusEnum("overall_status").default("AMAN"),
 	isArchived: boolean("is_archived").default(false),
 	studentUserId: integer("student_user_id").references(() => users.id),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 2a. Student Health
+export const studentHealth = pgTable("student_health", {
+	id: serial("id").primaryKey(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull()
+		.unique(),
+	bloodType: text("blood_type"),
+	diseaseHistory: text("disease_history"),
+	congenitalDisease: text("congenital_disease"),
+	height: integer("height"),
+	weight: integer("weight"),
+	clothingSize: text("clothing_size"),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// 2b. Student Parents / Guardians
+export const studentParents = pgTable("student_parents", {
+	id: serial("id").primaryKey(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
+	type: text("type").notNull(), // "ayah" | "ibu" | "wali"
+	name: text("name"),
+	birthPlace: text("birth_place"),
+	birthDate: timestamp("birth_date"),
+	religion: text("religion"),
+	nationality: text("nationality"),
+	education: text("education"),
+	job: text("job"),
+	address: text("address"),
+	phone: text("phone"),
+	email: text("email"),
+	status: text("status"), // "Hidup" | "Meninggal" (Untuk Ayah/Ibu)
+	guardianRelation: text("guardian_relation"), // Hubungan dengan mahasiswa (Khusus Wali)
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1093,10 +1150,29 @@ export const internalNotesRelations = relations(internalNotes, ({ one }) => ({
 	}),
 }));
 
-export const studentsRelations = relations(students, ({ one }) => ({
+export const studentsRelations = relations(students, ({ one, many }) => ({
 	pa: one(users, {
 		fields: [students.paId],
 		references: [users.id],
+	}),
+	health: one(studentHealth, {
+		fields: [students.id],
+		references: [studentHealth.studentId],
+	}),
+	parents: many(studentParents),
+}));
+
+export const studentParentsRelations = relations(studentParents, ({ one }) => ({
+	student: one(students, {
+		fields: [studentParents.studentId],
+		references: [students.id],
+	}),
+}));
+
+export const studentHealthRelations = relations(studentHealth, ({ one }) => ({
+	student: one(students, {
+		fields: [studentHealth.studentId],
+		references: [students.id],
 	}),
 }));
 
