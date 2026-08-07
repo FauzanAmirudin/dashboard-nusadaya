@@ -32,6 +32,9 @@ export const studentStatusEnum = pgEnum("student_status", [
 	"cuti",
 	"alumni",
 	"keluar",
+	"dropout",
+	"mengundurkan_diri",
+	"lulus",
 ]);
 
 export const statusEnum = pgEnum("status", [

@@ -299,6 +299,217 @@ export const coreRoutes = new Elysia()
 			}),
 		},
 	)
+	.put(
+		"/:id",
+		async ({ params, body, set, user }: any) => {
+			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const id = parseInt(params.id, 10);
+
+			// 1. Validasi email & nim (kalau berubah)
+			if (body.nim) {
+				const existingNim = await db.query.students.findFirst({
+					where: eq(students.nim, body.nim),
+				});
+				if (existingNim && existingNim.id !== id) {
+					set.status = 400;
+					return { success: false, message: "NIM sudah terdaftar" };
+				}
+			}
+			if (body.email) {
+				const existingEmail = await db.query.students.findFirst({
+					where: eq(students.email, body.email),
+				});
+				if (existingEmail && existingEmail.id !== id) {
+					set.status = 400;
+					return { success: false, message: "Email sudah terdaftar" };
+				}
+			}
+
+			// 2. Update student
+			await db
+				.update(students)
+				.set({
+					nim: body.nim || null,
+					name: body.name,
+					nickname: body.nickname,
+					cohort: body.cohort,
+					program: body.program,
+					subProgram: body.subProgram,
+					birthPlace: body.birthPlace,
+					birthDate: body.birthDate ? new Date(body.birthDate) : null,
+					gender: body.gender,
+					religion: body.religion,
+					nationality: body.nationality,
+					addressStreet: body.addressStreet,
+					addressRt: body.addressRt,
+					addressRw: body.addressRw,
+					addressNo: body.addressNo,
+					addressVillage: body.addressVillage,
+					addressDistrict: body.addressDistrict,
+					addressCity: body.addressCity,
+					addressProvince: body.addressProvince,
+					livingWith: body.livingWith,
+					schoolOrigin: body.schoolOrigin,
+					schoolAddress: body.schoolAddress,
+					schoolMajor: body.schoolMajor,
+					graduationYear: body.graduationYear,
+					classType: body.classType,
+					academicYear: body.academicYear,
+					batch: body.batch,
+					phone: body.phone,
+					email: body.email,
+					profilePhotoUrl: body.profilePhotoUrl,
+					paId: body.paId,
+					studentStatus: body.studentStatus || "aktif",
+					destinationCountry: body.destinationCountry,
+					period: body.period,
+					updatedAt: new Date(),
+				})
+				.where(eq(students.id, id));
+
+			// 3. Update Student Health
+			await db
+				.update(studentHealth)
+				.set({
+					bloodType: body.bloodType,
+					diseaseHistory: body.diseaseHistory,
+					congenitalDisease: body.congenitalDisease,
+					height: body.height,
+					weight: body.weight,
+					clothingSize: body.clothingSize,
+					updatedAt: new Date(),
+				})
+				.where(eq(studentHealth.studentId, id));
+
+			// 4. Update Student Parents (Ayah, Ibu, Wali)
+			await db.delete(studentParents).where(eq(studentParents.studentId, id));
+
+			if (body.parents && body.parents.length > 0) {
+				const parentInserts = body.parents.map((p: any) => ({
+					studentId: id,
+					type: p.type,
+					name: p.name,
+					birthPlace: p.birthPlace,
+					birthDate: p.birthDate ? new Date(p.birthDate) : null,
+					religion: p.religion,
+					nationality: p.nationality,
+					education: p.education,
+					job: p.job,
+					address: p.address,
+					phone: p.phone,
+					email: p.email,
+					status: p.status,
+					guardianRelation: p.guardianRelation,
+				}));
+				await db.insert(studentParents).values(parentInserts);
+			}
+
+			// 5. Update PMB Data
+			await db
+				.update(pmbData)
+				.set({
+					rekomendasi: body.rekomendasi,
+					timVisit: body.timVisit,
+					timSosialisasi: body.timSosialisasi,
+					roReferral: body.roReferral,
+					mitraSponsor: body.mitraSponsor,
+					koordinator: body.koordinator,
+					updatedAt: new Date(),
+				})
+				.where(eq(pmbData.studentId, id));
+
+			// 6. Catat di auditLogs
+			await db.insert(auditLogs).values({
+				userId: user.id,
+				action: "UPDATE_STUDENT",
+				entity: "students",
+				entityId: id,
+				details: { nim: body.nim, name: body.name },
+			});
+
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				// Tab 1
+				nim: t.Optional(t.String()),
+				name: t.String(),
+				nickname: t.Optional(t.String()),
+				gender: t.Optional(t.String()),
+				birthPlace: t.Optional(t.String()),
+				birthDate: t.Optional(t.String()),
+				religion: t.Optional(t.String()),
+				nationality: t.Optional(t.String()),
+				addressStreet: t.Optional(t.String()),
+				addressRt: t.Optional(t.String()),
+				addressRw: t.Optional(t.String()),
+				addressNo: t.Optional(t.String()),
+				addressVillage: t.Optional(t.String()),
+				addressDistrict: t.Optional(t.String()),
+				addressCity: t.Optional(t.String()),
+				addressProvince: t.Optional(t.String()),
+				livingWith: t.Optional(t.String()),
+				phone: t.Optional(t.String()),
+				email: t.Optional(t.String()),
+				profilePhotoUrl: t.Optional(t.String()),
+
+				// Tab 2
+				schoolOrigin: t.Optional(t.String()),
+				schoolAddress: t.Optional(t.String()),
+				schoolMajor: t.Optional(t.String()),
+				graduationYear: t.Optional(t.Number()),
+				program: t.String(),
+				subProgram: t.Optional(t.String()),
+				classType: t.Optional(t.String()),
+				batch: t.Optional(t.Number()),
+				academicYear: t.Optional(t.String()),
+				cohort: t.Number(),
+
+				// Tab 3
+				bloodType: t.Optional(t.String()),
+				diseaseHistory: t.Optional(t.String()),
+				congenitalDisease: t.Optional(t.String()),
+				height: t.Optional(t.Number()),
+				weight: t.Optional(t.Number()),
+				clothingSize: t.Optional(t.String()),
+
+				// Tab 4, 5, 6
+				parents: t.Optional(
+					t.Array(
+						t.Object({
+							type: t.String(),
+							name: t.Optional(t.String()),
+							birthPlace: t.Optional(t.String()),
+							birthDate: t.Optional(t.String()),
+							religion: t.Optional(t.String()),
+							nationality: t.Optional(t.String()),
+							education: t.Optional(t.String()),
+							job: t.Optional(t.String()),
+							address: t.Optional(t.String()),
+							phone: t.Optional(t.String()),
+							email: t.Optional(t.String()),
+							status: t.Optional(t.String()),
+							guardianRelation: t.Optional(t.String()),
+						}),
+					),
+				),
+
+				paId: t.Optional(t.Number()),
+				studentStatus: t.Optional(t.String()),
+				destinationCountry: t.Optional(t.String()),
+				period: t.Optional(t.String()),
+				rekomendasi: t.Optional(t.String()),
+				timVisit: t.Optional(t.String()),
+				timSosialisasi: t.Optional(t.String()),
+				roReferral: t.Optional(t.String()),
+				mitraSponsor: t.Optional(t.String()),
+				koordinator: t.Optional(t.String()),
+			}),
+		},
+	)
 	.patch(
 		"/:id",
 		async ({ params, body, set, user }: any) => {
@@ -532,6 +743,7 @@ export const coreRoutes = new Elysia()
 			internship,
 			decision,
 			grades,
+			parents,
 		] = await Promise.all([
 			db.query.pmbData.findFirst({
 				where: eq(pmbData.studentId, id),
@@ -567,6 +779,9 @@ export const coreRoutes = new Elysia()
 				where: eq(courseGrades.studentId, id),
 				with: { accBy: { columns: { fullName: true } } },
 			}),
+			db.query.studentParents.findMany({
+				where: eq(studentParents.studentId, id),
+			}),
 		]);
 
 		return {
@@ -581,6 +796,7 @@ export const coreRoutes = new Elysia()
 				internship,
 				decision,
 				courseGrades: grades,
+				parents,
 			},
 		};
 	})
@@ -597,4 +813,92 @@ export const coreRoutes = new Elysia()
 			where: eq(studentParents.studentId, id),
 		});
 		return { success: true, data };
-	});
+	})
+	// GET list of all PA users (for dropdown)
+	.get("/pa-list", async ({ set, user }: any) => {
+		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+		const paUsers = await db
+			.select({ id: users.id, fullName: users.fullName })
+			.from(users)
+			.where(eq(users.role, "pa"));
+		return { success: true, data: paUsers };
+	})
+	// PATCH student status
+	.patch(
+		"/:id/student-status",
+		async ({ params, body, set, user }: any) => {
+			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const id = parseInt(params.id, 10);
+			await db
+				.update(students)
+				.set({ studentStatus: body.studentStatus, updatedAt: new Date() })
+				.where(eq(students.id, id));
+			return { success: true, message: "Status mahasiswa berhasil diperbarui" };
+		},
+		{
+			body: t.Object({
+				studentStatus: t.String(),
+			}),
+		},
+	)
+	// PATCH student NIM
+	.patch(
+		"/:id/nim",
+		async ({ params, body, set, user }: any) => {
+			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const id = parseInt(params.id, 10);
+			// Check for duplicate NIM (exclude self)
+			if (body.nim) {
+				const existing = await db.query.students.findFirst({
+					where: eq(students.nim, body.nim),
+				});
+				if (existing && existing.id !== id) {
+					set.status = 400;
+					return {
+						success: false,
+						message: "NIM sudah digunakan oleh mahasiswa lain",
+					};
+				}
+			}
+			await db
+				.update(students)
+				.set({ nim: body.nim || null, updatedAt: new Date() })
+				.where(eq(students.id, id));
+			return { success: true, message: "NIM mahasiswa berhasil diperbarui" };
+		},
+		{
+			body: t.Object({
+				nim: t.Optional(t.String()),
+			}),
+		},
+	)
+	// PATCH student PA assignment
+	.patch(
+		"/:id/pa",
+		async ({ params, body, set, user }: any) => {
+			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const id = parseInt(params.id, 10);
+			await db
+				.update(students)
+				.set({ paId: body.paId ?? null, updatedAt: new Date() })
+				.where(eq(students.id, id));
+			return { success: true, message: "PA mahasiswa berhasil diperbarui" };
+		},
+		{
+			body: t.Object({
+				paId: t.Optional(t.Nullable(t.Number())),
+			}),
+		},
+	);

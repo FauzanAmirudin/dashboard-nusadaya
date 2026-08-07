@@ -61,12 +61,15 @@ type StudentDetail = {
 		birthPlace?: string | null;
 		birthDate?: string | Date | null;
 		gender?: string | null;
-		address?: string | null;
+		addressStreet?: string | null;
+		addressRt?: string | null;
+		addressRw?: string | null;
+		addressNo?: string | null;
+		addressVillage?: string | null;
+		addressDistrict?: string | null;
+		addressCity?: string | null;
+		addressProvince?: string | null;
 		schoolOrigin?: string | null;
-		parentName?: string | null;
-		parentJob?: string | null;
-		parentIncome?: string | null;
-		parentPhone?: string | null;
 		paId?: number | null;
 		studentStatus?: string | null;
 		destinationCountry?: string | null;
@@ -116,6 +119,7 @@ type StudentDetail = {
 		accAt?: string | Date | null;
 		accByUser?: { fullName: string } | null;
 	} | null;
+	parents?: any[];
 };
 
 const STATUS_COLORS = {
@@ -355,6 +359,25 @@ function StudentDetailContent() {
 			.toUpperCase();
 	};
 
+	const formatAddress = (s: any) => {
+		const parts = [];
+		if (s.addressStreet) parts.push(s.addressStreet);
+		if (s.addressRt || s.addressRw) {
+			parts.push(`RT ${s.addressRt || "-"}/RW ${s.addressRw || "-"}`);
+		}
+		if (s.addressNo) parts.push(`No. ${s.addressNo}`);
+		if (s.addressVillage) parts.push(s.addressVillage);
+		if (s.addressDistrict) parts.push(s.addressDistrict);
+		if (s.addressCity) parts.push(s.addressCity);
+		if (s.addressProvince) parts.push(s.addressProvince);
+		return parts.length > 0 ? parts.join(", ") : "-";
+	};
+
+	const primaryParent =
+		data.parents?.find((p: any) => p.type === "ayah") ||
+		data.parents?.find((p: any) => p.type === "ibu") ||
+		data.parents?.find((p: any) => p.type === "wali");
+
 	const visibleLinks = NAV_LINKS.filter((link) => {
 		if (!mounted || !user?.role || !link.roles.includes(user.role))
 			return false;
@@ -444,7 +467,15 @@ function StudentDetailContent() {
 					<ArrowLeft className="w-4 h-4" />
 					Kembali ke Daftar
 				</Link>
-				<div className="flex gap-3">
+				<div className="flex flex-wrap gap-3">
+					<Button
+						onClick={() =>
+							router.push(`/dashboard/students/${params.id}/profile`)
+						}
+						className="bg-[#0517B0] text-white hover:bg-[#04128A]"
+					>
+						Lihat Detail Profil
+					</Button>
 					{user?.role === "superadmin" && (
 						<Button
 							variant="outline"
@@ -545,7 +576,9 @@ function StudentDetailContent() {
 								<div>
 									<span className="text-slate-500 block text-xs">Tujuan</span>{" "}
 									<span className="font-medium">
-										{s.destinationCountry || "-"} ({s.period || "-"})
+										{s.destinationCountry
+											? `${s.destinationCountry} ${s.period ? `(${s.period})` : ""}`
+											: "-"}
 									</span>
 								</div>
 
@@ -579,7 +612,7 @@ function StudentDetailContent() {
 
 								<div className="col-span-2 md:col-span-4">
 									<span className="text-slate-500 block text-xs">Alamat</span>{" "}
-									<span className="font-medium">{s.address || "-"}</span>
+									<span className="font-medium">{formatAddress(s)}</span>
 								</div>
 
 								<div>
@@ -592,28 +625,36 @@ function StudentDetailContent() {
 									<span className="text-slate-500 block text-xs">
 										Nama Ortu
 									</span>{" "}
-									<span className="font-medium">{s.parentName || "-"}</span>
+									<span className="font-medium">
+										{primaryParent?.name || "-"}
+									</span>
 								</div>
 								<div>
 									<span className="text-slate-500 block text-xs">
 										Pekerjaan / Penghasilan Ortu
 									</span>{" "}
 									<span className="font-medium">
-										{s.parentJob || "-"} / {s.parentIncome || "-"}
+										{primaryParent?.job || "-"} / {primaryParent?.income || "-"}
 									</span>
 								</div>
 								<div>
 									<span className="text-slate-500 block text-xs">
 										No HP Ortu
 									</span>{" "}
-									<span className="font-medium">{s.parentPhone || "-"}</span>
+									<span className="font-medium">
+										{primaryParent?.phone || "-"}
+									</span>
 								</div>
 							</div>
 						</div>
 					</div>
 
 					{/* Progress Overview */}
-					<StudentProgress studentId={s.id} updateTrigger={updateTrigger} />
+					<StudentProgress
+						studentId={s.id}
+						updateTrigger={updateTrigger}
+						userRole={user?.role}
+					/>
 				</div>
 
 				{/* Anchor Navigation */}
@@ -655,6 +696,11 @@ function StudentDetailContent() {
 									<PmbPanel
 										studentId={s.id}
 										pmbData={data.pmb}
+										studentData={{
+											nim: s.nim,
+											studentStatus: s.studentStatus,
+											paId: s.paId,
+										}}
 										onUpdate={refetchStudent}
 									/>
 								) : currentLink.id === "crm" ? (

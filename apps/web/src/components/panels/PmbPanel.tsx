@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, DollarSign, Home, Users } from "lucide-react";
+import { CheckCircle2, ClipboardList, DollarSign, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,13 +8,18 @@ import { API_URL, getToken } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 
 import { TabChecklist } from "./pmb/TabChecklist";
+import { TabDataTambahan } from "./pmb/TabDataTambahan";
 import { TabFeeSharing } from "./pmb/TabFeeSharing";
-import { TabRumahJuang } from "./pmb/TabRumahJuang";
 import { TabSkemaKeuangan } from "./pmb/TabSkemaKeuangan";
 
 interface PmbPanelProps {
 	studentId: number;
 	pmbData: any;
+	studentData?: {
+		nim?: string | null;
+		studentStatus?: string | null;
+		paId?: number | null;
+	};
 	onUpdate: () => void;
 }
 
@@ -29,12 +34,18 @@ interface DocFile {
 	verifiedByUser?: { fullName: string } | null;
 }
 
-export function PmbPanel({ studentId, pmbData, onUpdate }: PmbPanelProps) {
+export function PmbPanel({
+	studentId,
+	pmbData,
+	studentData,
+	onUpdate,
+}: PmbPanelProps) {
 	const { user } = useAuthStore();
 	const isPmbAdmin = user?.role === "pmb" || user?.role === "superadmin";
 	const canEdit = isPmbAdmin;
 
 	const [documents, setDocuments] = useState<Record<string, DocFile[]>>({});
+	const [activeTab, setActiveTab] = useState("data-tambahan");
 
 	const fetchDocuments = async () => {
 		try {
@@ -99,7 +110,7 @@ export function PmbPanel({ studentId, pmbData, onUpdate }: PmbPanelProps) {
 						</h3>
 						<p className="text-xs text-slate-500">
 							Kelola checklist pendaftaran, skema biaya, penerima fee sharing,
-							dan Rumah Juang
+							dan data tambahan mahasiswa
 						</p>
 					</div>
 				</div>
@@ -112,14 +123,25 @@ export function PmbPanel({ studentId, pmbData, onUpdate }: PmbPanelProps) {
 			</div>
 
 			{/* Tabs Container */}
-			<Tabs defaultValue="checklist" className="w-full space-y-4">
+			<Tabs
+				value={activeTab}
+				onValueChange={setActiveTab}
+				className="w-full space-y-4"
+			>
 				<TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 bg-slate-100 p-1.5 rounded-xl border border-slate-200 h-auto gap-1">
+					<TabsTrigger
+						value="data-tambahan"
+						className="flex items-center justify-center gap-2 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
+					>
+						<ClipboardList className="w-4 h-4 text-rose-600" />
+						Data Tambahan
+					</TabsTrigger>
 					<TabsTrigger
 						value="checklist"
 						className="flex items-center justify-center gap-2 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
 					>
 						<CheckCircle2 className="w-4 h-4 text-emerald-600" />
-						Checklist & Akuisisi
+						Dokumen Mahasiswa
 					</TabsTrigger>
 					<TabsTrigger
 						value="finance"
@@ -134,13 +156,6 @@ export function PmbPanel({ studentId, pmbData, onUpdate }: PmbPanelProps) {
 					>
 						<Users className="w-4 h-4 text-amber-600" />
 						Fee Sharing
-					</TabsTrigger>
-					<TabsTrigger
-						value="rumah-juang"
-						className="flex items-center justify-center gap-2 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
-					>
-						<Home className="w-4 h-4 text-rose-600" />
-						Rumah Juang
 					</TabsTrigger>
 				</TabsList>
 
@@ -172,9 +187,10 @@ export function PmbPanel({ studentId, pmbData, onUpdate }: PmbPanelProps) {
 					/>
 				</TabsContent>
 
-				<TabsContent value="rumah-juang">
-					<TabRumahJuang
+				<TabsContent value="data-tambahan">
+					<TabDataTambahan
 						studentId={studentId}
+						studentData={studentData ?? {}}
 						pmbData={pmbData}
 						canEdit={canEdit}
 						onUpdate={onUpdate}

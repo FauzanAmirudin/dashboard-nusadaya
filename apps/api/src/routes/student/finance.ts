@@ -161,11 +161,12 @@ export const financeRoutes = new Elysia()
 				where: eq(financeData.studentId, id),
 			});
 			if (updated) {
-				const checked = 0;
-				// 				if (updated.registrationPaid) checked++;
-				// 				if (updated.semesterPaid) checked++;
-				// 				if (updated.installmentCleared) checked++;
-				// 				if (updated.arrearsCleared) checked++;
+				const checked: number = 0;
+				// TODO: Sesuaikan dengan schema financeData yang baru
+				// if (updated.registrasiStatus) checked++;
+				// if (updated.mandiriSemesterStatus) checked++;
+				// if (updated.mandiriInterviewStatus) checked++;
+				// if (updated.mandiriKeberangkatanStatus) checked++;
 
 				let status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
 				if (checked === 4) status = "AMAN";

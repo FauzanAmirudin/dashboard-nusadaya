@@ -252,6 +252,46 @@ export function TabChecklist({
 						))}
 					</CardContent>
 				</Card>
+
+				<Card className="border border-slate-200 shadow-sm">
+					<CardHeader className="bg-slate-50 border-b border-slate-100 py-3.5 px-4">
+						<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
+							<FileText className="w-4 h-4 text-indigo-600" />
+							Dokumen Mahasiswa Tambahan
+						</CardTitle>
+					</CardHeader>
+					<CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+						{[
+							{ key: "ktp", label: "KTP" },
+							{ key: "kk", label: "Kartu Keluarga (KK)" },
+							{ key: "cv", label: "Curriculum Vitae (CV)" },
+							{ key: "ijazah", label: "Ijazah Terakhir" },
+							{ key: "transkrip", label: "Transkrip Nilai Ijazah" },
+							{ key: "passport_depan", label: "Passport (Halaman Depan)" },
+							{ key: "passport_visa", label: "Passport (Halaman Visa)" },
+							{ key: "skbm", label: "Surat Keterangan Belum Menikah" },
+							{ key: "mcu", label: "Hasil Pre Medical Checkup" },
+							{ key: "sertifikasi_bahasa", label: "Sertifikasi Bahasa" },
+						].map((doc) => (
+							<div
+								key={doc.key}
+								className="p-3 rounded-lg border border-slate-200 bg-white"
+							>
+								<label className="text-xs font-semibold text-slate-700 mb-2 block flex items-center gap-1.5">
+									<FileText className="w-3.5 h-3.5 text-slate-400" />
+									{doc.label}
+								</label>
+								<DocumentUpload
+									studentId={studentId}
+									panel="pmb"
+									documentKey={doc.key}
+									onUploadSuccess={fetchDocuments}
+									canEdit={canEdit}
+								/>
+							</div>
+						))}
+					</CardContent>
+				</Card>
 			</div>
 
 			{/* Akuisisi & Catatan Section */}

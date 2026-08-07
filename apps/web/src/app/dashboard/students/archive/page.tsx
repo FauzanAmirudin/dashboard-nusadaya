@@ -38,6 +38,10 @@ type StudentData = {
 		cohort: number;
 		program: string;
 		overallStatus: string | null;
+		batch?: number | null;
+		academicYear?: string | null;
+		subProgram?: string | null;
+		phone?: string | null;
 	};
 	pmb: { status: string | null; isAcc: boolean | null } | null;
 	crm: { status: string | null; isAcc: boolean | null } | null;
@@ -227,30 +231,13 @@ export default function StudentsPage() {
 					<Table>
 						<TableHeader className="border-slate-200">
 							<TableRow className="border-slate-200 hover:bg-transparent">
-								<TableHead className="text-slate-500">NIM</TableHead>
-								<TableHead className="text-slate-500">Nama Lengkap</TableHead>
-								<TableHead className="text-slate-500">Angkatan</TableHead>
-								<TableHead className="text-slate-500 text-center">
-									Status
-								</TableHead>
-								<TableHead className="text-slate-500 text-center">
-									PMB
-								</TableHead>
-								<TableHead className="text-slate-500 text-center">
-									CRM
-								</TableHead>
-								<TableHead className="text-slate-500 text-center">
-									Finance
-								</TableHead>
-								<TableHead className="text-slate-500 text-center">
-									Akademik
-								</TableHead>
-								<TableHead className="text-slate-500 text-center">PA</TableHead>
-								<TableHead className="text-slate-500 text-center">
-									Magang
-								</TableHead>
-								<TableHead className="text-slate-500 text-center">
-									Direktur
+								<TableHead className="text-slate-500">Nama</TableHead>
+								<TableHead className="text-slate-500">Batch</TableHead>
+								<TableHead className="text-slate-500">Tahun Ajaran</TableHead>
+								<TableHead className="text-slate-500">Program Studi</TableHead>
+								<TableHead className="text-slate-500">Peminatan</TableHead>
+								<TableHead className="text-slate-500">
+									No. HP/WhatsApp
 								</TableHead>
 								<TableHead className="text-slate-500 text-right">
 									Aksi
@@ -273,64 +260,16 @@ export default function StudentsPage() {
 											router.push(`/dashboard/students/${s.student.id}`)
 										}
 									>
-										<TableCell className="font-medium text-slate-700">
-											{s.student.nim}
-										</TableCell>
 										<TableCell className="text-slate-900 font-semibold">
 											{s.student.name}
 										</TableCell>
 										<TableCell>
-											<Badge
-												variant="outline"
-												className="text-slate-500 border-slate-200"
-											>
-												{s.student.cohort}
-											</Badge>
+											{s.student.batch ? `Batch ${s.student.batch}` : "-"}
 										</TableCell>
-										<TableCell className="text-center">
-											<Badge
-												className={`${sColor.bg} ${sColor.text} ${sColor.border} border hover:bg-transparent`}
-											>
-												{s.student.overallStatus === "AMAN"
-													? "🟢 Aman"
-													: s.student.overallStatus === "TIDAK_AMAN"
-														? "🔴 Tdk Aman"
-														: "🟡 Perhatian"}
-											</Badge>
-										</TableCell>
-										<TableCell>
-											{renderStatusIcon(s.pmb?.isAcc ? "AMAN" : s.pmb?.status)}
-										</TableCell>
-										<TableCell>
-											{renderStatusIcon(s.crm?.isAcc ? "AMAN" : s.crm?.status)}
-										</TableCell>
-										<TableCell>
-											{renderStatusIcon(
-												s.finance?.isAcc ? "AMAN" : s.finance?.status,
-											)}
-										</TableCell>
-										<TableCell>
-											{renderStatusIcon(
-												s.academic?.isAcc ? "AMAN" : s.academic?.status,
-											)}
-										</TableCell>
-										<TableCell>
-											{renderStatusIcon(s.pa?.isAcc ? "AMAN" : s.pa?.status)}
-										</TableCell>
-										<TableCell>
-											{renderStatusIcon(
-												s.internship?.isAcc ? "AMAN" : s.internship?.status,
-											)}
-										</TableCell>
-										<TableCell className="text-center">
-											{s.decision?.isApprovedByDirector ? (
-												<Badge className="bg-blue-100 text-[#0517B0] hover:bg-blue-100">
-													Sudah
-												</Badge>
-											) : (
-												<span className="text-xs text-slate-500">Belum</span>
-											)}
-										</TableCell>
+										<TableCell>{s.student.academicYear || "-"}</TableCell>
+										<TableCell>{s.student.program || "-"}</TableCell>
+										<TableCell>{s.student.subProgram || "-"}</TableCell>
+										<TableCell>{s.student.phone || "-"}</TableCell>
 										<TableCell className="text-right">
 											<div className="flex justify-end gap-2">
 												<Button

@@ -1,10 +1,13 @@
 "use client";
 
 import {
+	CheckCircle,
+	Clock,
 	CreditCard,
 	Edit2,
 	Eye,
 	Loader2,
+	Megaphone,
 	Plus,
 	Trash2,
 	UploadCloud,
@@ -262,8 +265,70 @@ export function TabFeeSharing({
 		}).format(num);
 	};
 
+	const totalBiayaIklan = feeShareRecipients.reduce(
+		(sum, rec) => sum + (rec.nominalFee || 0),
+		0,
+	);
+	const totalSudahDibayar = feeShareRecipients
+		.filter((rec) => rec.statusPencairan === "sudah_dibayarkan")
+		.reduce((sum, rec) => sum + (rec.nominalFee || 0), 0);
+	const totalBelumDibayar = feeShareRecipients
+		.filter((rec) => rec.statusPencairan !== "sudah_dibayarkan")
+		.reduce((sum, rec) => sum + (rec.nominalFee || 0), 0);
+
 	return (
 		<div className="space-y-6">
+			{/* Summary Cards */}
+			<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+				<Card className="border border-slate-200 shadow-sm bg-gradient-to-br from-amber-50 to-amber-100/50">
+					<CardContent className="p-4 flex items-center gap-4">
+						<div className="p-3 bg-amber-500/10 rounded-xl">
+							<Megaphone className="w-6 h-6 text-amber-600" />
+						</div>
+						<div>
+							<p className="text-xs font-semibold text-slate-500 mb-1">
+								Total Biaya Iklan & Promosi
+							</p>
+							<h3 className="text-lg font-bold text-slate-800">
+								{formatRupiah(totalBiayaIklan)}
+							</h3>
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card className="border border-slate-200 shadow-sm bg-gradient-to-br from-emerald-50 to-emerald-100/50">
+					<CardContent className="p-4 flex items-center gap-4">
+						<div className="p-3 bg-emerald-500/10 rounded-xl">
+							<CheckCircle className="w-6 h-6 text-emerald-600" />
+						</div>
+						<div>
+							<p className="text-xs font-semibold text-slate-500 mb-1">
+								Total Sudah Dibayarkan
+							</p>
+							<h3 className="text-lg font-bold text-emerald-700">
+								{formatRupiah(totalSudahDibayar)}
+							</h3>
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card className="border border-slate-200 shadow-sm bg-gradient-to-br from-rose-50 to-rose-100/50">
+					<CardContent className="p-4 flex items-center gap-4">
+						<div className="p-3 bg-rose-500/10 rounded-xl">
+							<Clock className="w-6 h-6 text-rose-600" />
+						</div>
+						<div>
+							<p className="text-xs font-semibold text-slate-500 mb-1">
+								Total Belum Dibayarkan
+							</p>
+							<h3 className="text-lg font-bold text-rose-700">
+								{formatRupiah(totalBelumDibayar)}
+							</h3>
+						</div>
+					</CardContent>
+				</Card>
+			</div>
+
 			<Card className="border border-slate-200 shadow-sm">
 				<CardHeader className="bg-slate-50 border-b border-slate-100 py-3.5 px-4 flex flex-row items-center justify-between">
 					<div>
@@ -368,7 +433,8 @@ export function TabFeeSharing({
 													</a>
 												</div>
 											) : (
-												canEdit && (
+												canEdit &&
+												rec.statusPencairan !== "sudah_dibayarkan" && (
 													<label className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-amber-600 cursor-pointer border border-dashed border-slate-300 rounded px-2 py-1 bg-slate-50 hover:bg-amber-50/50 transition-colors">
 														{uploadingFeeId === rec.id ? (
 															<Loader2 className="w-3 h-3 animate-spin" />
@@ -407,7 +473,10 @@ export function TabFeeSharing({
 														variant="ghost"
 														size="sm"
 														onClick={() => handleOpenEditModal(rec)}
-														className="h-7 w-7 p-0 text-slate-500 hover:text-[#0517B0]"
+														disabled={
+															rec.statusPencairan === "sudah_dibayarkan"
+														}
+														className="h-7 w-7 p-0 text-slate-500 hover:text-[#0517B0] disabled:opacity-30"
 													>
 														<Edit2 className="w-3.5 h-3.5" />
 													</Button>
@@ -415,7 +484,10 @@ export function TabFeeSharing({
 														variant="ghost"
 														size="sm"
 														onClick={() => setDeletingFeeId(rec.id)}
-														className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600"
+														disabled={
+															rec.statusPencairan === "sudah_dibayarkan"
+														}
+														className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600 disabled:opacity-30"
 													>
 														<Trash2 className="w-3.5 h-3.5" />
 													</Button>
@@ -539,53 +611,91 @@ export function TabFeeSharing({
 						<div className="grid grid-cols-2 gap-3">
 							<div>
 								<Label className="text-xs font-semibold text-slate-700">
-									Nominal Fee (Rp)
+									Rekening (Opsional)
 								</Label>
 								<Input
-									type="number"
-									min={0}
-									value={recipientForm.nominalFee}
-									onKeyDown={(e) => {
-										if (e.key === "-" || e.key === "e" || e.key === "E")
-											e.preventDefault();
-									}}
+									value={recipientForm.noRekening}
 									onChange={(e) =>
 										setRecipientForm({
 											...recipientForm,
-											nominalFee: Math.max(0, Number(e.target.value) || 0),
+											noRekening: e.target.value,
 										})
 									}
+									placeholder="No. Rekening"
 									className="mt-1 h-9 text-xs"
 								/>
 							</div>
 							<div>
 								<Label className="text-xs font-semibold text-slate-700">
-									Status Pencairan
+									Bank (Opsional)
 								</Label>
-								<Select
-									value={recipientForm.statusPencairan}
-									onValueChange={(val) => {
-										if (val)
-											setRecipientForm({
-												...recipientForm,
-												statusPencairan: val,
-											});
-									}}
-								>
-									<SelectTrigger className="mt-1 h-9 text-xs">
-										<SelectValue placeholder="Pilih Status" />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="belum_dibayarkan">
-											Belum Dibayarkan
-										</SelectItem>
-										<SelectItem value="sudah_dibayarkan">
-											Sudah Dibayarkan
-										</SelectItem>
-									</SelectContent>
-								</Select>
+								<Input
+									value={recipientForm.namaBank}
+									onChange={(e) =>
+										setRecipientForm({
+											...recipientForm,
+											namaBank: e.target.value,
+										})
+									}
+									placeholder="BCA, Mandiri, dll."
+									className="mt-1 h-9 text-xs"
+								/>
 							</div>
 						</div>
+
+						{/* Hanya tampilkan saat Edit */}
+						{editingRecipient && (
+							<div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+								<div>
+									<Label className="text-xs font-semibold text-slate-700">
+										Nominal Fee (Rp)
+									</Label>
+									<Input
+										type="number"
+										min={0}
+										value={recipientForm.nominalFee}
+										onKeyDown={(e) => {
+											if (e.key === "-" || e.key === "e" || e.key === "E")
+												e.preventDefault();
+										}}
+										onChange={(e) =>
+											setRecipientForm({
+												...recipientForm,
+												nominalFee: Math.max(0, Number(e.target.value) || 0),
+											})
+										}
+										className="mt-1 h-9 text-xs"
+									/>
+								</div>
+								<div>
+									<Label className="text-xs font-semibold text-slate-700">
+										Status Pencairan
+									</Label>
+									<Select
+										value={recipientForm.statusPencairan}
+										onValueChange={(val) => {
+											if (val)
+												setRecipientForm({
+													...recipientForm,
+													statusPencairan: val,
+												});
+										}}
+									>
+										<SelectTrigger className="mt-1 h-9 text-xs">
+											<SelectValue placeholder="Pilih Status" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="belum_dibayarkan">
+												Belum Dibayarkan
+											</SelectItem>
+											<SelectItem value="sudah_dibayarkan">
+												Sudah Dibayarkan
+											</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+							</div>
+						)}
 					</div>
 
 					<DialogFooter className="gap-2 pt-2">

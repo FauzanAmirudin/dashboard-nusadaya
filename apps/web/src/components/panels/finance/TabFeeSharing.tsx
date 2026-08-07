@@ -3,6 +3,7 @@
 import {
 	CheckCircle,
 	Clock,
+	CreditCard,
 	Edit2,
 	Eye,
 	Loader2,
@@ -226,13 +227,13 @@ export function TabFeeSharing({ studentId, canEdit }: TabFeeSharingProps) {
 										Penerima
 									</TableHead>
 									<TableHead className="text-xs font-bold text-slate-700">
-										Kategori
+										Nama
 									</TableHead>
 									<TableHead className="text-xs font-bold text-slate-700">
-										Rekening
+										No. HP
 									</TableHead>
 									<TableHead className="text-xs font-bold text-slate-700">
-										Nominal (Rp)
+										Fee (Nominal)
 									</TableHead>
 									<TableHead className="text-xs font-bold text-slate-700">
 										Invoice (PDF)
@@ -248,25 +249,27 @@ export function TabFeeSharing({ studentId, canEdit }: TabFeeSharingProps) {
 							<TableBody>
 								{recipients.map((r) => (
 									<TableRow key={r.id} className="hover:bg-slate-50/50">
-										<TableCell className="font-semibold text-xs text-slate-800">
-											{r.namaReferral}
-											<div className="text-[11px] font-normal text-slate-500">
-												{r.noHp}
-											</div>
-										</TableCell>
 										<TableCell>
 											<Badge
-												variant="secondary"
-												className="bg-slate-100 border-slate-200 text-[11px] text-slate-700"
+												variant="outline"
+												className="bg-slate-100 text-slate-700 border-slate-200 text-[11px] font-semibold"
 											>
 												{r.kategori}
 											</Badge>
 										</TableCell>
-										<TableCell className="text-xs">
-											<div>{r.noRekening || "-"}</div>
-											<div className="text-[11px] text-slate-500">
-												{r.namaBank || ""}
+										<TableCell>
+											<div className="font-semibold text-slate-800 text-xs">
+												{r.namaReferral}
 											</div>
+											{(r.namaBank || r.noRekening) && (
+												<div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+													<CreditCard className="w-3 h-3" />
+													{r.namaBank || "Bank"} - {r.noRekening || "-"}
+												</div>
+											)}
+										</TableCell>
+										<TableCell className="text-xs text-slate-600 font-medium">
+											{r.noHp}
 										</TableCell>
 										<TableCell>
 											{isEditing ? (

@@ -12,17 +12,18 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-	Cell,
-	Legend,
-	Pie,
-	PieChart,
-	Tooltip as RechartsTooltip,
-	ResponsiveContainer,
-} from "recharts";
+import { useState } from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import {
 	Table,
 	TableBody,
@@ -65,6 +66,8 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 		(s: any) => s.pmb?.status === "TIDAK_AMAN",
 	).length;
 
+	const [progressFilter, setProgressFilter] = useState("ALL");
+
 	const handleExport = () => {
 		const exportData = data.map((s: any) => ({
 			NIM: s.student.nim,
@@ -90,48 +93,95 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 		);
 	};
 
-	const pieData = [
-		{ name: "Aman", value: countAman },
-		{ name: "Perlu Perhatian", value: countPerhatian },
-		{ name: "Tidak Aman", value: countTidakAman },
-	];
+	const renderProgressBadge = (pmb: any) => {
+		const completedCount = [
+			pmb?.formReceived,
+			pmb?.documentsComplete,
+			pmb?.dataInputted,
+			pmb?.initialFollowUp,
+		].filter(Boolean).length;
+		const total = 4;
 
-	const filteredData = data.filter(
-		(s: any) =>
-			s.student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			s.student.nim.includes(searchQuery),
-	);
-
-	const renderStatusBadge = (status: string | null | undefined) => {
-		if (status === "AMAN") {
+		if (completedCount === total) {
 			return (
-				<Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/10">
-					🟢 Aman
+				<Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/10">
+					✅ {completedCount}/{total} Selesai
 				</Badge>
 			);
-		}
-		if (status === "TIDAK_AMAN") {
+		} else if (completedCount > 0) {
 			return (
-				<Badge className="bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/10">
-					🔴 Tdk Aman
+				<Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/10">
+					⏳ {completedCount}/{total} Proses
 				</Badge>
 			);
 		}
 		return (
-			<Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/10">
-				🟡 Perhatian
+			<Badge className="bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-100">
+				❌ 0/{total} Belum
 			</Badge>
 		);
 	};
 
-	const formatRupiah = (val: number) => {
-		return new Intl.NumberFormat("id-ID", {
-			style: "currency",
-			currency: "IDR",
-			minimumFractionDigits: 0,
-			maximumFractionDigits: 0,
-		}).format(val || 0);
+	const renderPeminatan = (
+		program: string | null,
+		subProgram: string | null,
+	) => {
+		if (!program && !subProgram) return "-";
+
+		let flagUrl = "";
+		if (subProgram) {
+			const spLower = subProgram.toLowerCase();
+			if (spLower.includes("malaysia"))
+				flagUrl = "https://flagcdn.com/w20/my.png";
+			else if (spLower.includes("taiwan"))
+				flagUrl = "https://flagcdn.com/w20/tw.png";
+			else if (spLower.includes("timur tengah"))
+				flagUrl = "https://flagcdn.com/w20/sa.png";
+			else if (spLower.includes("indonesia"))
+				flagUrl = "https://flagcdn.com/w20/id.png";
+		}
+
+		return (
+			<div className="flex items-center gap-2">
+				<span className="text-sm">{program || "-"}</span>
+				{subProgram && (
+					<span className="inline-flex items-center gap-1.5 text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">
+						{flagUrl && (
+							<img
+								src={flagUrl}
+								alt="flag"
+								className="w-3.5 h-2.5 object-cover rounded-[1px]"
+							/>
+						)}
+						<span className="text-xs">{subProgram}</span>
+					</span>
+				)}
+			</div>
+		);
 	};
+
+	const getProgressStatus = (pmb: any) => {
+		const completedCount = [
+			pmb?.formReceived,
+			pmb?.documentsComplete,
+			pmb?.dataInputted,
+			pmb?.initialFollowUp,
+		].filter(Boolean).length;
+		if (completedCount === 4) return "SELESAI";
+		if (completedCount > 0) return "PROSES";
+		return "BELUM";
+	};
+
+	const filteredData = data.filter((s: any) => {
+		const matchSearch =
+			(s.student?.name || "")
+				.toLowerCase()
+				.includes(searchQuery.toLowerCase()) ||
+			(s.student?.nim || "").toLowerCase().includes(searchQuery.toLowerCase());
+
+		if (progressFilter === "ALL") return matchSearch;
+		return matchSearch && getProgressStatus(s.pmb) === progressFilter;
+	});
 
 	return (
 		<div className="space-y-6 pb-10">
@@ -229,119 +279,62 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 				</Card>
 			</div>
 
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-				{/* Donut Chart */}
-				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-1">
-					<CardHeader>
-						<CardTitle className="text-slate-800 flex items-center gap-2">
-							<LayoutDashboard className="h-5 w-5 text-slate-500" />
-							Distribusi Status PMB
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="flex flex-col items-center">
-						<div className="h-64 w-full">
-							<ResponsiveContainer width="100%" height="100%">
-								<PieChart>
-									<Pie
-										data={pieData}
-										innerRadius={60}
-										outerRadius={80}
-										paddingAngle={5}
-										dataKey="value"
-									>
-										{pieData.map((entry, index) => (
-											<Cell
-												key={`cell-${entry.name}`}
-												fill={PIE_COLORS[index % PIE_COLORS.length]}
-											/>
-										))}
-									</Pie>
-									<RechartsTooltip
-										contentStyle={{
-											backgroundColor: "#ffffff",
-											borderColor: "#e2e8f0",
-											color: "#0f172a",
-										}}
-										itemStyle={{ color: "#0f172a" }}
-									/>
-									<Legend verticalAlign="bottom" height={36} />
-								</PieChart>
-							</ResponsiveContainer>
-						</div>
-						<div className="mt-4 w-full space-y-2">
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-emerald-500" /> Aman
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countAman}
-								</span>
-							</div>
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-amber-500" /> Perlu
-									Perhatian
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countPerhatian}
-								</span>
-							</div>
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-rose-500" /> Tidak
-									Aman
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countTidakAman}
-								</span>
-							</div>
-						</div>
-					</CardContent>
-				</Card>
-
-				{/* List Mahasiswa dengan Kendala */}
-				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-2">
+			<div className="mt-6">
+				<Card className="bg-white border-slate-200 shadow-sm">
 					<CardHeader className="border-b border-slate-200 pb-4 bg-slate-50/50">
 						<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
 							<CardTitle className="text-slate-800 text-lg">
-								Tabel Kelengkapan Mahasiswa
+								Data Mahasiswa
 							</CardTitle>
-							<div className="relative w-full md:w-72">
-								<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-								<Input
-									placeholder="Cari NIM atau Nama Mahasiswa..."
-									className="pl-9 bg-white"
-									value={searchQuery}
-									onChange={(e) => setSearchQuery(e.target.value)}
-								/>
+							<div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+								<Select
+									value={progressFilter}
+									onValueChange={(val) => setProgressFilter(val || "ALL")}
+								>
+									<SelectTrigger className="w-full sm:w-[180px] bg-white">
+										<SelectValue placeholder="Filter Progress" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="ALL">Semua Progress</SelectItem>
+										<SelectItem value="SELESAI">Selesai (4/4)</SelectItem>
+										<SelectItem value="PROSES">Proses</SelectItem>
+										<SelectItem value="BELUM">Belum (0/4)</SelectItem>
+									</SelectContent>
+								</Select>
+								<div className="relative w-full sm:w-72">
+									<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+									<Input
+										placeholder="Cari Nama atau NIM..."
+										className="pl-9 bg-white"
+										value={searchQuery}
+										onChange={(e) => setSearchQuery(e.target.value)}
+									/>
+								</div>
 							</div>
 						</div>
 					</CardHeader>
 					<CardContent className="p-4 sm:p-6">
-						<div className="overflow-y-auto max-h-[300px] border border-slate-200 rounded-md">
+						<div className="overflow-y-auto max-h-[500px] border border-slate-200 rounded-md">
 							<Table>
 								<TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
 									<TableRow className="border-slate-200 hover:bg-slate-50">
-										<TableHead className="text-slate-500 font-semibold py-3">
-											NIM
+										<TableHead className="text-slate-500 font-semibold py-3 min-w-[200px]">
+											Nama Mahasiswa
 										</TableHead>
 										<TableHead className="text-slate-500 font-semibold py-3">
-											Nama Lengkap
+											Batch
 										</TableHead>
 										<TableHead className="text-slate-500 font-semibold py-3">
-											Angkatan
+											Tahun Ajaran
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3 min-w-[200px]">
+											Program Studi & Peminatan
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3">
+											No. HP
 										</TableHead>
 										<TableHead className="text-slate-500 font-semibold text-center py-3">
-											Status PMB
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3">
-											Rekomendasi
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3 text-right">
-											Fee Mitra
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3 text-right">
-											Fee Koord
+											Progress PMB
 										</TableHead>
 										<TableHead className="text-slate-500 font-semibold text-right py-3 pr-4">
 											Aksi
@@ -354,31 +347,36 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 											key={s.student.id}
 											className="border-slate-200 hover:bg-blue-50/50 transition-colors"
 										>
-											<TableCell className="font-medium text-slate-700">
-												{s.student.nim}
-											</TableCell>
-											<TableCell className="text-slate-900 font-semibold">
-												{s.student.name}
+											<TableCell className="font-semibold text-slate-900">
+												<div className="flex flex-col">
+													<span>{s.student.name}</span>
+													<span className="text-xs text-slate-500 font-normal">
+														NIM: {s.student.nim || "-"}
+													</span>
+												</div>
 											</TableCell>
 											<TableCell>
 												<Badge
 													variant="outline"
 													className="text-slate-500 border-slate-200"
 												>
-													{s.student.cohort}
+													{s.student.batch || "-"}
 												</Badge>
 											</TableCell>
+											<TableCell className="text-slate-600 font-medium">
+												{s.student.academicYear || "-"}
+											</TableCell>
+											<TableCell className="text-slate-600">
+												{renderPeminatan(
+													s.student.program,
+													s.student.subProgram,
+												)}
+											</TableCell>
+											<TableCell className="text-slate-600 text-sm">
+												{s.student.phone || "-"}
+											</TableCell>
 											<TableCell className="text-center">
-												{renderStatusBadge(s.pmb?.status)}
-											</TableCell>
-											<TableCell className="text-slate-600 font-medium text-sm">
-												{s.pmb?.rekomendasi || "-"}
-											</TableCell>
-											<TableCell className="text-right text-slate-700 font-medium">
-												{formatRupiah(s.finance?.vMitra || 0)}
-											</TableCell>
-											<TableCell className="text-right text-slate-700 font-medium">
-												{formatRupiah(s.finance?.vKoordinator || 0)}
+												{renderProgressBadge(s.pmb)}
 											</TableCell>
 											<TableCell className="text-right pr-4">
 												<button
@@ -388,7 +386,7 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 															`/dashboard/students/${s.student.id}?context=pmb`,
 														)
 													}
-													className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
+													className="bg-blue-50 text-[#0517B0] hover:bg-blue-100 px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
 												>
 													Periksa
 												</button>

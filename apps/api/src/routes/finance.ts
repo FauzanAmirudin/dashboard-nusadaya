@@ -66,7 +66,8 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 					user.role !== "superadmin" &&
 					user.role !== "pa" &&
 					user.role !== "magang" &&
-					user.role !== "crm")
+					user.role !== "crm" &&
+					user.role !== "pmb")
 			) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };

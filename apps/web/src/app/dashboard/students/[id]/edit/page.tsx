@@ -8,7 +8,7 @@ import {
 	UploadCloud,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -34,8 +34,9 @@ const TABS = [
 	"Keterangan Wali",
 ];
 
-export default function AddStudentPage() {
+export default function EditStudentPage() {
 	const router = useRouter();
+	const { id } = useParams();
 	const { user } = useAuthStore();
 	const [isLoading, setIsLoading] = useState(false);
 	const [paUsers, setPaUsers] = useState<any[]>([]);
@@ -152,22 +153,149 @@ export default function AddStudentPage() {
 		}
 	}, [user, router]);
 
-	// Load from local storage
+	// Fetch existing student data for edit
 	useEffect(() => {
-		const saved = localStorage.getItem("addStudentFormData");
-		if (saved) {
+		const fetchData = async () => {
+			if (!id) return;
+			setIsLoading(true);
 			try {
-				const parsed = JSON.parse(saved);
-				setFormData((prev) => ({ ...prev, ...parsed }));
-			} catch (e) {}
-		}
-	}, []);
+				const [studentRes, healthRes, parentsRes] = await Promise.all([
+					api.students[id as string].get(),
+					api.students[id as string].health.get(),
+					api.students[id as string].parents.get(),
+				]);
 
-	// Save to local storage when formData changes
-	useEffect(() => {
-		const { profilePhoto, ...toSave } = formData;
-		localStorage.setItem("addStudentFormData", JSON.stringify(toSave));
-	}, [formData]);
+				if (studentRes.data?.success && studentRes.data.data?.student) {
+					const std = studentRes.data.data.student;
+					const pmb = studentRes.data.data.pmb;
+					const health = healthRes.data?.data;
+					const parents = parentsRes.data?.data || [];
+
+					if (std.profilePhotoUrl) {
+						setPreviewUrl(
+							std.profilePhotoUrl.startsWith("http")
+								? std.profilePhotoUrl
+								: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}${std.profilePhotoUrl}`,
+						);
+					}
+
+					const ayah: any = parents.find((p: any) => p.type === "ayah") || {};
+					const ibu: any = parents.find((p: any) => p.type === "ibu") || {};
+					const wali: any = parents.find((p: any) => p.type === "wali") || {};
+
+					setFormData((prev) => ({
+						...prev,
+						// Tab 1
+						nim: std.nim || "",
+						name: std.name || "",
+						nickname: std.nickname || "",
+						gender: std.gender || "",
+						birthPlace: std.birthPlace || "",
+						birthDate: std.birthDate
+							? new Date(std.birthDate).toISOString().split("T")[0]
+							: "",
+						religion: std.religion || "",
+						nationality: std.nationality || "Indonesia",
+						addressStreet: std.addressStreet || "",
+						addressRt: std.addressRt || "",
+						addressRw: std.addressRw || "",
+						addressNo: std.addressNo || "",
+						addressVillage: std.addressVillage || "",
+						addressDistrict: std.addressDistrict || "",
+						addressCity: std.addressCity || "",
+						addressProvince: std.addressProvince || "",
+						livingWith: std.livingWith || "",
+						phone: std.phone || "",
+						email: std.email || "",
+
+						// Tab 2
+						schoolOrigin: std.schoolOrigin || "",
+						schoolAddress: std.schoolAddress || "",
+						schoolMajor: std.schoolMajor || "",
+						graduationYear: std.graduationYear?.toString() || "",
+						program: std.program || "",
+						subProgram: std.subProgram || "",
+						classType: std.classType || "",
+						batch: std.batch?.toString() || "",
+						academicYear: std.academicYear || "",
+						cohort:
+							std.cohort?.toString() || new Date().getFullYear().toString(),
+
+						// Data tambahan PMB dll
+						paId: std.paId?.toString() || "",
+						studentStatus: std.studentStatus || "aktif",
+						destinationCountry: std.destinationCountry || "",
+						period: std.period || "",
+						rekomendasi: pmb?.rekomendasi || "",
+						timVisit: pmb?.timVisit || "",
+						timSosialisasi: pmb?.timSosialisasi || "",
+						roReferral: pmb?.roReferral || "",
+						mitraSponsor: pmb?.mitraSponsor || "",
+						koordinator: pmb?.koordinator || "",
+
+						// Tab 3 Health
+						bloodType: health?.bloodType || "",
+						diseaseHistory: health?.diseaseHistory || "",
+						congenitalDisease: health?.congenitalDisease || "",
+						height: health?.height?.toString() || "",
+						weight: health?.weight?.toString() || "",
+						clothingSize: health?.clothingSize || "",
+
+						// Tab 4 Ayah
+						ayahName: ayah.name || "",
+						ayahBirthPlace: ayah.birthPlace || "",
+						ayahBirthDate: ayah.birthDate
+							? new Date(ayah.birthDate).toISOString().split("T")[0]
+							: "",
+						ayahReligion: ayah.religion || "",
+						ayahNationality: ayah.nationality || "Indonesia",
+						ayahEducation: ayah.education || "",
+						ayahJob: ayah.job || "",
+						ayahAddress: ayah.address || "",
+						ayahPhone: ayah.phone || "",
+						ayahEmail: ayah.email || "",
+						ayahStatus: ayah.status || "Hidup",
+
+						// Tab 5 Ibu
+						ibuName: ibu.name || "",
+						ibuBirthPlace: ibu.birthPlace || "",
+						ibuBirthDate: ibu.birthDate
+							? new Date(ibu.birthDate).toISOString().split("T")[0]
+							: "",
+						ibuReligion: ibu.religion || "",
+						ibuNationality: ibu.nationality || "Indonesia",
+						ibuEducation: ibu.education || "",
+						ibuJob: ibu.job || "",
+						ibuAddress: ibu.address || "",
+						ibuPhone: ibu.phone || "",
+						ibuEmail: ibu.email || "",
+						ibuStatus: ibu.status || "Hidup",
+
+						// Tab 6 Wali
+						waliName: wali.name || "",
+						waliBirthPlace: wali.birthPlace || "",
+						waliBirthDate: wali.birthDate
+							? new Date(wali.birthDate).toISOString().split("T")[0]
+							: "",
+						waliReligion: wali.religion || "",
+						waliNationality: wali.nationality || "Indonesia",
+						waliEducation: wali.education || "",
+						waliJob: wali.job || "",
+						waliAddress: wali.address || "",
+						waliPhone: wali.phone || "",
+						waliEmail: wali.email || "",
+						waliGuardianRelation: wali.guardianRelation || "",
+					}));
+				}
+			} catch (e) {
+				console.error(e);
+				toast.error("Gagal memuat data mahasiswa");
+			} finally {
+				setIsLoading(false);
+			}
+		};
+		fetchData();
+	}, [id]);
 
 	useEffect(() => {
 		const fetchPAs = async () => {
@@ -513,19 +641,22 @@ export default function AddStudentPage() {
 				koordinator: formData.koordinator || undefined,
 			};
 
-			const { data: resData, error } = await api.students.post(payload);
+			const { data: resData, error } =
+				await api.students[id as string].put(payload);
 
-			if (error || !resData?.success || !resData.data) {
+			if (error || !resData?.success) {
 				toast.error(
 					resData?.message ||
 						error?.value?.message ||
-						"Gagal menambahkan mahasiswa",
+						"Gagal mengubah data mahasiswa",
 				);
 				setIsLoading(false);
 				return;
 			}
 
-			const newStudentId = resData.data.id;
+			toast.success("Berhasil mengubah data mahasiswa");
+
+			const newStudentId = id as string;
 
 			if (formData.profilePhoto) {
 				const uploadRes = await api.students[newStudentId][
@@ -536,7 +667,7 @@ export default function AddStudentPage() {
 
 				if (!uploadRes.data?.success) {
 					toast.error(
-						"Mahasiswa berhasil dibuat, tapi gagal mengupload foto profil.",
+						"Berhasil mengubah data, tapi gagal mengupload foto profil.",
 					);
 				}
 			}
