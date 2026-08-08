@@ -40,6 +40,145 @@ import {
 } from "../../db/schema";
 import { requireRole } from "../../middleware/rbac";
 
+export async function createStudentPipeline(body: any, userId: number) {
+	// 1. Validasi email & nim
+	if (body.nim) {
+		const existingNim = await db.query.students.findFirst({
+			where: eq(students.nim, body.nim),
+		});
+		if (existingNim) {
+			throw new Error("NIM sudah terdaftar");
+		}
+	}
+	if (body.email) {
+		const existingEmail = await db.query.students.findFirst({
+			where: eq(students.email, body.email),
+		});
+		if (existingEmail) {
+			throw new Error("Email sudah terdaftar");
+		}
+	}
+
+	// 2. Buat User Account untuk Mahasiswa
+	const passwordHash = await Bun.password.hash("nusadaya123"); // Default password
+	const [newUser] = await db
+		.insert(users)
+		.values({
+			username: body.nim || body.email || `mhs_${Date.now()}`, // Username pakai NIM atau Email jika kosong
+			passwordHash,
+			fullName: body.name,
+			role: "mahasiswa",
+		})
+		.returning();
+
+	// 3. Insert student
+	const [newStudent] = await db
+		.insert(students)
+		.values({
+			nim: body.nim || null,
+			name: body.name,
+			nickname: body.nickname,
+			cohort: body.cohort,
+			program: body.program,
+			subProgram: body.subProgram,
+			birthPlace: body.birthPlace,
+			birthDate: body.birthDate ? new Date(body.birthDate) : null,
+			gender: body.gender,
+			religion: body.religion,
+			nationality: body.nationality,
+			addressStreet: body.addressStreet,
+			addressRt: body.addressRt,
+			addressRw: body.addressRw,
+			addressNo: body.addressNo,
+			addressVillage: body.addressVillage,
+			addressDistrict: body.addressDistrict,
+			addressCity: body.addressCity,
+			addressProvince: body.addressProvince,
+			livingWith: body.livingWith,
+			schoolOrigin: body.schoolOrigin,
+			schoolAddress: body.schoolAddress,
+			schoolMajor: body.schoolMajor,
+			graduationYear: body.graduationYear,
+			classType: body.classType,
+			academicYear: body.academicYear,
+			batch: body.batch,
+			phone: body.phone,
+			email: body.email,
+			profilePhotoUrl: body.profilePhotoUrl,
+			paId: body.paId,
+			studentStatus: body.studentStatus || "aktif",
+			destinationCountry: body.destinationCountry,
+			period: body.period,
+			studentUserId: newUser.id, // Relasi ke akun login
+		})
+		.returning();
+
+	const studentId = newStudent.id;
+
+	// 4. Insert Student Health
+	await db.insert(studentHealth).values({
+		studentId,
+		bloodType: body.bloodType,
+		diseaseHistory: body.diseaseHistory,
+		congenitalDisease: body.congenitalDisease,
+		height: body.height,
+		weight: body.weight,
+		clothingSize: body.clothingSize,
+	});
+
+	// 5. Insert Student Parents (Ayah, Ibu, Wali)
+	if (body.parents && body.parents.length > 0) {
+		const parentInserts = body.parents.map((p: any) => ({
+			studentId,
+			type: p.type,
+			name: p.name,
+			birthPlace: p.birthPlace,
+			birthDate: p.birthDate ? new Date(p.birthDate) : null,
+			religion: p.religion,
+			nationality: p.nationality,
+			education: p.education,
+			job: p.job,
+			address: p.address,
+			phone: p.phone,
+			email: p.email,
+			status: p.status,
+			guardianRelation: p.guardianRelation,
+		}));
+		await db.insert(studentParents).values(parentInserts);
+	}
+
+	// 6. Initialize related panels
+	await Promise.all([
+		db.insert(pmbData).values({
+			studentId,
+			rekomendasi: body.rekomendasi,
+			timVisit: body.timVisit,
+			timSosialisasi: body.timSosialisasi,
+			roReferral: body.roReferral,
+			mitraSponsor: body.mitraSponsor,
+			koordinator: body.koordinator,
+		}),
+		db.insert(pmbPaymentPlan).values({ studentId }),
+		db.insert(crmData).values({ studentId }),
+		db.insert(financeData).values({ studentId }),
+		db.insert(academicData).values({ studentId }),
+		db.insert(paData).values({ studentId }),
+		db.insert(internshipData).values({ studentId }),
+		db.insert(finalDecision).values({ studentId }),
+	]);
+
+	// 7. Catat di auditLogs
+	await db.insert(auditLogs).values({
+		userId: userId,
+		action: "CREATE_STUDENT",
+		entity: "students",
+		entityId: studentId,
+		details: { nim: newStudent.nim, name: newStudent.name },
+	});
+
+	return { student: newStudent };
+}
+
 export const coreRoutes = new Elysia()
 	.get("/", async ({ query }) => {
 		const isArchived = query?.archived === "true";
@@ -81,145 +220,13 @@ export const coreRoutes = new Elysia()
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
-
-			// 1. Validasi email & nim
-			if (body.nim) {
-				const existingNim = await db.query.students.findFirst({
-					where: eq(students.nim, body.nim),
-				});
-				if (existingNim) {
-					set.status = 400;
-					return { success: false, message: "NIM sudah terdaftar" };
-				}
+			try {
+				const result = await createStudentPipeline(body, user.id);
+				return { success: true, data: result.student };
+			} catch (error: any) {
+				set.status = 400;
+				return { success: false, message: error.message };
 			}
-			if (body.email) {
-				const existingEmail = await db.query.students.findFirst({
-					where: eq(students.email, body.email),
-				});
-				if (existingEmail) {
-					set.status = 400;
-					return { success: false, message: "Email sudah terdaftar" };
-				}
-			}
-
-			// 2. Buat User Account untuk Mahasiswa
-			const passwordHash = await Bun.password.hash("nusadaya123"); // Default password
-			const [newUser] = await db
-				.insert(users)
-				.values({
-					username: body.nim || body.email, // Username pakai NIM atau Email jika kosong
-					passwordHash,
-					fullName: body.name,
-					role: "mahasiswa",
-				})
-				.returning();
-
-			// 3. Insert student
-			const [newStudent] = await db
-				.insert(students)
-				.values({
-					nim: body.nim || null,
-					name: body.name,
-					nickname: body.nickname,
-					cohort: body.cohort,
-					program: body.program,
-					subProgram: body.subProgram,
-					birthPlace: body.birthPlace,
-					birthDate: body.birthDate ? new Date(body.birthDate) : null,
-					gender: body.gender,
-					religion: body.religion,
-					nationality: body.nationality,
-					addressStreet: body.addressStreet,
-					addressRt: body.addressRt,
-					addressRw: body.addressRw,
-					addressNo: body.addressNo,
-					addressVillage: body.addressVillage,
-					addressDistrict: body.addressDistrict,
-					addressCity: body.addressCity,
-					addressProvince: body.addressProvince,
-					livingWith: body.livingWith,
-					schoolOrigin: body.schoolOrigin,
-					schoolAddress: body.schoolAddress,
-					schoolMajor: body.schoolMajor,
-					graduationYear: body.graduationYear,
-					classType: body.classType,
-					academicYear: body.academicYear,
-					batch: body.batch,
-					phone: body.phone,
-					email: body.email,
-					profilePhotoUrl: body.profilePhotoUrl,
-					paId: body.paId,
-					studentStatus: body.studentStatus || "aktif",
-					destinationCountry: body.destinationCountry,
-					period: body.period,
-					studentUserId: newUser.id, // Relasi ke akun login
-				})
-				.returning();
-
-			const studentId = newStudent.id;
-
-			// 4. Insert Student Health
-			await db.insert(studentHealth).values({
-				studentId,
-				bloodType: body.bloodType,
-				diseaseHistory: body.diseaseHistory,
-				congenitalDisease: body.congenitalDisease,
-				height: body.height,
-				weight: body.weight,
-				clothingSize: body.clothingSize,
-			});
-
-			// 5. Insert Student Parents (Ayah, Ibu, Wali)
-			if (body.parents && body.parents.length > 0) {
-				const parentInserts = body.parents.map((p: any) => ({
-					studentId,
-					type: p.type,
-					name: p.name,
-					birthPlace: p.birthPlace,
-					birthDate: p.birthDate ? new Date(p.birthDate) : null,
-					religion: p.religion,
-					nationality: p.nationality,
-					education: p.education,
-					job: p.job,
-					address: p.address,
-					phone: p.phone,
-					email: p.email,
-					status: p.status,
-					guardianRelation: p.guardianRelation,
-				}));
-				await db.insert(studentParents).values(parentInserts);
-			}
-
-			// 6. Initialize related panels
-			await Promise.all([
-				db.insert(pmbData).values({
-					studentId,
-					rekomendasi: body.rekomendasi,
-					timVisit: body.timVisit,
-					timSosialisasi: body.timSosialisasi,
-					roReferral: body.roReferral,
-					mitraSponsor: body.mitraSponsor,
-					koordinator: body.koordinator,
-				}),
-				db.insert(pmbPaymentPlan).values({ studentId }),
-				db.insert(crmData).values({ studentId }),
-				db.insert(financeData).values({ studentId }),
-				db.insert(academicData).values({ studentId }),
-				db.insert(paData).values({ studentId }),
-				db.insert(internshipData).values({ studentId }),
-				db.insert(finalDecision).values({ studentId }),
-			]);
-
-			// 7. Catat di auditLogs
-			await db.insert(auditLogs).values({
-				userId: user.id,
-				action: "CREATE_STUDENT",
-				entity: "students",
-				entityId: studentId,
-				details: { nim: newStudent.nim, name: newStudent.name },
-			});
-
-			return { success: true, data: newStudent };
 		},
 		{
 			body: t.Object({

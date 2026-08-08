@@ -13,7 +13,6 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,7 +31,9 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { exportToCSV } from "@/lib/export";
+import { FormMahasiswaModule } from "./pmb/FormMahasiswaModule";
 
 const STATUS_COLORS = {
 	AMAN: {
@@ -279,131 +280,158 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 				</Card>
 			</div>
 
-			<div className="mt-6">
-				<Card className="bg-white border-slate-200 shadow-sm">
-					<CardHeader className="border-b border-slate-200 pb-4 bg-slate-50/50">
-						<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-							<CardTitle className="text-slate-800 text-lg">
-								Data Mahasiswa
-							</CardTitle>
-							<div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-								<Select
-									value={progressFilter}
-									onValueChange={(val) => setProgressFilter(val || "ALL")}
-								>
-									<SelectTrigger className="w-full sm:w-[180px] bg-white">
-										<SelectValue placeholder="Filter Progress" />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="ALL">Semua Progress</SelectItem>
-										<SelectItem value="SELESAI">Selesai (4/4)</SelectItem>
-										<SelectItem value="PROSES">Proses</SelectItem>
-										<SelectItem value="BELUM">Belum (0/4)</SelectItem>
-									</SelectContent>
-								</Select>
-								<div className="relative w-full sm:w-72">
-									<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-									<Input
-										placeholder="Cari Nama atau NIM..."
-										className="pl-9 bg-white"
-										value={searchQuery}
-										onChange={(e) => setSearchQuery(e.target.value)}
-									/>
+			<Tabs defaultValue="data-mahasiswa" className="w-full mt-6">
+				<TabsList className="bg-slate-100 p-1 rounded-lg border border-slate-200">
+					<TabsTrigger
+						value="data-mahasiswa"
+						className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-md px-6"
+					>
+						Data Mahasiswa
+					</TabsTrigger>
+					<TabsTrigger
+						value="form-mahasiswa"
+						className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-md px-6"
+					>
+						Form Mahasiswa
+					</TabsTrigger>
+				</TabsList>
+
+				<TabsContent
+					value="data-mahasiswa"
+					className="mt-6 border-none p-0 outline-none"
+				>
+					<Card className="bg-white border-slate-200 shadow-sm">
+						<CardHeader className="border-b border-slate-200 pb-4 bg-slate-50/50">
+							<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+								<CardTitle className="text-slate-800 text-lg">
+									Data Mahasiswa
+								</CardTitle>
+								<div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+									<Select
+										value={progressFilter}
+										onValueChange={(val) => setProgressFilter(val || "ALL")}
+									>
+										<SelectTrigger className="w-full sm:w-[180px] bg-white">
+											<SelectValue placeholder="Filter Progress" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="ALL">Semua Progress</SelectItem>
+											<SelectItem value="SELESAI">Selesai (4/4)</SelectItem>
+											<SelectItem value="PROSES">Proses</SelectItem>
+											<SelectItem value="BELUM">Belum (0/4)</SelectItem>
+										</SelectContent>
+									</Select>
+									<div className="relative w-full sm:w-72">
+										<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+										<Input
+											placeholder="Cari Nama atau NIM..."
+											className="pl-9 bg-white"
+											value={searchQuery}
+											onChange={(e) => setSearchQuery(e.target.value)}
+										/>
+									</div>
 								</div>
 							</div>
-						</div>
-					</CardHeader>
-					<CardContent className="p-4 sm:p-6">
-						<div className="overflow-y-auto max-h-[500px] border border-slate-200 rounded-md">
-							<Table>
-								<TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
-									<TableRow className="border-slate-200 hover:bg-slate-50">
-										<TableHead className="text-slate-500 font-semibold py-3 min-w-[200px]">
-											Nama Mahasiswa
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3">
-											Batch
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3">
-											Tahun Ajaran
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3 min-w-[200px]">
-											Program Studi & Peminatan
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3">
-											No. HP
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold text-center py-3">
-											Progress PMB
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold text-right py-3 pr-4">
-											Aksi
-										</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{filteredData.map((s: any) => (
-										<TableRow
-											key={s.student.id}
-											className="border-slate-200 hover:bg-blue-50/50 transition-colors"
-										>
-											<TableCell className="font-semibold text-slate-900">
-												<div className="flex flex-col">
-													<span>{s.student.name}</span>
-													<span className="text-xs text-slate-500 font-normal">
-														NIM: {s.student.nim || "-"}
-													</span>
-												</div>
-											</TableCell>
-											<TableCell>
-												<Badge
-													variant="outline"
-													className="text-slate-500 border-slate-200"
-												>
-													{s.student.batch || "-"}
-												</Badge>
-											</TableCell>
-											<TableCell className="text-slate-600 font-medium">
-												{s.student.academicYear || "-"}
-											</TableCell>
-											<TableCell className="text-slate-600">
-												{renderPeminatan(
-													s.student.program,
-													s.student.subProgram,
-												)}
-											</TableCell>
-											<TableCell className="text-slate-600 text-sm">
-												{s.student.phone || "-"}
-											</TableCell>
-											<TableCell className="text-center">
-												{renderProgressBadge(s.pmb)}
-											</TableCell>
-											<TableCell className="text-right pr-4">
-												<button
-													type="button"
-													onClick={() =>
-														router.push(
-															`/dashboard/students/${s.student.id}?context=pmb`,
-														)
-													}
-													className="bg-blue-50 text-[#0517B0] hover:bg-blue-100 px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
-												>
-													Periksa
-												</button>
-											</TableCell>
+						</CardHeader>
+						<CardContent className="p-4 sm:p-6">
+							<div className="overflow-y-auto max-h-[500px] border border-slate-200 rounded-md">
+								<Table>
+									<TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+										<TableRow className="border-slate-200 hover:bg-slate-50">
+											<TableHead className="text-slate-500 font-semibold py-3 min-w-[200px]">
+												Nama Mahasiswa
+											</TableHead>
+											<TableHead className="text-slate-500 font-semibold py-3">
+												Batch
+											</TableHead>
+											<TableHead className="text-slate-500 font-semibold py-3">
+												Tahun Ajaran
+											</TableHead>
+											<TableHead className="text-slate-500 font-semibold py-3 min-w-[200px]">
+												Program Studi & Peminatan
+											</TableHead>
+											<TableHead className="text-slate-500 font-semibold py-3">
+												No. HP
+											</TableHead>
+											<TableHead className="text-slate-500 font-semibold text-center py-3">
+												Progress PMB
+											</TableHead>
+											<TableHead className="text-slate-500 font-semibold text-right py-3 pr-4">
+												Aksi
+											</TableHead>
 										</TableRow>
-									))}
-								</TableBody>
-							</Table>
-							{filteredData.length === 0 && (
-								<div className="text-center py-8 text-slate-500">
-									Tidak ada data mahasiswa ditemukan.
-								</div>
-							)}
-						</div>
-					</CardContent>
-				</Card>
-			</div>
+									</TableHeader>
+									<TableBody>
+										{filteredData.map((s: any) => (
+											<TableRow
+												key={s.student.id}
+												className="border-slate-200 hover:bg-blue-50/50 transition-colors"
+											>
+												<TableCell className="font-semibold text-slate-900">
+													<div className="flex flex-col">
+														<span>{s.student.name}</span>
+														<span className="text-xs text-slate-500 font-normal">
+															NIM: {s.student.nim || "-"}
+														</span>
+													</div>
+												</TableCell>
+												<TableCell>
+													<Badge
+														variant="outline"
+														className="text-slate-500 border-slate-200"
+													>
+														{s.student.batch || "-"}
+													</Badge>
+												</TableCell>
+												<TableCell className="text-slate-600 font-medium">
+													{s.student.academicYear || "-"}
+												</TableCell>
+												<TableCell className="text-slate-600">
+													{renderPeminatan(
+														s.student.program,
+														s.student.subProgram,
+													)}
+												</TableCell>
+												<TableCell className="text-slate-600 text-sm">
+													{s.student.phone || "-"}
+												</TableCell>
+												<TableCell className="text-center">
+													{renderProgressBadge(s.pmb)}
+												</TableCell>
+												<TableCell className="text-right pr-4">
+													<button
+														type="button"
+														onClick={() =>
+															router.push(
+																`/dashboard/students/${s.student.id}?context=pmb`,
+															)
+														}
+														className="bg-blue-50 text-[#0517B0] hover:bg-blue-100 px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+													>
+														Periksa
+													</button>
+												</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
+								{filteredData.length === 0 && (
+									<div className="text-center py-8 text-slate-500">
+										Tidak ada data mahasiswa ditemukan.
+									</div>
+								)}
+							</div>
+						</CardContent>
+					</Card>
+				</TabsContent>
+
+				<TabsContent
+					value="form-mahasiswa"
+					className="mt-6 border-none p-0 outline-none"
+				>
+					<FormMahasiswaModule />
+				</TabsContent>
+			</Tabs>
 		</div>
 	);
 }

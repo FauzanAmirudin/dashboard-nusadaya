@@ -9,6 +9,7 @@ import { db } from "./db";
 import { users } from "./db/schema";
 import { dosenRouter } from "./routes/dosen";
 import { financeRouter } from "./routes/finance";
+import { formRegisterRoutes } from "./routes/form-register";
 import { magangRouter } from "./routes/magang";
 import { mahasiswaRouter } from "./routes/mahasiswa";
 import { paRouter } from "./routes/pa";
@@ -152,6 +153,7 @@ const app = new Elysia()
 
 	// Module Routers
 	.use(studentsRouter)
+	.use(formRegisterRoutes)
 	.use(dosenRouter)
 	.use(paRouter)
 	.use(magangRouter)

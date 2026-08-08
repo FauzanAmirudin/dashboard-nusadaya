@@ -11,6 +11,7 @@ import {
 	serial,
 	text,
 	timestamp,
+	varchar,
 } from "drizzle-orm/pg-core";
 
 // Enums
@@ -58,6 +59,12 @@ export const noteTypeEnum = pgEnum("note_type", [
 	"praktik_luar",
 	"informasi_umum",
 	"lainnya",
+]);
+
+export const formResponseStatusEnum = pgEnum("form_response_status", [
+	"PENDING",
+	"APPROVED",
+	"REJECTED",
 ]);
 
 // 1. Users (RBAC)
@@ -1275,6 +1282,140 @@ export const vocationalLeftoversRelations = relations(
 		reporter: one(users, {
 			fields: [vocationalLeftovers.reportedBy],
 			references: [users.id],
+		}),
+	}),
+);
+
+// 15. PMB Form Registrations
+export const pmbFormTokens = pgTable("pmb_form_tokens", {
+	id: serial("id").primaryKey(),
+	token: varchar("token", { length: 255 }).unique().notNull(), // UUID v4
+	createdBy: integer("created_by").references(() => users.id),
+	isUsed: boolean("is_used").default(false),
+	usedAt: timestamp("used_at"),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const pmbFormResponses = pgTable("pmb_form_responses", {
+	id: serial("id").primaryKey(),
+	tokenId: integer("token_id")
+		.references(() => pmbFormTokens.id)
+		.unique()
+		.notNull(),
+	status: formResponseStatusEnum("status").default("PENDING"),
+
+	// Tab 1: Keterangan Mahasiswa
+	name: text("name").notNull(),
+	nickname: text("nickname"),
+	gender: text("gender"),
+	birthPlace: text("birth_place"),
+	birthDate: timestamp("birth_date"),
+	religion: text("religion"),
+	nationality: text("nationality"),
+	addressStreet: text("address_street"),
+	addressRt: text("address_rt"),
+	addressRw: text("address_rw"),
+	addressNo: text("address_no"),
+	addressVillage: text("address_village"),
+	addressDistrict: text("address_district"),
+	addressCity: text("address_city"),
+	addressProvince: text("address_province"),
+	livingWith: text("living_with"),
+	phone: text("phone"),
+	email: text("email"),
+	profilePhotoUrl: text("profile_photo_url"),
+
+	// Tab 2: Pendidikan
+	schoolOrigin: text("school_origin"),
+	schoolAddress: text("school_address"),
+	schoolMajor: text("school_major"),
+	graduationYear: integer("graduation_year"),
+	program: text("program"),
+	subProgram: text("sub_program"),
+	classType: text("class_type"),
+	batch: integer("batch"),
+	academicYear: text("academic_year"),
+
+	// Tab 3: Kesehatan
+	bloodType: text("blood_type"),
+	diseaseHistory: text("disease_history"),
+	congenitalDisease: text("congenital_disease"),
+	height: decimal("height", { precision: 5, scale: 2 }),
+	weight: decimal("weight", { precision: 5, scale: 2 }),
+	clothingSize: text("clothing_size"),
+
+	// Tab 4: Ayah
+	ayahName: text("ayah_name"),
+	ayahBirthPlace: text("ayah_birth_place"),
+	ayahBirthDate: timestamp("ayah_birth_date"),
+	ayahReligion: text("ayah_religion"),
+	ayahNationality: text("ayah_nationality"),
+	ayahEducation: text("ayah_education"),
+	ayahJob: text("ayah_job"),
+	ayahAddress: text("ayah_address"),
+	ayahPhone: text("ayah_phone"),
+	ayahEmail: text("ayah_email"),
+	ayahStatus: text("ayah_status"),
+
+	// Tab 5: Ibu
+	ibuName: text("ibu_name"),
+	ibuBirthPlace: text("ibu_birth_place"),
+	ibuBirthDate: timestamp("ibu_birth_date"),
+	ibuReligion: text("ibu_religion"),
+	ibuNationality: text("ibu_nationality"),
+	ibuEducation: text("ibu_education"),
+	ibuJob: text("ibu_job"),
+	ibuAddress: text("ibu_address"),
+	ibuPhone: text("ibu_phone"),
+	ibuEmail: text("ibu_email"),
+	ibuStatus: text("ibu_status"),
+
+	// Tab 6: Wali
+	waliName: text("wali_name"),
+	waliBirthPlace: text("wali_birth_place"),
+	waliBirthDate: timestamp("wali_birth_date"),
+	waliReligion: text("wali_religion"),
+	waliNationality: text("wali_nationality"),
+	waliEducation: text("wali_education"),
+	waliJob: text("wali_job"),
+	waliAddress: text("wali_address"),
+	waliPhone: text("wali_phone"),
+	waliEmail: text("wali_email"),
+	waliGuardianRelation: text("wali_guardian_relation"),
+
+	// Metadata
+	submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+	processedAt: timestamp("processed_at"),
+	processedBy: integer("processed_by").references(() => users.id),
+	rejectionNotes: text("rejection_notes"),
+	studentId: integer("student_id").references(() => students.id),
+});
+
+export const pmbFormTokensRelations = relations(pmbFormTokens, ({ one }) => ({
+	creator: one(users, {
+		fields: [pmbFormTokens.createdBy],
+		references: [users.id],
+	}),
+	response: one(pmbFormResponses, {
+		fields: [pmbFormTokens.id],
+		references: [pmbFormResponses.tokenId],
+	}),
+}));
+
+export const pmbFormResponsesRelations = relations(
+	pmbFormResponses,
+	({ one }) => ({
+		token: one(pmbFormTokens, {
+			fields: [pmbFormResponses.tokenId],
+			references: [pmbFormTokens.id],
+		}),
+		processor: one(users, {
+			fields: [pmbFormResponses.processedBy],
+			references: [users.id],
+		}),
+		student: one(students, {
+			fields: [pmbFormResponses.studentId],
+			references: [students.id],
 		}),
 	}),
 );
