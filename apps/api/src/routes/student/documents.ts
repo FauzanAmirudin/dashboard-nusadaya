@@ -1,6 +1,4 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../../db";
 import {
@@ -36,7 +34,7 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
-import { requireRole } from "../../middleware/rbac";
+import { fileService } from "../../modules/file/service/file.service";
 
 export const documentsRoutes = new Elysia()
 	.get("/:id/:panel/documents", async (context) => {
@@ -124,22 +122,25 @@ export const documentsRoutes = new Elysia()
 					return { success: false, message: "Invalid panel" };
 			}
 
-			// Generate unique filename
-			const timestamp = Date.now();
-			const safeDocKey = documentKey.replace(/[^a-zA-Z0-9_-]/g, "");
-			const originalName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
-			const filename = `${studentId}_${panel}_${safeDocKey}_${timestamp}_${originalName}`;
+			// Upload file via FileService — tidak boleh akses filesystem langsung
+			let uploadResult: { id: string; storagePath: string } | null = null;
+			try {
+				uploadResult = await fileService.uploadFile({
+					file,
+					studentId,
+					category: panel,
+					panel,
+					documentKey,
+					uploadedBy: user.id,
+				});
+			} catch (err) {
+				const error = err as Error;
+				set.status = 400;
+				return { success: false, message: error.message };
+			}
 
-			// Create directory if not exists
-			const uploadDir = join(process.cwd(), "uploads", "documents", panel);
-			await mkdir(uploadDir, { recursive: true });
-
-			// Write file to disk
-			const filePath = join(uploadDir, filename);
-			const fileBuffer = Buffer.from(await file.arrayBuffer());
-			await Bun.write(filePath, fileBuffer);
-
-			const fileUrl = `/uploads/documents/${panel}/${filename}`;
+			const fileUrl = `/files/${uploadResult.id}/download`;
+			const originalName = file.name;
 
 			// Allow multiple files per documentKey by NOT deleting the old ones
 

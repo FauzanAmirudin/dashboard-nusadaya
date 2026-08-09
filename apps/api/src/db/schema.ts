@@ -1419,3 +1419,81 @@ export const pmbFormResponsesRelations = relations(
 		}),
 	}),
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STORAGE SYSTEM — File Metadata & Backup Jobs
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Tabel `files` — metadata semua file yang tersimpan di storage.
+ *
+ * PostgreSQL HANYA menyimpan metadata (path, checksum, mime_type, dll.).
+ * File fisik tersimpan di local storage (atau nanti S3) via FileService.
+ *
+ * Prinsip:
+ * - storagePath berisi path relatif dari base STORAGE_PATH
+ * - filename adalah nama file fisik (ULID + ext), bukan nama asli
+ * - originalName adalah nama asli dari user (disimpan untuk referensi)
+ * - deletedAt digunakan untuk soft delete (audit trail), bukan hard delete langsung
+ */
+export const files = pgTable("files", {
+	id: text("id").primaryKey(), // ULID
+	studentId: integer("student_id").references(() => students.id), // null untuk file non-mahasiswa
+	category: text("category").notNull(), // "identity" | "academic" | "profile" | "finance" | "internship" | "thesis" | "certificates" | "achievement" | "other"
+	storageDisk: text("storage_disk").default("local").notNull(), // "local" | "s3"
+	storagePath: text("storage_path").notNull(), // path relatif, e.g. "students/42/identity/01KABC.pdf"
+	filename: text("filename").notNull(), // nama file fisik (ULID + ext)
+	originalName: text("original_name").notNull(), // nama asli dari user, e.g. "KTP.pdf"
+	extension: text("extension").notNull(), // "pdf" | "jpg" | "png" | dll.
+	mimeType: text("mime_type").notNull(),
+	size: integer("size").notNull(), // bytes
+	checksum: text("checksum"), // sha256:<hex>
+	visibility: text("visibility").default("private").notNull(), // "private" | "public"
+	uploadedBy: integer("uploaded_by").references(() => users.id),
+	panel: text("panel"), // "pmb" | "finance" | "akademik" | "pa" | "magang" | "dosen" | dll.
+	documentKey: text("document_key"), // kunci unik per jenis dokumen dalam panel
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	deletedAt: timestamp("deleted_at"), // soft delete untuk audit trail
+});
+
+export const filesRelations = relations(files, ({ one }) => ({
+	student: one(students, {
+		fields: [files.studentId],
+		references: [students.id],
+	}),
+	uploader: one(users, {
+		fields: [files.uploadedBy],
+		references: [users.id],
+	}),
+}));
+
+/**
+ * Tabel `backup_jobs` — tracking pekerjaan backup.
+ *
+ * - Status final (queued/processing/completed/failed) disimpan di PostgreSQL.
+ * - Progress real-time (percentage, current_file) disimpan di Redis (bukan di sini).
+ * - filters berisi kriteria backup sebagai JSON dinamis (tidak di-hardcode).
+ */
+export const backupJobs = pgTable("backup_jobs", {
+	id: text("id").primaryKey(), // ULID
+	type: text("type").notNull(), // "student" | "cohort" | "program" | "specialization" | "full"
+	status: text("status").default("queued").notNull(), // "queued" | "processing" | "completed" | "failed"
+	filters: jsonb("filters"), // { studentId?, cohortId?, programId?, specializationId?, category?, dateFrom?, dateTo? }
+	totalFiles: integer("total_files").default(0),
+	processedFiles: integer("processed_files").default(0),
+	totalSize: integer("total_size").default(0), // bytes
+	outputPath: text("output_path"),
+	createdBy: integer("created_by").references(() => users.id),
+	startedAt: timestamp("started_at"),
+	completedAt: timestamp("completed_at"),
+	errorMessage: text("error_message"),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const backupJobsRelations = relations(backupJobs, ({ one }) => ({
+	creator: one(users, {
+		fields: [backupJobs.createdBy],
+		references: [users.id],
+	}),
+}));

@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   db:
     image: postgres:15-alpine
@@ -7,6 +6,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-nusadaya}
+    ports:
+      - "5454:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -14,7 +15,7 @@ services:
     image: redis:7-alpine
     restart: always
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
 
@@ -29,6 +30,13 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-nusadaya}
       - JWT_SECRET=${JWT_SECRET:-secretkey}
       - REDIS_URL=redis://redis:6379
+      # Storage di luar source code — persistent via Docker volume
+      # Bukan di apps/api/uploads/ (dilarang oleh plan)
+      - STORAGE_PATH=/app/storage
+      - BACKUP_PATH=/app/backups
+    volumes:
+      - academic_storage:/app/storage
+      - academic_backups:/app/backups
     depends_on:
       - db
       - redis
@@ -49,5 +57,8 @@ services:
       - api
 
 volumes:
-  postgres_data:
-  redis_data:
+  postgres_data: # Data PostgreSQL
+  redis_data: # Data Redis
+  academic_storage: # File mahasiswa (students/, temporary/, exports/, dll.)
+  academic_backups: # File backup (students/, cohorts/, full/, dll.)
+

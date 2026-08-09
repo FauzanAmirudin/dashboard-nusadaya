@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getToken } from "@/lib/eden";
 import {
 	Table,
 	TableBody,
@@ -14,6 +15,8 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
 export function TabFormulir() {
 	const [tokens, setTokens] = useState<any[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -21,10 +24,10 @@ export function TabFormulir() {
 	const fetchTokens = async () => {
 		try {
 			const res = await fetch(
-				`${process.env.NEXT_PUBLIC_API_URL}/pmb/form-tokens`,
+				`${API_URL}/pmb/form-tokens`,
 				{
 					headers: {
-						Authorization: `Bearer ${localStorage.getItem("token")}`,
+						Authorization: `Bearer ${getToken()}`,
 					},
 				},
 			);
@@ -46,11 +49,11 @@ export function TabFormulir() {
 	const generateToken = async () => {
 		try {
 			const res = await fetch(
-				`${process.env.NEXT_PUBLIC_API_URL}/pmb/form-tokens`,
+				`${API_URL}/pmb/form-tokens`,
 				{
 					method: "POST",
 					headers: {
-						Authorization: `Bearer ${localStorage.getItem("token")}`,
+						Authorization: `Bearer ${getToken()}`,
 					},
 				},
 			);

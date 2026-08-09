@@ -200,6 +200,11 @@ function StudentDetailContent() {
 	const [mounted, setMounted] = useState(false);
 	const [updateTrigger, setUpdateTrigger] = useState(0);
 	const [isGenerating, setIsGenerating] = useState(false);
+	
+	const [isExporting, setIsExporting] = useState(false);
+	const [exportJobId, setExportJobId] = useState<string | null>(null);
+	const [exportStatus, setExportStatus] = useState<string | null>(null);
+	const [exportDownloadUrl, setExportDownloadUrl] = useState<string | null>(null);
 
 	useEffect(() => {
 		setMounted(true);
@@ -240,6 +245,53 @@ function StudentDetailContent() {
 			toast.error("Terjadi kesalahan sistem saat menghubungi server.");
 		} finally {
 			setIsGenerating(false);
+		}
+	};
+
+	useEffect(() => {
+		if (!exportJobId) return;
+		const interval = setInterval(async () => {
+			try {
+				const res = await api.exports[exportJobId].get();
+				if (res.data?.success) {
+					const status = res.data?.data?.status;
+					setExportStatus(status ?? null);
+					if (status === 'completed') {
+						setExportDownloadUrl(res.data?.data?.downloadUrl ?? null);
+						clearInterval(interval);
+						setIsExporting(false);
+						toast.success("File ZIP siap diunduh!");
+					} else if (status === 'failed') {
+						clearInterval(interval);
+						setIsExporting(false);
+						toast.error("Gagal membuat file ZIP.");
+					}
+				}
+			} catch (err) {
+				console.error("Polling export error", err);
+			}
+		}, 2000);
+		return () => clearInterval(interval);
+	}, [exportJobId]);
+
+	const handleExportFiles = async () => {
+		if (!data?.student?.id) return;
+		setIsExporting(true);
+		setExportStatus('queued');
+		setExportJobId(null);
+		setExportDownloadUrl(null);
+		try {
+			const res = await api.exports.student[data.student.id].post();
+			if (res.data?.success) {
+				setExportJobId(res.data?.data?.jobId ?? null);
+				toast.info("Sedang menyiapkan file ZIP...");
+			} else {
+				toast.error(res.data?.message || "Gagal memulai ekspor.");
+				setIsExporting(false);
+			}
+		} catch (err) {
+			toast.error("Terjadi kesalahan koneksi saat ekspor.");
+			setIsExporting(false);
 		}
 	};
 
@@ -490,6 +542,31 @@ function StudentDetailContent() {
 									: "Buat Akun Mahasiswa"}
 						</Button>
 					)}
+					{user?.role === "superadmin" && (
+						<Button
+							variant="outline"
+							onClick={
+								exportStatus === 'completed' && exportDownloadUrl
+									? () => {
+											window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/exports/${exportJobId}/download`;
+										}
+									: handleExportFiles
+							}
+							disabled={isExporting}
+							className={
+								exportStatus === 'completed'
+									? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 hover:text-green-800"
+									: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:text-blue-800"
+							}
+						>
+							<Download className="w-4 h-4 mr-2" />
+							{isExporting
+								? "Menyiapkan ZIP..."
+								: exportStatus === 'completed'
+									? "Unduh ZIP"
+									: "Unduh Semua Berkas"}
+						</Button>
+					)}
 					{(user?.role === "superadmin" || user?.role === "pmb") && (
 						<>
 							<Button
@@ -519,7 +596,9 @@ function StudentDetailContent() {
 					<div className="flex items-start gap-5">
 						<Avatar className="w-16 h-16 border-2 border-[#0517B0]/30">
 							{s.profilePhotoUrl ? (
-								<img
+								<>
+									{/* biome-ignore lint/performance/noImgElement: Dynamic avatar image */}
+									<img
 									src={
 										s.profilePhotoUrl.startsWith("http")
 											? s.profilePhotoUrl
@@ -528,6 +607,7 @@ function StudentDetailContent() {
 									alt={s.name}
 									className="w-full h-full object-cover rounded-full"
 								/>
+								</>
 							) : (
 								<AvatarFallback className="bg-gradient-to-br from-[#0517B0] to-blue-600 text-white text-xl font-bold">
 									{getInitials(s.name)}

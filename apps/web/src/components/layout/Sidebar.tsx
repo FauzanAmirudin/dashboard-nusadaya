@@ -15,6 +15,7 @@ import {
 	Users,
 	Wallet,
 	X,
+	DatabaseBackup,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -116,6 +117,12 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 		icon: ShieldCheck,
 		label: "Panel Finalisasi",
 		href: "/dashboard/finalisasi",
+		roles: ["superadmin"],
+	},
+	{
+		icon: DatabaseBackup,
+		label: "Backup & Sistem",
+		href: "/dashboard/settings/backup",
 		roles: ["superadmin"],
 	},
 ];

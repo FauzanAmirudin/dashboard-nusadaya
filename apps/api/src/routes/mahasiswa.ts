@@ -1,5 +1,3 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
@@ -25,6 +23,7 @@ import {
 	users,
 	vocabLogs,
 } from "../db/schema";
+import { fileService } from "../modules/file/service/file.service";
 
 export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 	.derive(async ({ request, jwt, cookie: { auth } }: any) => {
@@ -208,16 +207,24 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			return { success: false, message: "Data mahasiswa tidak ditemukan" };
 		}
 
-		const uploadDir = join(process.cwd(), "uploads", "profile");
-		await mkdir(uploadDir, { recursive: true });
-
-		const fileName = `student_${studentData.id}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-		const filePath = join(uploadDir, fileName);
-
-		const fileBuffer = await file.arrayBuffer();
-		await Bun.write(filePath, fileBuffer);
-
-		const fileUrl = `/uploads/profile/${fileName}`;
+		// Upload foto profil mahasiswa via FileService
+		let fileUrl: string;
+		try {
+			const uploadResult = await fileService.uploadFile({
+				file,
+				studentId: studentData.id,
+				category: "profile",
+				panel: "mahasiswa",
+				documentKey: "profile_photo",
+				uploadedBy: user.id,
+				visibility: "public",
+			});
+			fileUrl = `/files/${uploadResult.id}/download`;
+		} catch (err) {
+			const error = err as Error;
+			set.status = 400;
+			return { success: false, message: error.message };
+		}
 
 		await db
 			.update(students)

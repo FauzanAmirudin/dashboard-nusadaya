@@ -10,12 +10,24 @@ import { users } from "./db/schema";
 import { dosenRouter } from "./routes/dosen";
 import { financeRouter } from "./routes/finance";
 import { formRegisterRoutes } from "./routes/form-register";
+import { healthRoutes } from "./routes/health";
 import { magangRouter } from "./routes/magang";
 import { mahasiswaRouter } from "./routes/mahasiswa";
 import { paRouter } from "./routes/pa";
 import { settingsRoutes } from "./routes/settings";
 import { studentsRouter } from "./routes/student";
 import { vocationalRouter } from "./routes/vocational";
+// Modul Storage Baru
+import { fileModule } from "./modules/file";
+import { backupModule } from "./modules/backup";
+import { exportModule } from "./modules/export";
+import { fileService } from "./modules/file/service/file.service";
+// Workers
+import { startBackupWorker } from "./workers/backup.worker";
+import { startExportWorker } from "./workers/export.worker";
+import { startFileWorker } from "./workers/file.worker";
+import { startPdfWorker } from "./workers/pdf.worker";
+import { startScheduledWorker } from "./workers/scheduled.worker";
 
 const JWT_SECRET =
 	process.env.JWT_SECRET || "super_secret_jwt_key_nusadaya_2026";
@@ -32,16 +44,8 @@ const app = new Elysia()
 			},
 		}),
 	)
-	.get("/uploads/*", async ({ params, set }) => {
-		const { join } = await import("node:path");
-		const filePath = join(process.cwd(), "uploads", params["*"]);
-		const file = Bun.file(filePath);
-		if (await file.exists()) {
-			return file;
-		}
-		set.status = 404;
-		return "Not found";
-	})
+	// CATATAN: Endpoint /uploads/* lama dihapus.
+	// File sekarang diakses via GET /files/:id/download (streaming, auth-protected)
 	.use(cors({ origin: true, credentials: true }))
 	// JWT and cookie must be used before derive
 	.use(elysiaJwt({ name: "jwt", secret: JWT_SECRET }))
@@ -151,7 +155,7 @@ const app = new Elysia()
 		return { success: true, data: result };
 	})
 
-	// Module Routers
+	// Module Routers (existing)
 	.use(studentsRouter)
 	.use(formRegisterRoutes)
 	.use(dosenRouter)
@@ -160,12 +164,73 @@ const app = new Elysia()
 	.use(financeRouter)
 	.use(settingsRoutes)
 	.use(vocationalRouter)
-	.use(mahasiswaRouter);
+	.use(mahasiswaRouter)
 
-app.listen(process.env.PORT || 3001, () => {
+	// Module Routers (storage system baru)
+	.use(fileModule)
+	.use(backupModule)
+	.use(exportModule)
+
+	// Health check
+	.use(healthRoutes);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STARTUP
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.get("/debug", async () => {
+	try {
+		const { sql } = require("drizzle-orm");
+		const dbRes = await db.execute(sql`SELECT 1 as num`);
+		return {
+			redis: process.env.REDIS_URL,
+			db: process.env.DATABASE_URL,
+			port: process.env.PORT,
+			db_query: "success"
+		};
+	} catch (err: any) {
+		return { db_error: err.message };
+	}
+});
+
+app.listen(process.env.PORT || 3001, async () => {
 	console.log(
 		`🦊 Nusadaya API is running at http://localhost:${process.env.PORT || 3001}`,
 	);
+
+	// 1. Inisialisasi direktori storage
+	await fileService.ensureDirectories();
+
+	// 2. Jalankan workers di background (non-blocking)
+	// Konfigurasi concurrency: Backup=1, Export=1, File=1, PDF=2
+	// Sesuai rekomendasi plan: mulai konservatif, monitor disk I/O
+	setTimeout(() => {
+		// Backup Worker (1 instance — concurrency 1)
+		startBackupWorker().catch((err) =>
+			console.error("[BackupWorker] Fatal error:", err),
+		);
+
+		// Export Worker (1 instance)
+		startExportWorker().catch((err) =>
+			console.error("[ExportWorker] Fatal error:", err),
+		);
+
+		// File Worker (cleanup — tidak perlu banyak)
+		startFileWorker();
+
+		// PDF Workers (2 instance)
+		startPdfWorker(1).catch((err) =>
+			console.error("[PdfWorker#1] Fatal error:", err),
+		);
+		startPdfWorker(2).catch((err) =>
+			console.error("[PdfWorker#2] Fatal error:", err),
+		);
+
+		// Scheduled Worker (cron jobs)
+		startScheduledWorker();
+	}, 1000); // Delay 1 detik agar server sudah siap dulu
 });
 
 export type App = typeof app;
+
+

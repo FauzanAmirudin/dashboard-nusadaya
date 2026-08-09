@@ -1,5 +1,3 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import { and, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../../db";
@@ -36,6 +34,7 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { fileService } from "../../modules/file/service/file.service";
 import { requireRole } from "../../middleware/rbac";
 
 export const crmRoutes = new Elysia()
@@ -339,25 +338,30 @@ export const crmRoutes = new Elysia()
 				};
 			}
 
-			const uploadDir = join(
-				process.cwd(),
-				"uploads",
-				"crm",
-				id.toString(),
-				documentKey,
-			);
-			await mkdir(uploadDir, { recursive: true });
+			// Upload via FileService — tidak boleh akses filesystem langsung
+			let uploadResult: { id: string } | null = null;
+			try {
+				uploadResult = await fileService.uploadFile({
+					file,
+					studentId: id,
+					category: "identity",
+					panel: "crm",
+					documentKey,
+					uploadedBy: user.id,
+				});
+			} catch (err) {
+				const error = err as Error;
+				set.status = 400;
+				return { success: false, message: error.message };
+			}
 
-			const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-			const fileUrl = join(uploadDir, filename);
-
-			await Bun.write(fileUrl, await file.arrayBuffer());
+			const fileUrl = `/files/${uploadResult.id}/download`;
 
 			await db.insert(crmDocuments).values({
 				studentId: id,
 				documentKey,
 				fileName: file.name,
-				fileUrl: fileUrl,
+				fileUrl,
 				fileSize: file.size,
 				mimeType: file.type,
 				uploadedBy: user.id,

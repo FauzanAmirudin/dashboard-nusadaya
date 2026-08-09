@@ -3,12 +3,8 @@
 import { Eye, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { getToken } from "@/lib/eden";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
@@ -26,6 +22,8 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
 const MONTHS = [
 	{ value: "1", label: "Januari" },
 	{ value: "2", label: "Februari" },
@@ -42,15 +40,13 @@ const MONTHS = [
 ];
 
 export function TabRiwayatRespons() {
+	const router = useRouter();
 	const [history, setHistory] = useState<any[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const [filterMonth, setFilterMonth] = useState("");
 	const [filterYear, setFilterYear] = useState("");
-
-	const [selectedData, setSelectedData] = useState<any>(null);
-	const [isDetailOpen, setIsDetailOpen] = useState(false);
 
 	const fetchHistory = async () => {
 		setIsLoading(true);
@@ -60,10 +56,10 @@ export function TabRiwayatRespons() {
 			if (filterYear) query.append("year", filterYear);
 
 			const res = await fetch(
-				`${process.env.NEXT_PUBLIC_API_URL}/pmb/form-responses/history?${query.toString()}`,
+				`${API_URL}/pmb/form-responses/history?${query.toString()}`,
 				{
 					headers: {
-						Authorization: `Bearer ${localStorage.getItem("token")}`,
+						Authorization: `Bearer ${getToken()}`,
 					},
 				},
 			);
@@ -205,10 +201,7 @@ export function TabRiwayatRespons() {
 										<button
 											type="button"
 											className="text-[#0517B0] hover:bg-blue-50 p-2 rounded-md transition-colors"
-											onClick={() => {
-												setSelectedData(h);
-												setIsDetailOpen(true);
-											}}
+											onClick={() => router.push(`/dashboard/pmb/responses/${h.id}`)}
 										>
 											<Eye className="w-5 h-5" />
 										</button>
@@ -220,94 +213,6 @@ export function TabRiwayatRespons() {
 				</Table>
 			</div>
 
-			{/* Modal Detail */}
-			<Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-				<DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-					<DialogHeader>
-						<DialogTitle>Detail Riwayat Pendaftaran</DialogTitle>
-					</DialogHeader>
-
-					{selectedData && (
-						<div className="space-y-6">
-							{selectedData.status === "REJECTED" && (
-								<div className="bg-rose-50 border border-rose-200 rounded-md p-4 space-y-1">
-									<p className="text-sm font-semibold text-rose-800">
-										Alasan Penolakan:
-									</p>
-									<p className="text-sm text-rose-700">
-										{selectedData.rejectionNotes}
-									</p>
-								</div>
-							)}
-
-							<div className="grid grid-cols-2 gap-4">
-								<div className="space-y-4">
-									<h4 className="font-semibold border-b pb-2">
-										Data Mahasiswa
-									</h4>
-									<div className="grid grid-cols-3 gap-2 text-sm">
-										<span className="text-slate-500">Nama Lengkap</span>
-										<span className="col-span-2 font-medium">
-											{selectedData.name}
-										</span>
-
-										<span className="text-slate-500">Tempat, Tgl Lahir</span>
-										<span className="col-span-2 font-medium">
-											{selectedData.birthPlace},{" "}
-											{selectedData.birthDate
-												? new Date(selectedData.birthDate).toLocaleDateString(
-														"id-ID",
-													)
-												: "-"}
-										</span>
-
-										<span className="text-slate-500">No. HP</span>
-										<span className="col-span-2 font-medium">
-											{selectedData.phone}
-										</span>
-
-										<span className="text-slate-500">Alamat Lengkap</span>
-										<span className="col-span-2 font-medium">
-											{selectedData.addressStreet} No. {selectedData.addressNo}{" "}
-											RT {selectedData.addressRt}/RW {selectedData.addressRw},{" "}
-											{selectedData.addressVillage},{" "}
-											{selectedData.addressDistrict}, {selectedData.addressCity}
-											, {selectedData.addressProvince}
-										</span>
-									</div>
-								</div>
-
-								<div className="space-y-4">
-									<h4 className="font-semibold border-b pb-2">
-										Data Pendidikan
-									</h4>
-									<div className="grid grid-cols-3 gap-2 text-sm">
-										<span className="text-slate-500">Asal Sekolah</span>
-										<span className="col-span-2 font-medium">
-											{selectedData.schoolOrigin}
-										</span>
-
-										<span className="text-slate-500">Jurusan</span>
-										<span className="col-span-2 font-medium">
-											{selectedData.schoolMajor}
-										</span>
-
-										<span className="text-slate-500">Tahun Lulus</span>
-										<span className="col-span-2 font-medium">
-											{selectedData.graduationYear}
-										</span>
-
-										<span className="text-slate-500">Program Diminati</span>
-										<span className="col-span-2 font-medium">
-											{selectedData.program} - {selectedData.subProgram}
-										</span>
-									</div>
-								</div>
-							</div>
-						</div>
-					)}
-				</DialogContent>
-			</Dialog>
 		</div>
 	);
 }

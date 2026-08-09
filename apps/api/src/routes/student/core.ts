@@ -1,5 +1,3 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import { and, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../../db";
@@ -38,6 +36,7 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { fileService } from "../../modules/file/service/file.service";
 import { requireRole } from "../../middleware/rbac";
 
 export async function createStudentPipeline(body: any, userId: number) {
@@ -578,16 +577,24 @@ export const coreRoutes = new Elysia()
 				return { success: false, message: "Tidak ada file yang diupload" };
 			}
 
-			const uploadDir = join(process.cwd(), "uploads", "profile");
-			await mkdir(uploadDir, { recursive: true });
-
-			const fileName = `student_${id}_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-			const filePath = join(uploadDir, fileName);
-
-			const fileBuffer = await file.arrayBuffer();
-			await Bun.write(filePath, fileBuffer);
-
-			const fileUrl = `/uploads/profile/${fileName}`;
+			// Upload foto profil via FileService
+			let fileUrl: string;
+			try {
+				const uploadResult = await fileService.uploadFile({
+					file,
+					studentId: id,
+					category: "profile",
+					panel: "pmb",
+					documentKey: "profile_photo",
+					uploadedBy: user.id,
+					visibility: "public",
+				});
+				fileUrl = `/files/${uploadResult.id}/download`;
+			} catch (err) {
+				const error = err as Error;
+				set.status = 400;
+				return { success: false, message: error.message };
+			}
 
 			await db
 				.update(students)

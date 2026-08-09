@@ -1,5 +1,3 @@
-import { mkdir, unlink } from "node:fs/promises";
-import { join } from "node:path";
 import { and, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../../db";
@@ -13,6 +11,7 @@ import {
 	students,
 	users,
 } from "../../db/schema";
+import { fileService } from "../../modules/file/service/file.service";
 
 export const pmbRoutes = new Elysia()
 	.put(
@@ -189,7 +188,7 @@ export const pmbRoutes = new Elysia()
 			data: { ...rest, accByUser, paymentPlan, finance },
 		};
 	})
-	.get("/:id/pmb/documents", async ({ params, set }) => {
+	.get("/:id/pmb/documents", async ({ params }) => {
 		const id = Number(params.id);
 		const docs = await db.query.pmbDocuments.findMany({
 			where: eq(pmbDocuments.studentId, id),
@@ -264,25 +263,30 @@ export const pmbRoutes = new Elysia()
 				};
 			}
 
-			const uploadDir = join(
-				process.cwd(),
-				"uploads",
-				"pmb",
-				id.toString(),
-				documentKey,
-			);
-			await mkdir(uploadDir, { recursive: true });
+			// Upload via FileService — tidak boleh akses filesystem langsung
+			let uploadResult: { id: string } | null = null;
+			try {
+				uploadResult = await fileService.uploadFile({
+					file,
+					studentId: id,
+					category: "identity",
+					panel: "pmb",
+					documentKey,
+					uploadedBy: user.id,
+				});
+			} catch (err) {
+				const error = err as Error;
+				set.status = 400;
+				return { success: false, message: error.message };
+			}
 
-			const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-			const fileUrl = join(uploadDir, filename);
-
-			await Bun.write(fileUrl, await file.arrayBuffer());
+			const fileUrl = `/files/${uploadResult.id}/download`;
 
 			await db.insert(pmbDocuments).values({
 				studentId: id,
 				documentKey,
 				fileName: file.name,
-				fileUrl: fileUrl,
+				fileUrl,
 				fileSize: file.size,
 				mimeType: file.type,
 				uploadedBy: user.id,
@@ -359,7 +363,7 @@ export const pmbRoutes = new Elysia()
 		await db.delete(pmbDocuments).where(eq(pmbDocuments.id, docId));
 		return { success: true };
 	})
-	.get("/:id/pmb/payment-plan", async ({ params, set }) => {
+	.get("/:id/pmb/payment-plan", async ({ params }) => {
 		const id = parseInt(params.id, 10);
 		const plan = await db.query.pmbPaymentPlan.findFirst({
 			where: eq(pmbPaymentPlan.studentId, id),
@@ -459,7 +463,7 @@ export const pmbRoutes = new Elysia()
 		},
 	)
 	// Fee Share Recipients Routes (Table: feeShareRecipients)
-	.get("/:id/pmb/fee-share-recipients", async ({ params, set }) => {
+	.get("/:id/pmb/fee-share-recipients", async ({ params }) => {
 		const id = parseInt(params.id, 10);
 		const recipients = await db.query.feeShareRecipients.findMany({
 			where: eq(feeShareRecipients.studentId, id),
@@ -580,9 +584,16 @@ export const pmbRoutes = new Elysia()
 		});
 
 		if (recipient?.invoiceFileUrl) {
+			// Hapus file invoice lama via FileService (berdasarkan panel+documentKey)
+			// invoiceFileUrl baru berformat "/files/{id}/download"
 			try {
-				await unlink(recipient.invoiceFileUrl);
-			} catch (_) {}
+				const fileId = recipient.invoiceFileUrl.split("/files/")[1]?.split("/")[0];
+				if (fileId) {
+					await fileService.deleteFile(fileId);
+				}
+			} catch (_) {
+				// Abaikan error jika file tidak ditemukan
+			}
 		}
 
 		await db
@@ -609,18 +620,24 @@ export const pmbRoutes = new Elysia()
 				return { success: false, message: "File tidak ditemukan" };
 			}
 
-			const uploadDir = join(
-				process.cwd(),
-				"uploads",
-				"fee_invoices",
-				studentId.toString(),
-			);
-			await mkdir(uploadDir, { recursive: true });
+			// Upload invoice via FileService
+			let uploadResult: { id: string } | null = null;
+			try {
+				uploadResult = await fileService.uploadFile({
+					file,
+					studentId,
+					category: "finance",
+					panel: "pmb",
+					documentKey: `fee_invoice_${recipientId}`,
+					uploadedBy: user.id,
+				});
+			} catch (err) {
+				const error = err as Error;
+				set.status = 400;
+				return { success: false, message: error.message };
+			}
 
-			const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-			const filePath = join(uploadDir, filename);
-
-			await Bun.write(filePath, await file.arrayBuffer());
+			const filePath = `/files/${uploadResult.id}/download`;
 
 			await db
 				.update(feeShareRecipients)
@@ -646,7 +663,7 @@ export const pmbRoutes = new Elysia()
 				where: eq(feeShareRecipients.id, recipientId),
 			});
 
-			if (!recipient || !recipient.invoiceFileUrl) {
+			if (!recipient?.invoiceFileUrl) {
 				set.status = 404;
 				return { success: false, message: "Invoice tidak ditemukan" };
 			}

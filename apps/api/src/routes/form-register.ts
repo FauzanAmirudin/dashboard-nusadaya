@@ -39,13 +39,25 @@ export const formRegisterRoutes = new Elysia()
 				};
 			}
 
+			// Format data
+			const insertData: any = { ...body };
+			if (insertData.birthDate) insertData.birthDate = new Date(insertData.birthDate);
+			if (insertData.ayahBirthDate) insertData.ayahBirthDate = new Date(insertData.ayahBirthDate);
+			if (insertData.ibuBirthDate) insertData.ibuBirthDate = new Date(insertData.ibuBirthDate);
+			if (insertData.waliBirthDate) insertData.waliBirthDate = new Date(insertData.waliBirthDate);
+			
+			if (insertData.graduationYear) insertData.graduationYear = Number(insertData.graduationYear);
+			if (insertData.batch) insertData.batch = Number(insertData.batch);
+			if (insertData.height) insertData.height = Number(insertData.height);
+			if (insertData.weight) insertData.weight = Number(insertData.weight);
+
 			// Save Response
 			await db.transaction(async (tx) => {
 				await tx.insert(pmbFormResponses).values({
 					tokenId: tokenRecord.id,
 					status: "PENDING",
-					...body,
-				} as any); // Cast as any because body contains all fields
+					...insertData,
+				});
 
 				await tx
 					.update(pmbFormTokens)
@@ -420,4 +432,25 @@ export const formRegisterRoutes = new Elysia()
 			set.status = 500;
 			return { success: false, message: error.message };
 		}
+	})
+	// 9. ADMIN: Get Single Response
+	.get("/pmb/form-responses/:id", async (context) => {
+		const user = (context as any).user;
+		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			context.set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		const id = Number(context.params.id);
+		const response = await db.query.pmbFormResponses.findFirst({
+			where: eq(pmbFormResponses.id, id),
+			with: { processor: { columns: { fullName: true } } },
+		});
+
+		if (!response) {
+			context.set.status = 404;
+			return { success: false, message: "Response not found" };
+		}
+
+		return { success: true, data: response };
 	});

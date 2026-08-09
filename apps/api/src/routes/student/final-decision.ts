@@ -1,5 +1,3 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import { and, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../../db";
@@ -36,6 +34,7 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { fileService } from "../../modules/file/service/file.service";
 import { requireRole } from "../../middleware/rbac";
 
 export const finalDecisionRoutes = new Elysia()
@@ -328,26 +327,23 @@ export const finalDecisionRoutes = new Elysia()
 				});
 			}
 
-			// Generate unique filename
-			const timestamp = Date.now();
-			const originalName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
-			const filename = `${studentId}_sk_direktur_${timestamp}_${originalName}`;
-
-			// Create directory if not exists
-			const uploadDir = join(
-				process.cwd(),
-				"uploads",
-				"documents",
-				"final-decision",
-			);
-			await mkdir(uploadDir, { recursive: true });
-
-			// Write file to disk
-			const filePath = join(uploadDir, filename);
-			const fileBuffer = await file.arrayBuffer();
-			await Bun.write(filePath, fileBuffer);
-
-			const fileUrl = `/uploads/documents/final-decision/${filename}`;
+			// Upload SK Direktur via FileService
+			let fileUrl: string;
+			try {
+				const uploadResult = await fileService.uploadFile({
+					file,
+					studentId,
+					category: "academic",
+					panel: "akademik",
+					documentKey: "sk_direktur",
+					uploadedBy: user.id,
+				});
+				fileUrl = `/files/${uploadResult.id}/download`;
+			} catch (err) {
+				const error = err as Error;
+				set.status = 400;
+				return { success: false, message: error.message };
+			}
 
 			// Update row in DB
 			await db
@@ -391,7 +387,7 @@ export const finalDecisionRoutes = new Elysia()
 			return { success: true, message: "SK Direktur berhasil dihapus" };
 		},
 	)
-	.get("/finalization", async ({ query, user, set }: any) => {
+	.get("/finalization", async ({ user, set }: any) => {
 		if (user?.role !== "superadmin") {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };

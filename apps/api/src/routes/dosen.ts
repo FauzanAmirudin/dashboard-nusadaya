@@ -1,5 +1,3 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
@@ -9,6 +7,7 @@ import {
 	practicesMaterialReports,
 	students,
 } from "../db/schema";
+import { fileService } from "../modules/file/service/file.service";
 
 export const dosenRouter = new Elysia({ prefix: "/dosen" })
 	.get("/dashboard", async (context) => {
@@ -182,13 +181,21 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" })
 		let fileName = "";
 
 		if (file) {
-			const uploadDir = join(process.cwd(), "uploads", "practices");
-			await mkdir(uploadDir, { recursive: true });
-
-			fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-			fileUrl = join(uploadDir, fileName);
-
-			await Bun.write(fileUrl, await file.arrayBuffer());
+			try {
+				const uploadResult = await fileService.uploadFile({
+					file,
+					category: "vocational",
+					panel: "dosen",
+					documentKey: `laporan_sisa_bahan_${body.budgetRequestId}`,
+					uploadedBy: user.id,
+				});
+				fileUrl = `/files/${uploadResult.id}/download`;
+				fileName = file.name;
+			} catch (err) {
+				const error = err as Error;
+				set.status = 400;
+				return { success: false, message: error.message };
+			}
 		}
 
 		await db.insert(practicesMaterialReports).values({
@@ -248,15 +255,21 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" })
 			};
 
 			if (file) {
-				const uploadDir = join(process.cwd(), "uploads", "practices");
-				await mkdir(uploadDir, { recursive: true });
-
-				const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-				const fileUrl = join(uploadDir, fileName);
-
-				await Bun.write(fileUrl, await file.arrayBuffer());
-				updateData.fileUrl = fileUrl;
-				updateData.fileName = fileName;
+				try {
+					const uploadResult = await fileService.uploadFile({
+						file,
+						category: "vocational",
+						panel: "dosen",
+						documentKey: `laporan_sisa_bahan_${body.budgetRequestId}_update`,
+						uploadedBy: user.id,
+					});
+					updateData.fileUrl = `/files/${uploadResult.id}/download`;
+					updateData.fileName = file.name;
+				} catch (err) {
+					const error = err as Error;
+					set.status = 400;
+					return { success: false, message: error.message };
+				}
 			}
 
 			await db

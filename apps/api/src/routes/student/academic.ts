@@ -1,5 +1,3 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import { and, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../../db";
@@ -36,10 +34,11 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { fileService } from "../../modules/file/service/file.service";
 import { requireRole } from "../../middleware/rbac";
 
 export const academicRoutes = new Elysia()
-	.get("/:id/academic", async ({ params, set }) => {
+	.get("/:id/academic", async ({ params }) => {
 		const id = Number(params.id);
 		const academic = await db.query.academicData.findFirst({
 			where: eq(academicData.studentId, id),
@@ -262,7 +261,7 @@ export const academicRoutes = new Elysia()
 	})
 
 	// --- DOSEN ROUTES ---
-	.get("/:id/course-grades", async ({ params, set }) => {
+	.get("/:id/course-grades", async ({ params }) => {
 		const id = Number(params.id);
 		const grades = await db.query.courseGrades.findMany({
 			where: eq(courseGrades.studentId, id),
@@ -608,10 +607,23 @@ export const academicRoutes = new Elysia()
 			return { success: false, message: "Tipe file tidak diizinkan" };
 		}
 
-		const uploadDir = `./uploads/course-grades/${id}/${courseId}/${documentKey}`;
-		await mkdir(uploadDir, { recursive: true });
-		const filePath = `${uploadDir}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-		await Bun.write(filePath, await file.arrayBuffer());
+		// Upload via FileService
+		let filePath: string;
+		try {
+			const uploadResult = await fileService.uploadFile({
+				file,
+				studentId: id,
+				category: "academic",
+				panel: "akademik",
+				documentKey,
+				uploadedBy: user.id,
+			});
+			filePath = `/files/${uploadResult.id}/download`;
+		} catch (err) {
+			const error = err as Error;
+			set.status = 400;
+			return { success: false, message: error.message };
+		}
 
 		await db.insert(courseGradeDocuments).values({
 			studentId: id,

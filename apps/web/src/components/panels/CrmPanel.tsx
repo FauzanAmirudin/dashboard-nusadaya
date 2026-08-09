@@ -133,6 +133,8 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 	const [showAllLogs, setShowAllLogs] = useState(false);
+	const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
+	const [selectedDocToDelete, setSelectedDocToDelete] = useState<number | null>(null);
 
 	const fetchCrmData = async () => {
 		try {
@@ -339,12 +341,17 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 		}
 	};
 
-	const handleDeleteDocument = async (docId: number) => {
-		if (!confirm("Apakah Anda yakin ingin menghapus file ini?")) return;
+	const confirmDeleteDocument = (docId: number) => {
+		setSelectedDocToDelete(docId);
+		setIsDeleteDocOpen(true);
+	};
+
+	const handleDeleteDocument = async () => {
+		if (!selectedDocToDelete) return;
 
 		try {
 			const res = await fetch(
-				`${API_URL}/students/${studentId}/crm/documents/${docId}`,
+				`${API_URL}/students/${studentId}/crm/documents/${selectedDocToDelete}`,
 				{
 					method: "DELETE",
 					headers: { Authorization: `Bearer ${token}` },
@@ -352,6 +359,8 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 			);
 			if (res.ok) {
 				toast.success("Dokumen berhasil dihapus");
+				setIsDeleteDocOpen(false);
+				setSelectedDocToDelete(null);
 				fetchDocuments();
 			} else {
 				toast.error("Gagal menghapus dokumen");
@@ -1737,6 +1746,30 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 						</Card>
 					</TabsContent>
 				</Tabs>
+
+				<Dialog open={isDeleteDocOpen} onOpenChange={setIsDeleteDocOpen}>
+					<DialogContent>
+						<DialogHeader>
+							<DialogTitle>Konfirmasi Hapus</DialogTitle>
+						</DialogHeader>
+						<div className="space-y-4 pt-4">
+							<p className="text-slate-600">
+								Apakah Anda yakin ingin menghapus dokumen ini?
+							</p>
+							<div className="flex justify-end gap-3 pt-4">
+								<Button variant="outline" onClick={() => setIsDeleteDocOpen(false)}>
+									Batal
+								</Button>
+								<Button
+									variant="destructive"
+									onClick={handleDeleteDocument}
+								>
+									Hapus Dokumen
+								</Button>
+							</div>
+						</div>
+					</DialogContent>
+				</Dialog>
 			</div>
 		</TooltipProvider>
 	);

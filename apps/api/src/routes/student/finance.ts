@@ -1,5 +1,3 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import { and, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../../db";
@@ -39,7 +37,7 @@ import {
 import { requireRole } from "../../middleware/rbac";
 
 export const financeRoutes = new Elysia()
-	.get("/:id/finance", async ({ params, set }) => {
+	.get("/:id/finance", async ({ params }) => {
 		const id = Number(params.id);
 		const finance = await db.query.financeData.findFirst({
 			where: eq(financeData.studentId, id),

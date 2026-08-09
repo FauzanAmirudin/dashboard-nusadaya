@@ -13,11 +13,15 @@
 		"@elysiajs/cors": "latest",
 		"@elysiajs/jwt": "latest",
 		"@elysiajs/swagger": "latest",
+		"archiver": "^8.0.0",
 		"drizzle-orm": "latest",
 		"elysia": "latest",
-		"postgres": "latest"
+		"ioredis": "^6.0.0",
+		"postgres": "latest",
+		"ulidx": "^2.4.1"
 	},
 	"devDependencies": {
+		"@types/archiver": "^8.0.0",
 		"bun-types": "latest",
 		"drizzle-kit": "latest"
 	}

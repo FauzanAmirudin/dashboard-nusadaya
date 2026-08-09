@@ -9,7 +9,7 @@ import {
 	Trash2,
 	XCircle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { DosenPanel } from "@/components/panels/DosenPanel";
 import {
@@ -22,6 +22,12 @@ import {
 	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -103,6 +109,8 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 	const [loadingItem, setLoadingItem] = useState<string | null>(null);
 	const [isSavingAttendance, setIsSavingAttendance] = useState(false);
 	const [isSavingNotes, setIsSavingNotes] = useState(false);
+	const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
+	const [selectedDocToDelete, setSelectedDocToDelete] = useState<number | null>(null);
 
 	const fetchAcademicData = async () => {
 		try {
@@ -118,7 +126,7 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 		}
 	};
 
-	const fetchDocuments = async () => {
+	const fetchDocuments = useCallback(async () => {
 		try {
 			const { data, error } =
 				await api.students[studentId.toString()].academic.documents.get();
@@ -128,12 +136,12 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 		} catch (err) {
 			console.error("Failed to fetch documents", err);
 		}
-	};
+	}, [studentId]);
 
 	useEffect(() => {
 		fetchAcademicData();
 		fetchDocuments();
-	}, [studentId]);
+	}, [studentId, fetchDocuments]);
 
 	useEffect(() => {
 		if (acadState) {
@@ -449,16 +457,23 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 		}
 	};
 
-	const handleDeleteDocument = async (docId: number) => {
+	const confirmDeleteDocument = (docId: number) => {
 		if (!canEdit) return;
-		if (!confirm("Apakah Anda yakin ingin menghapus file ini?")) return;
+		setSelectedDocToDelete(docId);
+		setIsDeleteDocOpen(true);
+	};
+
+	const handleDeleteDocument = async () => {
+		if (!canEdit || !selectedDocToDelete) return;
 		try {
 			const { error } =
 				await api.students[studentId.toString()].academic.documents[
-					docId.toString()
+					selectedDocToDelete.toString()
 				].delete();
 			if (!error) {
-				toast.success("Dokumen berhasil dihapus");
+				toast.success("Dokumen dihapus");
+				setIsDeleteDocOpen(false);
+				setSelectedDocToDelete(null);
 				fetchDocuments();
 			} else {
 				toast.error("Gagal menghapus dokumen");
@@ -841,6 +856,30 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 					</div>
 				)}
 			</div>
+
+			<Dialog open={isDeleteDocOpen} onOpenChange={setIsDeleteDocOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Konfirmasi Hapus</DialogTitle>
+					</DialogHeader>
+					<div className="space-y-4 pt-4">
+						<p className="text-slate-600">
+							Apakah Anda yakin ingin menghapus dokumen ini?
+						</p>
+						<div className="flex justify-end gap-3 pt-4">
+							<Button variant="outline" onClick={() => setIsDeleteDocOpen(false)}>
+								Batal
+							</Button>
+							<Button
+								variant="destructive"
+								onClick={handleDeleteDocument}
+							>
+								Hapus Dokumen
+							</Button>
+						</div>
+					</div>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

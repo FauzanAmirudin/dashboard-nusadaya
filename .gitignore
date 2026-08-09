@@ -115,3 +115,5 @@ finance_modification.md
 demo-accounts.md
 apps/api/uploads/
 /.agents
+/storage/
+/backups/

@@ -3,6 +3,12 @@
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -45,6 +51,9 @@ export default function MasterAkademikSettings() {
 		categoryName: "",
 	});
 
+	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+	const [itemToDelete, setItemToDelete] = useState<{ id: number; type: string } | null>(null);
+
 	const fetchData = async () => {
 		setIsLoading(true);
 		try {
@@ -82,8 +91,12 @@ export default function MasterAkademikSettings() {
 		} else toast.error("Gagal menambah event type");
 	};
 
+	const confirmDelete = (id: number, type: string) => {
+		setItemToDelete({ id, type });
+		setIsDeleteDialogOpen(true);
+	};
+
 	const handleDeleteEvent = async (id: number) => {
-		if (!confirm("Hapus?")) return;
 		const { error } =
 			await api.settings["master-events"][id.toString()].delete();
 		if (!error) {
@@ -113,7 +126,6 @@ export default function MasterAkademikSettings() {
 	};
 
 	const handleDeleteBusiness = async (id: number) => {
-		if (!confirm("Hapus?")) return;
 		const { error } =
 			await api.settings["master-business"][id.toString()].delete();
 		if (!error) {
@@ -134,13 +146,21 @@ export default function MasterAkademikSettings() {
 	};
 
 	const handleDeleteService = async (id: number) => {
-		if (!confirm("Hapus?")) return;
 		const { error } =
 			await api.settings["master-services"][id.toString()].delete();
 		if (!error) {
 			toast.success("Service tag dihapus");
 			fetchData();
 		} else toast.error("Gagal menghapus");
+	};
+
+	const executeDelete = () => {
+		if (!itemToDelete) return;
+		if (itemToDelete.type === "event") handleDeleteEvent(itemToDelete.id);
+		if (itemToDelete.type === "business") handleDeleteBusiness(itemToDelete.id);
+		if (itemToDelete.type === "service") handleDeleteService(itemToDelete.id);
+		setIsDeleteDialogOpen(false);
+		setItemToDelete(null);
 	};
 
 	if (isLoading) {
@@ -192,7 +212,7 @@ export default function MasterAkademikSettings() {
 											<Button
 												variant="ghost"
 												size="sm"
-												onClick={() => handleDeleteEvent(ev.id)}
+												onClick={() => confirmDelete(ev.id, "event")}
 											>
 												<Trash2 className="w-4 h-4 text-rose-500" />
 											</Button>
@@ -262,7 +282,7 @@ export default function MasterAkademikSettings() {
 											<Button
 												variant="ghost"
 												size="sm"
-												onClick={() => handleDeleteBusiness(bp.id)}
+												onClick={() => confirmDelete(bp.id, "business")}
 											>
 												<Trash2 className="w-4 h-4 text-rose-500" />
 											</Button>
@@ -356,7 +376,7 @@ export default function MasterAkademikSettings() {
 											<Button
 												variant="ghost"
 												size="sm"
-												onClick={() => handleDeleteService(sv.id)}
+												onClick={() => confirmDelete(sv.id, "service")}
 											>
 												<Trash2 className="w-4 h-4 text-rose-500" />
 											</Button>
@@ -393,6 +413,30 @@ export default function MasterAkademikSettings() {
 					)}
 				</CardContent>
 			</Card>
+
+			<Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Konfirmasi Hapus</DialogTitle>
+					</DialogHeader>
+					<div className="space-y-4 pt-4">
+						<p className="text-slate-600">
+							Apakah Anda yakin ingin menghapus data ini?
+						</p>
+						<div className="flex justify-end gap-3 pt-4">
+							<Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+								Batal
+							</Button>
+							<Button
+								variant="destructive"
+								onClick={executeDelete}
+							>
+								Hapus
+							</Button>
+						</div>
+					</div>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

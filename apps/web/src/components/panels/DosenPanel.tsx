@@ -150,6 +150,12 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 		hasKwu: true,
 	});
 
+	const [isDeleteCourseOpen, setIsDeleteCourseOpen] = useState(false);
+	const [selectedCourseToDelete, setSelectedCourseToDelete] = useState<{ id: number; name: string } | null>(null);
+
+	const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
+	const [selectedDocToDelete, setSelectedDocToDelete] = useState<{ courseId: number; docId: number } | null>(null);
+
 	const fetchGrades = async () => {
 		const { data, error } =
 			await api.students[studentId.toString()]["course-grades"].get();
@@ -359,16 +365,21 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 		}
 	};
 
-	const handleDeleteCourse = async (courseId: number, courseName: string) => {
-		if (!confirm(`Hapus MK "${courseName}"? Data nilai dan ACC akan hilang.`))
-			return;
+	const confirmDeleteCourse = (courseId: number, courseName: string) => {
+		setSelectedCourseToDelete({ id: courseId, name: courseName });
+		setIsDeleteCourseOpen(true);
+	};
 
+	const handleDeleteCourse = async () => {
+		if (!selectedCourseToDelete) return;
 		const { error } =
 			await api.students[studentId.toString()]["course-grades"][
-				courseId.toString()
+				selectedCourseToDelete.id.toString()
 			].delete();
 		if (!error) {
-			toast.success(`MK "${courseName}" berhasil dihapus`);
+			toast.success(`MK "${selectedCourseToDelete.name}" berhasil dihapus`);
+			setIsDeleteCourseOpen(false);
+			setSelectedCourseToDelete(null);
 			fetchGrades();
 			onUpdate();
 		} else {
@@ -443,15 +454,22 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 		}
 	};
 
-	const handleDeleteDocument = async (courseId: number, docId: number) => {
-		if (!confirm("Hapus dokumen ini?")) return;
+	const confirmDeleteDocument = (courseId: number, docId: number) => {
+		setSelectedDocToDelete({ courseId, docId });
+		setIsDeleteDocOpen(true);
+	};
+
+	const handleDeleteDocument = async () => {
+		if (!selectedDocToDelete) return;
 		const { error } =
 			await api.students[studentId.toString()]["course-grades"][
-				courseId.toString()
-			].documents[docId.toString()].delete();
+				selectedDocToDelete.courseId.toString()
+			].documents[selectedDocToDelete.docId.toString()].delete();
 		if (!error) {
 			toast.success("Dokumen dihapus");
-			fetchDocumentsForCourse(courseId);
+			setIsDeleteDocOpen(false);
+			setSelectedDocToDelete(null);
+			fetchDocumentsForCourse(selectedDocToDelete.courseId);
 		} else {
 			toast.error("Gagal menghapus dokumen");
 		}
@@ -858,6 +876,7 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																courseId={g.id}
 																documentKey="attendance_proof"
 																canEdit={canEditThisRow && !g.isAcc}
+																
 															/>
 														</div>
 
@@ -876,6 +895,7 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																courseId={g.id}
 																documentKey="grade_card"
 																canEdit={canEditThisRow && !g.isAcc}
+																
 															/>
 														</div>
 
@@ -895,6 +915,7 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																courseId={g.id}
 																documentKey="dispensation"
 																canEdit={canEditThisRow && !g.isAcc}
+																
 															/>
 														</div>
 
@@ -914,6 +935,7 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																courseId={g.id}
 																documentKey="product_photo"
 																canEdit={canEditThisRow && !g.isAcc}
+																
 															/>
 															{g.productPhotoUrl && (
 																<div className="mt-3">
@@ -1039,7 +1061,7 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																	</AlertDialogCancel>
 																	<AlertDialogAction
 																		onClick={() =>
-																			handleDeleteCourse(g.id, g.courseName)
+																			confirmDeleteCourse(g.id, g.courseName)
 																		}
 																		className="bg-rose-600 hover:bg-rose-700 text-white"
 																	>
@@ -1307,6 +1329,54 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 				onUpdate={fetchGrades}
 			/>
 			<WeeklyEvents studentId={studentId} />
+
+			<Dialog open={isDeleteCourseOpen} onOpenChange={setIsDeleteCourseOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Konfirmasi Hapus Mata Kuliah</DialogTitle>
+					</DialogHeader>
+					<div className="space-y-4 pt-4">
+						<p className="text-slate-600">
+							Apakah Anda yakin ingin menghapus MK "{selectedCourseToDelete?.name}"? Seluruh data nilai dan status ACC akan ikut terhapus dan tidak dapat dikembalikan.
+						</p>
+						<div className="flex justify-end gap-3 pt-4">
+							<Button variant="outline" onClick={() => setIsDeleteCourseOpen(false)}>
+								Batal
+							</Button>
+							<Button
+								variant="destructive"
+								onClick={handleDeleteCourse}
+							>
+								Hapus MK
+							</Button>
+						</div>
+					</div>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog open={isDeleteDocOpen} onOpenChange={setIsDeleteDocOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Konfirmasi Hapus Dokumen</DialogTitle>
+					</DialogHeader>
+					<div className="space-y-4 pt-4">
+						<p className="text-slate-600">
+							Apakah Anda yakin ingin menghapus dokumen lampiran ini?
+						</p>
+						<div className="flex justify-end gap-3 pt-4">
+							<Button variant="outline" onClick={() => setIsDeleteDocOpen(false)}>
+								Batal
+							</Button>
+							<Button
+								variant="destructive"
+								onClick={handleDeleteDocument}
+							>
+								Hapus Dokumen
+							</Button>
+						</div>
+					</div>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }
