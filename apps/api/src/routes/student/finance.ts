@@ -17,6 +17,8 @@ import {
 	finalDecision,
 	financeData,
 	financeDocuments,
+	financeSemesterInstallments,
+	financeSemesters,
 	internalNotes,
 	internshipData,
 	internshipDocuments,
@@ -333,4 +335,406 @@ export const financeRoutes = new Elysia()
 
 		await db.delete(financeDocuments).where(eq(financeDocuments.id, docId));
 		return { success: true };
-	});
+	})
+	.get("/:id/finance/semesters", async ({ params }) => {
+		const id = Number(params.id);
+
+		let semesters = await db.query.financeSemesters.findMany({
+			where: eq(financeSemesters.studentId, id),
+			orderBy: (financeSemesters, { asc }) => [
+				asc(financeSemesters.semesterNumber),
+			],
+			with: {
+				installments: {
+					orderBy: (installments, { asc }) => [
+						asc(installments.installmentNumber),
+					],
+				},
+			},
+		});
+
+		// Auto-seed if empty
+		if (semesters.length === 0) {
+			const seedData = Array.from({ length: 6 }).map((_, i) => ({
+				studentId: id,
+				semesterNumber: i + 1,
+				totalBilled: 0,
+			}));
+			await db.insert(financeSemesters).values(seedData);
+
+			semesters = await db.query.financeSemesters.findMany({
+				where: eq(financeSemesters.studentId, id),
+				orderBy: (financeSemesters, { asc }) => [
+					asc(financeSemesters.semesterNumber),
+				],
+				with: {
+					installments: {
+						orderBy: (installments, { asc }) => [
+							asc(installments.installmentNumber),
+						],
+					},
+				},
+			});
+		}
+
+		return { success: true, data: semesters };
+	})
+	.patch(
+		"/:id/finance/semesters/:semesterId",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			const semesterId = Number(params.semesterId);
+			const updates = body as Record<string, any>;
+
+			const current = await db.query.financeSemesters.findFirst({
+				where: eq(financeSemesters.id, semesterId),
+				with: { installments: true },
+			});
+
+			if (!current) {
+				set.status = 404;
+				return { success: false, message: "Semester not found" };
+			}
+
+			let newStatus = current.status;
+			const isTalangan =
+				updates.isTalangan !== undefined
+					? updates.isTalangan
+					: current.isTalangan;
+			const totalBilled =
+				updates.totalBilled !== undefined
+					? Number(updates.totalBilled)
+					: current.totalBilled;
+
+			if (isTalangan) {
+				newStatus = "LUNAS";
+			} else {
+				const totalPaid = current.installments.reduce(
+					(sum, inst) => sum + inst.nominalPaid,
+					0,
+				);
+				if (totalPaid === 0) newStatus = "BELUM_BAYAR";
+				else if (totalPaid >= (totalBilled || 0)) newStatus = "LUNAS";
+				else newStatus = "SEBAGIAN";
+			}
+
+			await db
+				.update(financeSemesters)
+				.set({
+					...updates,
+					status: newStatus,
+					updatedAt: new Date(),
+				})
+				.where(eq(financeSemesters.id, semesterId));
+
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				totalBilled: t.Optional(t.Number()),
+				isTalangan: t.Optional(t.Boolean()),
+				notes: t.Optional(t.String()),
+			}),
+		},
+	)
+	.post(
+		"/:id/finance/semesters/bulk-payment",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			const studentId = Number(params.id);
+			const b = body as any;
+			let remainingAmount = Number(b.nominalPaid);
+			if (remainingAmount <= 0) {
+				set.status = 400;
+				return { success: false, message: "Nominal tidak valid" };
+			}
+
+			// Fetch all semesters
+			const semesters = await db.query.financeSemesters.findMany({
+				where: eq(financeSemesters.studentId, studentId),
+				orderBy: (financeSemesters, { asc }) => [
+					asc(financeSemesters.semesterNumber),
+				],
+				with: { installments: true },
+			});
+
+			for (const sem of semesters) {
+				if (remainingAmount <= 0) break;
+
+				const totalPaid = sem.installments.reduce(
+					(sum, inst) => sum + inst.nominalPaid,
+					0,
+				);
+				const unpaidBalance = (sem.totalBilled || 0) - totalPaid;
+
+				if (unpaidBalance > 0) {
+					const amountToApply = Math.min(unpaidBalance, remainingAmount);
+
+					const installmentNumber = sem.installments.length + 1;
+
+					await db.insert(financeSemesterInstallments).values({
+						semesterId: sem.id,
+						installmentNumber,
+						nominalPaid: amountToApply,
+						paymentDate: b.paymentDate ? new Date(b.paymentDate) : new Date(),
+						buktiBayarUrl: b.buktiBayarUrl,
+						notes: b.notes || "Pembayaran Multi-Semester",
+						isTalangan: b.isTalangan ?? false,
+					});
+
+					remainingAmount -= amountToApply;
+
+					// Recalculate status
+					const newTotalPaid = totalPaid + amountToApply;
+					let newStatus = sem.status;
+					if (newTotalPaid === 0) newStatus = "BELUM_BAYAR";
+					else if (newTotalPaid >= (sem.totalBilled || 0)) newStatus = "LUNAS";
+					else newStatus = "SEBAGIAN";
+
+					await db
+						.update(financeSemesters)
+						.set({
+							status: newStatus,
+							isTalangan: false, // Cancel talangan because it's paid
+							updatedAt: new Date(),
+						})
+						.where(eq(financeSemesters.id, sem.id));
+				}
+			}
+
+			return { success: true, remainingAmount };
+		},
+		{
+			body: t.Object({
+				nominalPaid: t.Number(),
+				paymentDate: t.Optional(t.String()),
+				buktiBayarUrl: t.Optional(t.String()),
+				notes: t.Optional(t.String()),
+				isTalangan: t.Optional(t.Boolean()),
+			}),
+		},
+	)
+	.post(
+		"/:id/finance/semesters/:semesterId/installments",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			const semesterId = Number(params.semesterId);
+			const b = body as any;
+
+			const current = await db.query.financeSemesters.findFirst({
+				where: eq(financeSemesters.id, semesterId),
+				with: { installments: true },
+			});
+
+			if (!current) {
+				set.status = 404;
+				return { success: false, message: "Semester not found" };
+			}
+
+			const installmentNumber = current.installments.length + 1;
+
+			await db.insert(financeSemesterInstallments).values({
+				semesterId,
+				installmentNumber,
+				nominalPaid: b.nominalPaid,
+				paymentDate: b.paymentDate ? new Date(b.paymentDate) : new Date(),
+				buktiBayarUrl: b.buktiBayarUrl,
+				notes: b.notes,
+				isTalangan: b.isTalangan ?? false,
+			});
+
+			// Recalculate status
+			const newTotalPaid =
+				current.installments.reduce((sum, inst) => sum + inst.nominalPaid, 0) +
+				Number(b.nominalPaid);
+			let newStatus = current.status;
+
+			if (newTotalPaid === 0) newStatus = "BELUM_BAYAR";
+			else if (newTotalPaid >= (current.totalBilled || 0)) newStatus = "LUNAS";
+			else newStatus = "SEBAGIAN";
+
+			await db
+				.update(financeSemesters)
+				.set({
+					status: newStatus,
+					updatedAt: new Date(),
+				})
+				.where(eq(financeSemesters.id, semesterId));
+
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				nominalPaid: t.Number(),
+				paymentDate: t.Optional(t.String()),
+				buktiBayarUrl: t.Optional(t.String()),
+				notes: t.Optional(t.String()),
+				isTalangan: t.Optional(t.Boolean()),
+			}),
+		},
+	)
+	.patch(
+		"/:id/finance/semesters/:semesterId/installments/:installmentId",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			const semesterId = Number(params.semesterId);
+			const installmentId = Number(params.installmentId);
+			const updates = body as any;
+
+			const currentSemester = await db.query.financeSemesters.findFirst({
+				where: eq(financeSemesters.id, semesterId),
+				with: { installments: true },
+			});
+
+			if (!currentSemester) {
+				set.status = 404;
+				return { success: false, message: "Semester not found" };
+			}
+
+			const inst = await db.query.financeSemesterInstallments.findFirst({
+				where: and(
+					eq(financeSemesterInstallments.id, installmentId),
+					eq(financeSemesterInstallments.semesterId, semesterId),
+				),
+			});
+
+			if (!inst) {
+				set.status = 404;
+				return { success: false, message: "Installment not found" };
+			}
+
+			await db
+				.update(financeSemesterInstallments)
+				.set({
+					nominalPaid: updates.nominalPaid ?? inst.nominalPaid,
+					paymentDate: updates.paymentDate
+						? new Date(updates.paymentDate)
+						: inst.paymentDate,
+					buktiBayarUrl:
+						updates.buktiBayarUrl !== undefined
+							? updates.buktiBayarUrl
+							: inst.buktiBayarUrl,
+					notes: updates.notes !== undefined ? updates.notes : inst.notes,
+					isTalangan: updates.isTalangan ?? inst.isTalangan,
+				})
+				.where(eq(financeSemesterInstallments.id, installmentId));
+
+			// Recalculate status
+			const refreshedSemester = await db.query.financeSemesters.findFirst({
+				where: eq(financeSemesters.id, semesterId),
+				with: { installments: true },
+			});
+
+			if (refreshedSemester) {
+				const totalPaid = refreshedSemester.installments.reduce(
+					(sum, inst) => sum + inst.nominalPaid,
+					0,
+				);
+				let newStatus = refreshedSemester.status;
+				if (totalPaid === 0) newStatus = "BELUM_BAYAR";
+				else if (totalPaid >= (refreshedSemester.totalBilled || 0))
+					newStatus = "LUNAS";
+				else newStatus = "SEBAGIAN";
+
+				await db
+					.update(financeSemesters)
+					.set({
+						status: newStatus,
+						updatedAt: new Date(),
+					})
+					.where(eq(financeSemesters.id, semesterId));
+			}
+
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				nominalPaid: t.Optional(t.Number()),
+				paymentDate: t.Optional(t.String()),
+				buktiBayarUrl: t.Optional(t.String()),
+				notes: t.Optional(t.String()),
+				isTalangan: t.Optional(t.Boolean()),
+			}),
+		},
+	)
+	.delete(
+		"/:id/finance/semesters/:semesterId/installments/:installmentId",
+		async (context) => {
+			const { params, set } = context;
+			const user = (context as any).user;
+			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			const semesterId = Number(params.semesterId);
+			const installmentId = Number(params.installmentId);
+
+			const inst = await db.query.financeSemesterInstallments.findFirst({
+				where: and(
+					eq(financeSemesterInstallments.id, installmentId),
+					eq(financeSemesterInstallments.semesterId, semesterId),
+				),
+			});
+
+			if (!inst) {
+				set.status = 404;
+				return { success: false, message: "Installment not found" };
+			}
+
+			await db
+				.delete(financeSemesterInstallments)
+				.where(eq(financeSemesterInstallments.id, installmentId));
+
+			// Recalculate status
+			const current = await db.query.financeSemesters.findFirst({
+				where: eq(financeSemesters.id, semesterId),
+				with: { installments: true },
+			});
+
+			if (current && !current.isTalangan) {
+				const totalPaid = current.installments.reduce(
+					(sum, inst) => sum + inst.nominalPaid,
+					0,
+				);
+				let newStatus = current.status;
+				if (totalPaid === 0) newStatus = "BELUM_BAYAR";
+				else if (totalPaid >= (current.totalBilled || 0)) newStatus = "LUNAS";
+				else newStatus = "SEBAGIAN";
+
+				await db
+					.update(financeSemesters)
+					.set({
+						status: newStatus,
+						updatedAt: new Date(),
+					})
+					.where(eq(financeSemesters.id, semesterId));
+			}
+
+			return { success: true };
+		},
+	);

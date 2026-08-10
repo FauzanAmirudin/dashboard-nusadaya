@@ -446,6 +446,58 @@ export const financeCustomFields = pgTable("finance_custom_fields", {
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const financeSemesters = pgTable("finance_semesters", {
+	id: serial("id").primaryKey(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
+	semesterNumber: integer("semester_number").notNull(), // 1–6
+	totalBilled: integer("total_billed").default(0),
+	isTalangan: boolean("is_talangan").default(false),
+	notes: text("notes"),
+	status: text("status").default("BELUM_BAYAR"), // "BELUM_BAYAR" | "SEBAGIAN" | "LUNAS"
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const financeSemesterInstallments = pgTable(
+	"finance_semester_installments",
+	{
+		id: serial("id").primaryKey(),
+		semesterId: integer("semester_id")
+			.references(() => financeSemesters.id)
+			.notNull(),
+		installmentNumber: integer("installment_number").notNull(),
+		nominalPaid: integer("nominal_paid").notNull(),
+		paymentDate: timestamp("payment_date"),
+		buktiBayarUrl: text("bukti_bayar_url"),
+		notes: text("notes"),
+		isTalangan: boolean("is_talangan").default(false),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+);
+
+export const financeSemestersRelations = relations(
+	financeSemesters,
+	({ one, many }) => ({
+		student: one(students, {
+			fields: [financeSemesters.studentId],
+			references: [students.id],
+		}),
+		installments: many(financeSemesterInstallments),
+	}),
+);
+
+export const financeSemesterInstallmentsRelations = relations(
+	financeSemesterInstallments,
+	({ one }) => ({
+		semester: one(financeSemesters, {
+			fields: [financeSemesterInstallments.semesterId],
+			references: [financeSemesters.id],
+		}),
+	}),
+);
+
 export const feeShareRecipients = pgTable("fee_share_recipients", {
 	id: serial("id").primaryKey(),
 	studentId: integer("student_id")
