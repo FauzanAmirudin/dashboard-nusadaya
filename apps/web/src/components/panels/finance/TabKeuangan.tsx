@@ -657,7 +657,7 @@ export function TabKeuangan({
 											{canEdit && (
 												<button
 													type="button"
-													className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors w-full text-left ${
+													className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
 														sem.isTalangan
 															? "bg-violet-50 border-violet-300 text-violet-700"
 															: "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
