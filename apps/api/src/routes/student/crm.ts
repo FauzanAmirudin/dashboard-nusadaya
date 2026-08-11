@@ -34,11 +34,11 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
-import { fileService } from "../../modules/file/service/file.service";
 import { requireRole } from "../../middleware/rbac";
+import { fileService } from "../../modules/file/service/file.service";
 
 export const crmRoutes = new Elysia()
-	.get("/:id/crm", async ({ params, set }) => {
+	.get("/:id/crm", async ({ params }) => {
 		const id = Number(params.id);
 		const crm = await db.query.crmData.findFirst({
 			where: eq(crmData.studentId, id),
@@ -67,7 +67,7 @@ export const crmRoutes = new Elysia()
 
 		return { success: true, data: { crm, logs, finance, pmb } };
 	})
-	.get("/:id/crm/logs", async ({ params, query, set }) => {
+	.get("/:id/crm/logs", async ({ params, query }) => {
 		const id = Number(params.id);
 		const limit = Number(query?.limit) || 20;
 		const page = Number(query?.page) || 1;
@@ -81,6 +81,52 @@ export const crmRoutes = new Elysia()
 		});
 
 		return { success: true, data: logs };
+	})
+	.get("/:id/crm/kehadiran", async ({ params, set }) => {
+		const id = Number(params.id);
+		const user = (set as any).user;
+
+		const academic = await db.query.academicData.findFirst({
+			where: eq(academicData.studentId, id),
+			columns: {
+				attendanceTotal: true,
+				attendancePresent: true,
+				attendanceAlphaNote: true,
+			},
+		});
+
+		const courses = await db.query.courseGrades.findMany({
+			where: eq(courseGrades.studentId, id),
+			columns: {
+				courseName: true,
+				courseCode: true,
+				totalMeetings: true,
+				attendancePresent: true,
+			},
+			with: {
+				dosen: { columns: { fullName: true } },
+			},
+		});
+
+		const crm = await db.query.crmData.findFirst({
+			where: eq(crmData.studentId, id),
+			columns: {
+				practiceAttendance: true,
+			},
+		});
+
+		return {
+			success: true,
+			data: {
+				academic: academic || {
+					attendanceTotal: 0,
+					attendancePresent: 0,
+					attendanceAlphaNote: null,
+				},
+				courses: courses || [],
+				crm: crm || { practiceAttendance: false },
+			},
+		};
 	})
 	.patch(
 		"/:id/crm",
@@ -122,6 +168,21 @@ export const crmRoutes = new Elysia()
 				where: eq(crmData.studentId, id),
 			});
 			if (updated) {
+				const odsProgressChecks = [false, false, false, false, false];
+				try {
+					if (updated.odsDetails) {
+						let parsed = updated.odsDetails;
+						if (typeof parsed === "string") parsed = JSON.parse(parsed);
+						if (Array.isArray(parsed)) {
+							parsed.forEach((ods: any, index: number) => {
+								if (index < 5 && ods.isDone) {
+									odsProgressChecks[index] = true;
+								}
+							});
+						}
+					}
+				} catch (e) {}
+
 				const crmChecks = [
 					updated.isMonitoringParent,
 					updated.isMonitoringIndustry,
@@ -131,17 +192,18 @@ export const crmRoutes = new Elysia()
 					updated.odsDocumentation,
 					updated.isPrammagangReport,
 					updated.isPrammagangDocumentation,
+					...odsProgressChecks,
 				];
 
-				const checked = crmChecks.filter(Boolean).length;
-				const totalChecks = 8;
+				const checkedCount = crmChecks.filter((c) => c === true).length;
+				const totalChecks = 13;
 
 				let status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
-				if (checked === totalChecks) status = "AMAN";
-				else if (checked >= 4) status = "PERLU_PERHATIAN";
+				if (checkedCount === totalChecks) status = "AMAN";
+				else if (checkedCount >= 6) status = "PERLU_PERHATIAN";
 
 				const extraUpdates: any = { status };
-				if (checked < totalChecks && updated.isAcc) {
+				if (checkedCount < totalChecks && updated.isAcc) {
 					extraUpdates.isAcc = false;
 					extraUpdates.accAt = null;
 					extraUpdates.accBy = null;
@@ -181,6 +243,8 @@ export const crmRoutes = new Elysia()
 				location: payload.location,
 				topic: payload.topic,
 				logText: payload.logText,
+				logType: payload.logType || "modul_crm",
+				attachments: payload.attachments || [],
 				agreements: payload.agreements || [],
 				followUps: payload.followUps || [],
 			});
@@ -195,11 +259,60 @@ export const crmRoutes = new Elysia()
 				location: t.Optional(t.String()),
 				topic: t.Optional(t.String()),
 				logText: t.String(),
+				logType: t.Optional(t.String()),
+				attachments: t.Optional(
+					t.Array(
+						t.Object({
+							id: t.String(),
+							url: t.String(),
+							name: t.String(),
+						}),
+					),
+				),
 				agreements: t.Optional(t.Array(t.String())),
 				followUps: t.Optional(t.Array(t.Any())),
 			}),
 		},
 	)
+	.delete("/:id/crm/log/:logId", async (context) => {
+		const { params, set } = context;
+		const user = (context as any).user;
+		if (!user) {
+			set.status = 401;
+			return { success: false, message: "Unauthorized" };
+		}
+
+		const id = Number(params.id);
+		const logId = Number(params.logId);
+
+		const log = await db.query.crmLogs.findFirst({
+			where: and(eq(crmLogs.id, logId), eq(crmLogs.studentId, id)),
+		});
+
+		if (!log) {
+			set.status = 404;
+			return { success: false, message: "Log tidak ditemukan" };
+		}
+
+		// Hapus file fisik & metadata gambar yang terlampir
+		if (log.attachments && Array.isArray(log.attachments)) {
+			for (const attachment of log.attachments as any[]) {
+				if (attachment.id) {
+					try {
+						await fileService.deleteFile(attachment.id);
+					} catch (e) {
+						console.error(`Gagal menghapus lampiran ${attachment.id}:`, e);
+					}
+				}
+			}
+		}
+
+		await db
+			.delete(crmLogs)
+			.where(and(eq(crmLogs.id, logId), eq(crmLogs.studentId, id)));
+
+		return { success: true };
+	})
 	.post("/:id/crm/acc", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
@@ -262,7 +375,7 @@ export const crmRoutes = new Elysia()
 	})
 
 	// --- CRM DOCUMENTS ---
-	.get("/:id/crm/documents", async ({ params, set }) => {
+	.get("/:id/crm/documents", async ({ params }) => {
 		const id = Number(params.id);
 		const docs = await db.query.crmDocuments.findMany({
 			where: eq(crmDocuments.studentId, id),
@@ -298,11 +411,14 @@ export const crmRoutes = new Elysia()
 			const documentKey = params.documentKey;
 
 			const allowedKeys = [
-				"odsActive",
-				"studentMonitoring",
-				"parentFollowUp",
-				"practiceAttendance",
-				"odsDocumentation",
+				"parent_follow_up",
+				"industry_monitoring",
+				"vocab_book",
+				"practice_attendance",
+				"ods_report",
+				"ods_documentation",
+				"pramagang_report",
+				"pramagang_documentation",
 			];
 			if (!allowedKeys.includes(documentKey)) {
 				set.status = 400;

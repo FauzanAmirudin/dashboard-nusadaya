@@ -7,6 +7,11 @@ import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "./db";
 import { users } from "./db/schema";
+import { backupModule } from "./modules/backup";
+import { exportModule } from "./modules/export";
+// Modul Storage Baru
+import { fileModule } from "./modules/file";
+import { fileService } from "./modules/file/service/file.service";
 import { dosenRouter } from "./routes/dosen";
 import { financeRouter } from "./routes/finance";
 import { formRegisterRoutes } from "./routes/form-register";
@@ -17,11 +22,6 @@ import { paRouter } from "./routes/pa";
 import { settingsRoutes } from "./routes/settings";
 import { studentsRouter } from "./routes/student";
 import { vocationalRouter } from "./routes/vocational";
-// Modul Storage Baru
-import { fileModule } from "./modules/file";
-import { backupModule } from "./modules/backup";
-import { exportModule } from "./modules/export";
-import { fileService } from "./modules/file/service/file.service";
 // Workers
 import { startBackupWorker } from "./workers/backup.worker";
 import { startExportWorker } from "./workers/export.worker";
@@ -50,9 +50,9 @@ const app = new Elysia()
 	// JWT and cookie must be used before derive
 	.use(elysiaJwt({ name: "jwt", secret: JWT_SECRET }))
 	.use(cookie())
-	// Auth derive: runs on EVERY request — reads Bearer token OR cookie
+	// Auth derive: runs on EVERY request — reads Bearer token OR cookie OR query
 	// Must be defined inline at root level (not inside a plugin) so it propagates to all sub-routes
-	.derive(async ({ jwt, cookie: { auth }, request }) => {
+	.derive(async ({ jwt, cookie: { auth }, request, query }) => {
 		// 1. Authorization: Bearer <token> header (used for cross-origin dev requests)
 		const authHeader = request.headers.get("authorization");
 		if (authHeader?.startsWith("Bearer ")) {
@@ -67,6 +67,15 @@ const app = new Elysia()
 		// 2. Fallback: httpOnly cookie (same-origin)
 		if (auth.value) {
 			const profile = await jwt.verify(auth.value as string);
+			if (profile) {
+				return {
+					user: profile as { id: number; username: string; role: string },
+				};
+			}
+		}
+		// 3. Fallback: Query string (used for cross-origin iframe / file downloads)
+		if (query?.token) {
+			const profile = await jwt.verify(query.token as string);
 			if (profile) {
 				return {
 					user: profile as { id: number; username: string; role: string },
@@ -133,7 +142,7 @@ const app = new Elysia()
 				auth.remove();
 				return { success: true };
 			})
-			// biome-ignore lint/suspicious/noExplicitAny: Elysia type inference workaround
+
 			.get("/me", (context: any) => {
 				const { user, set } = context;
 				if (!user) {
@@ -186,7 +195,7 @@ app.get("/debug", async () => {
 			redis: process.env.REDIS_URL,
 			db: process.env.DATABASE_URL,
 			port: process.env.PORT,
-			db_query: "success"
+			db_query: "success",
 		};
 	} catch (err: any) {
 		return { db_error: err.message };
@@ -232,5 +241,3 @@ app.listen(process.env.PORT || 3001, async () => {
 });
 
 export type App = typeof app;
-
-

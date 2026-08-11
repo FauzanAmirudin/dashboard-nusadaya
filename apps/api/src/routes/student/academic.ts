@@ -34,8 +34,8 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
-import { fileService } from "../../modules/file/service/file.service";
 import { requireRole } from "../../middleware/rbac";
+import { fileService } from "../../modules/file/service/file.service";
 
 export const academicRoutes = new Elysia()
 	.get("/:id/academic", async ({ params }) => {
@@ -265,6 +265,7 @@ export const academicRoutes = new Elysia()
 		const id = Number(params.id);
 		const grades = await db.query.courseGrades.findMany({
 			where: eq(courseGrades.studentId, id),
+			orderBy: (grades, { asc }) => [asc(grades.id)],
 			with: {
 				accBy: { columns: { fullName: true } },
 			},
@@ -285,7 +286,7 @@ export const academicRoutes = new Elysia()
 			if (
 				user.role !== "superadmin" &&
 				user.role !== "dosen" &&
-				user.role !== "superadmin"
+				user.role !== "akademik"
 			) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
@@ -322,7 +323,7 @@ export const academicRoutes = new Elysia()
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (user?.role !== "superadmin") {
+		if (user?.role !== "superadmin" && user?.role !== "akademik") {
 			set.status = 403;
 			return {
 				success: false,
@@ -358,8 +359,12 @@ export const academicRoutes = new Elysia()
 				return { success: false, message: "Course not found" };
 			}
 
-			// Only superadmin or the assigned dosen can edit
-			if (user.role !== "superadmin" && current.dosenId !== user.id) {
+			// Only superadmin, akademik, or the assigned dosen can edit
+			if (
+				user.role !== "superadmin" &&
+				user.role !== "akademik" &&
+				current.dosenId !== user.id
+			) {
 				set.status = 403;
 				return {
 					success: false,
@@ -503,7 +508,11 @@ export const academicRoutes = new Elysia()
 			return { success: false, message: "Course not found" };
 		}
 
-		if (user.role !== "superadmin" && current.dosenId !== user.id) {
+		if (
+			user.role !== "superadmin" &&
+			user.role !== "akademik" &&
+			current.dosenId !== user.id
+		) {
 			set.status = 403;
 			return {
 				success: false,
@@ -532,9 +541,12 @@ export const academicRoutes = new Elysia()
 			return { success: false, message: "Unauthorized" };
 		}
 
-		if (user.role !== "superadmin") {
+		if (user.role !== "superadmin" && user.role !== "akademik") {
 			set.status = 403;
-			return { success: false, message: "Only Superadmin can unlock courses" };
+			return {
+				success: false,
+				message: "Only Superadmin or Akademik can unlock courses",
+			};
 		}
 
 		const current = await db.query.courseGrades.findFirst({

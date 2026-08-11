@@ -284,6 +284,11 @@ export const crmData = pgTable("crm_data", {
 		false,
 	),
 	hasActiveCase: boolean("has_active_case").default(false),
+	odsDetails: jsonb("ods_details").default("[]"),
+	pramagangStartDate: timestamp("pramagang_start_date", { mode: "string" }),
+	pramagangEndDate: timestamp("pramagang_end_date", { mode: "string" }),
+	pramagangIndustry: varchar("pramagang_industry", { length: 255 }),
+	pramagangVideoLink: text("pramagang_video_link"),
 	caseNotes: text("case_notes"),
 	isAcc: boolean("is_acc").default(false),
 	accAt: timestamp("acc_at"),
@@ -303,6 +308,8 @@ export const crmLogs = pgTable("crm_logs", {
 		.notNull(),
 	logText: text("log_text").notNull(),
 	// New CRM v2 Log Fields
+	logType: varchar("log_type", { length: 50 }).default("modul_crm"), // modul_crm, orang_tua_masalah, orang_tua_komunikasi, industri_masalah
+	attachments: jsonb("attachments").default("[]"), // Array of photo URLs
 	startTime: text("start_time"), // format: HH:mm
 	endTime: text("end_time"), // format: HH:mm
 	media: text("media"),

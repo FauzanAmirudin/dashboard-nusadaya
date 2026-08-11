@@ -222,7 +222,7 @@ export function DocumentUpload({
 							title="Review Dokumen"
 							onClick={() =>
 								window.open(
-									`/dashboard/students/${studentId}/documents/${doc.id}?url=${encodeURIComponent(doc.fileUrl)}&name=${encodeURIComponent(doc.fileName)}`,
+									`/dashboard/students/${studentId}/documents/${doc.id}?url=${encodeURIComponent(doc.fileUrl)}&name=${encodeURIComponent(doc.fileName)}&token=${token}`,
 									"_blank",
 								)
 							}

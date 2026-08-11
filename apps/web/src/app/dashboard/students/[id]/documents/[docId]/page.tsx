@@ -9,10 +9,14 @@ function DocumentReviewContent() {
 	const searchParams = useSearchParams();
 	const fileUrl = searchParams.get("url");
 	const fileName = searchParams.get("name") || "Dokumen Tanpa Nama";
+	const token = searchParams.get("token");
 	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 	const cleanFileUrl = fileUrl?.startsWith("./") ? fileUrl.slice(1) : fileUrl;
-	const fullUrl = cleanFileUrl ? `${API_URL}${cleanFileUrl}` : "";
+	let fullUrl = cleanFileUrl ? `${API_URL}${cleanFileUrl}` : "";
+	if (fullUrl && token) {
+		fullUrl += `?token=${token}`;
+	}
 
 	return (
 		<div className="flex flex-col h-[calc(100vh-8rem)] bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">

@@ -108,6 +108,7 @@ interface DosenPanelProps {
 export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 	const { user } = useAuthStore();
 	const isDosen = user?.role === "dosen" || user?.role === "superadmin";
+	const isAkademik = user?.role === "akademik" || user?.role === "superadmin";
 	const isSuperadmin = user?.role === "superadmin";
 
 	const [gradesData, setGradesData] = useState<CourseGrade[]>([]);
@@ -151,10 +152,16 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 	});
 
 	const [isDeleteCourseOpen, setIsDeleteCourseOpen] = useState(false);
-	const [selectedCourseToDelete, setSelectedCourseToDelete] = useState<{ id: number; name: string } | null>(null);
+	const [selectedCourseToDelete, setSelectedCourseToDelete] = useState<{
+		id: number;
+		name: string;
+	} | null>(null);
 
 	const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
-	const [selectedDocToDelete, setSelectedDocToDelete] = useState<{ courseId: number; docId: number } | null>(null);
+	const [selectedDocToDelete, setSelectedDocToDelete] = useState<{
+		courseId: number;
+		docId: number;
+	} | null>(null);
 
 	const fetchGrades = async () => {
 		const { data, error } =
@@ -536,7 +543,9 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 							{gradesData.map((g, index) => {
 								const isEditing = editingId === g.id;
 								const canEditThisRow =
-									isSuperadmin || (isDosen && user?.id === g.dosenId);
+									isSuperadmin ||
+									isAkademik ||
+									(isDosen && user?.id === g.dosenId);
 								const isExpanded = expandedRows.has(g.id);
 
 								const rowBgColor =
@@ -875,8 +884,9 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																panel="dosen"
 																courseId={g.id}
 																documentKey="attendance_proof"
-																canEdit={canEditThisRow && !g.isAcc}
-																
+																canEdit={
+																	(canEditThisRow || isAkademik) && !g.isAcc
+																}
 															/>
 														</div>
 
@@ -894,8 +904,9 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																panel="dosen"
 																courseId={g.id}
 																documentKey="grade_card"
-																canEdit={canEditThisRow && !g.isAcc}
-																
+																canEdit={
+																	(canEditThisRow || isAkademik) && !g.isAcc
+																}
 															/>
 														</div>
 
@@ -914,8 +925,9 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																panel="dosen"
 																courseId={g.id}
 																documentKey="dispensation"
-																canEdit={canEditThisRow && !g.isAcc}
-																
+																canEdit={
+																	(canEditThisRow || isAkademik) && !g.isAcc
+																}
 															/>
 														</div>
 
@@ -934,8 +946,9 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																panel="dosen"
 																courseId={g.id}
 																documentKey="product_photo"
-																canEdit={canEditThisRow && !g.isAcc}
-																
+																canEdit={
+																	(canEditThisRow || isAkademik) && !g.isAcc
+																}
 															/>
 															{g.productPhotoUrl && (
 																<div className="mt-3">
@@ -960,16 +973,19 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 														Aksi Lanjutan
 													</h5>
 
-													{!isSuperadmin && isDosen && !canEditThisRow && (
-														<Badge
-															variant="outline"
-															className="w-full justify-center py-2 text-slate-500 border-slate-300 bg-slate-50"
-														>
-															🔒 Bukan MK Anda
-														</Badge>
-													)}
+													{!isSuperadmin &&
+														!isAkademik &&
+														isDosen &&
+														!canEditThisRow && (
+															<Badge
+																variant="outline"
+																className="w-full justify-center py-2 text-slate-500 border-slate-300 bg-slate-50"
+															>
+																🔒 Bukan MK Anda
+															</Badge>
+														)}
 
-													{canEditThisRow && !g.isAcc && (
+													{(canEditThisRow || isAkademik) && !g.isAcc && (
 														<AlertDialog>
 															<AlertDialogTrigger
 																render={
@@ -1034,7 +1050,7 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 														</AlertDialog>
 													)}
 
-													{isSuperadmin && !g.isAcc && (
+													{(isSuperadmin || isAkademik) && !g.isAcc && (
 														<AlertDialog>
 															<AlertDialogTrigger
 																render={
@@ -1085,7 +1101,7 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 																tidak dapat diubah lagi.
 															</p>
 
-															{isSuperadmin && (
+															{(isSuperadmin || isAkademik) && (
 																<AlertDialog>
 																	<AlertDialogTrigger
 																		render={
@@ -1248,7 +1264,7 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 						<DialogTitle>Tambah Mata Kuliah Baru</DialogTitle>
 						<DialogDescription>
 							Masukkan data mata kuliah dan ID dosen pengampu. (Fitur ini khusus
-							Superadmin).
+							Superadmin/Akademik).
 						</DialogDescription>
 					</DialogHeader>
 					<div className="space-y-4 py-4">
@@ -1337,16 +1353,18 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 					</DialogHeader>
 					<div className="space-y-4 pt-4">
 						<p className="text-slate-600">
-							Apakah Anda yakin ingin menghapus MK "{selectedCourseToDelete?.name}"? Seluruh data nilai dan status ACC akan ikut terhapus dan tidak dapat dikembalikan.
+							Apakah Anda yakin ingin menghapus MK "
+							{selectedCourseToDelete?.name}"? Seluruh data nilai dan status ACC
+							akan ikut terhapus dan tidak dapat dikembalikan.
 						</p>
 						<div className="flex justify-end gap-3 pt-4">
-							<Button variant="outline" onClick={() => setIsDeleteCourseOpen(false)}>
+							<Button
+								variant="outline"
+								onClick={() => setIsDeleteCourseOpen(false)}
+							>
 								Batal
 							</Button>
-							<Button
-								variant="destructive"
-								onClick={handleDeleteCourse}
-							>
+							<Button variant="destructive" onClick={handleDeleteCourse}>
 								Hapus MK
 							</Button>
 						</div>
@@ -1364,13 +1382,13 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 							Apakah Anda yakin ingin menghapus dokumen lampiran ini?
 						</p>
 						<div className="flex justify-end gap-3 pt-4">
-							<Button variant="outline" onClick={() => setIsDeleteDocOpen(false)}>
+							<Button
+								variant="outline"
+								onClick={() => setIsDeleteDocOpen(false)}
+							>
 								Batal
 							</Button>
-							<Button
-								variant="destructive"
-								onClick={handleDeleteDocument}
-							>
+							<Button variant="destructive" onClick={handleDeleteDocument}>
 								Hapus Dokumen
 							</Button>
 						</div>

@@ -11,7 +11,7 @@ export const downloadRoute = new Elysia().get(
 	"/files/:id/download",
 	async (context) => {
 		const { params, set } = context;
-		// biome-ignore lint/suspicious/noExplicitAny: Elysia type inference workaround
+
 		const user = (context as any).user;
 
 		if (!user) {
@@ -20,16 +20,29 @@ export const downloadRoute = new Elysia().get(
 		}
 
 		try {
-			const { stream, record } = await fileService.streamFile(params.id);
+			const record = await fileService.getFileMetadata(params.id);
+			if (!record) {
+				set.status = 404;
+				return { success: false, message: "File metadata tidak ditemukan" };
+			}
 
-			// Set header agar browser tahu cara menampilkan file
+			// Local path resolution
+			const absolutePath = fileService.getAbsolutePath(record.storagePath);
+			const file = Bun.file(absolutePath);
+
+			if (!(await file.exists())) {
+				set.status = 404;
+				return { success: false, message: "File fisik tidak ditemukan" };
+			}
+
+			// Set header agar browser tahu cara menampilkan file (walaupun Bun.file sudah set MIME, kita set disposition agar benar)
 			set.headers["Content-Type"] = record.mimeType;
 			set.headers["Content-Disposition"] =
 				`inline; filename="${encodeURIComponent(record.originalName)}"`;
 			set.headers["Content-Length"] = String(record.size);
 
-			// Return stream langsung — Bun/Elysia mendukung ReadableStream response
-			return stream;
+			// Return Bun.file langsung — ini menyelesaikan masalah 'Failed to load PDF document' di browser
+			return file;
 		} catch (err) {
 			const error = err as Error;
 			set.status = 404;

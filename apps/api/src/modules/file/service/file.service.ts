@@ -1,10 +1,10 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { monotonicFactory } from "ulidx";
-import type { FileRecord } from "../repository/file.repository";
-import { fileRepository } from "../repository/file.repository";
 import { LocalStorageProvider } from "../providers/local.provider";
 import type { StorageProvider } from "../providers/storage.interface";
+import type { FileRecord } from "../repository/file.repository";
+import { fileRepository } from "../repository/file.repository";
 import { calculateChecksum } from "../utils/checksum";
 import { generateFilename, getExtension } from "../utils/filename";
 import { validateFile } from "../validators/file.validator";
@@ -63,7 +63,15 @@ export class FileService {
 	 * Upload file — validasi → temp storage → checksum → permanent storage → DB.
 	 */
 	async uploadFile(params: UploadFileParams): Promise<UploadFileResult> {
-		const { file, studentId, category, panel, documentKey, uploadedBy, visibility = "private" } = params;
+		const {
+			file,
+			studentId,
+			category,
+			panel,
+			documentKey,
+			uploadedBy,
+			visibility = "private",
+		} = params;
 
 		// 1. Baca file ke buffer
 		const buffer = Buffer.from(await file.arrayBuffer());
@@ -122,7 +130,9 @@ export class FileService {
 	 * Download file — return Buffer untuk serve ke client.
 	 * Untuk streaming besar gunakan streamFile().
 	 */
-	async downloadFile(fileId: string): Promise<{ buffer: Buffer; record: FileRecord }> {
+	async downloadFile(
+		fileId: string,
+	): Promise<{ buffer: Buffer; record: FileRecord }> {
 		const record = await fileRepository.findFileById(fileId);
 		if (!record) throw new Error("File tidak ditemukan");
 
@@ -135,7 +145,9 @@ export class FileService {
 	 * Gunakan ini untuk download file besar (PDF, video, ZIP).
 	 * Tidak load seluruh file ke RAM.
 	 */
-	async streamFile(fileId: string): Promise<{ stream: ReadableStream; record: FileRecord }> {
+	async streamFile(
+		fileId: string,
+	): Promise<{ stream: ReadableStream; record: FileRecord }> {
 		const record = await fileRepository.findFileById(fileId);
 		if (!record) throw new Error("File tidak ditemukan");
 
@@ -165,9 +177,19 @@ export class FileService {
 	}
 
 	/**
+	 * Dapatkan path absolut file.
+	 */
+	getAbsolutePath(storagePath: string): string {
+		return this.provider.getAbsolutePath(storagePath);
+	}
+
+	/**
 	 * Daftar file mahasiswa, opsional filter per kategori.
 	 */
-	async listStudentFiles(studentId: number, category?: string): Promise<FileRecord[]> {
+	async listStudentFiles(
+		studentId: number,
+		category?: string,
+	): Promise<FileRecord[]> {
 		return fileRepository.findFilesByStudentId(studentId, category);
 	}
 
@@ -209,8 +231,10 @@ export class FileService {
 	 * Dipanggil sekali di index.ts.
 	 */
 	async ensureDirectories(): Promise<void> {
-		const storagePath = process.env.STORAGE_PATH ?? join(process.cwd(), "../../storage");
-		const backupPath = process.env.BACKUP_PATH ?? join(process.cwd(), "../../backups");
+		const storagePath =
+			process.env.STORAGE_PATH ?? join(process.cwd(), "../../storage");
+		const backupPath =
+			process.env.BACKUP_PATH ?? join(process.cwd(), "../../backups");
 
 		const dirs = [
 			// Storage

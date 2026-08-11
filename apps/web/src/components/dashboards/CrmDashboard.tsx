@@ -10,14 +10,6 @@ import {
 	XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import {
-	Cell,
-	Legend,
-	Pie,
-	PieChart,
-	Tooltip as RechartsTooltip,
-	ResponsiveContainer,
-} from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,8 +22,6 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { exportToCSV } from "@/lib/export";
-
-const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
 
 export function CrmDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 	const router = useRouter();
@@ -76,12 +66,6 @@ export function CrmDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 			`Data_CRM_${new Date().toISOString().split("T")[0]}`,
 		);
 	};
-
-	const pieData = [
-		{ name: "Aman", value: countAman },
-		{ name: "Perlu Perhatian", value: countPerhatian },
-		{ name: "Tidak Aman", value: countTidakAman },
-	];
 
 	const filteredData = data.filter(
 		(s: any) =>
@@ -198,78 +182,9 @@ export function CrmDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 				</Card>
 			</div>
 
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-				{/* Donut Chart */}
-				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-1">
-					<CardHeader>
-						<CardTitle className="text-slate-800 flex items-center gap-2">
-							<LayoutDashboard className="h-5 w-5 text-slate-500" />
-							Distribusi Status CRM
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="flex flex-col items-center">
-						<div className="h-64 w-full">
-							<ResponsiveContainer width="100%" height="100%">
-								<PieChart>
-									<Pie
-										data={pieData}
-										innerRadius={60}
-										outerRadius={80}
-										paddingAngle={5}
-										dataKey="value"
-									>
-										{pieData.map((entry, index) => (
-											<Cell
-												key={`cell-${entry.name}`}
-												fill={PIE_COLORS[index % PIE_COLORS.length]}
-											/>
-										))}
-									</Pie>
-									<RechartsTooltip
-										contentStyle={{
-											backgroundColor: "#ffffff",
-											borderColor: "#e2e8f0",
-											color: "#0f172a",
-										}}
-										itemStyle={{ color: "#0f172a" }}
-									/>
-									<Legend verticalAlign="bottom" height={36} />
-								</PieChart>
-							</ResponsiveContainer>
-						</div>
-						<div className="mt-4 w-full space-y-2">
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-emerald-500" /> Aman
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countAman}
-								</span>
-							</div>
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-amber-500" /> Perlu
-									Perhatian
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countPerhatian}
-								</span>
-							</div>
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-rose-500" /> Tidak
-									Aman
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countTidakAman}
-								</span>
-							</div>
-						</div>
-					</CardContent>
-				</Card>
-
+			<div className="mt-6">
 				{/* List Mahasiswa dengan Kendala */}
-				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-2">
+				<Card className="bg-white border-slate-200 shadow-sm">
 					<CardHeader className="border-b border-slate-200 pb-4 bg-slate-50/50">
 						<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
 							<CardTitle className="text-slate-800 text-lg">
@@ -291,17 +206,26 @@ export function CrmDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 							<Table>
 								<TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
 									<TableRow className="border-slate-200 hover:bg-slate-50">
-										<TableHead className="text-slate-500 font-semibold py-3">
+										<TableHead className="text-slate-500 font-semibold py-3 min-w-[100px]">
 											NIM
 										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3">
-											Nama Lengkap
+										<TableHead className="text-slate-500 font-semibold py-3 min-w-[150px]">
+											Nama
 										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3">
+										<TableHead className="text-slate-500 font-semibold py-3 whitespace-nowrap">
 											Angkatan
 										</TableHead>
-										<TableHead className="text-slate-500 font-semibold text-center py-3">
-											Status CRM
+										<TableHead className="text-slate-500 font-semibold py-3 whitespace-nowrap">
+											Tahun Ajar
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3 min-w-[180px]">
+											Program Studi & Peminatan
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold py-3 whitespace-nowrap">
+											No WA
+										</TableHead>
+										<TableHead className="text-slate-500 font-semibold text-center py-3 whitespace-nowrap">
+											Progress Panel
 										</TableHead>
 										<TableHead className="text-slate-500 font-semibold text-right py-3 pr-4">
 											Aksi
@@ -315,18 +239,30 @@ export function CrmDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 											className="border-slate-200 hover:bg-blue-50/50 transition-colors"
 										>
 											<TableCell className="font-medium text-slate-700">
-												{s.student.nim}
+												{s.student.nim || "-"}
 											</TableCell>
 											<TableCell className="text-slate-900 font-semibold">
-												{s.student.name}
+												{s.student.name || "-"}
 											</TableCell>
 											<TableCell>
 												<Badge
 													variant="outline"
 													className="text-slate-500 border-slate-200"
 												>
-													{s.student.cohort}
+													{s.student.cohort || "-"}
 												</Badge>
+											</TableCell>
+											<TableCell className="text-slate-600">
+												{s.student.academicYear || "-"}
+											</TableCell>
+											<TableCell className="text-slate-600">
+												{s.student.program || "-"}
+												{s.student.subProgram
+													? ` - ${s.student.subProgram}`
+													: ""}
+											</TableCell>
+											<TableCell className="text-slate-600">
+												{s.student.phone || "-"}
 											</TableCell>
 											<TableCell className="text-center">
 												{renderStatusBadge(s.crm?.status)}
