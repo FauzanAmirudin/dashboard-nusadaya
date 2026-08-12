@@ -55,9 +55,20 @@ const STATUS_COLORS = {
 	},
 };
 
+import { MagangDashboard } from "@/components/dashboards/MagangDashboard";
+
 export default function StudentsPage() {
+	const { user } = useAuthStore();
+	if (user?.role === "magang") {
+		return <MagangDashboard hideHeader={true} />;
+	}
+	return <StudentsMaster />;
+}
+
+function StudentsMaster() {
 	const router = useRouter();
-	const { isAuthenticated, hasHydrated } = useAuthStore();
+	const { isAuthenticated, hasHydrated, user } = useAuthStore();
+
 	const [data, setData] = useState<StudentData[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [searchQuery, setSearchQuery] = useState("");

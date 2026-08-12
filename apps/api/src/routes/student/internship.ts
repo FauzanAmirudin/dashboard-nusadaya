@@ -71,22 +71,38 @@ export const internshipRoutes = new Elysia()
 			where: eq(academicData.studentId, id),
 		});
 
-		const hasDoc = (docs: any[], key: string) =>
-			docs.some((d) => d.documentKey === key);
+		const hasValidDoc = (docs: any[], key: string) =>
+			docs.some((d) => d.documentKey === key && d.isVerified === true);
 
 		const checks = {
-			pasFoto: hasDoc(pmbDocs, "pas_foto"),
-			cv: hasDoc(pmbDocs, "cv") || hasDoc(internshipDocs, "cv"),
-			ktm: hasDoc(pmbDocs, "ktm"),
-			khs: hasDoc(academicDocs, "khs"),
-			sl21: hasDoc(pmbDocs, "sl21"),
-			skma: hasDoc(pmbDocs, "skma"),
-			gapYear: pmbDataRow?.isGapYear ? hasDoc(pmbDocs, "gap_year") : true,
+			pasFoto: hasValidDoc(pmbDocs, "pas_foto"),
+			ktm: hasValidDoc(pmbDocs, "ktm"),
+			ktp: hasValidDoc(pmbDocs, "ktp"),
+			kk: hasValidDoc(pmbDocs, "kk"),
+			aktaKelahiran: hasValidDoc(pmbDocs, "akta_kelahiran"),
+			sl21: hasValidDoc(pmbDocs, "sl21"),
+			skma: hasValidDoc(pmbDocs, "skma"),
+			rekomendasiDisdik:
+				hasValidDoc(pmbDocs, "rekomendasi_disdik") ||
+				hasValidDoc(internshipDocs, "rekomendasi_disdik"),
+			gapYear: pmbDataRow?.isGapYear ? hasValidDoc(pmbDocs, "gap_year") : true,
 			pddikti: academicDataRow?.pddiktiInput === true,
-			ktpKkAkta: hasDoc(pmbDocs, "ktp_kk_akta"),
+			cv: hasValidDoc(pmbDocs, "cv") || hasValidDoc(internshipDocs, "cv"),
 		};
 
-		const isAllClear = Object.values(checks).every((v) => v === true);
+		const mandatoryChecks = [
+			checks.pasFoto,
+			checks.ktm,
+			checks.ktp,
+			checks.kk,
+			checks.aktaKelahiran,
+			checks.sl21,
+			checks.skma,
+			checks.rekomendasiDisdik,
+			...(pmbDataRow?.isGapYear ? [checks.gapYear] : []),
+		];
+
+		const isAllClear = mandatoryChecks.every((v) => v === true);
 
 		return {
 			success: true,
@@ -116,6 +132,8 @@ export const internshipRoutes = new Elysia()
 				"mcuDate",
 				"ticketDate",
 				"pdtDate",
+				"pdtEndDate",
+				"moaDate",
 				"danaTahap1Date",
 				"danaTahap2Date",
 			];
@@ -129,6 +147,12 @@ export const internshipRoutes = new Elysia()
 				...updates,
 				updatedAt: new Date(),
 			};
+
+			console.log("PATCH /:id/internship Payload:", {
+				id,
+				updates,
+				cleanUpdates,
+			});
 
 			// Validate LoL -> LoA -> MoA State Machine
 			if (cleanUpdates.loaConfirmed === true) {
@@ -171,36 +195,81 @@ export const internshipRoutes = new Elysia()
 				}
 			}
 
-			await db
-				.update(internshipData)
-				.set(cleanUpdates)
-				.where(eq(internshipData.studentId, id));
+			// Upsert: ensure internship row exists for this student before patching
+			const existing = await db.query.internshipData.findFirst({
+				where: eq(internshipData.studentId, id),
+			});
+
+			if (!existing) {
+				// Create a fresh row for this student
+				await db.insert(internshipData).values({
+					studentId: id,
+					...cleanUpdates,
+				});
+			} else {
+				await db
+					.update(internshipData)
+					.set(cleanUpdates)
+					.where(eq(internshipData.studentId, id));
+			}
 
 			// Recalculate status
 			const current = await db.query.internshipData.findFirst({
 				where: eq(internshipData.studentId, id),
 			});
 			if (current) {
-				const checks = [
+				const pmbDataRow = await db.query.pmbData.findFirst({
+					where: eq(pmbData.studentId, id),
+				});
+				const isGapYear = pmbDataRow?.isGapYear || false;
+
+				const praPasporChecks = [
+					current.praPasporPasFoto,
+					current.praPasporKtm,
+					current.praPasporKtp,
+					current.praPasporKk,
+					current.praPasporAktaKelahiran,
+					current.praPasporSl21,
+					current.praPasporSkma,
+					current.praPasporRekomendasiDisdik,
+					...(isGapYear ? [current.praPasporGapYear] : []),
+					current.praPasporPddikti,
+					current.praPasporCv,
+				];
+
+				const dokumenChecks = [
 					current.passportReady,
 					current.interviewReady,
-					current.loaConfirmed,
 					current.contractReady,
+					current.loaReady,
 					current.mcuReady,
 					current.visaReady,
-					current.ticketReady,
 					current.pdtReady,
+					current.dokumentasiReady,
+					current.ticketReady,
+					current.agenReady,
+				];
+
+				const syaratAkhirChecks = [
+					current.logbookReady,
+					current.laporanAkhirReady,
+					current.videoDokumentasiReady,
+				];
+
+				const checks = [
+					...praPasporChecks,
+					...dokumenChecks,
+					...syaratAkhirChecks,
 				];
 				const completedCount = checks.filter(Boolean).length;
+				const totalCount = checks.length;
+
 				let newStatus: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" =
 					"PERLU_PERHATIAN";
 
-				if (completedCount === 8) newStatus = "AMAN";
-				else if (completedCount <= 3) newStatus = "TIDAK_AMAN";
-
-				if (!current.passportReady || !current.visaReady) {
-					newStatus = "TIDAK_AMAN"; // Blocking rules
-				}
+				if (completedCount === totalCount) newStatus = "AMAN";
+				else if (completedCount <= Math.floor(totalCount / 3))
+					newStatus = "TIDAK_AMAN";
 
 				await db
 					.update(internshipData)
@@ -256,6 +325,59 @@ export const internshipRoutes = new Elysia()
 			return { success: false, message: "Forbidden" };
 		}
 
+		// Fetch internship data
+		const [internship] = await db
+			.select()
+			.from(internshipData)
+			.where(eq(internshipData.studentId, id));
+		if (!internship) {
+			set.status = 404;
+			return { success: false, message: "Internship data not found" };
+		}
+
+		const pmbDataRow = await db.query.pmbData.findFirst({
+			where: eq(pmbData.studentId, id),
+		});
+		const isGapYear = pmbDataRow?.isGapYear || false;
+
+		const requiredReadyFields: (keyof typeof internshipData.$inferSelect)[] = [
+			"praPasporPasFoto",
+			"praPasporKtm",
+			"praPasporKtp",
+			"praPasporKk",
+			"praPasporAktaKelahiran",
+			"praPasporSl21",
+			"praPasporSkma",
+			"praPasporRekomendasiDisdik",
+			...(isGapYear ? ["praPasporGapYear" as const] : []),
+			"praPasporPddikti",
+			"praPasporCv",
+			"passportReady",
+			"interviewReady",
+			"contractReady",
+			"loaReady",
+			"mcuReady",
+			"visaReady",
+			"pdtReady",
+			"dokumentasiReady",
+			"ticketReady",
+			"agenReady",
+			"logbookReady",
+			"laporanAkhirReady",
+			"videoDokumentasiReady",
+		];
+
+		const missingValidation = requiredReadyFields.filter(
+			(field) => !internship[field],
+		);
+		if (missingValidation.length > 0) {
+			set.status = 400;
+			return {
+				success: false,
+				message: `Gagal memberikan ACC: Ada ${missingValidation.length} progres (ceklist) yang belum selesai.`,
+			};
+		}
+
 		await db
 			.update(internshipData)
 			.set({
@@ -288,110 +410,7 @@ export const internshipRoutes = new Elysia()
 
 		return { success: true };
 	})
-	.patch(
-		"/:id/internship",
-		async (context) => {
-			const { params, body, set } = context;
-			const user = (context as any).user;
-			const id = Number(params.id);
 
-			if (!user || (user.role !== "magang" && user.role !== "superadmin")) {
-				set.status = 403;
-				return { success: false, message: "Forbidden" };
-			}
-
-			const current = await db.query.internshipData.findFirst({
-				where: eq(internshipData.studentId, id),
-			});
-			if (!current) {
-				set.status = 404;
-				return { success: false, message: "Not found" };
-			}
-
-			// Convert string dates to Date objects where applicable
-			const updates: any = { ...body, updatedAt: new Date() };
-			const dateFields = [
-				"passportExp",
-				"interviewDate",
-				"contractDate",
-				"mcuDate",
-				"ticketDate",
-				"pdtDate",
-			];
-			dateFields.forEach((field) => {
-				if (updates[field] !== undefined) {
-					updates[field] = updates[field] ? new Date(updates[field]) : null;
-				}
-			});
-
-			// Update status calculation based on body or current
-			const newState = { ...current, ...updates };
-
-			const checks = [
-				newState.passportReady,
-				newState.interviewReady,
-				newState.loaReady,
-				newState.contractReady,
-				newState.mcuReady,
-				newState.visaReady,
-				newState.ticketReady,
-				newState.pdtReady,
-			];
-			const completedCount = checks.filter(Boolean).length;
-
-			if (!newState.passportReady || !newState.visaReady) {
-				updates.status = "TIDAK_AMAN";
-			} else if (completedCount === 8) {
-				updates.status = "AMAN";
-			} else if (completedCount >= 4) {
-				updates.status = "PERLU_PERHATIAN";
-			} else {
-				updates.status = "TIDAK_AMAN";
-			}
-
-			await db
-				.update(internshipData)
-				.set(updates)
-				.where(eq(internshipData.studentId, id));
-			await db
-				.update(students)
-				.set({ overallStatus: updates.status })
-				.where(eq(students.id, id));
-
-			return { success: true };
-		},
-		{
-			body: t.Object({
-				passportReady: t.Optional(t.Boolean()),
-				passportNo: t.Optional(t.Union([t.String(), t.Null()])),
-				passportExp: t.Optional(t.Union([t.String(), t.Null()])),
-				interviewReady: t.Optional(t.Boolean()),
-				interviewDate: t.Optional(t.Union([t.String(), t.Null()])),
-				interviewResult: t.Optional(t.Union([t.String(), t.Null()])),
-				loaReady: t.Optional(t.Boolean()),
-				loaCompany: t.Optional(t.Union([t.String(), t.Null()])),
-				loaPosition: t.Optional(t.Union([t.String(), t.Null()])),
-				contractReady: t.Optional(t.Boolean()),
-				contractDate: t.Optional(t.Union([t.String(), t.Null()])),
-				mcuReady: t.Optional(t.Boolean()),
-				mcuPlace: t.Optional(t.Union([t.String(), t.Null()])),
-				mcuDate: t.Optional(t.Union([t.String(), t.Null()])),
-				mcuResult: t.Optional(t.Union([t.String(), t.Null()])),
-				visaReady: t.Optional(t.Boolean()),
-				visaType: t.Optional(t.Union([t.String(), t.Null()])),
-				visaStatus: t.Optional(t.Union([t.String(), t.Null()])),
-				visaNo: t.Optional(t.Union([t.String(), t.Null()])),
-				ticketReady: t.Optional(t.Boolean()),
-				ticketAirline: t.Optional(t.Union([t.String(), t.Null()])),
-				ticketDate: t.Optional(t.Union([t.String(), t.Null()])),
-				ticketFlight: t.Optional(t.Union([t.String(), t.Null()])),
-				pdtReady: t.Optional(t.Boolean()),
-				pdtDate: t.Optional(t.Union([t.String(), t.Null()])),
-				pdtPlace: t.Optional(t.Union([t.String(), t.Null()])),
-				notes: t.Optional(t.Union([t.String(), t.Null()])),
-			}),
-		},
-	)
 	.patch(
 		"/:id/internship/schedule",
 		async (context) => {

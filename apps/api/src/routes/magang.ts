@@ -1,11 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
-import {
-	internshipData,
-	internshipMonitoringSchedule,
-	students,
-} from "../db/schema";
+import { internshipData, pmbData, students } from "../db/schema";
 import { requireRole } from "../middleware/rbac";
 
 export const magangRouter = new Elysia({ prefix: "/magang" })
@@ -15,9 +11,11 @@ export const magangRouter = new Elysia({ prefix: "/magang" })
 			.select({
 				student: students,
 				internship: internshipData,
+				pmb: pmbData,
 			})
 			.from(students)
 			.leftJoin(internshipData, eq(students.id, internshipData.studentId))
+			.leftJoin(pmbData, eq(students.id, pmbData.studentId))
 			.orderBy(desc(students.createdAt));
 
 		// Calculate KPIs
@@ -26,27 +24,42 @@ export const magangRouter = new Elysia({ prefix: "/magang" })
 		let processing = 0;
 		let actionNeeded = 0;
 
-		const mappedStudents = results.map(({ student, internship }) => {
+		const mappedStudents = results.map(({ student, internship, pmb }) => {
+			const isGapYear = pmb?.isGapYear || false;
 			const checks = [
+				internship?.praPasporPasFoto,
+				internship?.praPasporKtm,
+				internship?.praPasporKtp,
+				internship?.praPasporKk,
+				internship?.praPasporAktaKelahiran,
+				internship?.praPasporSl21,
+				internship?.praPasporSkma,
+				internship?.praPasporRekomendasiDisdik,
+				...(isGapYear ? [internship?.praPasporGapYear] : []),
+				internship?.praPasporPddikti,
+				internship?.praPasporCv,
 				internship?.passportReady,
 				internship?.interviewReady,
-				internship?.loaConfirmed, // updated to use loaConfirmed
 				internship?.contractReady,
+				internship?.loaReady,
 				internship?.mcuReady,
 				internship?.visaReady,
-				internship?.ticketReady,
 				internship?.pdtReady,
+				internship?.dokumentasiReady,
+				internship?.ticketReady,
+				internship?.agenReady,
+				internship?.logbookReady,
+				internship?.laporanAkhirReady,
+				internship?.videoDokumentasiReady,
 			];
 			const completedCount = checks.filter(Boolean).length;
+			const totalCount = checks.length;
 			let status = "TIDAK_AMAN";
 
-			if (!internship?.passportReady || !internship?.visaReady) {
-				status = "TIDAK_AMAN";
-				actionNeeded++;
-			} else if (completedCount === 8) {
+			if (completedCount === totalCount) {
 				status = "AMAN";
 				readyToDepart++;
-			} else if (completedCount >= 4) {
+			} else if (completedCount >= Math.floor(totalCount / 2)) {
 				status = "PERLU_PERHATIAN";
 				processing++;
 			} else {
@@ -59,10 +72,15 @@ export const magangRouter = new Elysia({ prefix: "/magang" })
 				nim: student.nim,
 				name: student.name,
 				program: student.program,
+				subProgram: student.subProgram,
+				cohort: student.cohort,
+				academicYear: student.academicYear,
+				phone: student.phone,
 				destinationCity: internship?.destinationCity || "-",
 				internshipCompany: internship?.internshipCompany || "-",
 				completedDocs: completedCount,
-				status: internship?.status || status,
+				totalDocs: totalCount,
+				status: status,
 				estDepartureDate: internship?.estDepartureDate,
 				passportReady: internship?.passportReady,
 				visaReady: internship?.visaReady,
@@ -82,64 +100,4 @@ export const magangRouter = new Elysia({ prefix: "/magang" })
 				students: mappedStudents,
 			},
 		};
-	})
-	.get("/monitoring/student/:studentId", async ({ params: { studentId } }) => {
-		const results = await db
-			.select()
-			.from(internshipMonitoringSchedule)
-			.where(eq(internshipMonitoringSchedule.studentId, Number(studentId)))
-			.orderBy(desc(internshipMonitoringSchedule.scheduledDate));
-		return { success: true, data: results };
-	})
-	.post(
-		"/monitoring",
-		async (context) => {
-			const { body } = context;
-			const user = (context as any).user;
-			const b = body as any;
-			await db.insert(internshipMonitoringSchedule).values({
-				studentId: b.studentId,
-				scheduledDate: new Date(b.scheduledDate),
-				monitoringNotes: b.monitoringNotes,
-				condition: b.condition,
-				conductedBy: user?.userId,
-				completedAt: b.condition ? new Date() : null,
-			});
-			return { success: true };
-		},
-		{
-			body: t.Object({
-				studentId: t.Number(),
-				scheduledDate: t.String(),
-				monitoringNotes: t.Optional(t.String()),
-				condition: t.Optional(t.String()),
-			}),
-		},
-	)
-	.patch(
-		"/monitoring/:id",
-		async (context) => {
-			const {
-				params: { id },
-				body,
-			} = context;
-			const user = (context as any).user;
-			const b = body as any;
-			await db
-				.update(internshipMonitoringSchedule)
-				.set({
-					monitoringNotes: b.monitoringNotes,
-					condition: b.condition,
-					conductedBy: user?.userId,
-					completedAt: new Date(),
-				})
-				.where(eq(internshipMonitoringSchedule.id, Number(id)));
-			return { success: true };
-		},
-		{
-			body: t.Object({
-				monitoringNotes: t.Optional(t.String()),
-				condition: t.Optional(t.String()),
-			}),
-		},
-	);
+	});

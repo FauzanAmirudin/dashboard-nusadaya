@@ -36,7 +36,7 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			profile = await jwt.verify(auth.value as string);
 		}
 
-		if (!profile || profile.role !== "mahasiswa") {
+		if (profile?.role !== "mahasiswa") {
 			return { user: null };
 		}
 
@@ -556,6 +556,8 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				internshipDuration: magang?.internshipDuration,
 
 				status: magang?.status,
+				dokumentasiReady: magang?.dokumentasiReady,
+				agenReady: magang?.agenReady,
 				isAcc: magang?.isAcc,
 				accAt: magang?.accAt,
 

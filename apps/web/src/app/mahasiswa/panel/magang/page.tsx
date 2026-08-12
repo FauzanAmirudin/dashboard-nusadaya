@@ -71,20 +71,22 @@ export default function MagangPanelMahasiswa() {
 	}
 
 	const checklistItems = [
-		{ key: "passportReady", label: "1. Paspor" },
-		{ key: "interviewReady", label: "2. Interview" },
-		{ key: "loaReady", label: "3. Surat LoA" },
-		{ key: "contractReady", label: "4. Kontrak" },
-		{ key: "mcuReady", label: "5. Medical Check-Up" },
-		{ key: "visaReady", label: "6. Visa" },
-		{ key: "ticketReady", label: "7. Tiket Pesawat" },
-		{ key: "pdtReady", label: "8. Pelatihan (PDT)" },
+		{ key: "passportReady", label: "Paspor" },
+		{ key: "interviewReady", label: "Interview User" },
+		{ key: "contractReady", label: "Kontrak Magang & MOU" },
+		{ key: "loaReady", label: "Surat Izin Penerimaan Negara Tujuan" },
+		{ key: "mcuReady", label: "Medical Check-Up (MCU)" },
+		{ key: "visaReady", label: "Visa" },
+		{ key: "pdtReady", label: "Pembekalan (PDT)" },
+		{ key: "dokumentasiReady", label: "Dokumentasi Keberangkatan" },
+		{ key: "ticketReady", label: "Keberangkatan" },
+		{ key: "agenReady", label: "Dokumen Agen" },
 	];
 
 	const completedCount = checklistItems.filter(
 		(item) => data?.[item.key],
 	).length;
-	const checklistPercentage = (completedCount / 8) * 100;
+	const checklistPercentage = (completedCount / 10) * 100;
 
 	const formatDate = (dateString: string | null | undefined) => {
 		if (!dateString) return "-";
@@ -148,7 +150,7 @@ export default function MagangPanelMahasiswa() {
 						/>
 
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-							{checklistItems.map((item, index) => {
+							{checklistItems.map((item, _index) => {
 								const isChecked = data?.[item.key];
 								return (
 									<div
@@ -469,7 +471,10 @@ function RefreshCwIcon(props: any) {
 			strokeWidth="2"
 			strokeLinecap="round"
 			strokeLinejoin="round"
+			role="img"
+			aria-label="Refresh"
 		>
+			<title>Refresh</title>
 			<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
 			<path d="M3 3v5h5" />
 		</svg>

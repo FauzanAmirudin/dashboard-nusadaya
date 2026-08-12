@@ -323,12 +323,17 @@ export const statusRoutes = new Elysia().get(
 		const magangItems = [
 			{ prop: internship?.passportReady, name: "Paspor" },
 			{ prop: internship?.interviewReady, name: "Interview User" },
-			{ prop: internship?.loaReady, name: "Letter of Acceptance (LoA)" },
 			{ prop: internship?.contractReady, name: "Kontrak Magang" },
+			{
+				prop: internship?.loaReady,
+				name: "Surat Izin Penerimaan Negara Tujuan",
+			},
 			{ prop: internship?.mcuReady, name: "Medical Check Up (MCU)" },
 			{ prop: internship?.visaReady, name: "Visa" },
-			{ prop: internship?.ticketReady, name: "Tiket Pesawat" },
 			{ prop: internship?.pdtReady, name: "PDT (Pembekalan)" },
+			{ prop: internship?.dokumentasiReady, name: "Dokumentasi Keberangkatan" },
+			{ prop: internship?.ticketReady, name: "Keberangkatan (Tiket)" },
+			{ prop: internship?.agenReady, name: "Dokumen Agen" },
 		];
 		const magangCompleted = magangItems.filter((i) => i.prop).length;
 		magangItems
@@ -348,17 +353,17 @@ export const statusRoutes = new Elysia().get(
 			id: "magang",
 			name: "Tim Magang",
 			completed: magangCompleted,
-			total: 8,
+			total: magangItems.length,
 			status:
-				magangCompleted === 8
+				magangCompleted === magangItems.length
 					? "AMAN"
-					: magangCompleted >= 4
+					: magangCompleted >= 5
 						? "PERLU_PERHATIAN"
 						: "TIDAK_AMAN",
 			isAcc: internship?.isAcc,
 		});
 		totalCompleted += magangCompleted;
-		totalIndicators += 8;
+		totalIndicators += magangItems.length;
 
 		// Overall Status Logic
 		let overallStatus = "AMAN";

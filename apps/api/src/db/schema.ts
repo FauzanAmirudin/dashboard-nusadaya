@@ -840,6 +840,21 @@ export const internshipData = pgTable("internship_data", {
 		.notNull()
 		.unique(),
 
+	// 0. Pra-Paspor (Kelayakan)
+	praPasporPasFoto: boolean("pra_paspor_pas_foto").default(false),
+	praPasporKtm: boolean("pra_paspor_ktm").default(false),
+	praPasporKtp: boolean("pra_paspor_ktp").default(false),
+	praPasporKk: boolean("pra_paspor_kk").default(false),
+	praPasporAktaKelahiran: boolean("pra_paspor_akta_kelahiran").default(false),
+	praPasporSl21: boolean("pra_paspor_sl21").default(false),
+	praPasporSkma: boolean("pra_paspor_skma").default(false),
+	praPasporRekomendasiDisdik: boolean("pra_paspor_rekomendasi_disdik").default(
+		false,
+	),
+	praPasporGapYear: boolean("pra_paspor_gap_year").default(false),
+	praPasporPddikti: boolean("pra_paspor_pddikti").default(false),
+	praPasporCv: boolean("pra_paspor_cv").default(false),
+
 	// 1. Passport
 	passportReady: boolean("passport_ready").default(false),
 	passportNo: text("passport_no"),
@@ -880,6 +895,7 @@ export const internshipData = pgTable("internship_data", {
 	// 8. PDT
 	pdtReady: boolean("pdt_ready").default(false),
 	pdtDate: timestamp("pdt_date"),
+	pdtEndDate: timestamp("pdt_end_date"),
 	pdtPlace: text("pdt_place"),
 
 	// State Machine Kontrak Taiwan (LoL->LoA->MoA)
@@ -897,6 +913,11 @@ export const internshipData = pgTable("internship_data", {
 	destinationCity: text("destination_city"),
 	internshipDuration: text("internship_duration"),
 	internshipCompany: text("internship_company"),
+	dokumentasiReady: boolean("dokumentasi_ready").default(false),
+	dokumentasiKeberangkatanLink: text("dokumentasi_keberangkatan_link"),
+	agenReady: boolean("agen_ready").default(false),
+	agenNegaraTujuan: text("agen_negara_tujuan"),
+	agenPeminatan: text("agen_peminatan"),
 
 	// Dana Talangan - Tahap 1
 	danaTahap1Amount: integer("dana_tahap1_amount").default(0),
@@ -909,6 +930,12 @@ export const internshipData = pgTable("internship_data", {
 	danaTahap2Date: timestamp("dana_tahap2_date"),
 	danaTahap2Notes: text("dana_tahap2_notes"),
 	isDanaTahap2Disbursed: boolean("is_dana_tahap2_disbursed").default(false),
+
+	// 9. Post-Internship (Syarat Akhir)
+	logbookReady: boolean("logbook_ready").default(false),
+	laporanAkhirReady: boolean("laporan_akhir_ready").default(false),
+	videoDokumentasiReady: boolean("video_dokumentasi_ready").default(false),
+	videoDokumentasiLink: text("video_dokumentasi_link"),
 
 	notes: text("notes"),
 
