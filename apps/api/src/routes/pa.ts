@@ -67,6 +67,7 @@ export const paRouter = new Elysia({ prefix: "/pa" })
 				status: pa?.status || "PERLU_PERHATIAN",
 				counselingDone: pa?.counselingDone || false,
 				isAcc: pa?.isAcc || false,
+				pa,
 			};
 		});
 

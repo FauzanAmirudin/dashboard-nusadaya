@@ -3,6 +3,7 @@
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/eden";
@@ -142,14 +143,18 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 			<div className="space-y-6">
 				<div>
 					<div className="border-b border-slate-200 pb-4 mb-6">
-						<div className="flex justify-between items-center">
-							<h2 className="text-slate-800 text-lg font-bold flex items-center gap-2">
-								<span className="text-xl">📞</span> CRM — Customer Relationship
-								Management
-								<span className="ml-2 text-sm font-normal text-slate-500">
-									[{completedCount}/{totalChecks}]
-								</span>
-							</h2>
+						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+							<div>
+								<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
+									<span className="text-xl">📞</span> CRM — Customer Relationship Management
+									<span className="ml-2 text-sm font-normal text-slate-500">
+										[{completedCount}/{totalChecks}]
+									</span>
+								</CardTitle>
+								<p className="text-sm text-slate-500 mt-1">
+									Dikelola oleh: Admin CRM
+								</p>
+							</div>
 							<div className="flex items-center gap-3">
 								{isSuperadmin && !isCrmAdmin && (
 									<Badge
@@ -159,12 +164,6 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 										👁 Mode Lihat Saja
 									</Badge>
 								)}
-								<Badge
-									variant="outline"
-									className="border-slate-200 text-slate-500 bg-white"
-								>
-									Dikelola oleh: Admin CRM
-								</Badge>
 								{statusBadge}
 							</div>
 						</div>

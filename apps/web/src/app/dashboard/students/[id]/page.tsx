@@ -23,6 +23,7 @@ import { InternshipPanel } from "@/components/panels/InternshipPanel";
 import { PaPanel } from "@/components/panels/PaPanel";
 import { PmbPanel } from "@/components/panels/PmbPanel";
 import { StatusPanel } from "@/components/panels/StatusPanel";
+import { KehadiranPanel } from "@/components/panels/KehadiranPanel";
 import { StudentProgress } from "@/components/StudentProgress";
 import {
 	AlertDialog,
@@ -148,6 +149,7 @@ const NAV_LINKS = [
 	{ id: "crm", label: "CRM", roles: ["superadmin", "crm"] },
 	{ id: "finance", label: "Finance", roles: ["superadmin", "finance"] },
 	{ id: "akademik", label: "Akademik", roles: ["superadmin", "akademik"] },
+	{ id: "kehadiran", label: "Kehadiran", roles: ["superadmin", "akademik"] },
 	{ id: "dosen", label: "Dosen per MK", roles: ["dosen"] },
 	{ id: "pa", label: "PA", roles: ["superadmin", "pa"] },
 	{ id: "magang", label: "Tim Magang", roles: ["superadmin", "magang"] },
@@ -789,6 +791,8 @@ function StudentDetailContent() {
 									<FinancePanel studentId={s.id} onUpdate={refetchStudent} />
 								) : currentLink.id === "akademik" ? (
 									<AkademikPanel studentId={s.id} onUpdate={refetchStudent} />
+								) : currentLink.id === "kehadiran" ? (
+									<KehadiranPanel studentId={s.id} />
 								) : currentLink.id === "dosen" ? (
 									<DosenPanel studentId={s.id} onUpdate={refetchStudent} />
 								) : currentLink.id === "pa" ? (

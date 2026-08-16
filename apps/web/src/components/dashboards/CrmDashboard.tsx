@@ -73,25 +73,35 @@ export function CrmDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 			s.student.nim.includes(searchQuery),
 	);
 
-	const renderStatusBadge = (status: string | null | undefined) => {
-		if (status === "AMAN") {
-			return (
-				<Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/10">
-					🟢 Aman
-				</Badge>
-			);
-		}
-		if (status === "TIDAK_AMAN") {
-			return (
-				<Badge className="bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/10">
-					🔴 Tdk Aman
-				</Badge>
-			);
-		}
+	const renderProgressBadge = (crm: any) => {
+		const items = [
+			crm?.isMonitoringParent,
+			crm?.isMonitoringIndustry,
+			crm?.isVocabComplete,
+			crm?.hasStudyPermit,
+			crm?.practiceAttendance,
+			crm?.isOdsReport,
+			crm?.odsDocumentation,
+			crm?.isPrammagangReport,
+			crm?.isPrammagangDocumentation,
+		];
+		const completedCount = items.filter(Boolean).length;
+		const total = items.length;
+
 		return (
-			<Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/10">
-				🟡 Perhatian
-			</Badge>
+			<div className="flex items-center gap-2 justify-center">
+				<span className="text-sm font-medium text-slate-700">
+					{completedCount}/{total}
+				</span>
+				<div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
+					<div
+						className={`h-full rounded-full ${completedCount === total ? "bg-emerald-500" : "bg-blue-500"}`}
+						style={{
+							width: `${(completedCount / total) * 100}%`,
+						}}
+					/>
+				</div>
+			</div>
 		);
 	};
 
@@ -265,7 +275,7 @@ export function CrmDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 												{s.student.phone || "-"}
 											</TableCell>
 											<TableCell className="text-center">
-												{renderStatusBadge(s.crm?.status)}
+												{renderProgressBadge(s.crm)}
 											</TableCell>
 											<TableCell className="text-right pr-4">
 												<button

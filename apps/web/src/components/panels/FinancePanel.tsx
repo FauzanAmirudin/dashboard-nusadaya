@@ -3,6 +3,7 @@
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
@@ -64,17 +65,24 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 		<div className="space-y-6">
 			{/* Panel Header */}
 			<div className="border-b border-slate-200 pb-4 mb-6">
-				<div className="flex justify-between items-center">
-					<h2 className="text-slate-800 text-xl font-bold flex items-center gap-2">
-						<span>💰</span> Panel Keuangan Mahasiswa
-					</h2>
-					<div className="flex items-center gap-3">
-						<Badge
-							variant="outline"
-							className="border-slate-200 text-slate-500 bg-white"
-						>
+				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+					<div>
+						<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
+							<span className="text-xl">💰</span> Panel Keuangan Mahasiswa
+						</CardTitle>
+						<p className="text-sm text-slate-500 mt-1">
 							Dikelola oleh: Finance
-						</Badge>
+						</p>
+					</div>
+					<div className="flex items-center gap-3">
+						{user?.role === "superadmin" && !isFinanceAdmin && (
+							<Badge
+								variant="outline"
+								className="text-slate-400 border-slate-300"
+							>
+								👁 Mode Lihat Saja
+							</Badge>
+						)}
 					</div>
 				</div>
 			</div>

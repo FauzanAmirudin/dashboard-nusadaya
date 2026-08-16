@@ -11,14 +11,6 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-	Cell,
-	Legend,
-	Pie,
-	PieChart,
-	Tooltip as RechartsTooltip,
-	ResponsiveContainer,
-} from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -107,25 +99,30 @@ export function PaDashboard({ user }: any) {
 
 	const filteredData = data;
 
-	const renderStatusBadge = (status: string | null | undefined) => {
-		if (status === "AMAN") {
-			return (
-				<Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/10">
-					🟢 Aman
-				</Badge>
-			);
-		}
-		if (status === "TIDAK_AMAN") {
-			return (
-				<Badge className="bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/10">
-					🔴 Tdk Aman
-				</Badge>
-			);
-		}
+	const renderProgressBadge = (s: any) => {
+		const items = [
+			s.pa?.interview1Completed,
+			s.pa?.interview2Completed,
+			s.pa?.interview3Completed,
+			s.pa?.tripartiteMeetingCompleted,
+		];
+		const completedCount = items.filter(Boolean).length;
+		const total = 4;
+
 		return (
-			<Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/10">
-				🟡 Perhatian
-			</Badge>
+			<div className="flex items-center gap-2 justify-center">
+				<span className="text-sm font-medium text-slate-700">
+					{completedCount}/{total}
+				</span>
+				<div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
+					<div
+						className={`h-full rounded-full ${completedCount === total ? "bg-emerald-500" : "bg-blue-500"}`}
+						style={{
+							width: `${(completedCount / total) * 100}%`,
+						}}
+					/>
+				</div>
+			</div>
 		);
 	};
 
@@ -216,78 +213,9 @@ export function PaDashboard({ user }: any) {
 				</Card>
 			</div>
 
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-				{/* Donut Chart */}
-				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-1">
-					<CardHeader>
-						<CardTitle className="text-slate-800 flex items-center gap-2">
-							<LayoutDashboard className="h-5 w-5 text-slate-500" />
-							Distribusi Status PA
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="flex flex-col items-center">
-						<div className="h-64 w-full">
-							<ResponsiveContainer width="100%" height="100%">
-								<PieChart>
-									<Pie
-										data={pieData}
-										innerRadius={60}
-										outerRadius={80}
-										paddingAngle={5}
-										dataKey="value"
-									>
-										{pieData.map((entry, index) => (
-											<Cell
-												key={`cell-${entry.name}`}
-												fill={PIE_COLORS[index % PIE_COLORS.length]}
-											/>
-										))}
-									</Pie>
-									<RechartsTooltip
-										contentStyle={{
-											backgroundColor: "#ffffff",
-											borderColor: "#e2e8f0",
-											color: "#0f172a",
-										}}
-										itemStyle={{ color: "#0f172a" }}
-									/>
-									<Legend verticalAlign="bottom" height={36} />
-								</PieChart>
-							</ResponsiveContainer>
-						</div>
-						<div className="mt-4 w-full space-y-2">
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-emerald-500" /> Aman
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countAman}
-								</span>
-							</div>
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-amber-500" /> Perlu
-									Perhatian
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countPerhatian}
-								</span>
-							</div>
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-rose-500" /> Tidak
-									Aman
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countTidakAman}
-								</span>
-							</div>
-						</div>
-					</CardContent>
-				</Card>
-
+			<div className="flex flex-col gap-6">
 				{/* List Mahasiswa dengan Kendala */}
-				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-2">
+				<Card className="bg-white border-slate-200 shadow-sm w-full">
 					<CardHeader className="border-b border-slate-200 pb-4 bg-slate-50/50">
 						<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
 							<CardTitle className="text-slate-800 text-lg">
@@ -363,7 +291,7 @@ export function PaDashboard({ user }: any) {
 													{s.paName}
 												</TableCell>
 												<TableCell className="text-center">
-													{renderStatusBadge(s.status)}
+													{renderProgressBadge(s)}
 												</TableCell>
 												<TableCell className="text-right pr-4">
 													<button

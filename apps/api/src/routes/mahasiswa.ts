@@ -5,16 +5,25 @@ import {
 	academicData,
 	academicDocuments,
 	counselingLogs,
+	courseGrades,
+	courses,
 	crmData,
 	crmDocuments,
+	crmLogs,
+	departureAssessmentNotes,
+	departureAssessments,
+	entrepreneurshipRecords,
 	finalDecision,
 	financeData,
 	financeDocuments,
+	financeSemesterInstallments,
 	internshipData,
 	internshipDocuments,
+	overseasProgramChecklists,
 	paData,
 	paDocuments,
 	paInterviewLogs,
+	paStudentNotes,
 	pmbData,
 	pmbDocuments,
 	pmbFeeDisbursements,
@@ -406,12 +415,15 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				accAt: finance?.accAt,
 			};
 		} else if (panelKey === "akademik") {
-			const [academic, documents] = await Promise.all([
+			const [academic, documents, overseasChecklist] = await Promise.all([
 				db.query.academicData.findFirst({
 					where: eq(academicData.studentId, studentData.id),
 				}),
 				db.query.academicDocuments.findMany({
 					where: eq(academicDocuments.studentId, studentData.id),
+				}),
+				db.query.overseasProgramChecklists.findFirst({
+					where: eq(overseasProgramChecklists.studentId, studentData.id),
 				}),
 			]);
 			data = {
@@ -428,17 +440,17 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				academicCommunication: academic?.academicCommunication,
 				notes: academic?.notes,
 
-				taiwanCohort: academic?.taiwanCohort,
-				taiwanPasFotoChecked: academic?.taiwanPasFotoChecked,
-				taiwanCvChecked: academic?.taiwanCvChecked,
-				taiwanKtmChecked: academic?.taiwanKtmChecked,
-				taiwanKhsChecked: academic?.taiwanKhsChecked,
-				taiwanSl21Checked: academic?.taiwanSl21Checked,
-				taiwanAktifChecked: academic?.taiwanAktifChecked,
-				taiwanPddiktiChecked: academic?.taiwanPddiktiChecked,
-				taiwanLolChecked: academic?.taiwanLolChecked,
-				taiwanLoaChecked: academic?.taiwanLoaChecked,
-				taiwanSuhhanChecked: academic?.taiwanSuhhanChecked,
+				taiwanCohort: overseasChecklist?.cohort === "13/14" || overseasChecklist?.programType === "taiwan",
+				taiwanPasFotoChecked: overseasChecklist?.pasFotoChecked,
+				taiwanCvChecked: overseasChecklist?.cvChecked,
+				taiwanKtmChecked: overseasChecklist?.ktmChecked,
+				taiwanKhsChecked: overseasChecklist?.khsChecked,
+				taiwanSl21Checked: overseasChecklist?.sl21Checked,
+				taiwanAktifChecked: overseasChecklist?.aktifChecked,
+				taiwanPddiktiChecked: overseasChecklist?.pddiktiChecked,
+				taiwanLolChecked: overseasChecklist?.lolChecked,
+				taiwanLoaChecked: overseasChecklist?.loaChecked,
+				taiwanSuhhanChecked: overseasChecklist?.suhhanChecked,
 
 				documents: documents.map((d) => ({
 					documentKey: d.documentKey,

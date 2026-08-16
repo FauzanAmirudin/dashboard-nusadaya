@@ -2,7 +2,9 @@
 
 import {
 	BookOpen,
+	CalendarDays,
 	CheckSquare,
+	ClipboardCheck,
 	ClipboardList,
 	GraduationCap,
 	HeartHandshake,
@@ -12,10 +14,12 @@ import {
 	Plane,
 	Settings,
 	ShieldCheck,
+	UserCog,
 	Users,
 	Wallet,
 	X,
 	DatabaseBackup,
+	ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -25,11 +29,19 @@ import { api } from "@/lib/eden";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store";
 
-interface SidebarItem {
-	icon: React.ElementType;
+interface SidebarSubItem {
 	label: string;
 	href: string;
 	roles: string[];
+	icon?: React.ElementType;
+}
+
+interface SidebarItem {
+	icon: React.ElementType;
+	label: string;
+	href?: string;
+	roles: string[];
+	subItems?: SidebarSubItem[];
 }
 
 const SIDEBAR_ITEMS: SidebarItem[] = [
@@ -85,9 +97,46 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 	},
 	{
 		icon: GraduationCap,
-		label: "Panel Akademik",
-		href: "/dashboard/akademik",
+		label: "Akademik",
 		roles: ["superadmin", "akademik", "dosen"],
+		subItems: [
+			{
+				label: "Panel Akademik",
+				href: "/dashboard/akademik",
+				roles: ["superadmin", "dosen"],
+				icon: GraduationCap,
+			},
+			{
+				label: "Kalender Akademik",
+				href: "/dashboard/kalender-akademik",
+				roles: ["superadmin", "akademik"],
+				icon: CalendarDays,
+			},
+			{
+				label: "Penjadwalan & Info",
+				href: "/dashboard/penjadwalan",
+				roles: ["superadmin", "akademik"],
+				icon: CalendarDays,
+			},
+			{
+				label: "Manajemen Kehadiran",
+				href: "/dashboard/kehadiran",
+				roles: ["superadmin", "akademik", "dosen"],
+				icon: ClipboardCheck,
+			},
+			{
+				label: "Manajemen Mata Kuliah",
+				href: "/dashboard/mata-kuliah",
+				roles: ["superadmin", "akademik", "dosen"],
+				icon: BookOpen,
+			},
+			{
+				label: "Manajemen PA",
+				href: "/dashboard/akademik/pa",
+				roles: ["superadmin", "akademik"],
+				icon: GraduationCap,
+			},
+		]
 	},
 	{
 		icon: BookOpen,
@@ -118,6 +167,12 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 		label: "Panel Finalisasi",
 		href: "/dashboard/finalisasi",
 		roles: ["superadmin"],
+	},
+	{
+		icon: UserCog,
+		label: "Pengelolaan Pengguna",
+		href: "/dashboard/users",
+		roles: ["superadmin", "akademik"],
 	},
 	{
 		icon: DatabaseBackup,
@@ -151,9 +206,28 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 		router.push("/login");
 	};
 
-	const visibleItems = SIDEBAR_ITEMS.filter(
-		(item) => mounted && user?.role && item.roles.includes(user.role),
-	);
+	let visibleItems: SidebarItem[] = [];
+	if (mounted && user?.role) {
+		SIDEBAR_ITEMS.forEach((item) => {
+			if (user.role === "superadmin") {
+				if (item.roles.includes(user.role)) visibleItems.push(item);
+			} else {
+				if (item.subItems) {
+					const allowed = item.subItems.filter(sub => sub.roles.includes(user.role!));
+					allowed.forEach(sub => {
+						visibleItems.push({
+							icon: sub.icon || item.icon,
+							label: sub.label,
+							href: sub.href,
+							roles: sub.roles,
+						});
+					});
+				} else {
+					if (item.roles.includes(user.role)) visibleItems.push(item);
+				}
+			}
+		});
+	}
 
 	const moduleItems = visibleItems.filter(
 		(item) =>
@@ -220,7 +294,7 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 							)}
 							{mainItems.map((item) => (
 								<NavItem
-									key={item.href}
+									key={item.href || item.label}
 									item={item}
 									pathname={pathname}
 									context={context}
@@ -241,7 +315,7 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 							{collapsed && <div className="my-3 border-t border-slate-200" />}
 							{moduleItems.map((item) => (
 								<NavItem
-									key={item.href}
+									key={item.href || item.label}
 									item={item}
 									pathname={pathname}
 									context={context}
@@ -290,32 +364,94 @@ function NavItem({
 	context: string | null;
 	collapsed: boolean;
 }) {
+	const { user } = useAuthStore();
+	const [isOpen, setIsOpen] = useState(false);
+
+	const isSubActive = item.subItems?.some(sub => pathname === sub.href || pathname.startsWith(`${sub.href}/`));
+
+	useEffect(() => {
+		if (isSubActive) setIsOpen(true);
+	}, [isSubActive]);
+
 	let isActive = false;
 
-	if (context && pathname.startsWith("/dashboard/students/")) {
-		if (item.href === "/dashboard/students") {
-			isActive = false;
-		} else if (item.href === `/dashboard/${context}`) {
-			isActive = true;
-		} else if (
-			context === "final-decision" &&
-			(item.href === "/dashboard/evaluator" ||
-				item.href === "/dashboard/finalisasi")
-		) {
-			isActive = true;
+	if (item.href) {
+		if (context && pathname.startsWith("/dashboard/students/")) {
+			if (item.href === "/dashboard/students") {
+				isActive = false;
+			} else if (item.href === `/dashboard/${context}`) {
+				isActive = true;
+			} else if (
+				context === "final-decision" &&
+				(item.href === "/dashboard/evaluator" ||
+					item.href === "/dashboard/finalisasi")
+			) {
+				isActive = true;
+			}
+		} else {
+			isActive =
+				item.href === "/dashboard"
+					? pathname === "/dashboard"
+					: pathname === item.href || pathname.startsWith(`${item.href}/`);
 		}
-	} else {
-		isActive =
-			item.href === "/dashboard"
-				? pathname === "/dashboard"
-				: pathname === item.href || pathname.startsWith(`${item.href}/`);
 	}
 
 	const Icon = item.icon;
 
+	if (item.subItems) {
+		const visibleSubItems = item.subItems.filter(sub => user?.role && sub.roles.includes(user.role));
+		if (visibleSubItems.length === 0) return null;
+
+		return (
+			<div className="flex flex-col space-y-1">
+				<button
+					type="button"
+					onClick={() => setIsOpen(!isOpen)}
+					className={cn(
+						"flex items-center justify-between w-full px-3 py-2.5 rounded-lg transition-all duration-150 group",
+						isSubActive
+							? "bg-blue-50/50 text-[#0517B0] font-medium"
+							: "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+						collapsed && "justify-center px-0"
+					)}
+				>
+					<div className="flex items-center gap-3">
+						<Icon className={cn("h-5 w-5 shrink-0", isSubActive ? "text-[#0517B0]" : "")} />
+						{!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+					</div>
+					{!collapsed && (
+						<ChevronDown className={cn("w-4 h-4 transition-transform duration-200 text-slate-400", isOpen ? "rotate-180" : "")} />
+					)}
+				</button>
+
+				{!collapsed && isOpen && (
+					<div className="pl-9 pr-2 space-y-1 mt-1">
+						{visibleSubItems.map((sub) => {
+							const isSubItemActive = pathname === sub.href || pathname.startsWith(`${sub.href}/`);
+							return (
+								<Link
+									key={sub.href}
+									href={sub.href}
+									className={cn(
+										"block w-full text-sm px-3 py-2 rounded-md transition-all duration-150",
+										isSubItemActive
+											? "bg-blue-50 text-[#0517B0] font-medium border-l-[3px] border-[#0517B0] pl-[9px]"
+											: "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+									)}
+								>
+									{sub.label}
+								</Link>
+							);
+						})}
+					</div>
+				)}
+			</div>
+		);
+	}
+
 	return (
 		<Link
-			href={item.href}
+			href={item.href!}
 			className={cn(
 				"flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 group",
 				isActive

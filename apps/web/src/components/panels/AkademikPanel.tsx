@@ -41,9 +41,12 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { api } from "@/lib/eden";
+import { api, getToken } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 import { TabAnggaranPraktik } from "./akademik/TabAnggaranPraktik";
+import { TabManajemenMahasiswa } from "./akademik/TabManajemenMahasiswa";
+import { AssessmentFormCard } from "./akademik/assessment/AssessmentFormCard";
+import type { AssessmentRecord } from "./akademik/assessment/AssessmentFormCard";
 
 interface DocFile {
 	id: number;
@@ -63,7 +66,7 @@ interface AkademikPanelProps {
 }
 
 export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
-	const { user } = useAuthStore();
+	const { user, token } = useAuthStore();
 	const isAkademikAdmin =
 		user?.role === "akademik" || user?.role === "superadmin";
 	const isSuperadmin = user?.role === "superadmin";
@@ -75,42 +78,24 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 	const [documents, setDocuments] = useState<Record<string, DocFile[]>>({});
 	const [isLoading, setIsLoading] = useState(true);
 	const [activeTab, setActiveTab] = useState("dokumen");
+	const [assessment, setAssessment] = useState<AssessmentRecord | null>(null);
 
-	const [localChecks, setLocalChecks] = useState({
-		pddiktiInput: false,
-		utsPassed: false,
-		uasPassed: false,
-		attitudeIndicator: false,
-		assignmentsCompleted: false,
-		academicCommunication: false,
-		taiwanPasFotoChecked: false,
-		taiwanCvChecked: false,
-		taiwanKtmChecked: false,
-		taiwanKhsChecked: false,
-		taiwanSl21Checked: false,
-		taiwanAktifChecked: false,
-		taiwanGapYearChecked: false,
-		taiwanPddiktiChecked: false,
-		taiwanPribadiChecked: false,
-		taiwanLolChecked: false,
-		taiwanLoaChecked: false,
-		taiwanSuhhanChecked: false,
-	});
-
-	const [attendance, setAttendance] = useState<Record<string, number | string>>(
-		{
-			attendanceTotal: 0,
-			attendancePresent: 0,
-			attendanceAlphaNote: "",
-		},
-	);
-
-	const [notes, setNotes] = useState("");
-	const [loadingItem, setLoadingItem] = useState<string | null>(null);
-	const [isSavingAttendance, setIsSavingAttendance] = useState(false);
-	const [isSavingNotes, setIsSavingNotes] = useState(false);
 	const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
 	const [selectedDocToDelete, setSelectedDocToDelete] = useState<number | null>(null);
+	const [isSavingNotes, setIsSavingNotes] = useState(false);
+
+	const fetchAssessment = async () => {
+		try {
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/departure-assessment`,
+				{ headers: { Authorization: `Bearer ${getToken()}` } },
+			);
+			if (res.ok) {
+				const json = await res.json();
+				setAssessment(json.data?.assessment ?? null);
+			}
+		} catch (_) {}
+	};
 
 	const fetchAcademicData = async () => {
 		try {
@@ -141,61 +126,25 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 	useEffect(() => {
 		fetchAcademicData();
 		fetchDocuments();
+		fetchAssessment();
 	}, [studentId, fetchDocuments]);
 
-	useEffect(() => {
-		if (acadState) {
-			setLocalChecks({
-				pddiktiInput: !!acadState.pddiktiInput,
-				utsPassed: !!acadState.utsPassed,
-				uasPassed: !!acadState.uasPassed,
-				attitudeIndicator: !!acadState.attitudeIndicator,
-				assignmentsCompleted: !!acadState.assignmentsCompleted,
-				academicCommunication: !!acadState.academicCommunication,
-				taiwanPasFotoChecked: !!acadState.taiwanPasFotoChecked,
-				taiwanCvChecked: !!acadState.taiwanCvChecked,
-				taiwanKtmChecked: !!acadState.taiwanKtmChecked,
-				taiwanKhsChecked: !!acadState.taiwanKhsChecked,
-				taiwanSl21Checked: !!acadState.taiwanSl21Checked,
-				taiwanAktifChecked: !!acadState.taiwanAktifChecked,
-				taiwanGapYearChecked: !!acadState.taiwanGapYearChecked,
-				taiwanPddiktiChecked: !!acadState.taiwanPddiktiChecked,
-				taiwanPribadiChecked: !!acadState.taiwanPribadiChecked,
-				taiwanLolChecked: !!acadState.taiwanLolChecked,
-				taiwanLoaChecked: !!acadState.taiwanLoaChecked,
-				taiwanSuhhanChecked: !!acadState.taiwanSuhhanChecked,
-			});
-			setAttendance({
-				attendanceTotal: acadState.attendanceTotal || 0,
-				attendancePresent: acadState.attendancePresent || 0,
-				attendanceAlphaNote: acadState.attendanceAlphaNote || "",
-			});
-			setNotes(acadState.notes || "");
-		}
-	}, [acadState]);
-
-	const attTotal = Number(attendance.attendanceTotal) || 0;
-	const attPresent = Number(attendance.attendancePresent) || 0;
-	const attendancePercentage =
-		attTotal > 0 ? Math.round((attPresent / attTotal) * 100) : 0;
-
-	const isAttendancePassed = attendancePercentage >= 90;
+	// Status perhitungan sekarang berdasarkan acadState langsung
 
 	const baseChecklist = [
 		{
 			id: "pddiktiInput",
 			label: "Validasi Input PDDIKTI",
 			desc: "Data akademik terdaftar di sistem PDDIKTI",
-			checked: localChecks.pddiktiInput,
+			checked: !!acadState?.pddiktiInput,
 			auto: false,
 			documentKey: "pddikti_input",
 		},
-
 		{
 			id: "utsPassed",
 			label: "Nilai UTS Lulus",
 			desc: "Semua mata kuliah UTS memenuhi standar minimal",
-			checked: localChecks.utsPassed,
+			checked: !!acadState?.utsPassed,
 			auto: false,
 			documentKey: "uts_passed",
 		},
@@ -203,7 +152,7 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 			id: "uasPassed",
 			label: "Nilai UAS Lulus",
 			desc: "Semua mata kuliah UAS memenuhi standar minimal",
-			checked: localChecks.uasPassed,
+			checked: !!acadState?.uasPassed,
 			auto: false,
 			documentKey: "uas_passed",
 		},
@@ -211,7 +160,7 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 			id: "attitudeIndicator",
 			label: "Indikator Sikap",
 			desc: "Sikap dan etika dinilai baik oleh Dosen & PA",
-			checked: localChecks.attitudeIndicator,
+			checked: !!acadState?.attitudeIndicator,
 			auto: false,
 			documentKey: "attitude_indicator",
 		},
@@ -219,7 +168,7 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 			id: "assignmentsCompleted",
 			label: "Penyelesaian Tugas",
 			desc: "Tugas perkuliahan utama telah diselesaikan",
-			checked: localChecks.assignmentsCompleted,
+			checked: !!acadState?.assignmentsCompleted,
 			auto: false,
 			documentKey: "assignments_completed",
 		},
@@ -227,9 +176,17 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 			id: "academicCommunication",
 			label: "Komunikasi Akademik",
 			desc: "Komunikasi mahasiswa dengan dosen/PA aktif",
-			checked: localChecks.academicCommunication,
+			checked: !!acadState?.academicCommunication,
 			auto: false,
 			documentKey: "academic_communication",
+		},
+		{
+			id: "assessmentCompleted",
+			label: "Asesmen Pra-keberangkatan",
+			desc: "Hasil asesmen kesiapan keberangkatan",
+			checked: !!acadState?.assessmentCompleted,
+			auto: false,
+			documentKey: "pre_departure_assessment",
 		},
 	];
 
@@ -285,9 +242,9 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 		taiwanDocs.forEach((doc) => {
 			let forceDisabled = false;
 			if (doc.id === "taiwanLoaChecked")
-				forceDisabled = !localChecks.taiwanLolChecked;
+				forceDisabled = !acadState?.taiwanLolChecked;
 			if (doc.id === "taiwanSuhhanChecked")
-				forceDisabled = !localChecks.taiwanLoaChecked;
+				forceDisabled = !acadState?.taiwanLoaChecked;
 
 			checklist.push({
 				id: doc.id,
@@ -295,7 +252,7 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 				desc:
 					"Syarat wajib dokumen kohort Taiwan" +
 					(forceDisabled ? " (Terkunci)" : ""),
-				checked: (localChecks as any)[doc.id] || false,
+				checked: acadState?.[doc.id] || false,
 				auto: false,
 				documentKey: doc.key,
 				forceDisabled,
@@ -325,78 +282,7 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 		);
 	}
 
-	const handleCheckboxChange = async (id: string, checked: boolean) => {
-		if (!canEdit) return;
-		const prevState = { ...localChecks };
-		setLocalChecks((prev) => ({ ...prev, [id]: checked }));
-		setLoadingItem(id);
 
-		try {
-			const { error } = await api.students[studentId.toString()].academic.patch(
-				{ [id]: checked },
-			);
-			if (!error) {
-				toast.success("Berhasil disimpan");
-				fetchAcademicData();
-				onUpdate();
-			} else {
-				setLocalChecks(prevState);
-				toast.error("Gagal menyimpan perubahan");
-			}
-		} catch (e) {
-			setLocalChecks(prevState);
-			toast.error("Gagal menyimpan perubahan");
-		} finally {
-			setLoadingItem(null);
-		}
-	};
-
-	const handleSaveAttendance = async () => {
-		if (!canEdit) return;
-		setIsSavingAttendance(true);
-
-		try {
-			const { error } = await api.students[studentId.toString()].academic.patch(
-				{
-					attendanceTotal: Number(attendance.attendanceTotal) || 0,
-					attendancePresent: Number(attendance.attendancePresent) || 0,
-					attendanceAlphaNote: attendance.attendanceAlphaNote as string,
-				},
-			);
-			if (!error) {
-				toast.success("Data kehadiran berhasil disimpan");
-				fetchAcademicData();
-				onUpdate();
-			} else {
-				toast.error("Gagal menyimpan kehadiran");
-			}
-		} catch {
-			toast.error("Gagal menyimpan kehadiran");
-		} finally {
-			setIsSavingAttendance(false);
-		}
-	};
-
-	const handleSaveNotes = async () => {
-		if (!canEdit) return;
-		setIsSavingNotes(true);
-		try {
-			const { error } = await api.students[studentId.toString()].academic.patch(
-				{ notes },
-			);
-			if (!error) {
-				toast.success("Catatan akademik disimpan");
-				fetchAcademicData();
-				onUpdate();
-			} else {
-				toast.error("Gagal menyimpan catatan");
-			}
-		} catch {
-			toast.error("Gagal menyimpan catatan");
-		} finally {
-			setIsSavingNotes(false);
-		}
-	};
 
 	const handleAcc = async () => {
 		if (!isAkademikAdmin && !isSuperadmin) return;
@@ -510,20 +396,27 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 		<div className="space-y-6">
 			<div>
 				<div className="border-b border-slate-200 pb-4 mb-6">
-					<div className="flex justify-between items-center">
-						<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
-							<span className="text-xl">🎓</span> Akademik — Kepatuhan Akademik
-							<span className="ml-2 text-sm font-normal text-slate-500">
-								[{completedCount}/{checklist.length}]
-							</span>
-						</CardTitle>
-						<div className="flex items-center gap-3">
-							<Badge
-								variant="outline"
-								className="border-slate-200 text-slate-500 bg-white"
-							>
+					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+						<div>
+							<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
+								<span className="text-xl">🎓</span> Akademik — Kepatuhan Akademik
+								<span className="ml-2 text-sm font-normal text-slate-500">
+									[{completedCount}/{checklist.length}]
+								</span>
+							</CardTitle>
+							<p className="text-sm text-slate-500 mt-1">
 								Dikelola oleh: Admin Akademik
-							</Badge>
+							</p>
+						</div>
+						<div className="flex items-center gap-3">
+							{isSuperadmin && !isAkademikAdmin && (
+								<Badge
+									variant="outline"
+									className="text-slate-400 border-slate-300"
+								>
+									👁 Mode Lihat Saja
+								</Badge>
+							)}
 							{statusBadge}
 						</div>
 					</div>
@@ -535,7 +428,7 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 						onClick={() => setActiveTab("dokumen")}
 						className={`px-4 py-2 font-medium text-sm ${activeTab === "dokumen" ? "border-b-2 border-[#0517B0] text-[#0517B0]" : "text-slate-500 hover:text-slate-700"}`}
 					>
-						Berkas & Kelayakan
+						Manajemen Mahasiswa
 					</button>
 					<button
 						onClick={() => setActiveTab("penilaian")}
@@ -549,151 +442,22 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 					>
 						Anggaran Praktik
 					</button>
+					<button
+						onClick={() => setActiveTab("assessment")}
+						className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${activeTab === "assessment" ? "border-b-2 border-[#0517B0] text-[#0517B0]" : "text-slate-500 hover:text-slate-700"}`}
+					>
+						Assessment Pra-keberangkatan
+					</button>
 				</div>
 
 				{activeTab === "dokumen" && (
 					<div className="space-y-6">
-						{/* CHECKLIST */}
-						<div className="mb-8 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-							<div className="bg-slate-50 border-b border-slate-200 px-5 py-4">
-								<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-									CHECKLIST AKADEMIK
-								</h3>
-							</div>
-							<div className="p-5 space-y-4">
-								{checklist.map((item) => {
-									const itemDocs = documents[item.documentKey as string] || [];
-									return (
-										<div
-											key={item.id}
-											className="flex flex-col bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm"
-										>
-											<div
-												className={`flex items-center gap-4 p-4 transition-colors ${
-													item.checked
-														? "bg-emerald-50/50"
-														: item.auto
-															? "bg-slate-50"
-															: "bg-white hover:bg-slate-50/50"
-												}`}
-											>
-												<Checkbox
-													id={item.id}
-													checked={item.checked}
-													onCheckedChange={(c) =>
-														!item.auto &&
-														handleCheckboxChange(item.id, c as boolean)
-													}
-													disabled={
-														!canEdit ||
-														item.auto ||
-														loadingItem === item.id ||
-														(item as any).forceDisabled
-													}
-													className={`w-6 h-6 rounded-md transition-all ${
-														item.checked
-															? "data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
-															: ""
-													}`}
-												/>
-												<label
-													htmlFor={item.id}
-													className={`flex-1 cursor-pointer block ${item.auto ? "cursor-default pointer-events-none" : ""}`}
-												>
-													<div
-														className={`text-base font-semibold flex items-center ${
-															item.checked
-																? "text-emerald-900"
-																: "text-slate-700"
-														}`}
-													>
-														{item.label}
-														{item.auto && (
-															<Badge
-																variant="outline"
-																className="ml-2 text-[10px] text-slate-500 border-slate-300"
-															>
-																⚡ Otomatis
-															</Badge>
-														)}
-														{loadingItem === item.id && (
-															<Loader2 className="w-4 h-4 text-emerald-600 animate-spin ml-2" />
-														)}
-													</div>
-													<p
-														className={`text-sm ${
-															item.checked
-																? "text-emerald-700/80"
-																: "text-slate-500"
-														}`}
-													>
-														{item.desc}
-													</p>
-												</label>
-												<div>
-													{item.checked ? (
-														<CheckCircle className="w-6 h-6 text-emerald-500" />
-													) : item.auto ? (
-														<XCircle className="w-6 h-6 text-rose-400" />
-													) : (
-														<div className="w-6 h-6 rounded-full border-2 border-slate-300" />
-													)}
-												</div>
-											</div>
-
-											{/* Area Dokumen */}
-											{item.documentKey && (
-												<div className="p-4 bg-white border-t border-slate-100">
-													<div className="flex items-center justify-between mb-2">
-														<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
-															Lampiran Dokumen
-														</span>
-													</div>
-													<DocumentUpload
-														studentId={studentId}
-														panel="akademik"
-														documentKey={item.documentKey as string}
-														canEdit={canEdit}
-													/>
-												</div>
-											)}
-										</div>
-									);
-								})}
-							</div>
-						</div>
-
-						{/* CATATAN */}
-						<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-							<div className="bg-slate-50 border-b border-slate-200 px-5 py-4">
-								<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-									CATATAN AKADEMIK
-								</h3>
-							</div>
-							<div className="p-5">
-								<Textarea
-									placeholder="Tambahkan catatan khusus terkait akademik mahasiswa ini..."
-									value={notes}
-									onChange={(e) => setNotes(e.target.value)}
-									disabled={!canEdit}
-									className="min-h-[100px] bg-slate-50 resize-y mb-4"
-								/>
-								{canEdit && (
-									<div className="flex justify-end">
-										<Button
-											onClick={handleSaveNotes}
-											disabled={isSavingNotes}
-											className="bg-slate-800 hover:bg-slate-700 text-white"
-										>
-											{isSavingNotes && (
-												<Loader2 className="w-4 h-4 mr-2 animate-spin" />
-											)}
-											Simpan Catatan
-										</Button>
-									</div>
-								)}
-							</div>
-						</div>
+						<TabManajemenMahasiswa
+							studentId={studentId}
+							canEdit={canEdit}
+							acadState={acadState}
+							onRefresh={fetchAcademicData}
+						/>
 
 						{/* Status ACC Card */}
 						<Card className="bg-slate-50 border-slate-200 shadow-sm overflow-hidden">
@@ -853,6 +617,34 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 				{activeTab === "anggaran_praktik" && (
 					<div className="mt-2">
 						<TabAnggaranPraktik canEdit={canEdit} studentId={studentId} />
+					</div>
+				)}
+
+				{activeTab === "assessment" && (
+					<div className="mt-2 space-y-4">
+						<div className="flex items-center justify-between">
+							<h3 className="text-lg font-bold text-slate-800 border-l-4 border-[#0517B0] pl-3">
+								Assessment Pra-keberangkatan
+							</h3>
+						</div>
+						<AssessmentFormCard
+							studentId={studentId}
+							assessment={assessment}
+							canEdit={canEdit}
+							token={token}
+							onRefresh={async () => {
+								try {
+									const res = await fetch(
+										`${API_URL}/students/${studentId}/departure-assessment`,
+										{ headers: { Authorization: `Bearer ${getToken()}` } },
+									);
+									if (res.ok) {
+										const json = await res.json();
+										setAssessment(json.data?.assessment ?? null);
+									}
+								} catch (_) {}
+							}}
+						/>
 					</div>
 				)}
 			</div>

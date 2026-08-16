@@ -497,15 +497,18 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 		<div className="space-y-6">
 			<div>
 				<div className="border-b border-slate-200 pb-4 mb-6">
-					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-						<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
-							<span className="text-xl">📚</span> Dosen — Nilai & Kehadiran per
-							MK
-							<span className="ml-2 text-sm font-normal text-slate-500">
-								[{gradesData.filter((g) => g.isAcc).length}/{gradesData.length}{" "}
-								ACC]
-							</span>
-						</CardTitle>
+					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+						<div>
+							<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
+								<span className="text-xl">📚</span> Dosen — Nilai & Kehadiran per MK
+								<span className="ml-2 text-sm font-normal text-slate-500">
+									[{gradesData.filter((g) => g.isAcc).length}/{gradesData.length} ACC]
+								</span>
+							</CardTitle>
+							<p className="text-sm text-slate-500 mt-1">
+								Dikelola oleh: Dosen MK
+							</p>
+						</div>
 						<div className="flex items-center gap-3 w-full sm:w-auto">
 							{isSuperadmin && (
 								<Button
@@ -516,12 +519,12 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 									<PlusCircle className="w-4 h-4" /> Tambah MK
 								</Button>
 							)}
-							{!isSuperadmin && (
+							{isSuperadmin && !isDosen && (
 								<Badge
 									variant="outline"
-									className="border-slate-200 text-slate-500 bg-white"
+									className="text-slate-400 border-slate-300"
 								>
-									Dikelola oleh: Dosen MK
+									👁 Mode Lihat Saja
 								</Badge>
 							)}
 							{panelStatusBadge}

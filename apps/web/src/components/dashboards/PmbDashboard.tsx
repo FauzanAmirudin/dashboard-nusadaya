@@ -103,23 +103,20 @@ export function PmbDashboard({ data, searchQuery, setSearchQuery, user }: any) {
 		].filter(Boolean).length;
 		const total = 4;
 
-		if (completedCount === total) {
-			return (
-				<Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/10">
-					✅ {completedCount}/{total} Selesai
-				</Badge>
-			);
-		} else if (completedCount > 0) {
-			return (
-				<Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/10">
-					⏳ {completedCount}/{total} Proses
-				</Badge>
-			);
-		}
 		return (
-			<Badge className="bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-100">
-				❌ 0/{total} Belum
-			</Badge>
+			<div className="flex items-center gap-2 justify-center">
+				<span className="text-sm font-medium text-slate-700">
+					{completedCount}/{total}
+				</span>
+				<div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
+					<div
+						className={`h-full rounded-full ${completedCount === total ? "bg-emerald-500" : "bg-blue-500"}`}
+						style={{
+							width: `${(completedCount / total) * 100}%`,
+						}}
+					/>
+				</div>
+			</div>
 		);
 	};
 

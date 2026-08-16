@@ -3,7 +3,6 @@
 import {
 	AlertTriangle,
 	CheckCircle,
-	ClipboardList,
 	Clock,
 	Download,
 	LayoutDashboard,
@@ -21,9 +20,7 @@ import {
 	Tooltip as RechartsTooltip,
 	ResponsiveContainer,
 } from "recharts";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
 	Select,
@@ -46,38 +43,19 @@ type StudentData = {
 		program: string;
 		overallStatus: string | null;
 	};
-	pmb: { status: string | null } | null;
-	crm: { status: string | null } | null;
-	finance: { status: string | null } | null;
-	academic: { status: string | null } | null;
-	pa: { status: string | null } | null;
-	internship: { status: string | null } | null;
+	pmb: { status: string | null; isAcc?: boolean } | null;
+	crm: { status: string | null; isAcc?: boolean } | null;
+	finance: { status: string | null; isAcc?: boolean } | null;
+	academic: { status: string | null; isAcc?: boolean } | null;
+	pa: { status: string | null; isAcc?: boolean } | null;
+	internship: { status: string | null; isAcc?: boolean } | null;
 	decision: { isApprovedByDirector: boolean | null } | null;
-};
-
-const STATUS_COLORS = {
-	AMAN: {
-		bg: "bg-emerald-500/10",
-		text: "text-emerald-500",
-		border: "border-emerald-500/20",
-	},
-	PERLU_PERHATIAN: {
-		bg: "bg-amber-500/10",
-		text: "text-amber-500",
-		border: "border-amber-500/20",
-	},
-	TIDAK_AMAN: {
-		bg: "bg-rose-500/10",
-		text: "text-rose-500",
-		border: "border-rose-500/20",
-	},
 };
 
 const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
 
 import { AkademikDashboard } from "@/components/dashboards/AkademikDashboard";
 import { CrmDashboard } from "@/components/dashboards/CrmDashboard";
-import { DosenDashboard } from "@/components/dashboards/DosenDashboard";
 import { EvaluatorDashboard } from "@/components/dashboards/EvaluatorDashboard";
 import { FinanceDashboard } from "@/components/dashboards/FinanceDashboard";
 import { MagangDashboard } from "@/components/dashboards/MagangDashboard";
@@ -98,6 +76,11 @@ export default function DashboardPage() {
 			return;
 		}
 
+		if (user?.role === "dosen") {
+			router.push("/dashboard/akademik");
+			return;
+		}
+
 		const fetchStudents = async () => {
 			const { data: resData, error } = await api.students.get();
 			if (!error && resData?.data) {
@@ -109,7 +92,7 @@ export default function DashboardPage() {
 		fetchStudents();
 	}, [isAuthenticated, hasHydrated, router, user]);
 
-	const getRealtimeOverallStatus = (s: any) => {
+	const getRealtimeOverallStatus = (s: StudentData) => {
 		const panels = [
 			s.pmb?.isAcc ? "AMAN" : s.pmb?.status || "PERLU_PERHATIAN",
 			s.crm?.isAcc ? "AMAN" : s.crm?.status || "PERLU_PERHATIAN",
@@ -186,9 +169,6 @@ export default function DashboardPage() {
 			/>
 		);
 	if (user?.role === "dosen") {
-		if (typeof window !== "undefined") {
-			router.push("/dashboard/akademik");
-		}
 		return null;
 	}
 	if (user?.role === "pa")
@@ -261,20 +241,6 @@ export default function DashboardPage() {
 	const criticalAlerts = data.filter(
 		(s) => getRealtimeOverallStatus(s) === "TIDAK_AMAN",
 	);
-
-	const filteredData = data.filter(
-		(s) =>
-			s.student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			s.student.nim.includes(searchQuery),
-	);
-
-	const renderStatusIcon = (status: string | null | undefined) => {
-		if (status === "AMAN")
-			return <CheckCircle className="h-4 w-4 text-emerald-500 mx-auto" />;
-		if (status === "TIDAK_AMAN")
-			return <XCircle className="h-4 w-4 text-rose-500 mx-auto" />;
-		return <Clock className="h-4 w-4 text-amber-500 mx-auto" />;
-	};
 
 	return (
 		<div className="space-y-6 pb-10">

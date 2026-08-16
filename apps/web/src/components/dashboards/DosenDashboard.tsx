@@ -12,14 +12,6 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-	Cell,
-	Legend,
-	Pie,
-	PieChart,
-	Tooltip as RechartsTooltip,
-	ResponsiveContainer,
-} from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -259,78 +251,9 @@ export function DosenDashboard({ user }: DosenDashboardProps) {
 				</Card>
 			</div>
 
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-				{/* Donut Chart */}
-				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-1">
-					<CardHeader>
-						<CardTitle className="text-slate-800 flex items-center gap-2">
-							<LayoutDashboard className="h-5 w-5 text-slate-500" />
-							Distribusi Status Dosen
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="flex flex-col items-center">
-						<div className="h-64 w-full">
-							<ResponsiveContainer width="100%" height="100%">
-								<PieChart>
-									<Pie
-										data={pieData}
-										innerRadius={60}
-										outerRadius={80}
-										paddingAngle={5}
-										dataKey="value"
-									>
-										{pieData.map((entry, index) => (
-											<Cell
-												key={`cell-${entry.name}`}
-												fill={PIE_COLORS[index % PIE_COLORS.length]}
-											/>
-										))}
-									</Pie>
-									<RechartsTooltip
-										contentStyle={{
-											backgroundColor: "#ffffff",
-											borderColor: "#e2e8f0",
-											color: "#0f172a",
-										}}
-										itemStyle={{ color: "#0f172a" }}
-									/>
-									<Legend verticalAlign="bottom" height={36} />
-								</PieChart>
-							</ResponsiveContainer>
-						</div>
-						<div className="mt-4 w-full space-y-2">
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-emerald-500" /> Aman
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countAman}
-								</span>
-							</div>
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-amber-500" /> Perlu
-									Perhatian
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countPerhatian}
-								</span>
-							</div>
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-rose-500" /> Tidak
-									Aman
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countTidakAman}
-								</span>
-							</div>
-						</div>
-					</CardContent>
-				</Card>
-
+			<div className="flex flex-col gap-6">
 				{/* Data Table Section */}
-				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-2">
+				<Card className="bg-white border-slate-200 shadow-sm w-full">
 					<CardHeader className="border-b border-slate-100 pb-4">
 						<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
 							<CardTitle className="text-slate-800">

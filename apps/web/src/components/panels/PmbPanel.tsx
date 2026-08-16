@@ -3,6 +3,7 @@
 import { CheckCircle2, ClipboardList, DollarSign, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { API_URL, getToken } from "@/lib/eden";
 import { useAuthStore } from "@/store";
@@ -99,26 +100,30 @@ export function PmbPanel({
 	return (
 		<div className="space-y-6">
 			{/* Header */}
-			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
-				<div className="flex items-center gap-3">
-					<div className="p-2.5 bg-[#0517B0]/10 rounded-lg text-[#0517B0]">
-						<Users className="w-5 h-5" />
-					</div>
+			<div className="border-b border-slate-200 pb-4 mb-6">
+				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 					<div>
-						<h3 className="font-bold text-slate-800 text-base">
-							Panel PMB (Penerimaan Mahasiswa Baru)
-						</h3>
-						<p className="text-xs text-slate-500">
-							Kelola checklist pendaftaran, skema biaya, penerima fee sharing,
-							dan data tambahan mahasiswa
+						<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
+							<span className="text-xl">👥</span> Panel PMB (Penerimaan Mahasiswa Baru)
+							<span className="ml-2 text-sm font-normal text-slate-500">
+								[{completedCount}/4]
+							</span>
+						</CardTitle>
+						<p className="text-sm text-slate-500 mt-1">
+							Dikelola oleh: Admin PMB
 						</p>
 					</div>
-				</div>
-				<div className="flex items-center gap-3">
-					<span className="text-xs font-medium text-slate-500">
-						Status PMB:
-					</span>
-					{statusBadge}
+					<div className="flex items-center gap-3">
+						{user?.role === "superadmin" && !isPmbAdmin && (
+							<Badge
+								variant="outline"
+								className="text-slate-400 border-slate-300"
+							>
+								👁 Mode Lihat Saja
+							</Badge>
+						)}
+						{statusBadge}
+					</div>
 				</div>
 			</div>
 

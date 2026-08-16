@@ -2,23 +2,16 @@
 
 import {
 	CheckCircle,
+	ChevronRight,
+	ClipboardList,
 	Clock,
 	Download,
-	LayoutDashboard,
 	Search,
 	Users,
 	XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import {
-	Cell,
-	Legend,
-	Pie,
-	PieChart,
-	Tooltip as RechartsTooltip,
-	ResponsiveContainer,
-} from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,30 +25,74 @@ import {
 } from "@/components/ui/table";
 import { exportToCSV } from "@/lib/export";
 
-const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
+
+
+interface CourseGrade {
+	id: string;
+	totalMeetings?: number;
+	attendancePresent?: number;
+}
+
+interface Academic {
+	status?: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" | string | null;
+	pddiktiInput?: boolean;
+	attendancePresent?: number;
+	attendanceTotal?: number;
+	utsPassed?: boolean;
+	uasPassed?: boolean;
+	assignmentsCompleted?: boolean;
+	attitudeIndicator?: string;
+	academicCommunication?: string;
+	isAcc?: boolean;
+	taiwanCohort?: boolean;
+	gpa?: number;
+}
+
+interface AkademikStudent {
+	id: number | string;
+	nim: string;
+	name: string;
+}
+
+interface AkademikStudentData {
+	student: AkademikStudent;
+	academic?: Academic | null;
+	courseGrades?: CourseGrade[];
+}
+
+interface AkademikUser {
+	username?: string;
+}
+
+interface AkademikDashboardProps {
+	data: AkademikStudentData[];
+	searchQuery: string;
+	setSearchQuery: (value: string) => void;
+	user?: AkademikUser | null;
+}
 
 export function AkademikDashboard({
 	data,
 	searchQuery,
 	setSearchQuery,
 	user,
-}: any) {
+}: AkademikDashboardProps) {
 	const router = useRouter();
 	const [filterTaiwan, setFilterTaiwan] = useState(false);
 
 	const totalStudents = data.length;
 	const countAman = data.filter(
-		(s: any) => s.academic?.status === "AMAN",
+		(s) => s.academic?.status === "AMAN",
 	).length;
 	const countPerhatian = data.filter(
-		(s: any) => s.academic?.status === "PERLU_PERHATIAN" || !s.academic?.status,
+		(s) => s.academic?.status === "PERLU_PERHATIAN" || !s.academic?.status,
 	).length;
 	const countTidakAman = data.filter(
-		(s: any) => s.academic?.status === "TIDAK_AMAN",
+		(s) => s.academic?.status === "TIDAK_AMAN",
 	).length;
 
 	const handleExport = () => {
-		const exportData = data.map((s: any) => ({
+		const exportData = data.map((s) => ({
 			NIM: s.student.nim,
 			"Nama Mahasiswa": s.student.name,
 			"Input PDDIKTI": s.academic?.pddiktiInput ? "Sudah" : "Belum",
@@ -80,13 +117,7 @@ export function AkademikDashboard({
 		);
 	};
 
-	const pieData = [
-		{ name: "Aman", value: countAman },
-		{ name: "Perlu Perhatian", value: countPerhatian },
-		{ name: "Tidak Aman", value: countTidakAman },
-	];
-
-	const filteredData = data.filter((s: any) => {
+	const filteredData = data.filter((s) => {
 		const matchSearch =
 			s.student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
 			s.student.nim.includes(searchQuery);
@@ -94,25 +125,43 @@ export function AkademikDashboard({
 		return matchSearch && matchTaiwan;
 	});
 
-	const renderStatusBadge = (status: string | null | undefined) => {
-		if (status === "AMAN") {
-			return (
-				<Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/10">
-					🟢 Aman
-				</Badge>
-			);
-		}
-		if (status === "TIDAK_AMAN") {
-			return (
-				<Badge className="bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/10">
-					🔴 Tdk Aman
-				</Badge>
-			);
-		}
+	const renderProgressBadge = (academic?: Academic | null, courseGrades: CourseGrade[] = []) => {
+		let totalPertemuan = 0;
+		let totalHadir = 0;
+		courseGrades.forEach(c => {
+			totalPertemuan += (c.totalMeetings || 16);
+			totalHadir += (c.attendancePresent || 0);
+		});
+
+		const attendanceOk =
+			totalPertemuan > 0 &&
+			totalHadir / totalPertemuan >= 0.8;
+		const items = [
+			academic?.pddiktiInput,
+			attendanceOk,
+			academic?.utsPassed,
+			academic?.uasPassed,
+			academic?.attitudeIndicator,
+			academic?.assignmentsCompleted,
+			academic?.academicCommunication,
+		];
+		const completedCount = items.filter(Boolean).length;
+		const total = items.length;
+
 		return (
-			<Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/10">
-				🟡 Perhatian
-			</Badge>
+			<div className="flex items-center gap-2 justify-center">
+				<span className="text-sm font-medium text-slate-700">
+					{completedCount}/{total}
+				</span>
+				<div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
+					<div
+						className={`h-full rounded-full ${completedCount === total ? "bg-emerald-500" : "bg-blue-500"}`}
+						style={{
+							width: `${(completedCount / total) * 100}%`,
+						}}
+					/>
+				</div>
+			</div>
 		);
 	};
 
@@ -215,78 +264,35 @@ export function AkademikDashboard({
 				</Card>
 			</div>
 
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-				{/* Donut Chart */}
-				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-1">
-					<CardHeader>
-						<CardTitle className="text-slate-800 flex items-center gap-2">
-							<LayoutDashboard className="h-5 w-5 text-slate-500" />
-							Distribusi Status Akademik
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="flex flex-col items-center">
-						<div className="h-64 w-full">
-							<ResponsiveContainer width="100%" height="100%">
-								<PieChart>
-									<Pie
-										data={pieData}
-										innerRadius={60}
-										outerRadius={80}
-										paddingAngle={5}
-										dataKey="value"
-									>
-										{pieData.map((entry, index) => (
-											<Cell
-												key={`cell-${entry.name}`}
-												fill={PIE_COLORS[index % PIE_COLORS.length]}
-											/>
-										))}
-									</Pie>
-									<RechartsTooltip
-										contentStyle={{
-											backgroundColor: "#ffffff",
-											borderColor: "#e2e8f0",
-											color: "#0f172a",
-										}}
-										itemStyle={{ color: "#0f172a" }}
-									/>
-									<Legend verticalAlign="bottom" height={36} />
-								</PieChart>
-							</ResponsiveContainer>
+			{/* Quick Access — Assessment */}
+			<div
+				role="button"
+				tabIndex={0}
+				onClick={() => router.push("/dashboard/akademik/assessment")}
+				onKeyDown={(e) => e.key === "Enter" && router.push("/dashboard/akademik/assessment")}
+				className="cursor-pointer"
+			>
+				<Card className="bg-gradient-to-r from-[#0517B0]/5 to-blue-50 border-[#0517B0]/20 shadow-sm hover:shadow-md transition-shadow">
+					<CardContent className="p-5 flex items-center gap-4">
+						<div className="w-10 h-10 rounded-lg bg-[#0517B0]/10 flex items-center justify-center shrink-0">
+							<ClipboardList className="h-5 w-5 text-[#0517B0]" />
 						</div>
-						<div className="mt-4 w-full space-y-2">
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-emerald-500" /> Aman
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countAman}
-								</span>
-							</div>
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-amber-500" /> Perlu
-									Perhatian
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countPerhatian}
-								</span>
-							</div>
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-rose-500" /> Tidak
-									Aman
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countTidakAman}
-								</span>
-							</div>
+						<div className="flex-1">
+							<p className="font-semibold text-slate-800 text-sm">
+								Assessment Pra-keberangkatan
+							</p>
+							<p className="text-xs text-slate-500 mt-0.5">
+								Kelola nilai, dokumen PDF, dan progres assessment seluruh mahasiswa
+							</p>
 						</div>
+						<ChevronRight className="h-5 w-5 text-[#0517B0] shrink-0" />
 					</CardContent>
 				</Card>
+			</div>
 
+			<div className="flex flex-col gap-6">
 				{/* List Mahasiswa dengan Kendala */}
-				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-2">
+				<Card className="bg-white border-slate-200 shadow-sm w-full">
 					<CardHeader className="border-b border-slate-200 pb-4 bg-slate-50/50">
 						<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
 							<CardTitle className="text-slate-800 text-lg">
@@ -312,7 +318,7 @@ export function AkademikDashboard({
 						</div>
 					</CardHeader>
 					<CardContent className="p-4 sm:p-6">
-						<div className="overflow-y-auto max-h-[300px] border border-slate-200 rounded-md">
+						<div className="overflow-y-auto max-h-75 border border-slate-200 rounded-md">
 							<Table>
 								<TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
 									<TableRow className="border-slate-200 hover:bg-slate-50">
@@ -337,7 +343,7 @@ export function AkademikDashboard({
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{filteredData.map((s: any) => {
+									{filteredData.map((s) => {
 										const attendanceTotal = s.academic?.attendanceTotal || 0;
 										const attendancePresent =
 											s.academic?.attendancePresent || 0;
@@ -390,7 +396,7 @@ export function AkademikDashboard({
 													)}
 												</TableCell>
 												<TableCell className="text-center">
-													{renderStatusBadge(s.academic?.status)}
+													{renderProgressBadge(s.academic, s.courseGrades)}
 												</TableCell>
 												<TableCell className="text-right pr-4">
 													<button

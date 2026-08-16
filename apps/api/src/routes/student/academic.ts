@@ -9,6 +9,7 @@ import {
 	counselingLogs,
 	courseGradeDocuments,
 	courseGrades,
+	courses,
 	crmData,
 	crmDocuments,
 	crmLogs,
@@ -20,6 +21,7 @@ import {
 	internalNotes,
 	internshipData,
 	internshipDocuments,
+	overseasProgramChecklists,
 	paData,
 	paDocuments,
 	paInterviewLogs,
@@ -93,7 +95,7 @@ export const academicRoutes = new Elysia()
 			});
 			if (updated) {
 				let checked = 0;
-				let totalRequired = 6;
+				let totalRequired = 7; // Changed from 6 to 7 (added assessmentCompleted)
 
 				if (updated.pddiktiInput) checked++;
 				if (updated.utsPassed) checked++;
@@ -101,21 +103,26 @@ export const academicRoutes = new Elysia()
 				if (updated.attitudeIndicator) checked++;
 				if (updated.assignmentsCompleted) checked++;
 				if (updated.academicCommunication) checked++;
+				if (updated.assessmentCompleted) checked++;
 
-				if (updated.taiwanCohort) {
+				const overseasChecklist = await db.query.overseasProgramChecklists.findFirst({
+					where: eq(overseasProgramChecklists.studentId, id),
+				});
+
+				if (overseasChecklist && overseasChecklist.programType === "taiwan") {
 					totalRequired += 12;
-					if (updated.taiwanPasFotoChecked) checked++;
-					if (updated.taiwanCvChecked) checked++;
-					if (updated.taiwanKtmChecked) checked++;
-					if (updated.taiwanKhsChecked) checked++;
-					if (updated.taiwanSl21Checked) checked++;
-					if (updated.taiwanAktifChecked) checked++;
-					if (updated.taiwanGapYearChecked) checked++;
-					if (updated.taiwanPddiktiChecked) checked++;
-					if (updated.taiwanPribadiChecked) checked++;
-					if (updated.taiwanLolChecked) checked++;
-					if (updated.taiwanLoaChecked) checked++;
-					if (updated.taiwanSuhhanChecked) checked++;
+					if (overseasChecklist.pasFotoChecked) checked++;
+					if (overseasChecklist.cvChecked) checked++;
+					if (overseasChecklist.ktmChecked) checked++;
+					if (overseasChecklist.khsChecked) checked++;
+					if (overseasChecklist.sl21Checked) checked++;
+					if (overseasChecklist.aktifChecked) checked++;
+					if (overseasChecklist.gapYearChecked) checked++;
+					if (overseasChecklist.pddiktiChecked) checked++;
+					if (overseasChecklist.pribadiChecked) checked++;
+					if (overseasChecklist.lolChecked) checked++;
+					if (overseasChecklist.loaChecked) checked++;
+					if (overseasChecklist.suhhanChecked) checked++;
 				}
 
 				let status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
@@ -268,9 +275,18 @@ export const academicRoutes = new Elysia()
 			orderBy: (grades, { asc }) => [asc(grades.id)],
 			with: {
 				accBy: { columns: { fullName: true } },
+				course: true, // Mengambil data relasi dari tabel courses
 			},
 		});
-		return { success: true, data: grades };
+
+		// Map hasilnya agar kompatibel dengan frontend yang masih membaca courseCode dan courseName
+		const mappedGrades = grades.map(g => ({
+			...g,
+			courseCode: g.course?.code || g.courseCode,
+			courseName: g.course?.name || g.courseName,
+		}));
+
+		return { success: true, data: mappedGrades };
 	})
 	.post(
 		"/:id/course-grades",
@@ -300,8 +316,14 @@ export const academicRoutes = new Elysia()
 				hasKwu?: boolean;
 			};
 
+			// Cari courseId jika ada di master courses
+			const matchingCourse = await db.query.courses.findFirst({
+				where: eq(courses.code, input.courseCode)
+			});
+
 			await db.insert(courseGrades).values({
 				studentId: id,
+				courseId: matchingCourse?.id || null, // Hubungkan dengan master course
 				courseCode: input.courseCode,
 				courseName: input.courseName,
 				dosenId: input.dosenId,

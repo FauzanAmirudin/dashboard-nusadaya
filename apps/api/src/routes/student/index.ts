@@ -2,6 +2,7 @@ import { Elysia } from "elysia";
 import { academicRoutes } from "./academic";
 import { coreRoutes } from "./core";
 import { crmRoutes } from "./crm";
+import { departureAssessmentRoutes } from "./departure-assessment";
 import { documentsRoutes } from "./documents";
 import { finalDecisionRoutes } from "./final-decision";
 import { financeRoutes } from "./finance";
@@ -12,6 +13,7 @@ import { pmbRoutes } from "./pmb";
 import { statusRoutes } from "./status";
 
 export const studentsRouter = new Elysia({ prefix: "/students" })
+	.use(departureAssessmentRoutes)
 	.use(coreRoutes)
 	.use(statusRoutes)
 	.use(pmbRoutes)

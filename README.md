@@ -7,8 +7,11 @@ Sistem Terpadu Validasi Mahasiswa (Integrated Student Tracking System) untuk Nus
 - **Role-Based Access Control (RBAC):** Akses khusus yang berbeda untuk 10 peran: `Superadmin`, `Direktur`, `PMB`, `CRM`, `Finance`, `Akademik`, `PA`, `Magang`, `Evaluator`, dan `Dosen`.
 - **End-to-End Type Safety:** Sinkronisasi tipe data otomatis antara backend dan frontend menggunakan **Elysia Eden**.
 - **Real-Time Monitoring:** Panel ringkasan status progres tiap mahasiswa (Aman, Perlu Perhatian, Tidak Aman).
+- **Interactive Data Visualization:** Grafik dan metrik analitik dashboard yang interaktif terintegrasi dengan Recharts.
+- **Modern UI & Rich Text Editing:** Pengalaman pengguna modern dengan dukungan Dark/Light mode, animasi, toast notifications (Sonner), dan editor teks kaya (Tiptap).
 - **PDF Generator:** Fitur *export* dan *download* data progres mahasiswa ke format dokumen PDF dengan resolusi tinggi.
-- **Integrated Storage:** Manajemen unggah dokumen persyaratam magang.
+- **Bulk Document Export & Backup (.ZIP):** Pengunduhan banyak dokumen sekaligus dan sistem *backup/recovery* data terpadu menggunakan kompresi ZIP.
+- **Centralized Storage & Caching:** Manajemen file persisten yang lebih aman dan optimasi performa *backend* dengan integrasi **Redis**.
 
 ---
 
@@ -21,17 +24,22 @@ Proyek ini dibangun menggunakan arsitektur **Monorepo** dengan Bun workspaces, m
 - **Framework:** [ElysiaJS](https://elysiajs.com/)
 - **ORM:** [Drizzle ORM](https://orm.drizzle.team/)
 - **Database:** PostgreSQL
+- **Caching & Queue:** [Redis](https://redis.io/) (via ioredis)
+- **Utilities:** Archiver (ZIP Generator), ULID
 
 **Frontend (Web):**
 - **Framework:** [Next.js](https://nextjs.org/) (App Router)
 - **Styling:** Tailwind CSS v4 + [shadcn/ui](https://ui.shadcn.com/)
+- **UI & Animation:** next-themes (Dark Mode), tw-animate-css, Sonner (Toast)
 - **State Management:** [Zustand](https://zustand-demo.pmnd.rs/)
 - **API Client:** Elysia Eden
+- **Data Visualization:** [Recharts](https://recharts.org/)
+- **Rich Text Editor:** [Tiptap](https://tiptap.dev/)
 - **PDF Engine:** html-to-image + jsPDF
 
 **Tooling:**
-- **Linter/Formatter:** [Biome](https://biomejs.dev/)
-- **Deployment:** Docker & Docker Compose
+- **Linter/Formatter:** [Biome](https://biomejs.dev/) & ESLint
+- **Deployment:** Docker & Docker Compose (dengan Persistent Volumes)
 
 ---
 
@@ -91,11 +99,12 @@ cp apps/api/.env.example apps/api/.env
 ```
 *(Sesuaikan isi `.env` dengan kredensial database lokal Anda)*.
 
-### 3. Menjalankan Database
-Aplikasi ini sudah dilengkapi konfigurasi Docker Compose. Cukup nyalakan service `db`:
+### 3. Menjalankan Layanan Infrastruktur (Database & Redis)
+Aplikasi ini sudah dilengkapi konfigurasi Docker Compose untuk PostgreSQL dan Redis. Cukup nyalakan *services* melalui docker:
 ```bash
-docker-compose up -d
+docker-compose up -d db redis
 ```
+*(Catatan: Anda juga bisa menjalankan `docker-compose up -d` tanpa nama service untuk langsung menjalankan seluruh stack termasuk API dan Web via Docker).*
 
 ### 4. Setup Tabel & Data Dummy
 Jalankan migrasi agar struktur tabel Drizzle tersinkronisasi ke PostgreSQL, kemudian masukkan data contoh ke dalam *database*.

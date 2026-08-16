@@ -11,14 +11,6 @@ import {
 	XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import {
-	Cell,
-	Legend,
-	Pie,
-	PieChart,
-	Tooltip as RechartsTooltip,
-	ResponsiveContainer,
-} from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -290,94 +282,9 @@ export function EvaluatorDashboard({
 				</Card>
 			</div>
 
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-				{/* Donut Chart */}
-				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-1">
-					<CardHeader>
-						<CardTitle className="text-slate-800 flex items-center gap-2">
-							<LayoutDashboard className="h-5 w-5 text-slate-500" />
-							Distribusi Keputusan
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="flex flex-col items-center">
-						<div className="h-64 w-full">
-							<ResponsiveContainer width="100%" height="100%">
-								<PieChart>
-									<Pie
-										data={pieData}
-										innerRadius={60}
-										outerRadius={80}
-										paddingAngle={5}
-										dataKey="value"
-									>
-										{pieData.map((entry, index) => (
-											<Cell
-												key={`cell-${entry.name}`}
-												fill={PIE_COLORS[index % PIE_COLORS.length]}
-											/>
-										))}
-									</Pie>
-									<RechartsTooltip
-										contentStyle={{
-											backgroundColor: "#ffffff",
-											borderColor: "#e2e8f0",
-											color: "#0f172a",
-										}}
-										itemStyle={{ color: "#0f172a" }}
-									/>
-									<Legend verticalAlign="bottom" height={36} />
-								</PieChart>
-							</ResponsiveContainer>
-						</div>
-						<div className="mt-4 w-full space-y-2">
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-emerald-500" /> Layak
-									Berangkat
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countLayak}
-								</span>
-							</div>
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-blue-500" /> TTD
-									Kontrak
-								</span>
-								<span className="font-semibold text-slate-700">{countTTD}</span>
-							</div>
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-amber-500" /> Lanjut
-									Interview
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countLanjut}
-								</span>
-							</div>
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-rose-500" /> Remedial
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countRemedial}
-								</span>
-							</div>
-							<div className="flex justify-between text-sm">
-								<span className="flex items-center gap-2">
-									<div className="w-3 h-3 rounded-full bg-slate-500" /> Menunggu
-									Evaluasi
-								</span>
-								<span className="font-semibold text-slate-700">
-									{countMenunggu}
-								</span>
-							</div>
-						</div>
-					</CardContent>
-				</Card>
-
+			<div className="flex flex-col gap-6">
 				{/* List Mahasiswa dengan Keputusan */}
-				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-2">
+				<Card className="bg-white border-slate-200 shadow-sm w-full">
 					<CardHeader className="border-b border-slate-200 pb-4 bg-slate-50/50">
 						<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
 							<CardTitle className="text-slate-800 text-lg">
@@ -449,14 +356,18 @@ export function EvaluatorDashboard({
 													<TooltipProvider>
 														<Tooltip>
 															<TooltipTrigger className="w-full">
-																<div className="flex flex-col gap-1 items-center justify-center">
-																	<Progress
-																		value={(accCount / 7) * 100}
-																		className="h-2 w-20"
-																	/>
-																	<span className="text-xs text-slate-500 font-medium">
-																		{accCount}/7 ACC
+																<div className="flex items-center gap-2 justify-center">
+																	<span className="text-sm font-medium text-slate-700">
+																		{accCount}/7
 																	</span>
+																	<div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
+																		<div
+																			className={`h-full rounded-full ${accCount === 7 ? "bg-emerald-500" : "bg-blue-500"}`}
+																			style={{
+																				width: `${(accCount / 7) * 100}%`,
+																			}}
+																		/>
+																	</div>
 																</div>
 															</TooltipTrigger>
 															<TooltipContent>

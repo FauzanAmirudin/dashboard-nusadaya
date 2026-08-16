@@ -22,7 +22,9 @@ import {
 	internshipDocuments,
 	paData,
 	paDocuments,
+	paHafalanSessions,
 	paInterviewLogs,
+	paStudentNotes,
 	paTripartiteLogs,
 	pmbData,
 	pmbDocuments,
@@ -76,6 +78,30 @@ export const paRoutes = new Elysia()
 			orderBy: (logs, { desc }) => [desc(logs.interviewDate)],
 		});
 
+		const hafalanSessions = await db.query.paHafalanSessions
+			.findMany({
+				where: eq(paHafalanSessions.studentId, id),
+				with: {
+					createdByUser: { columns: { fullName: true, username: true } },
+				},
+				orderBy: [desc(paHafalanSessions.createdAt)],
+			})
+			.catch(() =>
+				db.select().from(paHafalanSessions).where(eq(paHafalanSessions.studentId, id)),
+			);
+
+		const studentNotes = await db.query.paStudentNotes
+			.findMany({
+				where: eq(paStudentNotes.studentId, id),
+				with: {
+					createdByUser: { columns: { fullName: true, username: true } },
+				},
+				orderBy: [desc(paStudentNotes.createdAt)],
+			})
+			.catch(() =>
+				db.select().from(paStudentNotes).where(eq(paStudentNotes.studentId, id)),
+			);
+
 		return {
 			success: true,
 			data: {
@@ -84,6 +110,8 @@ export const paRoutes = new Elysia()
 				counselingLogs: cLogs,
 				tripartiteLogs: tripartiteLogs,
 				interviewLogs: interviewLogs,
+				hafalanSessions,
+				studentNotes,
 			},
 		};
 	})
@@ -94,7 +122,7 @@ export const paRoutes = new Elysia()
 			const user = (context as any).user;
 			const id = Number(params.id);
 
-			if (!user || (user.role !== "pa" && user.role !== "superadmin")) {
+			if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -154,7 +182,7 @@ export const paRoutes = new Elysia()
 			const user = (context as any).user;
 			const id = Number(params.id);
 
-			if (!user || (user.role !== "pa" && user.role !== "superadmin")) {
+			if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -181,7 +209,7 @@ export const paRoutes = new Elysia()
 		const user = (context as any).user;
 		const logId = Number(params.logId);
 
-		if (!user || (user.role !== "pa" && user.role !== "superadmin")) {
+		if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -196,13 +224,14 @@ export const paRoutes = new Elysia()
 			const user = (context as any).user;
 			const id = Number(params.id);
 
-			if (!user || (user.role !== "pa" && user.role !== "superadmin")) {
+			if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
 
 			await db.insert(counselingLogs).values({
 				studentId: id,
+				type: (body as any).type || "konseling",
 				condition: (body as any).condition,
 				date: new Date((body as any).date),
 				notes: (body as any).notes,
@@ -210,25 +239,161 @@ export const paRoutes = new Elysia()
 
 			return { success: true };
 		},
-		{
-			body: t.Object({
-				condition: t.String(),
-				date: t.String(),
-				notes: t.String(),
-			}),
-		},
-	)
+			{
+				body: t.Object({
+					type: t.Optional(t.String()),
+					condition: t.String(),
+					date: t.String(),
+					notes: t.String(),
+				}),
+			},
+		)
 	.delete("/:id/pa/counseling/:logId", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
 		const logId = Number(params.logId);
 
-		if (!user || (user.role !== "pa" && user.role !== "superadmin")) {
+		if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
 
 		await db.delete(counselingLogs).where(eq(counselingLogs.id, logId));
+		return { success: true };
+	})
+	.post(
+		"/:id/pa/hafalan",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			const id = Number(params.id);
+			if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const { language, languageCustom, vocabCount, sentenceCount } = body as any;
+			const inserted = await db
+				.insert(paHafalanSessions)
+				.values({
+					studentId: id,
+					language,
+					languageCustom: languageCustom ?? null,
+					vocabCount: vocabCount ?? 0,
+					sentenceCount: sentenceCount ?? 0,
+					createdBy: user.id,
+				})
+				.returning();
+			return { success: true, data: inserted[0] };
+		},
+		{
+			body: t.Object({
+				language: t.String(),
+				languageCustom: t.Optional(t.Nullable(t.String())),
+				vocabCount: t.Optional(t.Number()),
+				sentenceCount: t.Optional(t.Number()),
+			}),
+		},
+	)
+	.patch(
+		"/:id/pa/hafalan/:logId",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const logId = Number(params.logId);
+			const { language, languageCustom, vocabCount, sentenceCount } = body as any;
+			await db
+				.update(paHafalanSessions)
+				.set({
+					language,
+					languageCustom: languageCustom ?? null,
+					vocabCount,
+					sentenceCount,
+					updatedAt: new Date(),
+				})
+				.where(eq(paHafalanSessions.id, logId));
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				language: t.String(),
+				languageCustom: t.Optional(t.Nullable(t.String())),
+				vocabCount: t.Number(),
+				sentenceCount: t.Number(),
+			}),
+		},
+	)
+	.delete("/:id/pa/hafalan/:logId", async (context) => {
+		const { params, set } = context;
+		const user = (context as any).user;
+		if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+		await db.delete(paHafalanSessions).where(eq(paHafalanSessions.id, Number(params.logId)));
+		return { success: true };
+	})
+	.post(
+		"/:id/pa/student-notes",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			const id = Number(params.id);
+			if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const { type, content } = body as any;
+			const inserted = await db
+				.insert(paStudentNotes)
+				.values({
+					studentId: id,
+					type,
+					content,
+					createdBy: user.id,
+				})
+				.returning();
+			return { success: true, data: inserted[0] };
+		},
+		{
+			body: t.Object({
+				type: t.String(),
+				content: t.String(),
+			}),
+		},
+	)
+	.patch(
+		"/:id/pa/student-notes/:noteId",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const noteId = Number(params.noteId);
+			const { content } = body as any;
+			await db
+				.update(paStudentNotes)
+				.set({ content, updatedAt: new Date() })
+				.where(eq(paStudentNotes.id, noteId));
+			return { success: true };
+		},
+		{
+			body: t.Object({ content: t.String() }),
+		},
+	)
+	.delete("/:id/pa/student-notes/:noteId", async (context) => {
+		const { params, set } = context;
+		const user = (context as any).user;
+		if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+		await db.delete(paStudentNotes).where(eq(paStudentNotes.id, Number(params.noteId)));
 		return { success: true };
 	})
 	.post("/:id/pa/acc", async ({ params, set, user }: any) => {
@@ -266,7 +431,7 @@ export const paRoutes = new Elysia()
 		return { success: true };
 	})
 	.post("/:id/pa/tripartite", async ({ params, body, set, user }: any) => {
-		if (user?.role !== "pa" && user?.role !== "superadmin") {
+		if (user?.role !== "pa" && user?.role !== "superadmin" && user?.role !== "akademik") {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -282,7 +447,7 @@ export const paRoutes = new Elysia()
 		return { success: true };
 	})
 	.delete("/:id/pa/tripartite/:logId", async ({ params, set, user }: any) => {
-		if (user?.role !== "pa" && user?.role !== "superadmin") {
+		if (user?.role !== "pa" && user?.role !== "superadmin" && user?.role !== "akademik") {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -292,7 +457,7 @@ export const paRoutes = new Elysia()
 		return { success: true };
 	})
 	.post("/:id/pa/interview", async ({ params, body, set, user }: any) => {
-		if (user?.role !== "pa" && user?.role !== "superadmin") {
+		if (user?.role !== "pa" && user?.role !== "superadmin" && user?.role !== "akademik") {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -308,7 +473,7 @@ export const paRoutes = new Elysia()
 		return { success: true };
 	})
 	.delete("/:id/pa/interview/:logId", async ({ params, set, user }: any) => {
-		if (user?.role !== "pa" && user?.role !== "superadmin") {
+		if (user?.role !== "pa" && user?.role !== "superadmin" && user?.role !== "akademik") {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
