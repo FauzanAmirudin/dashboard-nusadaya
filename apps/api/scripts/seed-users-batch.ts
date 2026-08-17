@@ -611,7 +611,7 @@ async function seedBatch() {
 		if (!existingDecision) {
 			await db.insert(finalDecision).values({
 				studentId: sId,
-				status: "AMAN",
+				evaluatorDecision: "menunggu",
 			});
 		}
 

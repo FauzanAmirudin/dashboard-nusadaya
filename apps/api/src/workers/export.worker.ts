@@ -105,8 +105,7 @@ async function processStudentZip(jobId: string, studentId: number) {
 				const { stream } = await fileService.streamFile(file.id);
 
 				// Convert Web Stream to Node Stream for archiver
-				// @ts-expect-error - Readable.fromWeb takes Web Stream
-				const nodeStream = Readable.fromWeb(stream);
+				const nodeStream = Readable.fromWeb(stream as any);
 
 				const filePathInZip = `${file.category}/${file.originalName}`;
 				archive.append(nodeStream, { name: filePathInZip });
