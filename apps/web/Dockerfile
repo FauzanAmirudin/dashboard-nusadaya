@@ -19,6 +19,8 @@ WORKDIR /app/apps/web
 # Set environment variable for build time (if provided)
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 
 # Build the Next.js application
 RUN bun run build
