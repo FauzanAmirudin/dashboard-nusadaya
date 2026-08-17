@@ -64,16 +64,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 		icon: Users,
 		label: "Semua Mahasiswa",
 		href: "/dashboard/students",
-		roles: [
-			"superadmin",
-			"pmb",
-			"crm",
-			"finance",
-			"akademik",
-			"dosen",
-			"pa",
-			"magang",
-		],
+		roles: ["superadmin", "pmb", "crm", "finance", "akademik", "pa", "magang"],
 	},
 	{
 		icon: ClipboardList,
@@ -101,7 +92,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 			{
 				label: "Panel Akademik",
 				href: "/dashboard/akademik",
-				roles: ["superadmin", "dosen"],
+				roles: ["superadmin", "akademik"],
 				icon: GraduationCap,
 			},
 			{

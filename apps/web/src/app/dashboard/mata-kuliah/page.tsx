@@ -257,12 +257,16 @@ export default function MataKuliahPage() {
 		<div className="p-6 max-w-7xl mx-auto space-y-6">
 			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
 				<div>
-					<h1 className="text-2xl font-bold flex items-center gap-2">
+					<h1 className="text-2xl font-bold flex items-center gap-2 text-slate-900">
 						<BookOpen className="h-6 w-6 text-blue-600" />
-						Manajemen Mata Kuliah
+						{user?.role === "dosen"
+							? "Mata Kuliah Yang Diampu"
+							: "Manajemen Mata Kuliah"}
 					</h1>
-					<p className="text-slate-500">
-						Kelola daftar mata kuliah dan jadwal mengajar
+					<p className="text-slate-500 text-sm mt-1">
+						{user?.role === "dosen"
+							? `Daftar mata kuliah aktif yang Anda ampu (${user.fullName || user.username}) beserta akses detail 16 pertemuan, absensi, dan penilaian`
+							: "Kelola master mata kuliah, penugasan dosen pengampu, dan jadwal perkuliahan"}
 					</p>
 				</div>
 				<div className="flex gap-2">
@@ -410,11 +414,12 @@ export default function MataKuliahPage() {
 													<Link href={`/dashboard/mata-kuliah/${c.id}`}>
 														<Button
 															variant="outline"
-															size="icon"
-															className="h-8 w-8"
-															title="Detail & Jadwal"
+															size="sm"
+															className="h-8 gap-1.5 font-medium text-blue-700 bg-blue-50/80 border-blue-200 hover:bg-blue-100 hover:text-blue-800 transition-colors"
+															title="Buka Detail & 16 Pertemuan"
 														>
 															<Eye className="h-4 w-4 text-blue-600" />
+															<span>Detail & 16 Pertemuan</span>
 														</Button>
 													</Link>
 													{(user?.role === "superadmin" ||

@@ -3,6 +3,11 @@ import postgres from "postgres";
 import { db } from "../src/db";
 import {
 	academicData,
+	courseGrades,
+	courseMeetingActivities,
+	courseMeetingAttendances,
+	courseMeetings,
+	courses,
 	crmData,
 	finalDecision,
 	financeData,
@@ -620,10 +625,265 @@ async function seedBatch() {
 		);
 	}
 
+	// -------------------------------------------------------------
+	// 5. Buat Mata Kuliah untuk 10 Dosen & Generate 18 Pertemuan
+	// -------------------------------------------------------------
+	console.log(
+		"\nMenyimpan Mata Kuliah untuk 10 Dosen & Membuat 18 Pertemuan...",
+	);
+	const courseDefinitions = [
+		{
+			code: "MK-HOSP-101",
+			name: "Food & Beverage Service Operation",
+			dosenIndex: 0,
+			peminatan: "Malaysia-Hospitality",
+			cohort: 2025,
+			type: "praktik" as const,
+		},
+		{
+			code: "MK-MGMT-102",
+			name: "Manajemen & Tata Kelola Perhotelan",
+			dosenIndex: 1,
+			peminatan: "Indonesia-Reguler",
+			cohort: 2025,
+			type: "teori" as const,
+		},
+		{
+			code: "MK-BAR-103",
+			name: "Coffee Brewing & Espresso Specialist",
+			dosenIndex: 2,
+			peminatan: "Timur tengah-Barista",
+			cohort: 2025,
+			type: "praktik" as const,
+		},
+		{
+			code: "MK-FO-104",
+			name: "Front Office Operation & System",
+			dosenIndex: 3,
+			peminatan: "Taiwan-Hospitality",
+			cohort: 2025,
+			type: "praktik" as const,
+		},
+		{
+			code: "MK-HK-105",
+			name: "Housekeeping & Room Management",
+			dosenIndex: 4,
+			peminatan: "Malaysia-Hospitality",
+			cohort: 2025,
+			type: "praktik" as const,
+		},
+		{
+			code: "MK-HYG-106",
+			name: "Hygiene, Sanitasi & K3 Perhotelan",
+			dosenIndex: 5,
+			peminatan: "Indonesia-Reguler",
+			cohort: 2025,
+			type: "teori" as const,
+		},
+		{
+			code: "MK-ENG-107",
+			name: "Bahasa Inggris Komunikasi Vokasi",
+			dosenIndex: 6,
+			peminatan: "Malaysia-Hospitality",
+			cohort: 2025,
+			type: "teori" as const,
+		},
+		{
+			code: "MK-CUL-108",
+			name: "Seni Kuliner Nusantara & Oriental",
+			dosenIndex: 7,
+			peminatan: "Taiwan-Hospitality",
+			cohort: 2025,
+			type: "praktik" as const,
+		},
+		{
+			code: "MK-KWU-109",
+			name: "Digital Marketing & Kewirausahaan",
+			dosenIndex: 8,
+			peminatan: "Indonesia-Reguler",
+			cohort: 2025,
+			type: "teori" as const,
+		},
+		{
+			code: "MK-CUL-110",
+			name: "Pastry, Bakery & Dessert Art",
+			dosenIndex: 9,
+			peminatan: "Malaysia-Hospitality",
+			cohort: 2025,
+			type: "praktik" as const,
+		},
+	];
+
+	for (const def of courseDefinitions) {
+		const dosen = createdDosen[def.dosenIndex];
+		if (!dosen) continue;
+
+		let course;
+		const [existingCourse] = await db
+			.select()
+			.from(courses)
+			.where(eq(courses.code, def.code));
+		if (existingCourse) {
+			const [updated] = await db
+				.update(courses)
+				.set({
+					name: def.name,
+					dosenId: dosen.id,
+					peminatan: def.peminatan,
+					cohort: def.cohort,
+					type: def.type,
+					updatedAt: new Date(),
+				})
+				.where(eq(courses.id, existingCourse.id))
+				.returning();
+			course = updated;
+		} else {
+			const [inserted] = await db
+				.insert(courses)
+				.values({
+					code: def.code,
+					name: def.name,
+					dosenId: dosen.id,
+					peminatan: def.peminatan,
+					cohort: def.cohort,
+					type: def.type,
+					createdBy: dosen.id,
+				})
+				.returning();
+			course = inserted;
+		}
+
+		// Check / generate 18 meetings
+		const existingMeetings = await db
+			.select()
+			.from(courseMeetings)
+			.where(eq(courseMeetings.courseId, course.id));
+		if (existingMeetings.length === 0) {
+			const meetingsToInsert = [
+				{
+					courseId: course.id,
+					meetingNumber: 0,
+					meetingType: "pkkmb" as const,
+					meetingLabel: "PKKMB - Pengenalan Program",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 1,
+					meetingType: "beginning" as const,
+					meetingLabel: "Beginning Class & Kontrak Kuliah",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 2,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 1: Pengantar & Teori Dasar",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 3,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 2: SOP & Standar Operasional",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 4,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 3: Praktik Mandiri Tahap 1",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 5,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 4: Praktik Terbimbing",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 6,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 5: Studi Kasus Lapangan",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 7,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 6: Simulasi & Roleplay",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 8,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 7: Review & Evaluasi Tengah",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 9,
+					meetingType: "uts" as const,
+					meetingLabel: "Ujian Tengah Semester (UTS)",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 10,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 8: Pendalaman Materi Lanjutan",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 11,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 9: Praktik Lanjutan Tahap 2",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 12,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 10: Service Excellence & Quality",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 13,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 11: Problem Solving & Handling",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 14,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 12: Project Work Kelompok",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 15,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 13: Presentasi Project",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 16,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 14: Review Akhir Semester",
+				},
+				{
+					courseId: course.id,
+					meetingNumber: 17,
+					meetingType: "uas" as const,
+					meetingLabel: "Ujian Akhir Semester (UAS)",
+				},
+			];
+			await db.insert(courseMeetings).values(meetingsToInsert);
+		}
+
+		console.log(
+			`✓ Mata Kuliah [${course.code}] ${course.name} -> Diampu oleh: ${dosen.fullName} (${dosen.username})`,
+		);
+	}
+
 	console.log("\n=======================================================");
 	console.log("🎉 BATCH SEEDING SELESAI DENGAN SUKSES!");
 	console.log("=======================================================");
 	console.log("• 10 Akun Dosen : dosen1 s.d dosen10 (Password: password)");
+	console.log(
+		"• 10 Mata Kuliah: Terhubung langsung ke masing-masing 10 Dosen lengkap dengan 18 pertemuan",
+	);
 	console.log("• 10 Akun PA    : pa1 s.d pa10 (Password: password)");
 	console.log(
 		"• 10 Mahasiswa  : mahasiswa1 s.d mahasiswa10 (Password: password)",
