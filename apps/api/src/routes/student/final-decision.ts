@@ -34,8 +34,8 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
-import { fileService } from "../../modules/file/service/file.service";
 import { requireRole } from "../../middleware/rbac";
+import { fileService } from "../../modules/file/service/file.service";
 
 export const finalDecisionRoutes = new Elysia()
 	.get("/:id/final-decision", async ({ params, set }) => {
@@ -170,7 +170,7 @@ export const finalDecisionRoutes = new Elysia()
 			const user = (context as any).user;
 			const id = Number(params.id);
 
-			if (!user || (user.role !== "evaluator" && user.role !== "superadmin")) {
+			if (!user || user.role !== "superadmin") {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}

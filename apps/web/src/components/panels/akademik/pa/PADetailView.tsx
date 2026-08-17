@@ -1,7 +1,5 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
 	ArrowLeft,
 	ChevronRight,
@@ -10,6 +8,8 @@ import {
 	Search,
 	Users,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,10 +66,9 @@ export function PADetailView({ paId }: Props) {
 	const fetchData = useCallback(async () => {
 		setIsLoading(true);
 		try {
-			const res = await fetch(
-				`${API_URL}/akademik/pa/users/${paId}/students`,
-				{ headers: { Authorization: `Bearer ${getToken()}` } },
-			);
+			const res = await fetch(`${API_URL}/akademik/pa/users/${paId}/students`, {
+				headers: { Authorization: `Bearer ${getToken()}` },
+			});
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const json = await res.json();
 			setPa(json.data?.pa ?? null);
@@ -86,8 +85,9 @@ export function PADetailView({ paId }: Props) {
 		fetchData();
 	}, [fetchData]);
 
-	const cohorts = Array.from(new Set(students.map((s) => s.cohort))).sort(
-		(a, b) => b - a,
+	const cohorts = Array.from(
+		{ length: new Date().getFullYear() - 2022 + 2 },
+		(_, i) => new Date().getFullYear() + 1 - i,
 	);
 
 	const filtered = students.filter((s) => {
@@ -249,9 +249,7 @@ export function PADetailView({ paId }: Props) {
 										className="hover:bg-slate-50/60 transition-colors"
 									>
 										<TableCell>
-											<div className="font-medium text-slate-800">
-												{s.name}
-											</div>
+											<div className="font-medium text-slate-800">{s.name}</div>
 											<div className="text-xs text-slate-400">
 												{s.nim ?? "-"}
 											</div>

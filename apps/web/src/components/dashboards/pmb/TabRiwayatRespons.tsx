@@ -1,10 +1,9 @@
 "use client";
 
 import { Eye, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { getToken } from "@/lib/eden";
-import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
@@ -21,6 +20,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { getToken } from "@/lib/eden";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -201,7 +201,9 @@ export function TabRiwayatRespons() {
 										<button
 											type="button"
 											className="text-[#0517B0] hover:bg-blue-50 p-2 rounded-md transition-colors"
-											onClick={() => router.push(`/dashboard/pmb/responses/${h.id}`)}
+											onClick={() =>
+												router.push(`/dashboard/pmb/responses/${h.id}`)
+											}
 										>
 											<Eye className="w-5 h-5" />
 										</button>
@@ -212,7 +214,6 @@ export function TabRiwayatRespons() {
 					</TableBody>
 				</Table>
 			</div>
-
 		</div>
 	);
 }

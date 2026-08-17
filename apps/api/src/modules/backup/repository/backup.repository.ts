@@ -29,10 +29,7 @@ export class BackupRepository {
 		});
 	}
 
-	async updateJob(
-		id: string,
-		data: Partial<BackupJobRecord>,
-	): Promise<void> {
+	async updateJob(id: string, data: Partial<BackupJobRecord>): Promise<void> {
 		await db
 			.update(backupJobs)
 			.set(data as Record<string, unknown>)

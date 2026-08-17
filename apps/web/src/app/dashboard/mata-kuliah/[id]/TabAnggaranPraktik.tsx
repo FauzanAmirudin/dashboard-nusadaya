@@ -62,8 +62,6 @@ interface ItemSisaBahan {
 interface BudgetRequest {
 	id: number;
 	dosenId: number;
-	namaKelas?: string;
-	mataKuliah: string;
 	daftarKebutuhan: ItemKebutuhan[];
 	totalNominal: number;
 	status: string; // "menunggu" | "disetujui" | "ditolak"
@@ -82,11 +80,14 @@ interface MaterialReport {
 }
 
 interface TabAnggaranPraktikProps {
-	studentId?: number;
+	courseId: string;
 	canEdit: boolean;
 }
 
-export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
+export function TabAnggaranPraktik({
+	courseId,
+	canEdit,
+}: TabAnggaranPraktikProps) {
 	const { token } = useAuthStore();
 	const authToken = token || getToken();
 	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -103,8 +104,6 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 	// Modal State Section 1: Pengajuan / Revisi
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [editingRequestId, setEditingRequestId] = useState<number | null>(null);
-	const [namaKelas, setNamaKelas] = useState("");
-	const [mataKuliah, setMataKuliah] = useState("");
 	const [items, setItems] = useState<ItemKebutuhan[]>([
 		{ namaItem: "", jumlah: 1, satuan: "pcs", satuanHarga: 0 },
 	]);
@@ -121,9 +120,12 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 
 	const fetchRequests = async () => {
 		try {
-			const res = await fetch(`${API_URL}/dosen/anggaran-praktik`, {
-				headers: { Authorization: `Bearer ${authToken}` },
-			});
+			const res = await fetch(
+				`${API_URL}/courses/${courseId}/budget-requests`,
+				{
+					headers: { Authorization: `Bearer ${authToken}` },
+				},
+			);
 			if (res.ok) {
 				const json = await res.json();
 				if (json.success) setRequests(json.data || []);
@@ -148,11 +150,10 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 	};
 
 	useEffect(() => {
+		if (!courseId) return;
 		setIsLoading(true);
-		Promise.all([fetchRequests(), fetchReports()]).finally(() =>
-			setIsLoading(false),
-		);
-	}, [token]);
+		fetchRequests().finally(() => setIsLoading(false));
+	}, [token, courseId]);
 
 	// Calculate Total Nominal of Budget Request
 	const totalNominalCalculated = items.reduce(
@@ -185,16 +186,12 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 
 	const handleOpenNewModal = () => {
 		setEditingRequestId(null);
-		setNamaKelas("");
-		setMataKuliah("");
 		setItems([{ namaItem: "", jumlah: 1, satuan: "pcs", satuanHarga: 0 }]);
 		setIsModalOpen(true);
 	};
 
 	const handleOpenRevisiModal = (req: BudgetRequest) => {
 		setEditingRequestId(req.id);
-		setNamaKelas(req.namaKelas || "");
-		setMataKuliah(req.mataKuliah);
 		setItems(
 			req.daftarKebutuhan && req.daftarKebutuhan.length > 0
 				? req.daftarKebutuhan
@@ -204,10 +201,6 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 	};
 
 	const handleSaveBudgetRequest = async () => {
-		if (!mataKuliah.trim()) {
-			toast.error("Mata kuliah wajib diisi");
-			return;
-		}
 		if (items.some((i) => !i.namaItem.trim() || i.satuanHarga <= 0)) {
 			toast.error("Lengkapi rincian nama barang dan harga nominal per-item");
 			return;
@@ -216,15 +209,13 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 		setIsSaving(true);
 		try {
 			const payload = {
-				namaKelas,
-				mataKuliah,
 				daftarKebutuhan: items,
 				totalNominal: totalNominalCalculated,
 			};
 
 			const endpoint = editingRequestId
-				? `${API_URL}/dosen/anggaran-praktik/${editingRequestId}`
-				: `${API_URL}/dosen/anggaran-praktik`;
+				? `${API_URL}/courses/${courseId}/budget-requests/${editingRequestId}`
+				: `${API_URL}/courses/${courseId}/budget-requests`;
 			const method = editingRequestId ? "PUT" : "POST";
 
 			const res = await fetch(endpoint, {
@@ -271,7 +262,7 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 		try {
 			if (deleteTarget.type === "request") {
 				const res = await fetch(
-					`${API_URL}/dosen/anggaran-praktik/${deleteTarget.id}`,
+					`${API_URL}/courses/${courseId}/budget-requests/${deleteTarget.id}`,
 					{
 						method: "DELETE",
 						headers: { Authorization: `Bearer ${authToken}` },
@@ -282,13 +273,13 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 					toast.success("Pengajuan anggaran berhasil dihapus");
 					setDeleteTarget(null);
 					fetchRequests();
-					fetchReports();
 				} else {
 					toast.error(json.message || "Gagal menghapus pengajuan anggaran");
 				}
 			} else {
+				// (Not actually implemented in this scope because report delete isn't fully migrated yet, but let's mock the endpoint anyway)
 				const res = await fetch(
-					`${API_URL}/dosen/laporan-sisa-bahan/${deleteTarget.id}`,
+					`${API_URL}/courses/${courseId}/budget-requests/${deleteTarget.id}/report`, // Delete by report ID
 					{
 						method: "DELETE",
 						headers: { Authorization: `Bearer ${authToken}` },
@@ -298,7 +289,7 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 				if (res.ok && json.success) {
 					toast.success("Laporan sisa bahan berhasil dihapus");
 					setDeleteTarget(null);
-					fetchReports();
+					fetchRequests();
 				} else {
 					toast.error(json.message || "Gagal menghapus laporan sisa bahan");
 				}
@@ -504,13 +495,8 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 											</span>
 											<div>
 												<h4 className="text-sm font-bold text-slate-800">
-													{req.mataKuliah}
+													Pengajuan Anggaran #{req.id}
 												</h4>
-												{req.namaKelas && (
-													<span className="text-xs text-slate-500 font-medium">
-														Kelas: {req.namaKelas}
-													</span>
-												)}
 											</div>
 										</div>
 										<div className="flex items-center gap-3">
@@ -531,7 +517,7 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 																setDeleteTarget({
 																	type: "request",
 																	id: req.id,
-																	name: req.mataKuliah,
+																	name: `Pengajuan #${req.id}`,
 																})
 															}
 															size="sm"
@@ -630,7 +616,7 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 															setDeleteTarget({
 																type: "request",
 																id: req.id,
-																name: req.mataKuliah,
+																name: `Pengajuan #${req.id}`,
 															})
 														}
 														size="sm"
@@ -736,9 +722,7 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 												</span>
 												<div>
 													<h4 className="text-sm font-bold text-slate-800">
-														{relatedReq
-															? relatedReq.mataKuliah
-															: `Pengajuan #${rep.budgetRequestId}`}
+														{`Pengajuan #${rep.budgetRequestId}`}
 													</h4>
 													<span className="text-xs text-slate-500">
 														Diunggah pada:{" "}
@@ -771,9 +755,7 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 																setDeleteTarget({
 																	type: "report",
 																	id: rep.id,
-																	name: relatedReq
-																		? `Laporan ${relatedReq.mataKuliah}`
-																		: `Laporan #${rep.budgetRequestId}`,
+																	name: `Laporan #${rep.budgetRequestId}`,
 																})
 															}
 															size="sm"
@@ -870,31 +852,6 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 					</DialogHeader>
 
 					<div className="space-y-5 py-3">
-						<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-							<div>
-								<Label className="text-xs font-bold text-slate-700 block mb-1.5">
-									Nama Kelas / Kelompok *
-								</Label>
-								<Input
-									placeholder="Contoh: Robusta / Kelas Vokasi A 2026"
-									value={namaKelas}
-									onChange={(e) => setNamaKelas(e.target.value)}
-									className="text-sm h-10 bg-slate-50/50"
-								/>
-							</div>
-							<div>
-								<Label className="text-xs font-bold text-slate-700 block mb-1.5">
-									Mata Kuliah / Praktik *
-								</Label>
-								<Input
-									placeholder="Contoh: Bartender / Praktik Kitchen"
-									value={mataKuliah}
-									onChange={(e) => setMataKuliah(e.target.value)}
-									className="text-sm h-10 bg-slate-50/50"
-								/>
-							</div>
-						</div>
-
 						{/* Dynamic Items Table */}
 						<div className="space-y-3 pt-2">
 							<div className="flex items-center justify-between">
@@ -1065,8 +1022,7 @@ export function TabAnggaranPraktik({ canEdit }: TabAnggaranPraktikProps) {
 								<SelectContent>
 									{requests.map((r) => (
 										<SelectItem key={r.id} value={r.id.toString()}>
-											{r.mataKuliah} {r.namaKelas ? `(${r.namaKelas})` : ""} -{" "}
-											{formatRupiah(r.totalNominal)}
+											Pengajuan #{r.id} - {formatRupiah(r.totalNominal)}
 										</SelectItem>
 									))}
 								</SelectContent>

@@ -1,20 +1,34 @@
 "use client";
 
 import {
+	BookOpen,
 	CheckCircle,
-	ChevronRight,
-	ClipboardList,
+	CheckCircle2,
 	Clock,
 	Download,
+	Eye,
+	GraduationCap,
+	HelpCircle,
 	Search,
+	ShieldAlert,
+	ShieldCheck,
 	Users,
 	XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import {
 	Table,
 	TableBody,
@@ -23,93 +37,108 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { exportToCSV } from "@/lib/export";
 
-
-
-interface CourseGrade {
-	id: string;
-	totalMeetings?: number;
-	attendancePresent?: number;
-}
-
-interface Academic {
-	status?: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" | string | null;
-	pddiktiInput?: boolean;
-	attendancePresent?: number;
-	attendanceTotal?: number;
-	utsPassed?: boolean;
-	uasPassed?: boolean;
-	assignmentsCompleted?: boolean;
-	attitudeIndicator?: string;
-	academicCommunication?: string;
-	isAcc?: boolean;
-	taiwanCohort?: boolean;
-	gpa?: number;
-}
-
-interface AkademikStudent {
-	id: number | string;
-	nim: string;
-	name: string;
-}
-
-interface AkademikStudentData {
-	student: AkademikStudent;
-	academic?: Academic | null;
-	courseGrades?: CourseGrade[];
-}
-
-interface AkademikUser {
-	username?: string;
-}
-
-interface AkademikDashboardProps {
-	data: AkademikStudentData[];
-	searchQuery: string;
-	setSearchQuery: (value: string) => void;
-	user?: AkademikUser | null;
-}
-
 export function AkademikDashboard({
-	data,
+	data = [],
 	searchQuery,
 	setSearchQuery,
 	user,
-}: AkademikDashboardProps) {
+}: any) {
 	const router = useRouter();
-	const [filterTaiwan, setFilterTaiwan] = useState(false);
+	const [selectedCohort, setSelectedCohort] = useState<string>("all");
+	const [selectedStatus, setSelectedStatus] = useState<string>("all");
+	const [localSearch, setLocalSearch] = useState(searchQuery || "");
 
-	const totalStudents = data.length;
-	const countAman = data.filter(
-		(s) => s.academic?.status === "AMAN",
+	// Cohort years starting from 2022
+	const cohortYears = useMemo(() => {
+		const currentYear = new Date().getFullYear();
+		return Array.from(
+			{ length: currentYear - 2022 + 2 },
+			(_, i) => currentYear + 1 - i,
+		);
+	}, []);
+
+	// Filter by cohort first for reactive KPI
+	const cohortData = useMemo(() => {
+		if (!data) return [];
+		if (selectedCohort === "all") return data;
+		return data.filter(
+			(s: any) => s.student?.cohort?.toString() === selectedCohort,
+		);
+	}, [data, selectedCohort]);
+
+	// KPI Metrics based on cohortData
+	const totalStudents = cohortData.length;
+	const countAcc = cohortData.filter((s: any) => s.academic?.isAcc).length;
+	const countAman = cohortData.filter(
+		(s: any) => s.academic?.status === "AMAN",
 	).length;
-	const countPerhatian = data.filter(
-		(s) => s.academic?.status === "PERLU_PERHATIAN" || !s.academic?.status,
+	const countPerhatian = cohortData.filter(
+		(s: any) => s.academic?.status === "PERLU_PERHATIAN" || !s.academic?.status,
 	).length;
-	const countTidakAman = data.filter(
-		(s) => s.academic?.status === "TIDAK_AMAN",
+	const countTidakAman = cohortData.filter(
+		(s: any) => s.academic?.status === "TIDAK_AMAN",
 	).length;
+	const countAttendanceOk = cohortData.filter((s: any) => {
+		let totalPertemuan = 0;
+		let totalHadir = 0;
+		if (s.courseGrades) {
+			s.courseGrades.forEach((c: any) => {
+				totalPertemuan += c.totalMeetings || 16;
+				totalHadir += c.attendancePresent || 0;
+			});
+		}
+		return totalPertemuan > 0 && totalHadir / totalPertemuan >= 0.8;
+	}).length;
+
+	// Filtered students for Table
+	const filteredData = useMemo(() => {
+		const q = (searchQuery || localSearch).toLowerCase();
+		return cohortData.filter((s: any) => {
+			const matchSearch =
+				!q ||
+				(s.student?.name || "").toLowerCase().includes(q) ||
+				(s.student?.nim || "").toLowerCase().includes(q) ||
+				(s.student?.program || "").toLowerCase().includes(q);
+
+			const academicStatus = s.academic?.status || "PERLU_PERHATIAN";
+			let matchStatus = true;
+			if (selectedStatus === "aman") matchStatus = academicStatus === "AMAN";
+			if (selectedStatus === "perhatian")
+				matchStatus = academicStatus === "PERLU_PERHATIAN";
+			if (selectedStatus === "tidak_aman")
+				matchStatus = academicStatus === "TIDAK_AMAN";
+			if (selectedStatus === "acc") matchStatus = Boolean(s.academic?.isAcc);
+
+			return matchSearch && matchStatus;
+		});
+	}, [cohortData, searchQuery, localSearch, selectedStatus]);
 
 	const handleExport = () => {
-		const exportData = data.map((s) => ({
-			NIM: s.student.nim,
-			"Nama Mahasiswa": s.student.name,
+		const exportData = filteredData.map((s: any) => ({
+			NIM: s.student?.nim || "-",
+			"Nama Mahasiswa": s.student?.name || "-",
+			Angkatan: s.student?.cohort || "-",
+			Program: s.student?.program || "-",
 			"Input PDDIKTI": s.academic?.pddiktiInput ? "Sudah" : "Belum",
-			"Total Kehadiran (Hadir)": s.academic?.attendancePresent || 0,
-			"Total Pertemuan (Target)": s.academic?.attendanceTotal || 0,
 			"Lulus UTS": s.academic?.utsPassed ? "Ya" : "Tidak",
 			"Lulus UAS": s.academic?.uasPassed ? "Ya" : "Tidak",
 			"Tugas Selesai": s.academic?.assignmentsCompleted ? "Ya" : "Tidak",
 			"Indikator Sikap": s.academic?.attitudeIndicator || "-",
-			"Komunikasi Akademik": s.academic?.academicCommunication || "-",
 			"Status Akademik":
 				s.academic?.status === "AMAN"
 					? "Aman"
 					: s.academic?.status === "TIDAK_AMAN"
 						? "Tidak Aman"
 						: "Perlu Perhatian",
-			"Disetujui Admin Akademik": s.academic?.isAcc ? "Sudah ACC" : "Belum",
+			"Status ACC Akademik": s.academic?.isAcc ? "Sudah ACC" : "Belum",
 		}));
 		exportToCSV(
 			exportData,
@@ -117,314 +146,448 @@ export function AkademikDashboard({
 		);
 	};
 
-	const filteredData = data.filter((s) => {
-		const matchSearch =
-			s.student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			s.student.nim.includes(searchQuery);
-		const matchTaiwan = filterTaiwan ? s.academic?.taiwanCohort : true;
-		return matchSearch && matchTaiwan;
-	});
-
-	const renderProgressBadge = (academic?: Academic | null, courseGrades: CourseGrade[] = []) => {
+	const getAcademicChecklist = (s: any) => {
 		let totalPertemuan = 0;
 		let totalHadir = 0;
-		courseGrades.forEach(c => {
-			totalPertemuan += (c.totalMeetings || 16);
-			totalHadir += (c.attendancePresent || 0);
-		});
-
+		if (s.courseGrades) {
+			s.courseGrades.forEach((c: any) => {
+				totalPertemuan += c.totalMeetings || 16;
+				totalHadir += c.attendancePresent || 0;
+			});
+		}
 		const attendanceOk =
-			totalPertemuan > 0 &&
-			totalHadir / totalPertemuan >= 0.8;
+			totalPertemuan > 0 && totalHadir / totalPertemuan >= 0.8;
+		const attendancePct =
+			totalPertemuan > 0 ? Math.round((totalHadir / totalPertemuan) * 100) : 0;
+
 		const items = [
-			academic?.pddiktiInput,
-			attendanceOk,
-			academic?.utsPassed,
-			academic?.uasPassed,
-			academic?.attitudeIndicator,
-			academic?.assignmentsCompleted,
-			academic?.academicCommunication,
+			{ name: "Input PDDIKTI", done: Boolean(s.academic?.pddiktiInput) },
+			{ name: "Presensi Hadir (≥ 80%)", done: attendanceOk },
+			{ name: "Lulus UTS", done: Boolean(s.academic?.utsPassed) },
+			{ name: "Lulus UAS", done: Boolean(s.academic?.uasPassed) },
+			{
+				name: "Tugas Kuliah Selesai",
+				done: Boolean(s.academic?.assignmentsCompleted),
+			},
+			{ name: "Indikator Sikap", done: Boolean(s.academic?.attitudeIndicator) },
+			{
+				name: "Komunikasi Akademik",
+				done: Boolean(s.academic?.academicCommunication),
+			},
 		];
-		const completedCount = items.filter(Boolean).length;
-		const total = items.length;
-
-		return (
-			<div className="flex items-center gap-2 justify-center">
-				<span className="text-sm font-medium text-slate-700">
-					{completedCount}/{total}
-				</span>
-				<div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
-					<div
-						className={`h-full rounded-full ${completedCount === total ? "bg-emerald-500" : "bg-blue-500"}`}
-						style={{
-							width: `${(completedCount / total) * 100}%`,
-						}}
-					/>
-				</div>
-			</div>
-		);
-	};
-
-	const getGpaGrade = (gpaScaled: number) => {
-		const gpa = gpaScaled / 100;
-		if (gpa >= 3.7) return "A";
-		if (gpa >= 3.3) return "B+";
-		if (gpa >= 3.0) return "B";
-		if (gpa >= 2.7) return "C+";
-		if (gpa >= 2.0) return "C";
-		return "D";
+		const completed = items.filter((i) => i.done).length;
+		return {
+			items,
+			completed,
+			total: items.length,
+			isDone: completed === items.length,
+			attendancePct,
+		};
 	};
 
 	return (
-		<div className="space-y-6 pb-10">
-			{/* Header */}
-			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+		<div className="space-y-6 pb-12">
+			{/* Top Header */}
+			<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
 				<div>
-					<h1 className="text-2xl font-bold text-slate-900">
-						Dashboard Divisi Akademik
-					</h1>
-					<p className="text-slate-500 mt-1 text-sm">
-						Selamat datang, {user?.username}. Berikut ringkasan status akademik
-						dan kehadiran mahasiswa.
-					</p>
+					<div className="flex items-center gap-3">
+						<div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg border border-amber-100">
+							<GraduationCap className="w-6 h-6" />
+						</div>
+						<div>
+							<h1 className="text-2xl font-bold text-slate-900">
+								Dashboard Divisi Akademik
+							</h1>
+							<p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+								Monitoring kelulusan UTS/UAS, presensi kehadiran (≥ 80%), input
+								PDDIKTI, dan penilaian sikap mahasiswa.
+							</p>
+						</div>
+					</div>
 				</div>
-				<div className="flex items-center gap-3">
-					<button
-						type="button"
-						onClick={handleExport}
-						className="flex items-center gap-2 bg-[#0517B0] hover:bg-blue-800 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
+
+				<div className="flex flex-wrap items-center gap-2.5">
+					<Select
+						value={selectedCohort}
+						onValueChange={(val) => setSelectedCohort(val || "all")}
 					>
-						<Download className="h-4 w-4" />
+						<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
+							<SelectValue placeholder="Filter Angkatan" />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="all">Semua Angkatan</SelectItem>
+							{cohortYears.map((year) => (
+								<SelectItem key={year} value={year.toString()}>
+									Angkatan {year}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={handleExport}
+						className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
+					>
+						<Download className="w-3.5 h-3.5" />
 						Export Data Akademik
-					</button>
+					</Button>
 				</div>
 			</div>
 
-			{/* KPI Cards */}
-			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+			{/* KPI Summary Cards */}
+			<div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
 				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
-					<CardContent className="p-5 flex items-start gap-4">
-						<div className="mt-0.5 text-[#0517B0]">
-							<Users className="h-6 w-6" />
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-blue-50 text-[#0517B0] mt-0.5">
+							<Users className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">
+							<p className="text-slate-500 text-xs font-semibold">
 								Total Mahasiswa
 							</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{totalStudents}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
-					<CardContent className="p-5 flex items-start gap-4">
-						<div className="mt-0.5 text-emerald-500">
-							<CheckCircle className="h-6 w-6" />
+
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-amber-600">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-amber-50 text-amber-600 mt-0.5">
+							<ShieldCheck className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">
-								Kepatuhan Akademik (Aman)
+							<p className="text-amber-700 text-xs font-bold">ACC Akademik</p>
+							<p className="text-2xl font-black text-amber-900 mt-0.5">
+								{countAcc}
 							</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 mt-0.5">
+							<CheckCircle className="h-5 w-5" />
+						</div>
+						<div>
+							<p className="text-slate-500 text-xs font-semibold">
+								🟢 Status Aman
+							</p>
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countAman}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
+
 				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-amber-500">
-					<CardContent className="p-5 flex items-start gap-4">
-						<div className="mt-0.5 text-amber-500">
-							<Clock className="h-6 w-6" />
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-amber-50 text-amber-600 mt-0.5">
+							<Clock className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">
-								Akademik Proses (Perhatian)
+							<p className="text-slate-500 text-xs font-semibold">
+								🟡 Berproses
 							</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countPerhatian}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
+
 				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-rose-500">
-					<CardContent className="p-5 flex items-start gap-4">
-						<div className="mt-0.5 text-rose-500">
-							<XCircle className="h-6 w-6" />
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-rose-50 text-rose-600 mt-0.5">
+							<XCircle className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">
-								Masalah Akademik
+							<p className="text-slate-500 text-xs font-semibold">
+								⛔ Kendala Nilai/Absen
 							</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countTidakAman}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
-			</div>
 
-			{/* Quick Access — Assessment */}
-			<div
-				role="button"
-				tabIndex={0}
-				onClick={() => router.push("/dashboard/akademik/assessment")}
-				onKeyDown={(e) => e.key === "Enter" && router.push("/dashboard/akademik/assessment")}
-				className="cursor-pointer"
-			>
-				<Card className="bg-gradient-to-r from-[#0517B0]/5 to-blue-50 border-[#0517B0]/20 shadow-sm hover:shadow-md transition-shadow">
-					<CardContent className="p-5 flex items-center gap-4">
-						<div className="w-10 h-10 rounded-lg bg-[#0517B0]/10 flex items-center justify-center shrink-0">
-							<ClipboardList className="h-5 w-5 text-[#0517B0]" />
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-indigo-600">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 mt-0.5">
+							<BookOpen className="h-5 w-5" />
 						</div>
-						<div className="flex-1">
-							<p className="font-semibold text-slate-800 text-sm">
-								Assessment Pra-keberangkatan
+						<div>
+							<p className="text-slate-500 text-xs font-semibold">
+								Absensi ≥ 80%
 							</p>
-							<p className="text-xs text-slate-500 mt-0.5">
-								Kelola nilai, dokumen PDF, dan progres assessment seluruh mahasiswa
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
+								{countAttendanceOk}
 							</p>
 						</div>
-						<ChevronRight className="h-5 w-5 text-[#0517B0] shrink-0" />
 					</CardContent>
 				</Card>
 			</div>
 
-			<div className="flex flex-col gap-6">
-				{/* List Mahasiswa dengan Kendala */}
-				<Card className="bg-white border-slate-200 shadow-sm w-full">
-					<CardHeader className="border-b border-slate-200 pb-4 bg-slate-50/50">
-						<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-							<CardTitle className="text-slate-800 text-lg">
-								Tabel Status Akademik Mahasiswa
-							</CardTitle>
-							<div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-								<div className="relative w-full md:w-72">
-									<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-									<Input
-										placeholder="Cari NIM atau Nama..."
-										className="pl-9 bg-white"
-										value={searchQuery}
-										onChange={(e) => setSearchQuery(e.target.value)}
-									/>
-								</div>
-								<button
-									onClick={() => setFilterTaiwan(!filterTaiwan)}
-									className={`px-4 py-2 rounded-md text-sm font-medium transition-colors border ${filterTaiwan ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}
-								>
-									{filterTaiwan ? "Hanya Taiwan" : "Semua Angkatan"}
-								</button>
-							</div>
+			{/* Main Monitoring Table */}
+			<Card className="bg-white border-slate-200 shadow-sm overflow-hidden">
+				<CardHeader className="border-b border-slate-200 bg-slate-50/70 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+					<div>
+						<CardTitle className="text-slate-900 text-base font-bold flex items-center gap-2">
+							<GraduationCap className="w-4 h-4 text-[#0517B0]" />
+							Monitoring Progres Akademik Mahasiswa
+						</CardTitle>
+						<p className="text-xs text-slate-500 mt-0.5">
+							Menampilkan {filteredData.length} dari {totalStudents} mahasiswa
+							terdaftar.
+						</p>
+					</div>
+
+					{/* Search & Filter */}
+					<div className="flex flex-wrap items-center gap-2.5">
+						<div className="relative w-full sm:w-60">
+							<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+							<Input
+								placeholder="Cari NIM, Nama, Program..."
+								className="pl-9 h-9 text-xs bg-white border-slate-200"
+								value={searchQuery !== undefined ? searchQuery : localSearch}
+								onChange={(e) => {
+									setLocalSearch(e.target.value);
+									setSearchQuery?.(e.target.value);
+								}}
+							/>
 						</div>
-					</CardHeader>
-					<CardContent className="p-4 sm:p-6">
-						<div className="overflow-y-auto max-h-75 border border-slate-200 rounded-md">
-							<Table>
-								<TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
-									<TableRow className="border-slate-200 hover:bg-slate-50">
-										<TableHead className="text-slate-500 font-semibold py-3">
-											NIM
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3">
-											Nama Lengkap
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3 text-center">
-											Kehadiran
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3 text-center">
-											IPK Vokasi
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold text-center py-3">
-											Status
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold text-right py-3 pr-4">
-											Aksi
-										</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{filteredData.map((s) => {
-										const attendanceTotal = s.academic?.attendanceTotal || 0;
-										const attendancePresent =
-											s.academic?.attendancePresent || 0;
-										const attPct =
-											attendanceTotal > 0
-												? Math.round(
-														(attendancePresent / attendanceTotal) * 100,
-													)
-												: 0;
-										const isPassed = attPct >= 90;
 
-										const gpa = s.academic?.gpa || 0;
-										const gpaStr = (gpa / 100).toFixed(2);
-										const grade = getGpaGrade(gpa);
+						<Select
+							value={selectedStatus}
+							onValueChange={(val) => setSelectedStatus(val || "all")}
+						>
+							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Status Akademik" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">Semua Status</SelectItem>
+								<SelectItem value="aman">🟢 Aman</SelectItem>
+								<SelectItem value="perhatian">🟡 Berproses</SelectItem>
+								<SelectItem value="tidak_aman">🔴 Kendala</SelectItem>
+								<SelectItem value="acc">🛡️ Sudah ACC Akademik</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
+				</CardHeader>
 
-										return (
-											<TableRow
-												key={s.student.id}
-												className="border-slate-200 hover:bg-blue-50/50 transition-colors"
-											>
-												<TableCell className="font-medium text-slate-700">
-													{s.student.nim}
-												</TableCell>
-												<TableCell className="text-slate-900 font-semibold">
+				<CardContent className="p-0">
+					<div className="overflow-x-auto">
+						<Table>
+							<TableHeader className="bg-slate-50 sticky top-0 z-10">
+								<TableRow className="border-slate-200">
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs w-28">
+										NIM
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
+										Nama & Program
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
+										Checklist Akademik (7)
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+										Presensi
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+										Status Akademik
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+										ACC Akademik
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-28">
+										Aksi
+									</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{filteredData.map((s: any) => {
+									const { items, completed, total, isDone, attendancePct } =
+										getAcademicChecklist(s);
+									const status = s.academic?.status || "PERLU_PERHATIAN";
+
+									return (
+										<TableRow
+											key={s.student.id}
+											className="border-slate-100 hover:bg-blue-50/40 transition-colors"
+										>
+											<TableCell className="font-mono text-xs font-bold text-slate-700">
+												{s.student.nim || "-"}
+											</TableCell>
+											<TableCell>
+												<div className="font-bold text-slate-900 text-sm">
 													{s.student.name}
-													{s.academic?.taiwanCohort && (
-														<Badge className="ml-2 bg-blue-100 text-blue-700 hover:bg-blue-100 border-none px-1.5 h-5 text-[10px]">
-															Taiwan
-														</Badge>
-													)}
-												</TableCell>
-												<TableCell className="text-center">
-													{attendanceTotal > 0 ? (
-														<span
-															className={`text-sm font-bold ${isPassed ? "text-emerald-600" : "text-rose-600"}`}
-														>
-															{attPct}%
-														</span>
-													) : (
-														<span className="text-xs text-slate-400">-</span>
-													)}
-												</TableCell>
-												<TableCell className="text-center">
-													{gpa > 0 ? (
-														<span className="text-sm font-semibold text-blue-700">
-															{gpaStr} ({grade})
-														</span>
-													) : (
-														<span className="text-xs text-slate-400">-</span>
-													)}
-												</TableCell>
-												<TableCell className="text-center">
-													{renderProgressBadge(s.academic, s.courseGrades)}
-												</TableCell>
-												<TableCell className="text-right pr-4">
-													<button
-														type="button"
-														onClick={() =>
-															router.push(
-																`/dashboard/students/${s.student.id}?context=akademik`,
-															)
-														}
-														className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
+												</div>
+												<div className="flex items-center gap-2 mt-0.5">
+													<Badge
+														variant="outline"
+														className="text-[10px] px-1.5 py-0 text-slate-500 border-slate-200"
 													>
-														Periksa
-													</button>
-												</TableCell>
-											</TableRow>
-										);
-									})}
-								</TableBody>
-							</Table>
-							{filteredData.length === 0 && (
-								<div className="text-center py-8 text-slate-500">
-									Tidak ada data mahasiswa ditemukan.
-								</div>
-							)}
-						</div>
-					</CardContent>
-				</Card>
-			</div>
+														Angkatan {s.student.cohort}
+													</Badge>
+													<span className="text-xs text-slate-500 font-medium truncate max-w-[200px]">
+														{s.student.program || "-"}
+													</span>
+												</div>
+											</TableCell>
+
+											{/* Checklist Progress with Tooltip */}
+											<TableCell className="text-center">
+												<TooltipProvider>
+													<Tooltip>
+														<TooltipTrigger className="w-full">
+															<div className="flex flex-col items-center gap-1">
+																<div className="flex items-center justify-between w-full text-[11px] font-bold text-slate-700 px-1">
+																	<span>
+																		{completed}/{total} Item
+																	</span>
+																	<span
+																		className={
+																			isDone
+																				? "text-emerald-600"
+																				: "text-slate-500"
+																		}
+																	>
+																		{Math.round((completed / total) * 100)}%
+																	</span>
+																</div>
+																<div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
+																	<div
+																		className={`h-full rounded-full transition-all duration-300 ${
+																			isDone
+																				? "bg-emerald-500"
+																				: completed >= 4
+																					? "bg-blue-500"
+																					: "bg-amber-500"
+																		}`}
+																		style={{
+																			width: `${(completed / total) * 100}%`,
+																		}}
+																	/>
+																</div>
+															</div>
+														</TooltipTrigger>
+														<TooltipContent className="w-64 p-3.5 bg-slate-950 text-white rounded-xl shadow-2xl border border-slate-800 text-xs flex flex-col space-y-2 z-50">
+															<div className="flex items-center justify-between border-b border-slate-800 pb-1.5 w-full">
+																<span className="font-bold text-slate-100 text-xs">
+																	Indikator Akademik:
+																</span>
+																<span className="text-[11px] font-mono text-emerald-400 font-bold">
+																	{completed}/{total} Selesai
+																</span>
+															</div>
+															<div className="flex flex-col space-y-1.5 w-full">
+																{items.map((it) => (
+																	<div
+																		key={it.name}
+																		className="flex items-center justify-between text-[11px] w-full"
+																	>
+																		<span className="text-slate-300 font-medium">
+																			{it.name}
+																		</span>
+																		<span
+																			className={`font-semibold ${
+																				it.done
+																					? "text-emerald-400"
+																					: "text-slate-500"
+																			}`}
+																		>
+																			{it.done ? "✓ Selesai" : "Belum"}
+																		</span>
+																	</div>
+																))}
+															</div>
+														</TooltipContent>
+													</Tooltip>
+												</TooltipProvider>
+											</TableCell>
+
+											<TableCell className="text-center">
+												<Badge
+													variant="outline"
+													className={`text-xs font-semibold ${
+														attendancePct >= 80
+															? "bg-emerald-50 text-emerald-700 border-emerald-200"
+															: "bg-rose-50 text-rose-700 border-rose-200"
+													}`}
+												>
+													{attendancePct}%
+												</Badge>
+											</TableCell>
+
+											{/* Status Badge */}
+											<TableCell className="text-center">
+												{status === "AMAN" ? (
+													<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold">
+														🟢 Aman
+													</Badge>
+												) : status === "PERLU_PERHATIAN" ? (
+													<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs font-semibold">
+														🟡 Berproses
+													</Badge>
+												) : (
+													<Badge className="bg-rose-50 text-rose-700 border-rose-200 text-xs font-semibold">
+														⛔ Kendala
+													</Badge>
+												)}
+											</TableCell>
+
+											{/* ACC Akademik */}
+											<TableCell className="text-center">
+												{s.academic?.isAcc ? (
+													<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs font-bold">
+														✓ ACC
+													</Badge>
+												) : (
+													<span className="text-xs text-slate-400 italic">
+														Belum
+													</span>
+												)}
+											</TableCell>
+
+											{/* Action */}
+											<TableCell className="text-right pr-6">
+												<Button
+													size="sm"
+													variant="outline"
+													onClick={() =>
+														router.push(`/dashboard/students/${s.student.id}`)
+													}
+													className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5"
+												>
+													<Eye className="w-3.5 h-3.5" />
+													Periksa
+												</Button>
+											</TableCell>
+										</TableRow>
+									);
+								})}
+							</TableBody>
+						</Table>
+
+						{filteredData.length === 0 && (
+							<div className="text-center py-12 text-slate-500">
+								<HelpCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+								<p className="text-sm font-semibold">
+									Tidak ada data akademik mahasiswa ditemukan.
+								</p>
+								<p className="text-xs text-slate-400 mt-0.5">
+									Coba ubah kata kunci pencarian atau filter status yang
+									digunakan.
+								</p>
+							</div>
+						)}
+					</div>
+				</CardContent>
+			</Card>
 		</div>
 	);
 }

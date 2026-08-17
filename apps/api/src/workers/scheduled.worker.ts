@@ -1,7 +1,7 @@
+import { join } from "node:path";
 import { backupService } from "../modules/backup/service/backup.service";
 import { retentionService } from "../modules/backup/service/retention.service";
 import { runFileCleanup } from "./file.worker";
-import { join } from "node:path";
 
 /**
  * ScheduledWorker — cron jobs untuk automated backup dan cleanup.
@@ -81,7 +81,8 @@ export function startScheduledWorker(): void {
 	setTimeout(() => {
 		console.log("[ScheduledWorker] Running initial retention cleanup...");
 		// fallback path jika process.env.BACKUP_PATH tidak ada
-		const backupPath = process.env.BACKUP_PATH ?? join(process.cwd(), "../../backups");
+		const backupPath =
+			process.env.BACKUP_PATH ?? join(process.cwd(), "../../backups");
 		retentionService.runRetentionCleanup(backupPath);
 	}, 30 * 1000);
 }

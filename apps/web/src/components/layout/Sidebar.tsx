@@ -4,8 +4,10 @@ import {
 	BookOpen,
 	CalendarDays,
 	CheckSquare,
+	ChevronDown,
 	ClipboardCheck,
 	ClipboardList,
+	DatabaseBackup,
 	GraduationCap,
 	HeartHandshake,
 	LayoutDashboard,
@@ -18,8 +20,6 @@ import {
 	Users,
 	Wallet,
 	X,
-	DatabaseBackup,
-	ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -58,7 +58,6 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 			"dosen",
 			"pa",
 			"magang",
-			"evaluator",
 		],
 	},
 	{
@@ -74,7 +73,6 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 			"dosen",
 			"pa",
 			"magang",
-			"evaluator",
 		],
 	},
 	{
@@ -136,7 +134,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 				roles: ["superadmin", "akademik"],
 				icon: GraduationCap,
 			},
-		]
+		],
 	},
 	{
 		icon: BookOpen,
@@ -157,15 +155,9 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 		roles: ["superadmin"],
 	},
 	{
-		icon: CheckSquare,
-		label: "Panel Evaluator",
-		href: "/dashboard/evaluator",
-		roles: ["superadmin"],
-	},
-	{
 		icon: ShieldCheck,
-		label: "Panel Finalisasi",
-		href: "/dashboard/finalisasi",
+		label: "Panel Keputusan Final",
+		href: "/dashboard/evaluator",
 		roles: ["superadmin"],
 	},
 	{
@@ -206,15 +198,17 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 		router.push("/login");
 	};
 
-	let visibleItems: SidebarItem[] = [];
+	const visibleItems: SidebarItem[] = [];
 	if (mounted && user?.role) {
 		SIDEBAR_ITEMS.forEach((item) => {
 			if (user.role === "superadmin") {
 				if (item.roles.includes(user.role)) visibleItems.push(item);
 			} else {
 				if (item.subItems) {
-					const allowed = item.subItems.filter(sub => sub.roles.includes(user.role!));
-					allowed.forEach(sub => {
+					const allowed = item.subItems.filter((sub) =>
+						sub.roles.includes(user.role!),
+					);
+					allowed.forEach((sub) => {
 						visibleItems.push({
 							icon: sub.icon || item.icon,
 							label: sub.label,
@@ -367,7 +361,9 @@ function NavItem({
 	const { user } = useAuthStore();
 	const [isOpen, setIsOpen] = useState(false);
 
-	const isSubActive = item.subItems?.some(sub => pathname === sub.href || pathname.startsWith(`${sub.href}/`));
+	const isSubActive = item.subItems?.some(
+		(sub) => pathname === sub.href || pathname.startsWith(`${sub.href}/`),
+	);
 
 	useEffect(() => {
 		if (isSubActive) setIsOpen(true);
@@ -399,7 +395,9 @@ function NavItem({
 	const Icon = item.icon;
 
 	if (item.subItems) {
-		const visibleSubItems = item.subItems.filter(sub => user?.role && sub.roles.includes(user.role));
+		const visibleSubItems = item.subItems.filter(
+			(sub) => user?.role && sub.roles.includes(user.role),
+		);
 		if (visibleSubItems.length === 0) return null;
 
 		return (
@@ -412,22 +410,35 @@ function NavItem({
 						isSubActive
 							? "bg-blue-50/50 text-[#0517B0] font-medium"
 							: "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-						collapsed && "justify-center px-0"
+						collapsed && "justify-center px-0",
 					)}
 				>
 					<div className="flex items-center gap-3">
-						<Icon className={cn("h-5 w-5 shrink-0", isSubActive ? "text-[#0517B0]" : "")} />
-						{!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+						<Icon
+							className={cn(
+								"h-5 w-5 shrink-0",
+								isSubActive ? "text-[#0517B0]" : "",
+							)}
+						/>
+						{!collapsed && (
+							<span className="text-sm font-medium">{item.label}</span>
+						)}
 					</div>
 					{!collapsed && (
-						<ChevronDown className={cn("w-4 h-4 transition-transform duration-200 text-slate-400", isOpen ? "rotate-180" : "")} />
+						<ChevronDown
+							className={cn(
+								"w-4 h-4 transition-transform duration-200 text-slate-400",
+								isOpen ? "rotate-180" : "",
+							)}
+						/>
 					)}
 				</button>
 
 				{!collapsed && isOpen && (
 					<div className="pl-9 pr-2 space-y-1 mt-1">
 						{visibleSubItems.map((sub) => {
-							const isSubItemActive = pathname === sub.href || pathname.startsWith(`${sub.href}/`);
+							const isSubItemActive =
+								pathname === sub.href || pathname.startsWith(`${sub.href}/`);
 							return (
 								<Link
 									key={sub.href}
@@ -436,7 +447,7 @@ function NavItem({
 										"block w-full text-sm px-3 py-2 rounded-md transition-all duration-150",
 										isSubItemActive
 											? "bg-blue-50 text-[#0517B0] font-medium border-l-[3px] border-[#0517B0] pl-[9px]"
-											: "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+											: "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
 									)}
 								>
 									{sub.label}

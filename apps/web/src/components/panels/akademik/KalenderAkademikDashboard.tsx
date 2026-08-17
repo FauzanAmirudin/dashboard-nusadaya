@@ -1,19 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { api } from "@/lib/eden";
+import {
+	ArrowLeft,
+	Calendar as CalendarIcon,
+	Download,
+	Eye,
+	FileText,
+	Loader2,
+	Pencil,
+	Plus,
+	Search,
+	Trash2,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Plus, Calendar as CalendarIcon, Eye, Trash2, ArrowLeft, Pencil, Download, FileText, Search } from "lucide-react";
-import { useAuthStore } from "@/store";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -24,6 +24,36 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { api } from "@/lib/eden";
+import { useAuthStore } from "@/store";
 
 const DEFAULT_18_PERIODS = [
 	{ title: "PKKMB", periodType: "pkkmb", orderIndex: 0 },
@@ -62,7 +92,7 @@ function formatDateIndonesian(dateStr: string | null | undefined): string {
 			}).format(date);
 		}
 		const date = new Date(dateStr);
-		if (isNaN(date.getTime())) return dateStr;
+		if (Number.isNaN(date.getTime())) return dateStr;
 		return new Intl.DateTimeFormat("id-ID", {
 			day: "numeric",
 			month: "long",
@@ -164,7 +194,8 @@ function ListCalendarView({
 	const handleDeleteConfirm = async () => {
 		if (!deleteCalendarId) return;
 		try {
-			const { error } = await api["academic-calendars"][deleteCalendarId.toString()].delete();
+			const { error } =
+				await api["academic-calendars"][deleteCalendarId.toString()].delete();
 			if (!error) {
 				toast.success("Kalender berhasil dihapus");
 				fetchCalendars();
@@ -179,7 +210,10 @@ function ListCalendarView({
 	};
 
 	// Available Cohort Options for Filter
-	const availableCohorts = Array.from(new Set(calendars.map((c) => c.cohort.toString()))).sort();
+	const availableCohorts = Array.from(
+		{ length: new Date().getFullYear() - 2022 + 2 },
+		(_, i) => (new Date().getFullYear() + 1 - i).toString(),
+	);
 
 	// Filtered Calendars List
 	const filteredCalendars = calendars.filter((c) => {
@@ -188,7 +222,8 @@ function ListCalendarView({
 			c.academicYear.toLowerCase().includes(searchQuery.toLowerCase()) ||
 			c.cohort.toString().includes(searchQuery);
 
-		const matchesCohort = cohortFilter === "all" || c.cohort.toString() === cohortFilter;
+		const matchesCohort =
+			cohortFilter === "all" || c.cohort.toString() === cohortFilter;
 
 		return matchesSearch && matchesCohort;
 	});
@@ -229,10 +264,15 @@ function ListCalendarView({
 
 						{/* Filter Cohort / Angkatan */}
 						<div className="w-full sm:w-[200px]">
-							<Select value={cohortFilter} onValueChange={(val) => setCohortFilter(val || "all")}>
+							<Select
+								value={cohortFilter}
+								onValueChange={(val) => setCohortFilter(val || "all")}
+							>
 								<SelectTrigger className="bg-white">
 									<SelectValue>
-										{cohortFilter === "all" ? "Semua Angkatan" : `Angkatan ${cohortFilter}`}
+										{cohortFilter === "all"
+											? "Semua Angkatan"
+											: `Angkatan ${cohortFilter}`}
 									</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
@@ -267,13 +307,20 @@ function ListCalendarView({
 							<TableBody>
 								{filteredCalendars.map((c) => (
 									<TableRow key={c.id}>
-										<TableCell className="font-semibold text-slate-900">TA {c.academicYear}</TableCell>
+										<TableCell className="font-semibold text-slate-900">
+											TA {c.academicYear}
+										</TableCell>
 										<TableCell>Angkatan {c.cohort}</TableCell>
 										<TableCell>
-											{formatDateIndonesian(c.startDate)} s.d. {formatDateIndonesian(c.endDate)}
+											{formatDateIndonesian(c.startDate)} s.d.{" "}
+											{formatDateIndonesian(c.endDate)}
 										</TableCell>
 										<TableCell className="text-right space-x-2">
-											<Button variant="outline" size="sm" onClick={() => onViewDetail(c.id)}>
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => onViewDetail(c.id)}
+											>
 												<Eye className="w-4 h-4 mr-1" /> Detail
 											</Button>
 											{canEdit && (
@@ -295,16 +342,22 @@ function ListCalendarView({
 			</Card>
 
 			{/* Confirm Delete Calendar AlertDialog */}
-			<AlertDialog open={deleteCalendarId !== null} onOpenChange={(open) => !open && setDeleteCalendarId(null)}>
+			<AlertDialog
+				open={deleteCalendarId !== null}
+				onOpenChange={(open) => !open && setDeleteCalendarId(null)}
+			>
 				<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
 					<AlertDialogHeader>
 						<AlertDialogTitle>Hapus Kalender Akademik</AlertDialogTitle>
 						<AlertDialogDescription className="text-slate-500">
-							Apakah Anda yakin ingin menghapus kalender akademik ini? Semua data periode dan kegiatan terkait akan ikut terhapus.
+							Apakah Anda yakin ingin menghapus kalender akademik ini? Semua
+							data periode dan kegiatan terkait akan ikut terhapus.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel className="border-slate-200 hover:bg-slate-50 text-slate-600">Batal</AlertDialogCancel>
+						<AlertDialogCancel className="border-slate-200 hover:bg-slate-50 text-slate-600">
+							Batal
+						</AlertDialogCancel>
 						<AlertDialogAction
 							onClick={handleDeleteConfirm}
 							className="bg-red-600 hover:bg-red-700 text-white"
@@ -337,7 +390,12 @@ function CreateCalendarView({
 	const [isSaving, setIsSaving] = useState(false);
 
 	const handleSave = async () => {
-		if (!form.academicYear || !form.cohort || !form.startDate || !form.endDate) {
+		if (
+			!form.academicYear ||
+			!form.cohort ||
+			!form.startDate ||
+			!form.endDate
+		) {
 			toast.error("Mohon lengkapi semua field");
 			return;
 		}
@@ -386,7 +444,7 @@ function CreateCalendarView({
 					<Label>Angkatan</Label>
 					<Input
 						type="number"
-						placeholder="Misal: 13"
+						placeholder="Misal: 2025"
 						value={form.cohort}
 						onChange={(e) => setForm({ ...form, cohort: e.target.value })}
 					/>
@@ -415,7 +473,9 @@ function CreateCalendarView({
 						Batal
 					</Button>
 					<Button onClick={handleSave} disabled={isSaving}>
-						{isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+						{isSaving ? (
+							<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+						) : null}
 						Simpan Kalender
 					</Button>
 				</div>
@@ -448,7 +508,8 @@ function DetailCalendarView({
 	const fetchDetail = async () => {
 		setIsLoading(true);
 		try {
-			const { data, error } = await api["academic-calendars"][calendarId.toString()].get();
+			const { data, error } =
+				await api["academic-calendars"][calendarId.toString()].get();
 			if (!error && data?.success) {
 				setCalendar(data.data);
 			}
@@ -466,7 +527,10 @@ function DetailCalendarView({
 	const handleDeleteEventConfirm = async () => {
 		if (!deleteEventId) return;
 		try {
-			const { error } = await api["academic-calendars"][calendarId.toString()].events[deleteEventId.toString()].delete();
+			const { error } =
+				await api["academic-calendars"][calendarId.toString()].events[
+					deleteEventId.toString()
+				].delete();
 			if (!error) {
 				toast.success("Kegiatan berhasil dihapus");
 				fetchDetail();
@@ -522,7 +586,9 @@ function DetailCalendarView({
 				heightLeft -= pageHeight;
 			}
 
-			pdf.save(`Kalender_Akademik_TA_${calendar.academicYear.replace("/", "-")}_Angkatan_${calendar.cohort}.pdf`);
+			pdf.save(
+				`Kalender_Akademik_TA_${calendar.academicYear.replace("/", "-")}_Angkatan_${calendar.cohort}.pdf`,
+			);
 			toast.success("Kalender Akademik berhasil di-export ke PDF!");
 		} catch (err) {
 			console.error("Export PDF Error:", err);
@@ -574,9 +640,12 @@ function DetailCalendarView({
 							</Button>
 							<div>
 								<CardTitle className="text-xl font-bold">
-									Detail Kalender Akademik: TA {calendar.academicYear} (Angkatan {calendar.cohort})
+									Detail Kalender Akademik: TA {calendar.academicYear} (Angkatan{" "}
+									{calendar.cohort})
 								</CardTitle>
-								<p className="text-xs text-slate-500 mt-1">Struktur 18 minggu & kegiatan akademik</p>
+								<p className="text-xs text-slate-500 mt-1">
+									Struktur 18 minggu & kegiatan akademik
+								</p>
 							</div>
 						</div>
 
@@ -599,15 +668,20 @@ function DetailCalendarView({
 				<CardContent>
 					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm pt-2 border-t">
 						<div>
-							<span className="text-slate-500 text-xs block mb-1">Tahun Ajaran & Angkatan</span>
+							<span className="text-slate-500 text-xs block mb-1">
+								Tahun Ajaran & Angkatan
+							</span>
 							<span className="font-semibold text-slate-900">
 								TA {calendar.academicYear} (Angkatan {calendar.cohort})
 							</span>
 						</div>
 						<div>
-							<span className="text-slate-500 text-xs block mb-1">Rentang Tanggal Kalender</span>
+							<span className="text-slate-500 text-xs block mb-1">
+								Rentang Tanggal Kalender
+							</span>
 							<span className="font-medium text-slate-800">
-								{formatDateIndonesian(calendar.startDate)} s.d. {formatDateIndonesian(calendar.endDate)}
+								{formatDateIndonesian(calendar.startDate)} s.d.{" "}
+								{formatDateIndonesian(calendar.endDate)}
 							</span>
 						</div>
 					</div>
@@ -621,14 +695,19 @@ function DetailCalendarView({
 					<CardHeader className="border-b bg-slate-50/50">
 						<CardTitle className="text-lg font-bold flex items-center justify-between">
 							<span>Struktur 18 Minggu Akademik</span>
-							<Badge variant="outline" className="font-normal text-xs bg-white">18 Pertemuan Standard</Badge>
+							<Badge variant="outline" className="font-normal text-xs bg-white">
+								18 Pertemuan Standard
+							</Badge>
 						</CardTitle>
 					</CardHeader>
 					<CardContent className="pt-6">
 						<div className="space-y-3 max-h-[700px] overflow-y-auto pr-2">
 							{displayedPeriods.map((p: any, idx: number) => {
-								const isUtsUas = p.periodType === "uts" || p.periodType === "uas";
-								const isClass = p.periodType === "beginning_class" || p.periodType === "pkkmb";
+								const isUtsUas =
+									p.periodType === "uts" || p.periodType === "uas";
+								const isClass =
+									p.periodType === "beginning_class" ||
+									p.periodType === "pkkmb";
 
 								return (
 									<div
@@ -637,8 +716,8 @@ function DetailCalendarView({
 											isUtsUas
 												? "border-amber-300 bg-amber-50/40"
 												: isClass
-												? "border-blue-300 bg-blue-50/30"
-												: "border-slate-200 bg-white hover:border-slate-400"
+													? "border-blue-300 bg-blue-50/30"
+													: "border-slate-200 bg-white hover:border-slate-400"
 										}`}
 									>
 										<div className="flex justify-between items-start">
@@ -654,7 +733,11 @@ function DetailCalendarView({
 											</div>
 											<Badge
 												variant={isUtsUas ? "default" : "outline"}
-												className={isUtsUas ? "bg-amber-600 hover:bg-amber-600" : "bg-white"}
+												className={
+													isUtsUas
+														? "bg-amber-600 hover:bg-amber-600"
+														: "bg-white"
+												}
 											>
 												{p.periodType.replace("_", " ").toUpperCase()}
 											</Badge>
@@ -662,11 +745,15 @@ function DetailCalendarView({
 
 										{p.description ? (
 											<div className="text-xs bg-slate-50 p-2.5 rounded-lg text-slate-700 border border-slate-200/60 mt-1">
-												<span className="font-semibold text-slate-500 block mb-0.5">Custom Deskripsi:</span>
+												<span className="font-semibold text-slate-500 block mb-0.5">
+													Custom Deskripsi:
+												</span>
 												{p.description}
 											</div>
 										) : (
-											<div className="text-xs text-slate-400 italic">Belum ada deskripsi khusus</div>
+											<div className="text-xs text-slate-400 italic">
+												Belum ada deskripsi khusus
+											</div>
 										)}
 
 										{canEdit && (
@@ -676,7 +763,8 @@ function DetailCalendarView({
 												className="mt-2 self-end text-xs flex items-center gap-1.5 bg-white shadow-xs"
 												onClick={() => setEditPeriod(p)}
 											>
-												<Pencil className="w-3.5 h-3.5 text-primary" /> Edit Deskripsi & Tanggal
+												<Pencil className="w-3.5 h-3.5 text-primary" /> Edit
+												Deskripsi & Tanggal
 											</Button>
 										)}
 									</div>
@@ -690,8 +778,12 @@ function DetailCalendarView({
 				<Card>
 					<CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between">
 						<div>
-							<CardTitle className="text-lg font-bold">Kegiatan & Acara Tambahan</CardTitle>
-							<p className="text-xs text-slate-500 mt-0.5">Event khusus diluar jadwal rutin 18 minggu</p>
+							<CardTitle className="text-lg font-bold">
+								Kegiatan & Acara Tambahan
+							</CardTitle>
+							<p className="text-xs text-slate-500 mt-0.5">
+								Event khusus diluar jadwal rutin 18 minggu
+							</p>
 						</div>
 						{canEdit && (
 							<Button size="sm" onClick={() => setIsEventModalOpen(true)}>
@@ -707,12 +799,19 @@ function DetailCalendarView({
 						) : (
 							<div className="space-y-3">
 								{calendar.events?.map((e: any) => (
-									<div key={e.id} className="p-4 border rounded-xl flex justify-between items-start hover:border-slate-400 bg-white transition-colors">
+									<div
+										key={e.id}
+										className="p-4 border rounded-xl flex justify-between items-start hover:border-slate-400 bg-white transition-colors"
+									>
 										<div>
-											<div className="font-semibold text-slate-900 text-sm">{e.title}</div>
+											<div className="font-semibold text-slate-900 text-sm">
+												{e.title}
+											</div>
 											<div className="text-xs text-slate-500 mt-1">
 												{formatDateIndonesian(e.startDate)}{" "}
-												{e.endDate && e.endDate !== e.startDate ? `s.d. ${formatDateIndonesian(e.endDate)}` : ""}
+												{e.endDate && e.endDate !== e.startDate
+													? `s.d. ${formatDateIndonesian(e.endDate)}`
+													: ""}
 											</div>
 											{e.description && (
 												<div className="text-xs mt-2 text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
@@ -741,64 +840,200 @@ function DetailCalendarView({
 			{/* HIDDEN PRINT/EXPORT TEMPLATE FOR PDF */}
 			<div
 				id="academic-calendar-pdf-template"
-				style={{ display: "none", width: "794px", background: "#ffffff", padding: "32px", fontFamily: "sans-serif" }}
+				style={{
+					display: "none",
+					width: "794px",
+					background: "#ffffff",
+					padding: "32px",
+					fontFamily: "sans-serif",
+				}}
 			>
 				{/* PDF Header */}
-				<div style={{ textAlign: "center", borderBottom: "2px solid #0f172a", paddingBottom: "16px", marginBottom: "20px" }}>
-					<h2 style={{ fontSize: "14px", fontWeight: "bold", color: "#64748b", textTransform: "uppercase", letterSpacing: "1px", margin: 0 }}>
+				<div
+					style={{
+						textAlign: "center",
+						borderBottom: "2px solid #0f172a",
+						paddingBottom: "16px",
+						marginBottom: "20px",
+					}}
+				>
+					<h2
+						style={{
+							fontSize: "14px",
+							fontWeight: "bold",
+							color: "#64748b",
+							textTransform: "uppercase",
+							letterSpacing: "1px",
+							margin: 0,
+						}}
+					>
 						Nusadaya Academy
 					</h2>
-					<h1 style={{ fontSize: "22px", fontWeight: "800", color: "#0f172a", margin: "6px 0" }}>
+					<h1
+						style={{
+							fontSize: "22px",
+							fontWeight: "800",
+							color: "#0f172a",
+							margin: "6px 0",
+						}}
+					>
 						KALENDER AKADEMIK
 					</h1>
-					<p style={{ fontSize: "13px", color: "#334155", margin: 0, fontWeight: "600" }}>
+					<p
+						style={{
+							fontSize: "13px",
+							color: "#334155",
+							margin: 0,
+							fontWeight: "600",
+						}}
+					>
 						Tahun Ajaran {calendar.academicYear} — Angkatan {calendar.cohort}
 					</p>
 					<p style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
-						Rentang Waktu: {formatDateIndonesian(calendar.startDate)} s.d. {formatDateIndonesian(calendar.endDate)}
+						Rentang Waktu: {formatDateIndonesian(calendar.startDate)} s.d.{" "}
+						{formatDateIndonesian(calendar.endDate)}
 					</p>
 				</div>
 
 				{/* Section 1: 18 Weeks Schedule Table */}
 				<div style={{ marginBottom: "24px" }}>
-					<h3 style={{ fontSize: "14px", fontWeight: "bold", color: "#0f172a", marginBottom: "10px", borderLeft: "4px solid #0284c7", paddingLeft: "8px" }}>
+					<h3
+						style={{
+							fontSize: "14px",
+							fontWeight: "bold",
+							color: "#0f172a",
+							marginBottom: "10px",
+							borderLeft: "4px solid #0284c7",
+							paddingLeft: "8px",
+						}}
+					>
 						JADWAL MINGGU PERTEMUAN & UTS/UAS
 					</h3>
-					<table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", color: "#1e293b" }}>
+					<table
+						style={{
+							width: "100%",
+							borderCollapse: "collapse",
+							fontSize: "11px",
+							color: "#1e293b",
+						}}
+					>
 						<thead>
-							<tr style={{ background: "#f1f5f9", textAlign: "left", color: "#475569" }}>
-								<th style={{ border: "1px solid #cbd5e1", padding: "8px 10px", width: "35px", textAlign: "center" }}>No</th>
-								<th style={{ border: "1px solid #cbd5e1", padding: "8px 10px", width: "180px" }}>Pertemuan / Agenda</th>
-								<th style={{ border: "1px solid #cbd5e1", padding: "8px 10px", width: "80px", textAlign: "center" }}>Jenis</th>
-								<th style={{ border: "1px solid #cbd5e1", padding: "8px 10px", width: "220px" }}>Tanggal / Rentang Tanggal</th>
-								<th style={{ border: "1px solid #cbd5e1", padding: "8px 10px" }}>Deskripsi Khusus</th>
+							<tr
+								style={{
+									background: "#f1f5f9",
+									textAlign: "left",
+									color: "#475569",
+								}}
+							>
+								<th
+									style={{
+										border: "1px solid #cbd5e1",
+										padding: "8px 10px",
+										width: "35px",
+										textAlign: "center",
+									}}
+								>
+									No
+								</th>
+								<th
+									style={{
+										border: "1px solid #cbd5e1",
+										padding: "8px 10px",
+										width: "180px",
+									}}
+								>
+									Pertemuan / Agenda
+								</th>
+								<th
+									style={{
+										border: "1px solid #cbd5e1",
+										padding: "8px 10px",
+										width: "80px",
+										textAlign: "center",
+									}}
+								>
+									Jenis
+								</th>
+								<th
+									style={{
+										border: "1px solid #cbd5e1",
+										padding: "8px 10px",
+										width: "220px",
+									}}
+								>
+									Tanggal / Rentang Tanggal
+								</th>
+								<th
+									style={{ border: "1px solid #cbd5e1", padding: "8px 10px" }}
+								>
+									Deskripsi Khusus
+								</th>
 							</tr>
 						</thead>
 						<tbody>
 							{displayedPeriods.map((p: any, idx: number) => {
-								const isUtsUas = p.periodType === "uts" || p.periodType === "uas";
+								const isUtsUas =
+									p.periodType === "uts" || p.periodType === "uas";
 								return (
 									<tr
 										key={idx}
 										style={{
-											background: isUtsUas ? "#fef3c7" : idx % 2 === 0 ? "#ffffff" : "#f8fafc",
+											background: isUtsUas
+												? "#fef3c7"
+												: idx % 2 === 0
+													? "#ffffff"
+													: "#f8fafc",
 										}}
 									>
-										<td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "center", fontWeight: "bold" }}>
+										<td
+											style={{
+												border: "1px solid #cbd5e1",
+												padding: "6px 10px",
+												textAlign: "center",
+												fontWeight: "bold",
+											}}
+										>
 											{idx + 1}
 										</td>
-										<td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", fontWeight: isUtsUas ? "bold" : "600" }}>
+										<td
+											style={{
+												border: "1px solid #cbd5e1",
+												padding: "6px 10px",
+												fontWeight: isUtsUas ? "bold" : "600",
+											}}
+										>
 											{p.title}
 										</td>
-										<td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "center", textTransform: "uppercase", fontSize: "10px", fontWeight: "600" }}>
+										<td
+											style={{
+												border: "1px solid #cbd5e1",
+												padding: "6px 10px",
+												textAlign: "center",
+												textTransform: "uppercase",
+												fontSize: "10px",
+												fontWeight: "600",
+											}}
+										>
 											{p.periodType}
 										</td>
-										<td style={{ border: "1px solid #cbd5e1", padding: "6px 10px" }}>
+										<td
+											style={{
+												border: "1px solid #cbd5e1",
+												padding: "6px 10px",
+											}}
+										>
 											{p.startDate === p.endDate
 												? formatDateIndonesian(p.startDate)
 												: `${formatDateIndonesian(p.startDate)} s.d. ${formatDateIndonesian(p.endDate)}`}
 										</td>
-										<td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", color: p.description ? "#0f172a" : "#94a3b8", fontStyle: p.description ? "normal" : "italic" }}>
+										<td
+											style={{
+												border: "1px solid #cbd5e1",
+												padding: "6px 10px",
+												color: p.description ? "#0f172a" : "#94a3b8",
+												fontStyle: p.description ? "normal" : "italic",
+											}}
+										>
 											{p.description || "-"}
 										</td>
 									</tr>
@@ -811,32 +1046,114 @@ function DetailCalendarView({
 				{/* Section 2: Additional Events (Only rendered if events exist) */}
 				{calendar.events && calendar.events.length > 0 && (
 					<div style={{ marginTop: "24px" }}>
-						<h3 style={{ fontSize: "14px", fontWeight: "bold", color: "#0f172a", marginBottom: "10px", borderLeft: "4px solid #16a34a", paddingLeft: "8px" }}>
+						<h3
+							style={{
+								fontSize: "14px",
+								fontWeight: "bold",
+								color: "#0f172a",
+								marginBottom: "10px",
+								borderLeft: "4px solid #16a34a",
+								paddingLeft: "8px",
+							}}
+						>
 							KEGIATAN & ACARA TAMBAHAN
 						</h3>
-						<table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", color: "#1e293b" }}>
+						<table
+							style={{
+								width: "100%",
+								borderCollapse: "collapse",
+								fontSize: "11px",
+								color: "#1e293b",
+							}}
+						>
 							<thead>
-								<tr style={{ background: "#f1f5f9", textAlign: "left", color: "#475569" }}>
-									<th style={{ border: "1px solid #cbd5e1", padding: "8px 10px", width: "35px", textAlign: "center" }}>No</th>
-									<th style={{ border: "1px solid #cbd5e1", padding: "8px 10px", width: "200px" }}>Nama Kegiatan</th>
-									<th style={{ border: "1px solid #cbd5e1", padding: "8px 10px", width: "220px" }}>Tanggal Waktu</th>
-									<th style={{ border: "1px solid #cbd5e1", padding: "8px 10px" }}>Deskripsi Lengkap</th>
+								<tr
+									style={{
+										background: "#f1f5f9",
+										textAlign: "left",
+										color: "#475569",
+									}}
+								>
+									<th
+										style={{
+											border: "1px solid #cbd5e1",
+											padding: "8px 10px",
+											width: "35px",
+											textAlign: "center",
+										}}
+									>
+										No
+									</th>
+									<th
+										style={{
+											border: "1px solid #cbd5e1",
+											padding: "8px 10px",
+											width: "200px",
+										}}
+									>
+										Nama Kegiatan
+									</th>
+									<th
+										style={{
+											border: "1px solid #cbd5e1",
+											padding: "8px 10px",
+											width: "220px",
+										}}
+									>
+										Tanggal Waktu
+									</th>
+									<th
+										style={{ border: "1px solid #cbd5e1", padding: "8px 10px" }}
+									>
+										Deskripsi Lengkap
+									</th>
 								</tr>
 							</thead>
 							<tbody>
 								{calendar.events.map((e: any, idx: number) => (
-									<tr key={idx} style={{ background: idx % 2 === 0 ? "#ffffff" : "#f8fafc" }}>
-										<td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "center", fontWeight: "bold" }}>
+									<tr
+										key={idx}
+										style={{
+											background: idx % 2 === 0 ? "#ffffff" : "#f8fafc",
+										}}
+									>
+										<td
+											style={{
+												border: "1px solid #cbd5e1",
+												padding: "6px 10px",
+												textAlign: "center",
+												fontWeight: "bold",
+											}}
+										>
 											{idx + 1}
 										</td>
-										<td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", fontWeight: "600" }}>
+										<td
+											style={{
+												border: "1px solid #cbd5e1",
+												padding: "6px 10px",
+												fontWeight: "600",
+											}}
+										>
 											{e.title}
 										</td>
-										<td style={{ border: "1px solid #cbd5e1", padding: "6px 10px" }}>
+										<td
+											style={{
+												border: "1px solid #cbd5e1",
+												padding: "6px 10px",
+											}}
+										>
 											{formatDateIndonesian(e.startDate)}{" "}
-											{e.endDate && e.endDate !== e.startDate ? `s.d. ${formatDateIndonesian(e.endDate)}` : ""}
+											{e.endDate && e.endDate !== e.startDate
+												? `s.d. ${formatDateIndonesian(e.endDate)}`
+												: ""}
 										</td>
-										<td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", color: e.description ? "#0f172a" : "#94a3b8" }}>
+										<td
+											style={{
+												border: "1px solid #cbd5e1",
+												padding: "6px 10px",
+												color: e.description ? "#0f172a" : "#94a3b8",
+											}}
+										>
 											{e.description || "-"}
 										</td>
 									</tr>
@@ -847,9 +1164,27 @@ function DetailCalendarView({
 				)}
 
 				{/* PDF Footer */}
-				<div style={{ marginTop: "32px", paddingTop: "16px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#94a3b8" }}>
-					<span>Dicetak dari Sistem Dashboard Nusadaya — Kalender Akademik</span>
-					<span>{new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</span>
+				<div
+					style={{
+						marginTop: "32px",
+						paddingTop: "16px",
+						borderTop: "1px solid #e2e8f0",
+						display: "flex",
+						justifyContent: "space-between",
+						fontSize: "10px",
+						color: "#94a3b8",
+					}}
+				>
+					<span>
+						Dicetak dari Sistem Dashboard Nusadaya — Kalender Akademik
+					</span>
+					<span>
+						{new Date().toLocaleDateString("id-ID", {
+							day: "numeric",
+							month: "long",
+							year: "numeric",
+						})}
+					</span>
 				</div>
 			</div>
 
@@ -879,7 +1214,10 @@ function DetailCalendarView({
 			)}
 
 			{/* Confirm Delete Event AlertDialog */}
-			<AlertDialog open={deleteEventId !== null} onOpenChange={(open) => !open && setDeleteEventId(null)}>
+			<AlertDialog
+				open={deleteEventId !== null}
+				onOpenChange={(open) => !open && setDeleteEventId(null)}
+			>
 				<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
 					<AlertDialogHeader>
 						<AlertDialogTitle>Hapus Kegiatan</AlertDialogTitle>
@@ -888,7 +1226,9 @@ function DetailCalendarView({
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel className="border-slate-200 hover:bg-slate-50 text-slate-600">Batal</AlertDialogCancel>
+						<AlertDialogCancel className="border-slate-200 hover:bg-slate-50 text-slate-600">
+							Batal
+						</AlertDialogCancel>
 						<AlertDialogAction
 							onClick={handleDeleteEventConfirm}
 							className="bg-red-600 hover:bg-red-700 text-white"
@@ -928,7 +1268,9 @@ function EditPeriodDialog({
 		try {
 			if (period.id) {
 				// Update existing saved period
-				const { error } = await api["academic-calendars"][calendarId.toString()].periods[period.id.toString()].patch({
+				const { error } = await api["academic-calendars"][
+					calendarId.toString()
+				].periods[period.id.toString()].patch({
 					startDate: form.startDate,
 					endDate: form.endDate,
 					description: form.description,
@@ -941,7 +1283,9 @@ function EditPeriodDialog({
 				}
 			} else {
 				// Insert new period into DB
-				const { error } = await api["academic-calendars"][calendarId.toString()].periods.post({
+				const { error } = await api["academic-calendars"][
+					calendarId.toString()
+				].periods.post({
 					title: period.title,
 					periodType: period.periodType,
 					startDate: form.startDate,
@@ -976,7 +1320,9 @@ function EditPeriodDialog({
 							<Input
 								type="date"
 								value={form.startDate}
-								onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+								onChange={(e) =>
+									setForm({ ...form, startDate: e.target.value })
+								}
 							/>
 						</div>
 						<div className="space-y-2">
@@ -993,15 +1339,21 @@ function EditPeriodDialog({
 						<Textarea
 							placeholder="Masukkan detail khusus tentang minggu/pertemuan ini"
 							value={form.description}
-							onChange={(e) => setForm({ ...form, description: e.target.value })}
+							onChange={(e) =>
+								setForm({ ...form, description: e.target.value })
+							}
 							rows={3}
 						/>
 					</div>
 				</div>
 				<DialogFooter>
-					<Button variant="outline" onClick={onClose} disabled={isSaving}>Batal</Button>
+					<Button variant="outline" onClick={onClose} disabled={isSaving}>
+						Batal
+					</Button>
 					<Button onClick={handleSave} disabled={isSaving}>
-						{isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+						{isSaving ? (
+							<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+						) : null}
 						Simpan Penyesuaian
 					</Button>
 				</DialogFooter>
@@ -1038,7 +1390,9 @@ function CreateEventDialog({
 
 		setIsSaving(true);
 		try {
-			const { error } = await api["academic-calendars"][calendarId.toString()].events.post({
+			const { error } = await api["academic-calendars"][
+				calendarId.toString()
+			].events.post({
 				title: form.title,
 				description: form.description,
 				startDate: form.startDate,
@@ -1077,7 +1431,9 @@ function CreateEventDialog({
 						<Textarea
 							placeholder="Detail acara, tempat, dsb."
 							value={form.description}
-							onChange={(e) => setForm({ ...form, description: e.target.value })}
+							onChange={(e) =>
+								setForm({ ...form, description: e.target.value })
+							}
 							rows={3}
 						/>
 					</div>
@@ -1087,7 +1443,9 @@ function CreateEventDialog({
 							<Input
 								type="date"
 								value={form.startDate}
-								onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+								onChange={(e) =>
+									setForm({ ...form, startDate: e.target.value })
+								}
 							/>
 						</div>
 						<div className="space-y-2">
@@ -1101,9 +1459,13 @@ function CreateEventDialog({
 					</div>
 				</div>
 				<DialogFooter>
-					<Button variant="outline" onClick={onClose} disabled={isSaving}>Batal</Button>
+					<Button variant="outline" onClick={onClose} disabled={isSaving}>
+						Batal
+					</Button>
 					<Button onClick={handleSave} disabled={isSaving}>
-						{isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+						{isSaving ? (
+							<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+						) : null}
 						Simpan Kegiatan
 					</Button>
 				</DialogFooter>

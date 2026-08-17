@@ -13,20 +13,6 @@ import {
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -37,6 +23,15 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -91,7 +86,7 @@ export default function MataKuliahPage() {
 	const [isEditOpen, setIsEditOpen] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [editingId, setEditingId] = useState<number | null>(null);
-	
+
 	const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 	const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -112,7 +107,7 @@ export default function MataKuliahPage() {
 					...(filterCohort !== "all" && { cohort: filterCohort }),
 					...(filterType !== "all" && { type: filterType }),
 					...(filterPeminatan !== "all" && { peminatan: filterPeminatan }),
-				}
+				},
 			});
 			if (error) throw error;
 			if (data?.success) {
@@ -128,7 +123,7 @@ export default function MataKuliahPage() {
 	const fetchDosen = async () => {
 		try {
 			const { data, error } = await api.users.get({
-				$query: { role: "dosen" }
+				$query: { role: "dosen" },
 			});
 			if (!error && data?.success) {
 				setDosenList(data.data as any[]);
@@ -154,7 +149,7 @@ export default function MataKuliahPage() {
 			toast.error("Mohon lengkapi data yang wajib diisi");
 			return;
 		}
-		
+
 		let dosenIdPayload = parseInt(formData.dosenId, 10);
 		if (user?.role === "dosen") {
 			dosenIdPayload = user.id;
@@ -175,7 +170,8 @@ export default function MataKuliahPage() {
 			};
 
 			if (isEditOpen && editingId) {
-				const { data, error } = await api.courses[editingId.toString()].patch(payload);
+				const { data, error } =
+					await api.courses[editingId.toString()].patch(payload);
 				if (error) throw new Error(error.value?.message || "Gagal menyimpan");
 				toast.success("Berhasil memperbarui mata kuliah");
 			} else {
@@ -183,7 +179,7 @@ export default function MataKuliahPage() {
 				if (error) throw new Error(error.value?.message || "Gagal menambahkan");
 				toast.success("Berhasil menambahkan mata kuliah");
 			}
-			
+
 			setIsAddOpen(false);
 			setIsEditOpen(false);
 			setFormData(initialForm);
@@ -235,19 +231,24 @@ export default function MataKuliahPage() {
 	});
 
 	// Get unique peminatan for filter
-	const uniquePeminatan = Array.from(new Set(courses.map(c => c.peminatan).filter(Boolean)));
+	const uniquePeminatan = Array.from(
+		new Set(courses.map((c) => c.peminatan).filter(Boolean)),
+	);
 
 	const handleExport = () => {
 		if (filteredCourses.length === 0) return;
-		const exportData = filteredCourses.map(c => ({
+		const exportData = filteredCourses.map((c) => ({
 			"Kode MK": c.code,
 			"Nama Mata Kuliah": c.name,
 			"Dosen Pengampu": c.dosen.fullName,
-			"Peminatan": c.peminatan || "-",
-			"Angkatan": c.cohort,
-			"Jenis": c.type === "teori" ? "Teori" : "Praktik"
+			Peminatan: c.peminatan || "-",
+			Angkatan: c.cohort,
+			Jenis: c.type === "teori" ? "Teori" : "Praktik",
 		}));
-		exportToCSV(exportData, `Daftar_Mata_Kuliah_${new Date().toISOString().split("T")[0]}`);
+		exportToCSV(
+			exportData,
+			`Daftar_Mata_Kuliah_${new Date().toISOString().split("T")[0]}`,
+		);
 	};
 
 	if (!hasHydrated) return null;
@@ -260,17 +261,21 @@ export default function MataKuliahPage() {
 						<BookOpen className="h-6 w-6 text-blue-600" />
 						Manajemen Mata Kuliah
 					</h1>
-					<p className="text-slate-500">Kelola daftar mata kuliah dan jadwal mengajar</p>
+					<p className="text-slate-500">
+						Kelola daftar mata kuliah dan jadwal mengajar
+					</p>
 				</div>
 				<div className="flex gap-2">
 					<Button variant="outline" onClick={handleExport}>
 						<Download className="mr-2 h-4 w-4" /> Export Excel
 					</Button>
 					{(user?.role === "superadmin" || user?.role === "akademik") && (
-						<Button onClick={() => {
-							setFormData(initialForm);
-							setIsAddOpen(true);
-						}}>
+						<Button
+							onClick={() => {
+								setFormData(initialForm);
+								setIsAddOpen(true);
+							}}
+						>
 							<Plus className="mr-2 h-4 w-4" /> Tambah Mata Kuliah
 						</Button>
 					)}
@@ -280,7 +285,9 @@ export default function MataKuliahPage() {
 			<Card>
 				<CardHeader className="pb-3 border-b">
 					<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-						<CardTitle className="text-lg font-medium">Daftar Mata Kuliah</CardTitle>
+						<CardTitle className="text-lg font-medium">
+							Daftar Mata Kuliah
+						</CardTitle>
 						<div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
 							<div className="relative">
 								<Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
@@ -291,18 +298,29 @@ export default function MataKuliahPage() {
 									onChange={(e) => setSearchQuery(e.target.value)}
 								/>
 							</div>
-							<Select value={filterCohort} onValueChange={(v) => setFilterCohort(v || "all")}>
+							<Select
+								value={filterCohort}
+								onValueChange={(v) => setFilterCohort(v || "all")}
+							>
 								<SelectTrigger className="w-full sm:w-[150px]">
 									<SelectValue placeholder="Angkatan" />
 								</SelectTrigger>
 								<SelectContent>
 									<SelectItem value="all">Semua Angkatan</SelectItem>
-									{[13, 14, 15, 16].map((c) => (
-										<SelectItem key={c} value={c.toString()}>Angkatan {c}</SelectItem>
+									{Array.from(
+										{ length: new Date().getFullYear() - 2022 + 2 },
+										(_, i) => new Date().getFullYear() + 1 - i,
+									).map((c) => (
+										<SelectItem key={c} value={c.toString()}>
+											Angkatan {c}
+										</SelectItem>
 									))}
 								</SelectContent>
 							</Select>
-							<Select value={filterType} onValueChange={(v) => setFilterType(v || "all")}>
+							<Select
+								value={filterType}
+								onValueChange={(v) => setFilterType(v || "all")}
+							>
 								<SelectTrigger className="w-full sm:w-[130px]">
 									<SelectValue placeholder="Jenis" />
 								</SelectTrigger>
@@ -313,14 +331,19 @@ export default function MataKuliahPage() {
 								</SelectContent>
 							</Select>
 							{uniquePeminatan.length > 0 && (
-								<Select value={filterPeminatan} onValueChange={(v) => setFilterPeminatan(v || "all")}>
+								<Select
+									value={filterPeminatan}
+									onValueChange={(v) => setFilterPeminatan(v || "all")}
+								>
 									<SelectTrigger className="w-full sm:w-[160px]">
 										<SelectValue placeholder="Peminatan" />
 									</SelectTrigger>
 									<SelectContent>
 										<SelectItem value="all">Semua Peminatan</SelectItem>
 										{uniquePeminatan.map((p, i) => (
-											<SelectItem key={i} value={p as string}>{p}</SelectItem>
+											<SelectItem key={i} value={p as string}>
+												{p}
+											</SelectItem>
 										))}
 									</SelectContent>
 								</Select>
@@ -351,7 +374,10 @@ export default function MataKuliahPage() {
 									</TableRow>
 								) : filteredCourses.length === 0 ? (
 									<TableRow>
-										<TableCell colSpan={7} className="text-center py-10 text-slate-500">
+										<TableCell
+											colSpan={7}
+											className="text-center py-10 text-slate-500"
+										>
 											Tidak ada data mata kuliah
 										</TableCell>
 									</TableRow>
@@ -363,29 +389,54 @@ export default function MataKuliahPage() {
 											<TableCell>{c.dosen.fullName}</TableCell>
 											<TableCell>{c.peminatan || "-"}</TableCell>
 											<TableCell className="text-center">
-												<Badge variant="outline" className="bg-slate-50">AK {c.cohort}</Badge>
+												<Badge variant="outline" className="bg-slate-50">
+													AK {c.cohort}
+												</Badge>
 											</TableCell>
 											<TableCell>
-												<Badge variant={c.type === "teori" ? "secondary" : "default"} className={c.type === "teori" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"}>
+												<Badge
+													variant={c.type === "teori" ? "secondary" : "default"}
+													className={
+														c.type === "teori"
+															? "bg-blue-100 text-blue-700"
+															: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+													}
+												>
 													{c.type === "teori" ? "Teori" : "Praktik"}
 												</Badge>
 											</TableCell>
 											<TableCell className="text-right">
 												<div className="flex justify-end gap-2">
 													<Link href={`/dashboard/mata-kuliah/${c.id}`}>
-														<Button variant="outline" size="icon" className="h-8 w-8" title="Detail & Jadwal">
+														<Button
+															variant="outline"
+															size="icon"
+															className="h-8 w-8"
+															title="Detail & Jadwal"
+														>
 															<Eye className="h-4 w-4 text-blue-600" />
 														</Button>
 													</Link>
-													{(user?.role === "superadmin" || user?.role === "akademik") && (
+													{(user?.role === "superadmin" ||
+														user?.role === "akademik") && (
 														<>
-															<Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(c)}>
+															<Button
+																variant="ghost"
+																size="icon"
+																className="h-8 w-8"
+																onClick={() => openEdit(c)}
+															>
 																<Edit className="h-4 w-4" />
 															</Button>
-															<Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => {
-																setDeletingId(c.id);
-																setDeleteConfirmOpen(true);
-															}}>
+															<Button
+																variant="ghost"
+																size="icon"
+																className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+																onClick={() => {
+																	setDeletingId(c.id);
+																	setDeleteConfirmOpen(true);
+																}}
+															>
 																<Trash2 className="h-4 w-4" />
 															</Button>
 														</>
@@ -402,15 +453,20 @@ export default function MataKuliahPage() {
 			</Card>
 
 			{/* Modal Form */}
-			<Dialog open={isAddOpen || isEditOpen} onOpenChange={(open) => {
-				if (!open) {
-					setIsAddOpen(false);
-					setIsEditOpen(false);
-				}
-			}}>
+			<Dialog
+				open={isAddOpen || isEditOpen}
+				onOpenChange={(open) => {
+					if (!open) {
+						setIsAddOpen(false);
+						setIsEditOpen(false);
+					}
+				}}
+			>
 				<DialogContent className="sm:max-w-[600px]">
 					<DialogHeader>
-						<DialogTitle>{isAddOpen ? "Tambah Mata Kuliah Baru" : "Edit Mata Kuliah"}</DialogTitle>
+						<DialogTitle>
+							{isAddOpen ? "Tambah Mata Kuliah Baru" : "Edit Mata Kuliah"}
+						</DialogTitle>
 					</DialogHeader>
 					<form onSubmit={handleSave} className="space-y-4 pt-4">
 						<div className="grid grid-cols-2 gap-4">
@@ -421,7 +477,9 @@ export default function MataKuliahPage() {
 									placeholder="Cth: MK-001"
 									className="border-2 border-slate-200"
 									value={formData.code}
-									onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+									onChange={(e) =>
+										setFormData({ ...formData, code: e.target.value })
+									}
 								/>
 							</div>
 							<div className="space-y-2">
@@ -432,11 +490,13 @@ export default function MataKuliahPage() {
 									placeholder="Cth: 13"
 									className="border-2 border-slate-200"
 									value={formData.cohort}
-									onChange={(e) => setFormData({ ...formData, cohort: e.target.value })}
+									onChange={(e) =>
+										setFormData({ ...formData, cohort: e.target.value })
+									}
 								/>
 							</div>
 						</div>
-						
+
 						<div className="space-y-2">
 							<Label>Nama Mata Kuliah *</Label>
 							<Input
@@ -444,20 +504,29 @@ export default function MataKuliahPage() {
 								placeholder="Cth: Front Office Operation"
 								className="border-2 border-slate-200"
 								value={formData.name}
-								onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+								onChange={(e) =>
+									setFormData({ ...formData, name: e.target.value })
+								}
 							/>
 						</div>
 
 						{user?.role !== "dosen" && (
 							<div className="space-y-2">
 								<Label>Dosen Pengampu *</Label>
-								<Select value={formData.dosenId || ""} onValueChange={(val) => setFormData({ ...formData, dosenId: val || "" })}>
+								<Select
+									value={formData.dosenId || ""}
+									onValueChange={(val) =>
+										setFormData({ ...formData, dosenId: val || "" })
+									}
+								>
 									<SelectTrigger className="border-2 border-slate-200">
 										<SelectValue placeholder="Pilih Dosen" />
 									</SelectTrigger>
 									<SelectContent>
-										{dosenList.map(d => (
-											<SelectItem key={d.id} value={d.id.toString()}>{d.fullName}</SelectItem>
+										{dosenList.map((d) => (
+											<SelectItem key={d.id} value={d.id.toString()}>
+												{d.fullName}
+											</SelectItem>
 										))}
 									</SelectContent>
 								</Select>
@@ -471,12 +540,19 @@ export default function MataKuliahPage() {
 									placeholder="Cth: F&B Service"
 									className="border-2 border-slate-200"
 									value={formData.peminatan}
-									onChange={(e) => setFormData({ ...formData, peminatan: e.target.value })}
+									onChange={(e) =>
+										setFormData({ ...formData, peminatan: e.target.value })
+									}
 								/>
 							</div>
 							<div className="space-y-2">
 								<Label>Jenis *</Label>
-								<Select value={formData.type || "teori"} onValueChange={(val) => setFormData({ ...formData, type: val || "teori" })}>
+								<Select
+									value={formData.type || "teori"}
+									onValueChange={(val) =>
+										setFormData({ ...formData, type: val || "teori" })
+									}
+								>
 									<SelectTrigger className="border-2 border-slate-200">
 										<SelectValue placeholder="Pilih Jenis" />
 									</SelectTrigger>
@@ -489,9 +565,20 @@ export default function MataKuliahPage() {
 						</div>
 
 						<div className="pt-4 flex justify-end gap-2">
-							<Button type="button" variant="outline" onClick={() => { setIsAddOpen(false); setIsEditOpen(false); }}>Batal</Button>
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => {
+									setIsAddOpen(false);
+									setIsEditOpen(false);
+								}}
+							>
+								Batal
+							</Button>
 							<Button type="submit" disabled={isSaving}>
-								{isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+								{isSaving ? (
+									<Loader2 className="h-4 w-4 animate-spin mr-2" />
+								) : null}
 								Simpan
 							</Button>
 						</div>
@@ -505,13 +592,21 @@ export default function MataKuliahPage() {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Hapus Mata Kuliah?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Tindakan ini tidak dapat dibatalkan. Menghapus mata kuliah juga akan menghapus seluruh data jadwal mengajar, presensi, dan penilaian di dalamnya secara permanen.
+							Tindakan ini tidak dapat dibatalkan. Menghapus mata kuliah juga
+							akan menghapus seluruh data jadwal mengajar, presensi, dan
+							penilaian di dalamnya secara permanen.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
 						<AlertDialogCancel disabled={isSaving}>Batal</AlertDialogCancel>
-						<AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-red-600 hover:bg-red-700">
-							{isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+						<AlertDialogAction
+							onClick={handleDelete}
+							disabled={isSaving}
+							className="bg-red-600 hover:bg-red-700"
+						>
+							{isSaving ? (
+								<Loader2 className="h-4 w-4 animate-spin mr-2" />
+							) : null}
 							Ya, Hapus
 						</AlertDialogAction>
 					</AlertDialogFooter>

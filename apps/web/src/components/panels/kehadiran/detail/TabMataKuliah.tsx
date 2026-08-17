@@ -1,14 +1,27 @@
 "use client";
 
+import {
+	CheckCircle,
+	ChevronDown,
+	ChevronUp,
+	Edit2,
+	Loader2,
+	Save,
+	X,
+	XCircle,
+} from "lucide-react";
 import { useEffect, useState } from "react";
-import { api } from "@/lib/eden";
 import { toast } from "sonner";
-import { Loader2, ChevronDown, ChevronUp, Edit2, Save, X, CheckCircle, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 
 export function TabMataKuliah({ studentId }: { studentId: number }) {
@@ -19,13 +32,18 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 	const canEdit = user?.role === "superadmin" || user?.role === "akademik";
 
 	const [editingCourse, setEditingCourse] = useState<number | null>(null);
-	const [editForm, setEditForm] = useState({ attendancePresent: 0, totalMeetings: 0 });
+	const [editForm, setEditForm] = useState({
+		attendancePresent: 0,
+		totalMeetings: 0,
+	});
 	const [isSaving, setIsSaving] = useState(false);
 
 	const fetchData = async () => {
 		setIsLoading(true);
 		try {
-			const res = await (api as any).attendance.mahasiswa[studentId]["mata-kuliah"].get();
+			const res = await (api as any).attendance.mahasiswa[studentId][
+				"mata-kuliah"
+			].get();
 			if (res.data?.success) {
 				setData(res.data.data);
 			} else {
@@ -53,7 +71,9 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 	const handleSaveEdit = async (courseId: number) => {
 		setIsSaving(true);
 		try {
-			const res = await (api as any).attendance.mahasiswa[studentId]["mata-kuliah"][courseId].patch(editForm);
+			const res = await (api as any).attendance.mahasiswa[studentId][
+				"mata-kuliah"
+			][courseId].patch(editForm);
 			if (res.data?.success) {
 				toast.success("Berhasil memperbarui data");
 				setEditingCourse(null);
@@ -69,11 +89,19 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 	};
 
 	if (isLoading) {
-		return <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>;
+		return (
+			<div className="flex justify-center p-8">
+				<Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+			</div>
+		);
 	}
 
 	if (!data || data.grades.length === 0) {
-		return <div className="text-center py-8 text-slate-500">Belum ada data mata kuliah yang terdaftar.</div>;
+		return (
+			<div className="text-center py-8 text-slate-500">
+				Belum ada data mata kuliah yang terdaftar.
+			</div>
+		);
 	}
 
 	return (
@@ -81,10 +109,15 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 			{data.grades.map((g: any, index: number) => {
 				const isExpanded = expandedCourse === g.id;
 				const isEditing = editingCourse === g.id;
-				const rate = g.totalMeetings > 0 ? Math.round((g.attendancePresent / g.totalMeetings) * 100) : 0;
+				const rate =
+					g.totalMeetings > 0
+						? Math.round((g.attendancePresent / g.totalMeetings) * 100)
+						: 0;
 				const isDanger = rate < 90 && g.totalMeetings > 0;
-				
-				const rowBgColor = !isDanger ? "bg-emerald-50 border-emerald-200" : "bg-rose-50 border-rose-200";
+
+				const rowBgColor = !isDanger
+					? "bg-emerald-50 border-emerald-200"
+					: "bg-rose-50 border-rose-200";
 
 				const p = g.practicalScore || 0;
 				const t = g.theoryScore || 0;
@@ -96,9 +129,13 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 				else if (finalScore >= 65) displayGrade = "C";
 				else if (finalScore >= 50) displayGrade = "D";
 
-				const finalScoreString = isInputted ? `${finalScore.toFixed(1)} (${displayGrade})` : "-";
-				
-				const courseRecords = data.records.filter((r: any) => r.session.subject === g.courseName);
+				const finalScoreString = isInputted
+					? `${finalScore.toFixed(1)} (${displayGrade})`
+					: "-";
+
+				const courseRecords = data.records.filter(
+					(r: any) => r.session.subject === g.courseName,
+				);
 
 				return (
 					<Collapsible
@@ -122,10 +159,11 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 								</div>
 								<div>
 									<div className="flex items-center gap-2 mb-2">
-										<h4 className="font-bold text-slate-800">
-											{g.courseName}
-										</h4>
-										<Badge variant="outline" className="text-[10px] h-5 bg-white">
+										<h4 className="font-bold text-slate-800">{g.courseName}</h4>
+										<Badge
+											variant="outline"
+											className="text-[10px] h-5 bg-white"
+										>
 											{g.courseCode || "MK"}
 										</Badge>
 										{g.isAcc && (
@@ -148,20 +186,28 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 										</div>
 										<div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-md border border-slate-100/50">
 											<span className="text-slate-500">Nilai Akhir:</span>
-											<span className="font-bold text-blue-700">{finalScoreString}</span>
+											<span className="font-bold text-blue-700">
+												{finalScoreString}
+											</span>
 										</div>
 										<div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-md border border-slate-100/50">
 											<span className="text-slate-500">Praktik:</span>
-											<span className="font-semibold text-slate-700">{g.practicalScore || 0}</span>
+											<span className="font-semibold text-slate-700">
+												{g.practicalScore || 0}
+											</span>
 										</div>
 										<div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-md border border-slate-100/50">
 											<span className="text-slate-500">Teori:</span>
-											<span className="font-semibold text-slate-700">{g.theoryScore || 0}</span>
+											<span className="font-semibold text-slate-700">
+												{g.theoryScore || 0}
+											</span>
 										</div>
 										<div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-md border border-slate-100/50">
 											<span className="text-slate-500">KWU:</span>
 											<span className="font-semibold text-slate-700">
-												{g.hasKwu ? `Rp ${(g.entrepreneurScore || 0).toLocaleString("id-ID")}` : "-"}
+												{g.hasKwu
+													? `Rp ${(g.entrepreneurScore || 0).toLocaleString("id-ID")}`
+													: "-"}
 											</span>
 										</div>
 										<div className="flex items-center gap-1.5 bg-white/60 px-2 py-1 rounded-md border border-slate-100/50">
@@ -198,7 +244,11 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 										}}
 										className="h-8 text-blue-600 bg-white border-blue-100 hover:bg-blue-50 flex-1 lg:flex-none"
 									>
-										{isEditing ? <X className="w-3.5 h-3.5 mr-1.5" /> : <Edit2 className="w-3.5 h-3.5 mr-1.5" />} 
+										{isEditing ? (
+											<X className="w-3.5 h-3.5 mr-1.5" />
+										) : (
+											<Edit2 className="w-3.5 h-3.5 mr-1.5" />
+										)}
 										{isEditing ? "Batal" : "Koreksi Hadir"}
 									</Button>
 								)}
@@ -210,35 +260,55 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 						<CollapsibleContent className="bg-white">
 							{isEditing && (
 								<div className="p-4 bg-blue-50/50 border-b border-blue-100">
-									<h4 className="text-xs font-bold text-blue-800 uppercase mb-3">Koreksi Manual Agregat Kehadiran</h4>
+									<h4 className="text-xs font-bold text-blue-800 uppercase mb-3">
+										Koreksi Manual Agregat Kehadiran
+									</h4>
 									<div className="flex items-end gap-4">
 										<div>
-											<label className="text-xs font-medium text-slate-500 mb-1 block">Total Hadir</label>
-											<Input 
-												type="number" 
-												className="w-24 bg-white h-9" 
-												value={editForm.attendancePresent} 
-												onChange={e => setEditForm({...editForm, attendancePresent: parseInt(e.target.value) || 0})}
+											<label className="text-xs font-medium text-slate-500 mb-1 block">
+												Total Hadir
+											</label>
+											<Input
+												type="number"
+												className="w-24 bg-white h-9"
+												value={editForm.attendancePresent}
+												onChange={(e) =>
+													setEditForm({
+														...editForm,
+														attendancePresent: parseInt(e.target.value) || 0,
+													})
+												}
 												min={0}
 											/>
 										</div>
 										<div>
-											<label className="text-xs font-medium text-slate-500 mb-1 block">Total Pertemuan</label>
-											<Input 
-												type="number" 
-												className="w-24 bg-white h-9" 
-												value={editForm.totalMeetings} 
-												onChange={e => setEditForm({...editForm, totalMeetings: parseInt(e.target.value) || 0})}
+											<label className="text-xs font-medium text-slate-500 mb-1 block">
+												Total Pertemuan
+											</label>
+											<Input
+												type="number"
+												className="w-24 bg-white h-9"
+												value={editForm.totalMeetings}
+												onChange={(e) =>
+													setEditForm({
+														...editForm,
+														totalMeetings: parseInt(e.target.value) || 0,
+													})
+												}
 												min={1}
 											/>
 										</div>
-										<Button 
+										<Button
 											size="sm"
-											onClick={() => handleSaveEdit(g.id)} 
+											onClick={() => handleSaveEdit(g.id)}
 											disabled={isSaving}
 											className="h-9 bg-blue-600 hover:bg-blue-700 text-white"
 										>
-											{isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+											{isSaving ? (
+												<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+											) : (
+												<Save className="w-4 h-4 mr-2" />
+											)}
 											Simpan
 										</Button>
 									</div>
@@ -247,19 +317,47 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 
 							{!isEditing && (
 								<div className="p-4 bg-slate-50">
-									<h4 className="text-sm font-medium mb-3 text-slate-700">Riwayat Sesi Terdaftar</h4>
+									<h4 className="text-sm font-medium mb-3 text-slate-700">
+										Riwayat Sesi Terdaftar
+									</h4>
 									{courseRecords.length === 0 ? (
-										<div className="text-sm text-slate-500">Tidak ada riwayat sesi detail.</div>
+										<div className="text-sm text-slate-500">
+											Tidak ada riwayat sesi detail.
+										</div>
 									) : (
 										<div className="space-y-2">
 											{courseRecords.map((r: any) => (
-												<div key={r.id} className="flex justify-between items-center bg-white p-2.5 rounded border border-slate-200 text-sm shadow-sm">
+												<div
+													key={r.id}
+													className="flex justify-between items-center bg-white p-2.5 rounded border border-slate-200 text-sm shadow-sm"
+												>
 													<div>
-														<div className="font-medium text-slate-800">{r.session.sessionDate ? new Date(r.session.sessionDate).toLocaleDateString('id-ID') : "-"}</div>
-														<div className="text-xs text-slate-500">{r.session.startTime} - {r.session.endTime} • Ruang: {r.session.room}</div>
+														<div className="font-medium text-slate-800">
+															{r.session.sessionDate
+																? new Date(
+																		r.session.sessionDate,
+																	).toLocaleDateString("id-ID")
+																: "-"}
+														</div>
+														<div className="text-xs text-slate-500">
+															{r.session.startTime} - {r.session.endTime} •
+															Ruang: {r.session.room}
+														</div>
 													</div>
-													<Badge variant={r.status === 'hadir' ? 'default' : r.status === 'izin' || r.status === 'sakit' ? 'secondary' : 'destructive'} 
-														className={r.status === 'hadir' ? 'bg-emerald-500 text-white' : ''}>
+													<Badge
+														variant={
+															r.status === "hadir"
+																? "default"
+																: r.status === "izin" || r.status === "sakit"
+																	? "secondary"
+																	: "destructive"
+														}
+														className={
+															r.status === "hadir"
+																? "bg-emerald-500 text-white"
+																: ""
+														}
+													>
 														{r.status.toUpperCase()}
 													</Badge>
 												</div>

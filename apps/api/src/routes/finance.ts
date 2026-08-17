@@ -364,39 +364,21 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 
 	// Tab 3: Anggaran Praktik
 
-	.post(
-		"/anggaran-praktik",
-		async ({ body, user }: any) => {
-			if (
-				!user ||
-				(user.role !== "dosen" &&
-					user.role !== "akademik" &&
-					user.role !== "superadmin")
-			)
-				return { success: false, message: "Forbidden" };
-			await db.insert(practicesBudgetRequests).values({
-				dosenId: user.id,
-				mataKuliah: body.mataKuliah,
-				daftarKebutuhan: body.daftarKebutuhan,
-				totalNominal: body.totalNominal,
-				status: "menunggu",
-			});
-			return { success: true };
-		},
-		{
-			body: t.Object({
-				mataKuliah: t.String(),
-				daftarKebutuhan: t.Any(),
-				totalNominal: t.Number(),
-			}),
-		},
-	)
-
 	.get("/anggaran-praktik", async ({ user }: any) => {
 		if (!user || (user.role !== "finance" && user.role !== "superadmin"))
 			return { success: false, message: "Forbidden" };
 
-		const requests = await db.query.practicesBudgetRequests.findMany();
+		const requests = await db.query.practicesBudgetRequests.findMany({
+			with: {
+				course: true,
+				dosen: {
+					columns: { id: true, fullName: true },
+				},
+			},
+			orderBy: (practicesBudgetRequests, { desc }) => [
+				desc(practicesBudgetRequests.createdAt),
+			],
+		});
 		return { success: true, data: requests };
 	})
 	.patch(

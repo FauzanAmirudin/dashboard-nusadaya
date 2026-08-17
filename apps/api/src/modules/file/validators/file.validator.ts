@@ -1,8 +1,8 @@
 import {
-	SIZE_LIMITS,
 	getAllowedExtensions,
 	getMimeCategory,
 	isAllowedMimeType,
+	SIZE_LIMITS,
 	validateMagicBytes,
 } from "../utils/mime";
 

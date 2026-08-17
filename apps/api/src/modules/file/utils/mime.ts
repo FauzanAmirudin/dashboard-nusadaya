@@ -9,9 +9,7 @@ export const ALLOWED_MIME_TYPES: Record<string, string[]> = {
 		"docx",
 	],
 	"application/vnd.ms-excel": ["xls"],
-	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
-		"xlsx",
-	],
+	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ["xlsx"],
 	// Gambar
 	"image/jpeg": ["jpg", "jpeg"],
 	"image/png": ["png"],
@@ -43,7 +41,10 @@ export function getMimeCategory(mimeType: string): MimeCategory {
 /**
  * Cek apakah MIME type dan extension diizinkan
  */
-export function isAllowedMimeType(mimeType: string, extension: string): boolean {
+export function isAllowedMimeType(
+	mimeType: string,
+	extension: string,
+): boolean {
 	const allowedExts = ALLOWED_MIME_TYPES[mimeType];
 	if (!allowedExts) return false;
 	return allowedExts.includes(extension.toLowerCase());
@@ -60,10 +61,7 @@ export function getAllowedExtensions(): string[] {
  * Validasi magic bytes file untuk PDF dan gambar.
  * Mencegah file berbahaya yang mengganti extension saja.
  */
-export function validateMagicBytes(
-	buffer: Buffer,
-	mimeType: string,
-): boolean {
+export function validateMagicBytes(buffer: Buffer, mimeType: string): boolean {
 	if (mimeType === "application/pdf") {
 		return buffer.slice(0, 4).toString("ascii") === PDF_MAGIC;
 	}

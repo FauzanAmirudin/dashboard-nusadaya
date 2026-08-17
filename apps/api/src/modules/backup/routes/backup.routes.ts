@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia";
-import { backupService } from "../service/backup.service";
 import { backupRepository } from "../repository/backup.repository";
+import { backupService } from "../service/backup.service";
 
 /**
  * Backup routes:
@@ -27,7 +27,10 @@ export const backupRoutes = new Elysia()
 			// Hanya superadmin yang bisa membuat backup
 			if (user.role !== "superadmin") {
 				set.status = 403;
-				return { success: false, message: "Hanya superadmin yang bisa membuat backup" };
+				return {
+					success: false,
+					message: "Hanya superadmin yang bisa membuat backup",
+				};
 			}
 
 			try {
@@ -130,7 +133,10 @@ export const backupRoutes = new Elysia()
 
 		if (user.role !== "superadmin") {
 			set.status = 403;
-			return { success: false, message: "Hanya superadmin yang bisa menghapus backup" };
+			return {
+				success: false,
+				message: "Hanya superadmin yang bisa menghapus backup",
+			};
 		}
 
 		const job = await backupRepository.findJobById(params.id);
@@ -161,7 +167,10 @@ export const backupRoutes = new Elysia()
 		const job = await backupRepository.findJobById(params.id);
 		if (!job || !job.outputPath) {
 			set.status = 404;
-			return { success: false, message: "Backup tidak ditemukan atau belum selesai" };
+			return {
+				success: false,
+				message: "Backup tidak ditemukan atau belum selesai",
+			};
 		}
 
 		// Gunakan Node.js child_process untuk zip — tidak ada crash risk
@@ -170,7 +179,10 @@ export const backupRoutes = new Elysia()
 		const { execSync } = require("child_process");
 		const { existsSync, readFileSync, unlinkSync } = require("fs");
 
-		const tmpFile = path.join(os.tmpdir(), `backup-${job.id}-${Date.now()}.zip`);
+		const tmpFile = path.join(
+			os.tmpdir(),
+			`backup-${job.id}-${Date.now()}.zip`,
+		);
 
 		try {
 			// PowerShell Compress-Archive (Windows) atau zip (Linux/Mac)
@@ -178,7 +190,7 @@ export const backupRoutes = new Elysia()
 			if (isWindows) {
 				execSync(
 					`powershell -Command "Compress-Archive -Path '${job.outputPath}\\*' -DestinationPath '${tmpFile}' -Force"`,
-					{ timeout: 120000 }
+					{ timeout: 120000 },
 				);
 			} else {
 				execSync(`cd "${job.outputPath}" && zip -r "${tmpFile}" .`, {
@@ -194,7 +206,9 @@ export const backupRoutes = new Elysia()
 			const zipBuffer = readFileSync(tmpFile);
 
 			// Cleanup temp file
-			try { unlinkSync(tmpFile); } catch {}
+			try {
+				unlinkSync(tmpFile);
+			} catch {}
 
 			set.headers = {
 				"Content-Type": "application/zip",
@@ -205,8 +219,13 @@ export const backupRoutes = new Elysia()
 			return zipBuffer;
 		} catch (err: any) {
 			// Cleanup on error
-			try { if (existsSync(tmpFile)) unlinkSync(tmpFile); } catch {}
+			try {
+				if (existsSync(tmpFile)) unlinkSync(tmpFile);
+			} catch {}
 			set.status = 500;
-			return { success: false, message: `Gagal mengkompresi backup: ${err.message}` };
+			return {
+				success: false,
+				message: `Gagal mengkompresi backup: ${err.message}`,
+			};
 		}
 	});

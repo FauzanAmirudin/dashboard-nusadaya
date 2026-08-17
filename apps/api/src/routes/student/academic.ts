@@ -105,9 +105,10 @@ export const academicRoutes = new Elysia()
 				if (updated.academicCommunication) checked++;
 				if (updated.assessmentCompleted) checked++;
 
-				const overseasChecklist = await db.query.overseasProgramChecklists.findFirst({
-					where: eq(overseasProgramChecklists.studentId, id),
-				});
+				const overseasChecklist =
+					await db.query.overseasProgramChecklists.findFirst({
+						where: eq(overseasProgramChecklists.studentId, id),
+					});
 
 				if (overseasChecklist && overseasChecklist.programType === "taiwan") {
 					totalRequired += 12;
@@ -280,7 +281,7 @@ export const academicRoutes = new Elysia()
 		});
 
 		// Map hasilnya agar kompatibel dengan frontend yang masih membaca courseCode dan courseName
-		const mappedGrades = grades.map(g => ({
+		const mappedGrades = grades.map((g) => ({
 			...g,
 			courseCode: g.course?.code || g.courseCode,
 			courseName: g.course?.name || g.courseName,
@@ -318,7 +319,7 @@ export const academicRoutes = new Elysia()
 
 			// Cari courseId jika ada di master courses
 			const matchingCourse = await db.query.courses.findFirst({
-				where: eq(courses.code, input.courseCode)
+				where: eq(courses.code, input.courseCode),
 			});
 
 			await db.insert(courseGrades).values({

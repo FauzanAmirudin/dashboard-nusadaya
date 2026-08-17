@@ -141,14 +141,12 @@ export function TabAnggaran({ canEdit }: TabAnggaranProps) {
 								{requests.map((r) => (
 									<TableRow key={r.id}>
 										<TableCell className="font-medium">
-											{r.mataKuliah}
-											{r.namaKelas && (
-												<div className="text-xs text-indigo-600 font-semibold">
-													Kelas: {r.namaKelas}
-												</div>
-											)}
-											<div className="text-xs text-slate-500">
-												Oleh: Dosen ID {r.dosenId}
+											{r.course?.name || `Mata Kuliah ID ${r.courseId}`}
+											<div className="text-xs text-indigo-600 font-semibold mt-0.5">
+												Kode: {r.course?.code || "-"}
+											</div>
+											<div className="text-xs text-slate-500 mt-1">
+												Oleh: {r.dosen?.fullName || `Dosen ID ${r.dosenId}`}
 											</div>
 										</TableCell>
 										<TableCell>
@@ -275,7 +273,10 @@ export function TabAnggaran({ canEdit }: TabAnggaranProps) {
 							<TableBody>
 								{reports.map((r) => (
 									<TableRow key={r.id}>
-										<TableCell>#{r.budgetRequestId}</TableCell>
+										<TableCell>
+											{r.budgetRequest?.course?.name ||
+												`Pengajuan ID ${r.budgetRequestId}`}
+										</TableCell>
 										<TableCell>
 											<ul className="list-disc pl-4 text-xs text-slate-700 space-y-0.5">
 												{(r.daftarSisaBahan || []).map((k: any, i: number) => {
@@ -371,10 +372,8 @@ export function TabAnggaran({ canEdit }: TabAnggaranProps) {
 									Mata Kuliah / Kelas:
 								</div>
 								<div className="text-sm font-bold text-slate-800">
-									{editStatusReq.mataKuliah}{" "}
-									{editStatusReq.namaKelas
-										? `(${editStatusReq.namaKelas})`
-										: ""}
+									{editStatusReq.course?.name ||
+										`Mata Kuliah ID ${editStatusReq.courseId}`}
 								</div>
 								<div className="text-xs text-slate-500">
 									Total Nominal:{" "}

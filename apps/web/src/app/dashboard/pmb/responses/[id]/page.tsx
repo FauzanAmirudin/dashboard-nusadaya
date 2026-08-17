@@ -1,18 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+	ArrowLeft,
+	CheckCircle2,
+	FileText,
+	Loader2,
+	User,
+	XCircle,
+} from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle2, FileText, Loader2, User, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { getToken } from "@/lib/eden";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -190,9 +197,7 @@ export default function ResponseDetailPage() {
 				<div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex gap-3 items-start">
 					<CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
 					<div>
-						<h4 className="font-semibold text-emerald-800">
-							Telah Disetujui
-						</h4>
+						<h4 className="font-semibold text-emerald-800">Telah Disetujui</h4>
 						<p className="text-sm text-emerald-700 mt-1">
 							Disetujui oleh: {data.processor.fullName} pada{" "}
 							{new Date(data.processedAt).toLocaleString("id-ID")}
@@ -222,13 +227,17 @@ export default function ResponseDetailPage() {
 						<span className="text-slate-500">Nama Lengkap</span>
 						<span className="col-span-2 font-medium">{data.name}</span>
 						<span className="text-slate-500">Nama Panggilan</span>
-						<span className="col-span-2 font-medium">{data.nickname || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.nickname || "-"}
+						</span>
 						<span className="text-slate-500">Email</span>
 						<span className="col-span-2 font-medium">{data.email || "-"}</span>
 						<span className="text-slate-500">No. HP</span>
 						<span className="col-span-2 font-medium">{data.phone || "-"}</span>
 						<span className="text-slate-500">Kewarganegaraan</span>
-						<span className="col-span-2 font-medium">{data.nationality || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.nationality || "-"}
+						</span>
 						<span className="text-slate-500">Tempat, Tgl Lahir</span>
 						<span className="col-span-2 font-medium">
 							{data.birthPlace},{" "}
@@ -239,9 +248,13 @@ export default function ResponseDetailPage() {
 						<span className="text-slate-500">Jenis Kelamin</span>
 						<span className="col-span-2 font-medium">{data.gender || "-"}</span>
 						<span className="text-slate-500">Agama</span>
-						<span className="col-span-2 font-medium">{data.religion || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.religion || "-"}
+						</span>
 						<span className="text-slate-500">Tinggal Dengan</span>
-						<span className="col-span-2 font-medium">{data.livingWith || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.livingWith || "-"}
+						</span>
 						<span className="text-slate-500">Alamat Lengkap</span>
 						<span className="col-span-2 font-medium">
 							{data.addressStreet} No. {data.addressNo} RT {data.addressRt}/RW{" "}
@@ -258,28 +271,44 @@ export default function ResponseDetailPage() {
 					</h3>
 					<div className="grid grid-cols-3 gap-y-3 text-sm">
 						<span className="text-slate-500">Asal Sekolah</span>
-						<span className="col-span-2 font-medium">{data.schoolOrigin || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.schoolOrigin || "-"}
+						</span>
 						<span className="text-slate-500">Jurusan Sekolah</span>
-						<span className="col-span-2 font-medium">{data.schoolMajor || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.schoolMajor || "-"}
+						</span>
 						<span className="text-slate-500">Tahun Lulus</span>
-						<span className="col-span-2 font-medium">{data.graduationYear || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.graduationYear || "-"}
+						</span>
 						<span className="text-slate-500">Alamat Sekolah</span>
-						<span className="col-span-2 font-medium">{data.schoolAddress || "-"}</span>
-						
+						<span className="col-span-2 font-medium">
+							{data.schoolAddress || "-"}
+						</span>
+
 						<div className="col-span-3 border-t my-2" />
-						
+
 						<span className="text-slate-500">Program Diminati</span>
-						<span className="col-span-2 font-medium">{data.program || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.program || "-"}
+						</span>
 						<span className="text-slate-500">Peminatan</span>
-						<span className="col-span-2 font-medium">{data.subProgram || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.subProgram || "-"}
+						</span>
 						<span className="text-slate-500">Pilihan Kelas</span>
-						<span className="col-span-2 font-medium">{data.classType || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.classType || "-"}
+						</span>
 						<span className="text-slate-500">Angkatan</span>
 						<span className="col-span-2 font-medium">{data.cohort || "-"}</span>
 						<span className="text-slate-500">Batch</span>
 						<span className="col-span-2 font-medium">{data.batch || "-"}</span>
 						<span className="text-slate-500">Tahun Ajaran</span>
-						<span className="col-span-2 font-medium">{data.academicYear || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.academicYear || "-"}
+						</span>
 					</div>
 				</div>
 
@@ -290,17 +319,29 @@ export default function ResponseDetailPage() {
 					</h3>
 					<div className="grid grid-cols-3 gap-y-3 text-sm">
 						<span className="text-slate-500">Golongan Darah</span>
-						<span className="col-span-2 font-medium">{data.bloodType || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.bloodType || "-"}
+						</span>
 						<span className="text-slate-500">Tinggi Badan</span>
-						<span className="col-span-2 font-medium">{data.height ? `${data.height} cm` : "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.height ? `${data.height} cm` : "-"}
+						</span>
 						<span className="text-slate-500">Berat Badan</span>
-						<span className="col-span-2 font-medium">{data.weight ? `${data.weight} kg` : "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.weight ? `${data.weight} kg` : "-"}
+						</span>
 						<span className="text-slate-500">Ukuran Baju</span>
-						<span className="col-span-2 font-medium">{data.clothingSize || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.clothingSize || "-"}
+						</span>
 						<span className="text-slate-500">Riwayat Penyakit</span>
-						<span className="col-span-2 font-medium">{data.diseaseHistory || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.diseaseHistory || "-"}
+						</span>
 						<span className="text-slate-500">Penyakit Bawaan</span>
-						<span className="col-span-2 font-medium">{data.congenitalDisease || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.congenitalDisease || "-"}
+						</span>
 					</div>
 				</div>
 
@@ -311,11 +352,17 @@ export default function ResponseDetailPage() {
 					</h3>
 					<div className="grid grid-cols-3 gap-y-3 text-sm">
 						<span className="text-slate-500">Nama Ayah</span>
-						<span className="col-span-2 font-medium">{data.ayahName || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ayahName || "-"}
+						</span>
 						<span className="text-slate-500">Keadaan</span>
-						<span className="col-span-2 font-medium">{data.ayahStatus || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ayahStatus || "-"}
+						</span>
 						<span className="text-slate-500">Kewarganegaraan</span>
-						<span className="col-span-2 font-medium">{data.ayahNationality || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ayahNationality || "-"}
+						</span>
 						<span className="text-slate-500">Tempat, Tgl Lahir</span>
 						<span className="col-span-2 font-medium">
 							{data.ayahBirthPlace || "-"},{" "}
@@ -324,17 +371,29 @@ export default function ResponseDetailPage() {
 								: "-"}
 						</span>
 						<span className="text-slate-500">Agama</span>
-						<span className="col-span-2 font-medium">{data.ayahReligion || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ayahReligion || "-"}
+						</span>
 						<span className="text-slate-500">Pendidikan Terakhir</span>
-						<span className="col-span-2 font-medium">{data.ayahEducation || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ayahEducation || "-"}
+						</span>
 						<span className="text-slate-500">Pekerjaan</span>
-						<span className="col-span-2 font-medium">{data.ayahJob || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ayahJob || "-"}
+						</span>
 						<span className="text-slate-500">No. HP</span>
-						<span className="col-span-2 font-medium">{data.ayahPhone || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ayahPhone || "-"}
+						</span>
 						<span className="text-slate-500">Email</span>
-						<span className="col-span-2 font-medium">{data.ayahEmail || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ayahEmail || "-"}
+						</span>
 						<span className="text-slate-500">Alamat Lengkap</span>
-						<span className="col-span-2 font-medium">{data.ayahAddress || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ayahAddress || "-"}
+						</span>
 					</div>
 				</div>
 
@@ -345,11 +404,17 @@ export default function ResponseDetailPage() {
 					</h3>
 					<div className="grid grid-cols-3 gap-y-3 text-sm">
 						<span className="text-slate-500">Nama Ibu</span>
-						<span className="col-span-2 font-medium">{data.ibuName || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ibuName || "-"}
+						</span>
 						<span className="text-slate-500">Keadaan</span>
-						<span className="col-span-2 font-medium">{data.ibuStatus || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ibuStatus || "-"}
+						</span>
 						<span className="text-slate-500">Kewarganegaraan</span>
-						<span className="col-span-2 font-medium">{data.ibuNationality || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ibuNationality || "-"}
+						</span>
 						<span className="text-slate-500">Tempat, Tgl Lahir</span>
 						<span className="col-span-2 font-medium">
 							{data.ibuBirthPlace || "-"},{" "}
@@ -358,17 +423,27 @@ export default function ResponseDetailPage() {
 								: "-"}
 						</span>
 						<span className="text-slate-500">Agama</span>
-						<span className="col-span-2 font-medium">{data.ibuReligion || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ibuReligion || "-"}
+						</span>
 						<span className="text-slate-500">Pendidikan Terakhir</span>
-						<span className="col-span-2 font-medium">{data.ibuEducation || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ibuEducation || "-"}
+						</span>
 						<span className="text-slate-500">Pekerjaan</span>
 						<span className="col-span-2 font-medium">{data.ibuJob || "-"}</span>
 						<span className="text-slate-500">No. HP</span>
-						<span className="col-span-2 font-medium">{data.ibuPhone || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ibuPhone || "-"}
+						</span>
 						<span className="text-slate-500">Email</span>
-						<span className="col-span-2 font-medium">{data.ibuEmail || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ibuEmail || "-"}
+						</span>
 						<span className="text-slate-500">Alamat Lengkap</span>
-						<span className="col-span-2 font-medium">{data.ibuAddress || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.ibuAddress || "-"}
+						</span>
 					</div>
 				</div>
 
@@ -379,11 +454,17 @@ export default function ResponseDetailPage() {
 					</h3>
 					<div className="grid grid-cols-3 gap-y-3 text-sm">
 						<span className="text-slate-500">Nama Wali</span>
-						<span className="col-span-2 font-medium">{data.waliName || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.waliName || "-"}
+						</span>
 						<span className="text-slate-500">Hubungan</span>
-						<span className="col-span-2 font-medium">{data.waliGuardianRelation || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.waliGuardianRelation || "-"}
+						</span>
 						<span className="text-slate-500">Kewarganegaraan</span>
-						<span className="col-span-2 font-medium">{data.waliNationality || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.waliNationality || "-"}
+						</span>
 						<span className="text-slate-500">Tempat, Tgl Lahir</span>
 						<span className="col-span-2 font-medium">
 							{data.waliBirthPlace || "-"},{" "}
@@ -392,17 +473,29 @@ export default function ResponseDetailPage() {
 								: "-"}
 						</span>
 						<span className="text-slate-500">Agama</span>
-						<span className="col-span-2 font-medium">{data.waliReligion || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.waliReligion || "-"}
+						</span>
 						<span className="text-slate-500">Pendidikan Terakhir</span>
-						<span className="col-span-2 font-medium">{data.waliEducation || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.waliEducation || "-"}
+						</span>
 						<span className="text-slate-500">Pekerjaan</span>
-						<span className="col-span-2 font-medium">{data.waliJob || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.waliJob || "-"}
+						</span>
 						<span className="text-slate-500">No. HP</span>
-						<span className="col-span-2 font-medium">{data.waliPhone || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.waliPhone || "-"}
+						</span>
 						<span className="text-slate-500">Email</span>
-						<span className="col-span-2 font-medium">{data.waliEmail || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.waliEmail || "-"}
+						</span>
 						<span className="text-slate-500">Alamat Lengkap</span>
-						<span className="col-span-2 font-medium">{data.waliAddress || "-"}</span>
+						<span className="col-span-2 font-medium">
+							{data.waliAddress || "-"}
+						</span>
 					</div>
 				</div>
 			</div>
@@ -454,7 +547,8 @@ export default function ResponseDetailPage() {
 					</DialogHeader>
 					<div className="space-y-4 pt-4">
 						<p className="text-slate-600">
-							Apakah Anda yakin ingin menyetujui data ini? Mahasiswa baru akan otomatis ditambahkan ke sistem akademik.
+							Apakah Anda yakin ingin menyetujui data ini? Mahasiswa baru akan
+							otomatis ditambahkan ke sistem akademik.
 						</p>
 						<div className="flex justify-end gap-3 pt-4">
 							<Button variant="outline" onClick={() => setIsApproveOpen(false)}>

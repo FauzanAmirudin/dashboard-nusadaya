@@ -48,11 +48,6 @@ async function seed() {
 		{ username: "dosen", fullName: "Dosen Pengajar", role: "dosen" as const },
 		{ username: "pa", fullName: "Pembimbing Akademik", role: "pa" as const },
 		{ username: "magang", fullName: "Tim Magang", role: "magang" as const },
-		{
-			username: "evaluator",
-			fullName: "Tim Evaluator",
-			role: "evaluator" as const,
-		},
 	];
 
 	const insertedUsers = await db

@@ -33,6 +33,16 @@ export const pmbRoutes = new Elysia()
 					documentsComplete: body.documentsComplete,
 					dataInputted: body.dataInputted,
 					initialFollowUp: body.initialFollowUp,
+					docKtp: body.docKtp ?? false,
+					docKk: body.docKk ?? false,
+					docCv: body.docCv ?? false,
+					docIjazah: body.docIjazah ?? false,
+					docTranskrip: body.docTranskrip ?? false,
+					docPassportDepan: body.docPassportDepan ?? false,
+					docPassportVisa: body.docPassportVisa ?? false,
+					docSkbm: body.docSkbm ?? false,
+					docMcu: body.docMcu ?? false,
+					docSertifikasiBahasa: body.docSertifikasiBahasa ?? false,
 					notes: body.notes,
 					rekomendasi: body.rekomendasi,
 					timVisit: body.timVisit,
@@ -45,18 +55,28 @@ export const pmbRoutes = new Elysia()
 				})
 				.where(eq(pmbData.studentId, id));
 
-			// Auto-calculate status based on the 4 checkboxes
+			// Auto-calculate status based on all 14 checklist items
 			const checkboxes = [
 				body.formReceived,
 				body.documentsComplete,
 				body.dataInputted,
 				body.initialFollowUp,
+				body.docKtp,
+				body.docKk,
+				body.docCv,
+				body.docIjazah,
+				body.docTranskrip,
+				body.docPassportDepan,
+				body.docPassportVisa,
+				body.docSkbm,
+				body.docMcu,
+				body.docSertifikasiBahasa,
 			];
 			const checkedCount = checkboxes.filter(Boolean).length;
 
 			let newStatus: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
-			if (checkedCount === 4) newStatus = "AMAN";
-			else if (checkedCount >= 2) newStatus = "PERLU_PERHATIAN";
+			if (checkedCount === 14) newStatus = "AMAN";
+			else if (checkedCount >= 7) newStatus = "PERLU_PERHATIAN";
 
 			await db
 				.update(pmbData)
@@ -71,6 +91,16 @@ export const pmbRoutes = new Elysia()
 				documentsComplete: t.Boolean(),
 				dataInputted: t.Boolean(),
 				initialFollowUp: t.Boolean(),
+				docKtp: t.Optional(t.Boolean()),
+				docKk: t.Optional(t.Boolean()),
+				docCv: t.Optional(t.Boolean()),
+				docIjazah: t.Optional(t.Boolean()),
+				docTranskrip: t.Optional(t.Boolean()),
+				docPassportDepan: t.Optional(t.Boolean()),
+				docPassportVisa: t.Optional(t.Boolean()),
+				docSkbm: t.Optional(t.Boolean()),
+				docMcu: t.Optional(t.Boolean()),
+				docSertifikasiBahasa: t.Optional(t.Boolean()),
 				notes: t.Optional(t.String()),
 				rekomendasi: t.Optional(t.String()),
 				timVisit: t.Optional(t.String()),
@@ -116,16 +146,30 @@ export const pmbRoutes = new Elysia()
 		const currentPmb = await db.query.pmbData.findFirst({
 			where: eq(pmbData.studentId, id),
 		});
-		if (
-			!currentPmb?.formReceived ||
-			!currentPmb.documentsComplete ||
-			!currentPmb.dataInputted ||
-			!currentPmb.initialFollowUp
-		) {
+
+		const allChecks = [
+			currentPmb?.formReceived,
+			currentPmb?.documentsComplete,
+			currentPmb?.dataInputted,
+			currentPmb?.initialFollowUp,
+			currentPmb?.docKtp,
+			currentPmb?.docKk,
+			currentPmb?.docCv,
+			currentPmb?.docIjazah,
+			currentPmb?.docTranskrip,
+			currentPmb?.docPassportDepan,
+			currentPmb?.docPassportVisa,
+			currentPmb?.docSkbm,
+			currentPmb?.docMcu,
+			currentPmb?.docSertifikasiBahasa,
+		];
+
+		if (!allChecks.every(Boolean)) {
 			set.status = 400;
 			return {
 				success: false,
-				message: "Semua checklist harus selesai sebelum ACC.",
+				message:
+					"Semua checklist kelengkapan berkas utama (4) dan dokumen tambahan (10) harus selesai divalidasi sebelum melakukan ACC PMB.",
 			};
 		}
 
@@ -228,6 +272,16 @@ export const pmbRoutes = new Elysia()
 				"documents_complete",
 				"data_inputted",
 				"initial_follow_up",
+				"ktp",
+				"kk",
+				"cv",
+				"ijazah",
+				"transkrip",
+				"passport_depan",
+				"passport_visa",
+				"skbm",
+				"mcu",
+				"sertifikasi_bahasa",
 			];
 			if (!allowedKeys.includes(documentKey)) {
 				set.status = 400;
@@ -587,7 +641,9 @@ export const pmbRoutes = new Elysia()
 			// Hapus file invoice lama via FileService (berdasarkan panel+documentKey)
 			// invoiceFileUrl baru berformat "/files/{id}/download"
 			try {
-				const fileId = recipient.invoiceFileUrl.split("/files/")[1]?.split("/")[0];
+				const fileId = recipient.invoiceFileUrl
+					.split("/files/")[1]
+					?.split("/")[0];
 				if (fileId) {
 					await fileService.deleteFile(fileId);
 				}

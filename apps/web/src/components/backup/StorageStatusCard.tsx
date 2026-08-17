@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { HardDrive, Server, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/eden";
 
 interface StorageStatus {
@@ -44,7 +44,7 @@ export function StorageStatusCard() {
 		const k = 1024;
 		const sizes = ["B", "KB", "MB", "GB", "TB"];
 		const i = Math.floor(Math.log(bytes) / Math.log(k));
-		return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+		return Number.parseFloat((bytes / k ** i).toFixed(2)) + " " + sizes[i];
 	};
 
 	if (loading) {
@@ -64,7 +64,9 @@ export function StorageStatusCard() {
 						<HardDrive className="h-6 w-6 text-blue-700" />
 					</div>
 					<div>
-						<p className="text-sm font-medium text-slate-500 mb-1">Storage Aktif</p>
+						<p className="text-sm font-medium text-slate-500 mb-1">
+							Storage Aktif
+						</p>
 						<p className="text-2xl font-bold text-slate-900">
 							{status ? formatBytes(status.totalStorageSize) : "-"}
 						</p>
@@ -76,7 +78,9 @@ export function StorageStatusCard() {
 						<ShieldCheck className="h-6 w-6 text-indigo-700" />
 					</div>
 					<div>
-						<p className="text-sm font-medium text-slate-500 mb-1">Total Backup</p>
+						<p className="text-sm font-medium text-slate-500 mb-1">
+							Total Backup
+						</p>
 						<p className="text-2xl font-bold text-slate-900">
 							{status ? formatBytes(status.totalBackupSize) : "-"}
 						</p>
@@ -84,7 +88,9 @@ export function StorageStatusCard() {
 				</div>
 
 				<div className="p-4 bg-slate-50 rounded-lg border border-slate-200 flex flex-col justify-center">
-					<p className="text-sm font-medium text-slate-500 mb-1">Kebijakan Retensi</p>
+					<p className="text-sm font-medium text-slate-500 mb-1">
+						Kebijakan Retensi
+					</p>
 					<p className="text-sm font-semibold text-slate-800">
 						{status?.retentionPolicy ?? "-"}
 					</p>

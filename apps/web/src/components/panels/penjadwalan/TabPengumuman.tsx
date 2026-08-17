@@ -1,27 +1,61 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { api } from "@/lib/eden";
+import { Eye, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Plus, Trash2, Pencil, Search, Eye } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { TiptapEditor } from "@/components/ui/TiptapEditor";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table";
+import { api } from "@/lib/eden";
 
-export function TabPengumuman({ canEdit, user }: { canEdit: boolean, user: any }) {
+export function TabPengumuman({
+	canEdit,
+	user,
+}: {
+	canEdit: boolean;
+	user: any;
+}) {
 	const [announcements, setAnnouncements] = useState<any[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 
 	// Filters
 	const [cohortFilter, setCohortFilter] = useState("all");
 	const [searchQuery, setSearchQuery] = useState("");
-	
+
 	// Modal states
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -58,7 +92,9 @@ export function TabPengumuman({ canEdit, user }: { canEdit: boolean, user: any }
 	const handleDeleteConfirm = async () => {
 		if (!deleteId) return;
 		try {
-			const { error } = await (api as any).scheduling.announcements[deleteId.toString()].delete();
+			const { error } = await (api as any).scheduling.announcements[
+				deleteId.toString()
+			].delete();
 			if (!error) {
 				toast.success("Pengumuman berhasil dihapus");
 				fetchAnnouncements();
@@ -78,7 +114,12 @@ export function TabPengumuman({ canEdit, user }: { canEdit: boolean, user: any }
 				<CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 					<CardTitle>Pengumuman Akademik</CardTitle>
 					{canEdit && (
-						<Button onClick={() => { setSelectedAnnouncement(null); setIsModalOpen(true); }}>
+						<Button
+							onClick={() => {
+								setSelectedAnnouncement(null);
+								setIsModalOpen(true);
+							}}
+						>
 							<Plus className="w-4 h-4 mr-2" />
 							Buat Pengumuman
 						</Button>
@@ -96,7 +137,10 @@ export function TabPengumuman({ canEdit, user }: { canEdit: boolean, user: any }
 							/>
 						</div>
 						<div className="w-full sm:w-[200px]">
-							<Select value={cohortFilter} onValueChange={(val) => setCohortFilter(val || "all")}>
+							<Select
+								value={cohortFilter}
+								onValueChange={(val) => setCohortFilter(val || "all")}
+							>
 								<SelectTrigger>
 									<SelectValue placeholder="Semua Angkatan" />
 								</SelectTrigger>
@@ -104,7 +148,11 @@ export function TabPengumuman({ canEdit, user }: { canEdit: boolean, user: any }
 									<SelectItem value="all">Semua Angkatan</SelectItem>
 									{[...Array(5)].map((_, i) => {
 										const num = 13 + i;
-										return <SelectItem key={num} value={num.toString()}>Angkatan {num}</SelectItem>;
+										return (
+											<SelectItem key={num} value={num.toString()}>
+												Angkatan {num}
+											</SelectItem>
+										);
 									})}
 								</SelectContent>
 							</Select>
@@ -112,9 +160,13 @@ export function TabPengumuman({ canEdit, user }: { canEdit: boolean, user: any }
 					</div>
 
 					{isLoading ? (
-						<div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+						<div className="flex justify-center p-8">
+							<Loader2 className="w-6 h-6 animate-spin text-primary" />
+						</div>
 					) : announcements.length === 0 ? (
-						<div className="text-center py-8 text-slate-500">Tidak ada pengumuman ditemukan.</div>
+						<div className="text-center py-8 text-slate-500">
+							Tidak ada pengumuman ditemukan.
+						</div>
 					) : (
 						<div className="rounded-md border overflow-x-auto">
 							<Table>
@@ -130,20 +182,53 @@ export function TabPengumuman({ canEdit, user }: { canEdit: boolean, user: any }
 								<TableBody>
 									{announcements.map((a) => (
 										<TableRow key={a.id}>
-											<TableCell>{new Date(a.publishedAt).toLocaleDateString("id-ID", { day: 'numeric', month: 'long', year: 'numeric' })}</TableCell>
-											<TableCell className="font-medium max-w-[300px] truncate">{a.title}</TableCell>
-											<TableCell>{a.targetCohort ? `Angkatan ${a.targetCohort}` : "Semua Angkatan"}</TableCell>
-											<TableCell>{a.creator?.fullName || a.creator?.name || "-"}</TableCell>
+											<TableCell>
+												{new Date(a.publishedAt).toLocaleDateString("id-ID", {
+													day: "numeric",
+													month: "long",
+													year: "numeric",
+												})}
+											</TableCell>
+											<TableCell className="font-medium max-w-[300px] truncate">
+												{a.title}
+											</TableCell>
+											<TableCell>
+												{a.targetCohort
+													? `Angkatan ${a.targetCohort}`
+													: "Semua Angkatan"}
+											</TableCell>
+											<TableCell>
+												{a.creator?.fullName || a.creator?.name || "-"}
+											</TableCell>
 											<TableCell className="text-right space-x-2">
-												<Button variant="outline" size="sm" onClick={() => { setSelectedAnnouncement(a); setIsDetailModalOpen(true); }}>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => {
+														setSelectedAnnouncement(a);
+														setIsDetailModalOpen(true);
+													}}
+												>
 													<Eye className="w-4 h-4 mr-1" /> Baca
 												</Button>
 												{canEdit && (
 													<>
-														<Button variant="ghost" size="icon" onClick={() => { setSelectedAnnouncement(a); setIsModalOpen(true); }}>
+														<Button
+															variant="ghost"
+															size="icon"
+															onClick={() => {
+																setSelectedAnnouncement(a);
+																setIsModalOpen(true);
+															}}
+														>
 															<Pencil className="w-4 h-4 text-slate-600" />
 														</Button>
-														<Button variant="ghost" size="icon" className="text-red-600" onClick={() => setDeleteId(a.id)}>
+														<Button
+															variant="ghost"
+															size="icon"
+															className="text-red-600"
+															onClick={() => setDeleteId(a.id)}
+														>
 															<Trash2 className="w-4 h-4" />
 														</Button>
 													</>
@@ -159,26 +244,50 @@ export function TabPengumuman({ canEdit, user }: { canEdit: boolean, user: any }
 			</Card>
 
 			{isModalOpen && (
-				<AnnouncementDialog 
-					announcement={selectedAnnouncement} 
-					onClose={() => setIsModalOpen(false)} 
-					onSuccess={() => { setIsModalOpen(false); fetchAnnouncements(); }} 
+				<AnnouncementDialog
+					announcement={selectedAnnouncement}
+					onClose={() => setIsModalOpen(false)}
+					onSuccess={() => {
+						setIsModalOpen(false);
+						fetchAnnouncements();
+					}}
 				/>
 			)}
 
 			{isDetailModalOpen && selectedAnnouncement && (
-				<Dialog open={true} onOpenChange={(open) => !open && setIsDetailModalOpen(false)}>
+				<Dialog
+					open={true}
+					onOpenChange={(open) => !open && setIsDetailModalOpen(false)}
+				>
 					<DialogContent className="max-w-2xl">
 						<DialogHeader>
-							<DialogTitle className="text-xl">{selectedAnnouncement.title}</DialogTitle>
+							<DialogTitle className="text-xl">
+								{selectedAnnouncement.title}
+							</DialogTitle>
 							<div className="text-xs text-slate-500 mt-2 flex gap-4">
-								<span>Tanggal: {new Date(selectedAnnouncement.publishedAt).toLocaleDateString("id-ID", { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-								<span>Target: {selectedAnnouncement.targetCohort ? `Angkatan ${selectedAnnouncement.targetCohort}` : "Semua Angkatan"}</span>
+								<span>
+									Tanggal:{" "}
+									{new Date(
+										selectedAnnouncement.publishedAt,
+									).toLocaleDateString("id-ID", {
+										day: "numeric",
+										month: "long",
+										year: "numeric",
+									})}
+								</span>
+								<span>
+									Target:{" "}
+									{selectedAnnouncement.targetCohort
+										? `Angkatan ${selectedAnnouncement.targetCohort}`
+										: "Semua Angkatan"}
+								</span>
 							</div>
 						</DialogHeader>
-						<div 
+						<div
 							className="py-4 prose prose-sm max-w-none prose-slate"
-							dangerouslySetInnerHTML={{ __html: selectedAnnouncement.description }}
+							dangerouslySetInnerHTML={{
+								__html: selectedAnnouncement.description,
+							}}
 						/>
 						<DialogFooter>
 							<Button onClick={() => setIsDetailModalOpen(false)}>Tutup</Button>
@@ -187,15 +296,26 @@ export function TabPengumuman({ canEdit, user }: { canEdit: boolean, user: any }
 				</Dialog>
 			)}
 
-			<AlertDialog open={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)}>
+			<AlertDialog
+				open={deleteId !== null}
+				onOpenChange={(open) => !open && setDeleteId(null)}
+			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle>Hapus Pengumuman</AlertDialogTitle>
-						<AlertDialogDescription>Apakah Anda yakin ingin menghapus pengumuman ini? Tindakan ini tidak dapat dibatalkan.</AlertDialogDescription>
+						<AlertDialogDescription>
+							Apakah Anda yakin ingin menghapus pengumuman ini? Tindakan ini
+							tidak dapat dibatalkan.
+						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
 						<AlertDialogCancel>Batal</AlertDialogCancel>
-						<AlertDialogAction onClick={handleDeleteConfirm} className="bg-red-600">Hapus</AlertDialogAction>
+						<AlertDialogAction
+							onClick={handleDeleteConfirm}
+							className="bg-red-600"
+						>
+							Hapus
+						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
@@ -203,13 +323,22 @@ export function TabPengumuman({ canEdit, user }: { canEdit: boolean, user: any }
 	);
 }
 
-function AnnouncementDialog({ announcement, onClose, onSuccess }: { announcement: any, onClose: () => void, onSuccess: () => void }) {
+function AnnouncementDialog({
+	announcement,
+	onClose,
+	onSuccess,
+}: {
+	announcement: any;
+	onClose: () => void;
+	onSuccess: () => void;
+}) {
 	const [isSaving, setIsSaving] = useState(false);
 	const [form, setForm] = useState({
 		title: announcement?.title || "",
 		description: announcement?.description || "",
 		targetCohort: announcement?.targetCohort?.toString() || "all",
-		publishedAt: announcement?.publishedAt || new Date().toISOString().split('T')[0],
+		publishedAt:
+			announcement?.publishedAt || new Date().toISOString().split("T")[0],
 	});
 
 	const handleSave = async () => {
@@ -222,12 +351,17 @@ function AnnouncementDialog({ announcement, onClose, onSuccess }: { announcement
 		try {
 			const payload = {
 				...form,
-				targetCohort: form.targetCohort === "all" ? undefined : parseInt(form.targetCohort, 10),
+				targetCohort:
+					form.targetCohort === "all"
+						? undefined
+						: parseInt(form.targetCohort, 10),
 			};
 
 			let error;
 			if (announcement?.id) {
-				const res = await (api as any).scheduling.announcements[announcement.id.toString()].patch(payload);
+				const res = await (api as any).scheduling.announcements[
+					announcement.id.toString()
+				].patch(payload);
 				error = res.error;
 			} else {
 				const res = await (api as any).scheduling.announcements.post(payload);
@@ -235,10 +369,18 @@ function AnnouncementDialog({ announcement, onClose, onSuccess }: { announcement
 			}
 
 			if (!error) {
-				toast.success(announcement ? "Pengumuman diperbarui" : "Pengumuman berhasil dipublish");
+				toast.success(
+					announcement
+						? "Pengumuman diperbarui"
+						: "Pengumuman berhasil dipublish",
+				);
 				onSuccess();
 			} else {
-				toast.error(announcement ? "Gagal memperbarui pengumuman" : "Gagal mempublish pengumuman");
+				toast.error(
+					announcement
+						? "Gagal memperbarui pengumuman"
+						: "Gagal mempublish pengumuman",
+				);
 			}
 		} catch (err: any) {
 			toast.error(err?.message || "Terjadi kesalahan");
@@ -251,18 +393,29 @@ function AnnouncementDialog({ announcement, onClose, onSuccess }: { announcement
 		<Dialog open={true} onOpenChange={(open) => !open && onClose()}>
 			<DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
 				<DialogHeader>
-					<DialogTitle>{announcement ? "Edit Pengumuman" : "Buat Pengumuman Baru"}</DialogTitle>
+					<DialogTitle>
+						{announcement ? "Edit Pengumuman" : "Buat Pengumuman Baru"}
+					</DialogTitle>
 				</DialogHeader>
 				<div className="space-y-4 py-4">
 					<div className="space-y-2">
-						<Label>Judul Pengumuman <span className="text-red-500">*</span></Label>
-						<Input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Masukkan judul..." />
+						<Label>
+							Judul Pengumuman <span className="text-red-500">*</span>
+						</Label>
+						<Input
+							value={form.title}
+							onChange={(e) => setForm({ ...form, title: e.target.value })}
+							placeholder="Masukkan judul..."
+						/>
 					</div>
-					
+
 					<div className="grid grid-cols-2 gap-4">
 						<div className="space-y-2">
 							<Label>Target Angkatan</Label>
-							<Select value={form.targetCohort} onValueChange={v => setForm({...form, targetCohort: v})}>
+							<Select
+								value={form.targetCohort}
+								onValueChange={(v) => setForm({ ...form, targetCohort: v })}
+							>
 								<SelectTrigger>
 									<SelectValue placeholder="Pilih Target Angkatan" />
 								</SelectTrigger>
@@ -270,29 +423,47 @@ function AnnouncementDialog({ announcement, onClose, onSuccess }: { announcement
 									<SelectItem value="all">Semua Angkatan (Umum)</SelectItem>
 									{[...Array(5)].map((_, i) => {
 										const num = 13 + i;
-										return <SelectItem key={num} value={num.toString()}>Angkatan {num}</SelectItem>;
+										return (
+											<SelectItem key={num} value={num.toString()}>
+												Angkatan {num}
+											</SelectItem>
+										);
 									})}
 								</SelectContent>
 							</Select>
 						</div>
 						<div className="space-y-2">
-							<Label>Tanggal Publish <span className="text-red-500">*</span></Label>
-							<Input type="date" value={form.publishedAt} onChange={e => setForm({...form, publishedAt: e.target.value})} />
+							<Label>
+								Tanggal Publish <span className="text-red-500">*</span>
+							</Label>
+							<Input
+								type="date"
+								value={form.publishedAt}
+								onChange={(e) =>
+									setForm({ ...form, publishedAt: e.target.value })
+								}
+							/>
 						</div>
 					</div>
 
 					<div className="space-y-2">
-						<Label>Isi Pengumuman <span className="text-red-500">*</span></Label>
-						<TiptapEditor 
-							content={form.description} 
-							onChange={(html) => setForm({...form, description: html})} 
+						<Label>
+							Isi Pengumuman <span className="text-red-500">*</span>
+						</Label>
+						<TiptapEditor
+							content={form.description}
+							onChange={(html) => setForm({ ...form, description: html })}
 						/>
 					</div>
 				</div>
 				<DialogFooter>
-					<Button variant="outline" onClick={onClose} disabled={isSaving}>Batal</Button>
+					<Button variant="outline" onClick={onClose} disabled={isSaving}>
+						Batal
+					</Button>
 					<Button onClick={handleSave} disabled={isSaving}>
-						{isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+						{isSaving ? (
+							<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+						) : null}
 						{announcement ? "Simpan Perubahan" : "Publish Pengumuman"}
 					</Button>
 				</DialogFooter>

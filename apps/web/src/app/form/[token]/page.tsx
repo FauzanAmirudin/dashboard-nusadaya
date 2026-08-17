@@ -1,6 +1,12 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, Copy, Loader2, UploadCloud } from "lucide-react";
+import {
+	ArrowLeft,
+	CheckCircle2,
+	Copy,
+	Loader2,
+	UploadCloud,
+} from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -464,7 +470,9 @@ export default function FormMahasiswaPublic() {
 						Tim PMB kami akan segera menghubungi Anda.
 					</p>
 					<Button
-						onClick={() => (window.location.href = "https://nusadayaacademy.com")}
+						onClick={() =>
+							(window.location.href = "https://nusadayaacademy.com")
+						}
 						className="w-full bg-[#0517B0] hover:bg-blue-800"
 					>
 						Kembali ke Beranda
@@ -512,7 +520,11 @@ export default function FormMahasiswaPublic() {
 										: "border-slate-200 text-slate-400 bg-white"
 							}`}
 						>
-							{idx < currentTab ? <CheckCircle2 className="w-4 h-4" /> : idx + 1}
+							{idx < currentTab ? (
+								<CheckCircle2 className="w-4 h-4" />
+							) : (
+								idx + 1
+							)}
 						</div>
 						<span
 							className={`ml-2 text-sm whitespace-nowrap hidden sm:block ${
@@ -536,7 +548,6 @@ export default function FormMahasiswaPublic() {
 
 			{/* Form Container */}
 			<div className="bg-white p-6 md:p-8 rounded-xl border border-slate-200 shadow-sm">
-
 				{/* TAB 1: Keterangan Mahasiswa */}
 				{currentTab === 0 && (
 					<div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
@@ -954,7 +965,7 @@ export default function FormMahasiswaPublic() {
 								</Label>
 								<Input
 									type="number"
-									placeholder="13"
+									placeholder="2025"
 									value={formData.batch}
 									onChange={(e) => updateData("batch", e.target.value)}
 								/>

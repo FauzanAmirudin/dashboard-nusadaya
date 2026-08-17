@@ -1,7 +1,7 @@
+import { and, eq, inArray, not } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
 import { users } from "../db/schema";
-import { eq, inArray, and, not } from "drizzle-orm";
 
 export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 	.derive((context) => {
@@ -16,7 +16,7 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
-		
+
 		let whereClause;
 		if (user.role === "akademik") {
 			// Akademik can only see PA and Dosen
@@ -55,7 +55,10 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 
 			if (user.role === "akademik" && !["pa", "dosen"].includes(input.role)) {
 				set.status = 403;
-				return { success: false, message: "Akademik hanya dapat menambahkan role PA atau Dosen" };
+				return {
+					success: false,
+					message: "Akademik hanya dapat menambahkan role PA atau Dosen",
+				};
 			}
 
 			const existingUser = await db.query.users.findFirst({
@@ -67,7 +70,7 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 			}
 
 			const passwordHash = await Bun.password.hash(input.password);
-			
+
 			const [newUser] = await db
 				.insert(users)
 				.values({
@@ -118,16 +121,29 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 				return { success: false, message: "User not found" };
 			}
 
-			if (user.role === "akademik" && !["pa", "dosen"].includes(targetUser.role)) {
+			if (
+				user.role === "akademik" &&
+				!["pa", "dosen"].includes(targetUser.role)
+			) {
 				set.status = 403;
-				return { success: false, message: "Akademik hanya dapat mengubah data role PA atau Dosen" };
+				return {
+					success: false,
+					message: "Akademik hanya dapat mengubah data role PA atau Dosen",
+				};
 			}
 
 			const input = body as any;
-			
-			if (user.role === "akademik" && input.role && !["pa", "dosen"].includes(input.role)) {
+
+			if (
+				user.role === "akademik" &&
+				input.role &&
+				!["pa", "dosen"].includes(input.role)
+			) {
 				set.status = 403;
-				return { success: false, message: "Akademik tidak dapat mengubah role di luar PA atau Dosen" };
+				return {
+					success: false,
+					message: "Akademik tidak dapat mengubah role di luar PA atau Dosen",
+				};
 			}
 
 			if (input.username && input.username !== targetUser.username) {
@@ -141,12 +157,17 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 			}
 
 			const updateData: any = {
-				fullName: input.fullName !== undefined ? input.fullName : targetUser.fullName,
-				username: input.username !== undefined ? input.username : targetUser.username,
+				fullName:
+					input.fullName !== undefined ? input.fullName : targetUser.fullName,
+				username:
+					input.username !== undefined ? input.username : targetUser.username,
 				role: input.role !== undefined ? input.role : targetUser.role,
 				email: input.email !== undefined ? input.email : targetUser.email,
 				phone: input.phone !== undefined ? input.phone : targetUser.phone,
-				profilePhotoUrl: input.profilePhotoUrl !== undefined ? input.profilePhotoUrl : targetUser.profilePhotoUrl,
+				profilePhotoUrl:
+					input.profilePhotoUrl !== undefined
+						? input.profilePhotoUrl
+						: targetUser.profilePhotoUrl,
 				updatedAt: new Date(),
 			};
 
@@ -195,9 +216,15 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 			return { success: false, message: "User not found" };
 		}
 
-		if (user.role === "akademik" && !["pa", "dosen"].includes(targetUser.role)) {
+		if (
+			user.role === "akademik" &&
+			!["pa", "dosen"].includes(targetUser.role)
+		) {
 			set.status = 403;
-			return { success: false, message: "Akademik hanya dapat menghapus role PA atau Dosen" };
+			return {
+				success: false,
+				message: "Akademik hanya dapat menghapus role PA atau Dosen",
+			};
 		}
 
 		await db.delete(users).where(eq(users.id, id));

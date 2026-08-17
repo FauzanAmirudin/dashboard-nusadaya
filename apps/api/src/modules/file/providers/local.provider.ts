@@ -1,6 +1,10 @@
 import { mkdir, rename, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { StorageProvider, UploadOptions, UploadResult } from "./storage.interface";
+import type {
+	StorageProvider,
+	UploadOptions,
+	UploadResult,
+} from "./storage.interface";
 
 /**
  * LocalStorageProvider — implementasi StorageProvider untuk local disk.

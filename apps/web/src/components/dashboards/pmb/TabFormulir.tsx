@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getToken } from "@/lib/eden";
 import {
 	Table,
 	TableBody,
@@ -14,6 +13,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { getToken } from "@/lib/eden";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -23,14 +23,11 @@ export function TabFormulir() {
 
 	const fetchTokens = async () => {
 		try {
-			const res = await fetch(
-				`${API_URL}/pmb/form-tokens`,
-				{
-					headers: {
-						Authorization: `Bearer ${getToken()}`,
-					},
+			const res = await fetch(`${API_URL}/pmb/form-tokens`, {
+				headers: {
+					Authorization: `Bearer ${getToken()}`,
 				},
-			);
+			});
 			const data = await res.json();
 			if (data.success) {
 				setTokens(data.data);
@@ -48,15 +45,12 @@ export function TabFormulir() {
 
 	const generateToken = async () => {
 		try {
-			const res = await fetch(
-				`${API_URL}/pmb/form-tokens`,
-				{
-					method: "POST",
-					headers: {
-						Authorization: `Bearer ${getToken()}`,
-					},
+			const res = await fetch(`${API_URL}/pmb/form-tokens`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${getToken()}`,
 				},
-			);
+			});
 			const data = await res.json();
 			if (data.success) {
 				toast.success("Tautan formulir berhasil dibuat");

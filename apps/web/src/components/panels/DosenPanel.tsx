@@ -500,9 +500,11 @@ export function DosenPanel({ studentId, onUpdate }: DosenPanelProps) {
 					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 						<div>
 							<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
-								<span className="text-xl">📚</span> Dosen — Nilai & Kehadiran per MK
+								<span className="text-xl">📚</span> Dosen — Nilai & Kehadiran
+								per MK
 								<span className="ml-2 text-sm font-normal text-slate-500">
-									[{gradesData.filter((g) => g.isAcc).length}/{gradesData.length} ACC]
+									[{gradesData.filter((g) => g.isAcc).length}/
+									{gradesData.length} ACC]
 								</span>
 							</CardTitle>
 							<p className="text-sm text-slate-500 mt-1">

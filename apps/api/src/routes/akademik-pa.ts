@@ -15,7 +15,11 @@ export const akademikPaRouter = new Elysia({ prefix: "/akademik/pa" })
 		}
 
 		const paUsers = await db
-			.select({ id: users.id, fullName: users.fullName, username: users.username })
+			.select({
+				id: users.id,
+				fullName: users.fullName,
+				username: users.username,
+			})
 			.from(users)
 			.where(eq(users.role, "pa"))
 			.orderBy(asc(users.fullName));
@@ -29,7 +33,9 @@ export const akademikPaRouter = new Elysia({ prefix: "/akademik/pa" })
 			.where(eq(students.isArchived, false))
 			.groupBy(students.paId);
 
-		const countMap = new Map(studentCounts.map((r) => [r.paId, Number(r.count)]));
+		const countMap = new Map(
+			studentCounts.map((r) => [r.paId, Number(r.count)]),
+		);
 
 		const result = paUsers.map((u) => ({
 			id: u.id,

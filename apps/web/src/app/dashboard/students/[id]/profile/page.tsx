@@ -24,12 +24,7 @@ export default function StudentProfilePage() {
 	const [parents, setParents] = useState<any[]>([]);
 
 	useEffect(() => {
-		if (
-			user &&
-			user.role !== "superadmin" &&
-			user.role !== "pmb" &&
-			user.role !== "evaluator"
-		) {
+		if (user && user.role !== "superadmin" && user.role !== "pmb") {
 			toast.error("Anda tidak memiliki akses ke halaman ini.");
 			router.push("/dashboard");
 		}

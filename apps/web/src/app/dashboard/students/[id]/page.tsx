@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AkademikPanel } from "@/components/panels/AkademikPanel";
 import { CatatanPanel } from "@/components/panels/CatatanPanel";
@@ -20,10 +20,10 @@ import { DosenPanel } from "@/components/panels/DosenPanel";
 import { FinalDecisionPanel } from "@/components/panels/FinalDecisionPanel";
 import { FinancePanel } from "@/components/panels/FinancePanel";
 import { InternshipPanel } from "@/components/panels/InternshipPanel";
+import { KehadiranPanel } from "@/components/panels/KehadiranPanel";
 import { PaPanel } from "@/components/panels/PaPanel";
 import { PmbPanel } from "@/components/panels/PmbPanel";
 import { StatusPanel } from "@/components/panels/StatusPanel";
-import { KehadiranPanel } from "@/components/panels/KehadiranPanel";
 import { StudentProgress } from "@/components/StudentProgress";
 import {
 	AlertDialog,
@@ -157,21 +157,12 @@ const NAV_LINKS = [
 	{
 		id: "final-decision",
 		label: "Keputusan Final",
-		roles: ["superadmin", "evaluator"],
+		roles: ["superadmin"],
 	},
 	{
 		id: "catatan",
 		label: "Catatan Internal",
-		roles: [
-			"superadmin",
-			"akademik",
-			"pa",
-			"pmb",
-			"crm",
-			"finance",
-			"magang",
-			"evaluator",
-		],
+		roles: ["superadmin", "akademik", "pa", "pmb", "crm", "finance", "magang"],
 	},
 ];
 
@@ -202,15 +193,31 @@ function StudentDetailContent() {
 	const [mounted, setMounted] = useState(false);
 	const [updateTrigger, setUpdateTrigger] = useState(0);
 	const [isGenerating, setIsGenerating] = useState(false);
-	
+
 	const [isExporting, setIsExporting] = useState(false);
 	const [exportJobId, setExportJobId] = useState<string | null>(null);
 	const [exportStatus, setExportStatus] = useState<string | null>(null);
-	const [exportDownloadUrl, setExportDownloadUrl] = useState<string | null>(null);
+	const [exportDownloadUrl, setExportDownloadUrl] = useState<string | null>(
+		null,
+	);
 
 	useEffect(() => {
 		setMounted(true);
 	}, []);
+
+	const refetchStudent = useCallback(async () => {
+		if (!params.id) return;
+		try {
+			const { data: resData, error } =
+				await api.students[params.id as string].get();
+			if (!error && resData?.data) {
+				setData(resData.data as unknown as StudentDetail);
+				setUpdateTrigger((prev) => prev + 1);
+			}
+		} catch (err) {
+			console.error("Failed refetching student detail", err);
+		}
+	}, [params.id]);
 
 	useEffect(() => {
 		if (!hasHydrated) return;
@@ -219,17 +226,16 @@ function StudentDetailContent() {
 			return;
 		}
 
-		const fetchStudent = async () => {
-			const { data: resData, error } =
-				await api.students[params.id as string].get();
-			if (!error && resData?.data) {
-				setData(resData.data as unknown as StudentDetail);
-			}
-			setIsLoading(false);
-		};
+		setIsLoading(true);
+		refetchStudent().finally(() => setIsLoading(false));
 
-		fetchStudent();
-	}, [params.id, isAuthenticated, hasHydrated, router]);
+		// Real-time background sync every 15 seconds
+		const syncInterval = setInterval(() => {
+			refetchStudent();
+		}, 15000);
+
+		return () => clearInterval(syncInterval);
+	}, [params.id, isAuthenticated, hasHydrated, router, refetchStudent]);
 
 	const handleGenerateAccount = async () => {
 		if (!data?.student?.id) return;
@@ -258,12 +264,12 @@ function StudentDetailContent() {
 				if (res.data?.success) {
 					const status = res.data?.data?.status;
 					setExportStatus(status ?? null);
-					if (status === 'completed') {
+					if (status === "completed") {
 						setExportDownloadUrl(res.data?.data?.downloadUrl ?? null);
 						clearInterval(interval);
 						setIsExporting(false);
 						toast.success("File ZIP siap diunduh!");
-					} else if (status === 'failed') {
+					} else if (status === "failed") {
 						clearInterval(interval);
 						setIsExporting(false);
 						toast.error("Gagal membuat file ZIP.");
@@ -279,7 +285,7 @@ function StudentDetailContent() {
 	const handleExportFiles = async () => {
 		if (!data?.student?.id) return;
 		setIsExporting(true);
-		setExportStatus('queued');
+		setExportStatus("queued");
 		setExportJobId(null);
 		setExportDownloadUrl(null);
 		try {
@@ -335,15 +341,6 @@ function StudentDetailContent() {
 			toast.error("Terjadi kesalahan sistem saat menghapus data.");
 		} finally {
 			setIsDeleting(false);
-		}
-	};
-
-	const refetchStudent = async () => {
-		const { data: resData, error } =
-			await api.students[params.id as string].get();
-		if (!error && resData?.data) {
-			setData(resData.data as unknown as StudentDetail);
-			setUpdateTrigger((prev) => prev + 1);
 		}
 	};
 
@@ -512,15 +509,29 @@ function StudentDetailContent() {
 
 			{/* Top Actions */}
 			<div className="flex justify-between items-center mb-6">
-				<Link
-					href={
-						user?.role === "superadmin" ? "/dashboard/students" : "/dashboard"
-					}
-					className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm font-medium"
+				<button
+					type="button"
+					onClick={() => {
+						const from = searchParams.get("from");
+						if (from) {
+							router.push(from);
+							return;
+						}
+						if (context && context !== "all") {
+							router.push(`/dashboard/${context}`);
+							return;
+						}
+						if (typeof window !== "undefined" && window.history.length > 1) {
+							router.back();
+						} else {
+							router.push("/dashboard");
+						}
+					}}
+					className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm font-medium cursor-pointer"
 				>
 					<ArrowLeft className="w-4 h-4" />
-					Kembali ke Daftar
-				</Link>
+					Kembali
+				</button>
 				<div className="flex flex-wrap gap-3">
 					<Button
 						onClick={() =>
@@ -548,15 +559,15 @@ function StudentDetailContent() {
 						<Button
 							variant="outline"
 							onClick={
-								exportStatus === 'completed' && exportDownloadUrl
+								exportStatus === "completed" && exportDownloadUrl
 									? () => {
-											window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/exports/${exportJobId}/download`;
+											window.location.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/exports/${exportJobId}/download`;
 										}
 									: handleExportFiles
 							}
 							disabled={isExporting}
 							className={
-								exportStatus === 'completed'
+								exportStatus === "completed"
 									? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 hover:text-green-800"
 									: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:text-blue-800"
 							}
@@ -564,7 +575,7 @@ function StudentDetailContent() {
 							<Download className="w-4 h-4 mr-2" />
 							{isExporting
 								? "Menyiapkan ZIP..."
-								: exportStatus === 'completed'
+								: exportStatus === "completed"
 									? "Unduh ZIP"
 									: "Unduh Semua Berkas"}
 						</Button>
@@ -601,14 +612,14 @@ function StudentDetailContent() {
 								<>
 									{/* biome-ignore lint/performance/noImgElement: Dynamic avatar image */}
 									<img
-									src={
-										s.profilePhotoUrl.startsWith("http")
-											? s.profilePhotoUrl
-											: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}${s.profilePhotoUrl}`
-									}
-									alt={s.name}
-									className="w-full h-full object-cover rounded-full"
-								/>
+										src={
+											s.profilePhotoUrl.startsWith("http")
+												? s.profilePhotoUrl
+												: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}${s.profilePhotoUrl}`
+										}
+										alt={s.name}
+										className="w-full h-full object-cover rounded-full"
+									/>
 								</>
 							) : (
 								<AvatarFallback className="bg-gradient-to-br from-[#0517B0] to-blue-600 text-white text-xl font-bold">

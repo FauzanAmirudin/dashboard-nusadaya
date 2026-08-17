@@ -560,15 +560,20 @@ export default function AddStudentPage() {
 		<div className="pb-20 max-w-5xl mx-auto">
 			{/* Top Actions */}
 			<div className="flex justify-between items-center mb-6">
-				<Link
-					href={
-						user?.role === "superadmin" ? "/dashboard/students" : "/dashboard"
-					}
-					className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm font-medium"
+				<button
+					type="button"
+					onClick={() => {
+						if (typeof window !== "undefined" && window.history.length > 1) {
+							router.back();
+						} else {
+							router.push("/dashboard");
+						}
+					}}
+					className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm font-medium cursor-pointer"
 				>
 					<ArrowLeft className="w-4 h-4" />
 					Kembali
-				</Link>
+				</button>
 			</div>
 
 			{/* Form Header */}
@@ -1052,7 +1057,7 @@ export default function AddStudentPage() {
 								</Label>
 								<Input
 									type="number"
-									placeholder="13"
+									placeholder="2025"
 									value={formData.batch}
 									onChange={(e) => updateData("batch", e.target.value)}
 								/>

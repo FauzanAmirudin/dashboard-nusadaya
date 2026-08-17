@@ -71,25 +71,40 @@ export function PmbPanel({
 		fetchDocuments();
 	}, [studentId]);
 
-	const completedCount = [
+	const mainCompletedCount = [
 		pmbData?.formReceived,
 		pmbData?.documentsComplete,
 		pmbData?.dataInputted,
 		pmbData?.initialFollowUp,
 	].filter(Boolean).length;
 
+	const docsCompletedCount = [
+		pmbData?.docKtp,
+		pmbData?.docKk,
+		pmbData?.docCv,
+		pmbData?.docIjazah,
+		pmbData?.docTranskrip,
+		pmbData?.docPassportDepan,
+		pmbData?.docPassportVisa,
+		pmbData?.docSkbm,
+		pmbData?.docMcu,
+		pmbData?.docSertifikasiBahasa,
+	].filter(Boolean).length;
+
+	const totalCompleted14 = mainCompletedCount + docsCompletedCount;
+
 	let statusBadge = (
 		<Badge className="bg-rose-500/10 text-rose-500 border-rose-500/20">
 			🔴 TIDAK AMAN
 		</Badge>
 	);
-	if (completedCount === 4) {
+	if (totalCompleted14 === 14) {
 		statusBadge = (
 			<Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
 				🟢 AMAN
 			</Badge>
 		);
-	} else if (completedCount >= 2) {
+	} else if (totalCompleted14 >= 7) {
 		statusBadge = (
 			<Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20">
 				🟡 PERLU PERHATIAN
@@ -104,9 +119,11 @@ export function PmbPanel({
 				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 					<div>
 						<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
-							<span className="text-xl">👥</span> Panel PMB (Penerimaan Mahasiswa Baru)
-							<span className="ml-2 text-sm font-normal text-slate-500">
-								[{completedCount}/4]
+							<span className="text-xl">👥</span> Panel PMB (Penerimaan
+							Mahasiswa Baru)
+							<span className="ml-2 text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+								Progres: {totalCompleted14}/14 Checklist ({mainCompletedCount}/4
+								Utama • {docsCompletedCount}/10 Dokumen)
 							</span>
 						</CardTitle>
 						<p className="text-sm text-slate-500 mt-1">
@@ -146,7 +163,10 @@ export function PmbPanel({
 						className="flex items-center justify-center gap-2 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
 					>
 						<CheckCircle2 className="w-4 h-4 text-emerald-600" />
-						Dokumen Mahasiswa
+						<span>Dokumen Mahasiswa</span>
+						<span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-200">
+							{totalCompleted14}/14
+						</span>
 					</TabsTrigger>
 					<TabsTrigger
 						value="finance"

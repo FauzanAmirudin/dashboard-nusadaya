@@ -146,7 +146,8 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 							<div>
 								<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
-									<span className="text-xl">📞</span> CRM — Customer Relationship Management
+									<span className="text-xl">📞</span> CRM — Customer
+									Relationship Management
 									<span className="ml-2 text-sm font-normal text-slate-500">
 										[{completedCount}/{totalChecks}]
 									</span>

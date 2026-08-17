@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import {
 	BookMarked,
 	Edit2,
@@ -10,6 +9,7 @@ import {
 	Trash2,
 	X,
 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
 	AlertDialog,
@@ -106,8 +106,9 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 	const [isAdding, setIsAdding] = useState(false);
 
 	// Edit dialog
-	const [editingSession, setEditingSession] =
-		useState<HafalanSession | null>(null);
+	const [editingSession, setEditingSession] = useState<HafalanSession | null>(
+		null,
+	);
 	const [editForm, setEditForm] = useState(INITIAL_FORM);
 	const [isSavingEdit, setIsSavingEdit] = useState(false);
 
@@ -146,25 +147,22 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 		}
 		setIsAdding(true);
 		try {
-			const res = await fetch(
-				`${API_URL}/students/${studentId}/pa/hafalan`,
-				{
-					method: "POST",
-					headers: {
-						Authorization: `Bearer ${getToken()}`,
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify({
-						language: addForm.language,
-						languageCustom:
-							addForm.language === "lainnya"
-								? addForm.languageCustom.trim()
-								: null,
-						vocabCount: addForm.vocabCount,
-						sentenceCount: addForm.sentenceCount,
-					}),
+			const res = await fetch(`${API_URL}/students/${studentId}/pa/hafalan`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${getToken()}`,
+					"Content-Type": "application/json",
 				},
-			);
+				body: JSON.stringify({
+					language: addForm.language,
+					languageCustom:
+						addForm.language === "lainnya"
+							? addForm.languageCustom.trim()
+							: null,
+					vocabCount: addForm.vocabCount,
+					sentenceCount: addForm.sentenceCount,
+				}),
+			});
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			toast.success("Setoran hafalan ditambahkan");
 			setShowAddForm(false);
@@ -345,15 +343,9 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>
-												<SelectItem value="inggris">
-													🇬🇧 Inggris
-												</SelectItem>
-												<SelectItem value="mandarin">
-													🇨🇳 Mandarin
-												</SelectItem>
-												<SelectItem value="lainnya">
-													Lainnya...
-												</SelectItem>
+												<SelectItem value="inggris">🇬🇧 Inggris</SelectItem>
+												<SelectItem value="mandarin">🇨🇳 Mandarin</SelectItem>
+												<SelectItem value="lainnya">Lainnya...</SelectItem>
 											</SelectContent>
 										</Select>
 									</div>
@@ -387,10 +379,7 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 											onChange={(e) =>
 												setAddForm((p) => ({
 													...p,
-													vocabCount: Math.max(
-														0,
-														Number(e.target.value) || 0,
-													),
+													vocabCount: Math.max(0, Number(e.target.value) || 0),
 												}))
 											}
 											className="h-9 text-sm"
@@ -615,10 +604,7 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 										onChange={(e) =>
 											setEditForm((p) => ({
 												...p,
-												vocabCount: Math.max(
-													0,
-													Number(e.target.value) || 0,
-												),
+												vocabCount: Math.max(0, Number(e.target.value) || 0),
 											}))
 										}
 										className="h-9 text-sm"
@@ -635,10 +621,7 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 										onChange={(e) =>
 											setEditForm((p) => ({
 												...p,
-												sentenceCount: Math.max(
-													0,
-													Number(e.target.value) || 0,
-												),
+												sentenceCount: Math.max(0, Number(e.target.value) || 0),
 											}))
 										}
 										className="h-9 text-sm"
@@ -667,10 +650,7 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 			)}
 
 			{/* Delete Dialog */}
-			<AlertDialog
-				open={showDeleteDialog}
-				onOpenChange={setShowDeleteDialog}
-			>
+			<AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle>Hapus Setoran Hafalan?</AlertDialogTitle>

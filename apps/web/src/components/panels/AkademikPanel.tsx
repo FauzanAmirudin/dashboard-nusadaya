@@ -22,16 +22,16 @@ import {
 	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import {
 	Dialog,
 	DialogContent,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,10 +43,9 @@ import {
 } from "@/components/ui/tooltip";
 import { api, getToken } from "@/lib/eden";
 import { useAuthStore } from "@/store";
-import { TabAnggaranPraktik } from "./akademik/TabAnggaranPraktik";
-import { TabManajemenMahasiswa } from "./akademik/TabManajemenMahasiswa";
-import { AssessmentFormCard } from "./akademik/assessment/AssessmentFormCard";
 import type { AssessmentRecord } from "./akademik/assessment/AssessmentFormCard";
+import { AssessmentFormCard } from "./akademik/assessment/AssessmentFormCard";
+import { TabManajemenMahasiswa } from "./akademik/TabManajemenMahasiswa";
 
 interface DocFile {
 	id: number;
@@ -81,7 +80,9 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 	const [assessment, setAssessment] = useState<AssessmentRecord | null>(null);
 
 	const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
-	const [selectedDocToDelete, setSelectedDocToDelete] = useState<number | null>(null);
+	const [selectedDocToDelete, setSelectedDocToDelete] = useState<number | null>(
+		null,
+	);
 	const [isSavingNotes, setIsSavingNotes] = useState(false);
 
 	const fetchAssessment = async () => {
@@ -282,8 +283,6 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 		);
 	}
 
-
-
 	const handleAcc = async () => {
 		if (!isAkademikAdmin && !isSuperadmin) return;
 		try {
@@ -399,7 +398,8 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 						<div>
 							<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
-								<span className="text-xl">🎓</span> Akademik — Kepatuhan Akademik
+								<span className="text-xl">🎓</span> Akademik — Kepatuhan
+								Akademik
 								<span className="ml-2 text-sm font-normal text-slate-500">
 									[{completedCount}/{checklist.length}]
 								</span>
@@ -436,12 +436,7 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 					>
 						Penilaian Vokasi & Dosen
 					</button>
-					<button
-						onClick={() => setActiveTab("anggaran_praktik")}
-						className={`px-4 py-2 font-medium text-sm ${activeTab === "anggaran_praktik" ? "border-b-2 border-[#0517B0] text-[#0517B0]" : "text-slate-500 hover:text-slate-700"}`}
-					>
-						Anggaran Praktik
-					</button>
+
 					<button
 						onClick={() => setActiveTab("assessment")}
 						className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${activeTab === "assessment" ? "border-b-2 border-[#0517B0] text-[#0517B0]" : "text-slate-500 hover:text-slate-700"}`}
@@ -614,12 +609,6 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 					</div>
 				)}
 
-				{activeTab === "anggaran_praktik" && (
-					<div className="mt-2">
-						<TabAnggaranPraktik canEdit={canEdit} studentId={studentId} />
-					</div>
-				)}
-
 				{activeTab === "assessment" && (
 					<div className="mt-2 space-y-4">
 						<div className="flex items-center justify-between">
@@ -659,13 +648,13 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 							Apakah Anda yakin ingin menghapus dokumen ini?
 						</p>
 						<div className="flex justify-end gap-3 pt-4">
-							<Button variant="outline" onClick={() => setIsDeleteDocOpen(false)}>
+							<Button
+								variant="outline"
+								onClick={() => setIsDeleteDocOpen(false)}
+							>
 								Batal
 							</Button>
-							<Button
-								variant="destructive"
-								onClick={handleDeleteDocument}
-							>
+							<Button variant="destructive" onClick={handleDeleteDocument}>
 								Hapus Dokumen
 							</Button>
 						</div>

@@ -88,12 +88,22 @@ export const statusRoutes = new Elysia().get(
 		let totalCompleted = 0;
 		let totalIndicators = 0;
 
-		// 1. PMB
+		// 1. PMB (14 Items Total)
 		const pmbItems = [
 			{ prop: pmb?.formReceived, name: "Formulir Pendaftaran" },
 			{ prop: pmb?.documentsComplete, name: "Dokumen Lengkap" },
 			{ prop: pmb?.dataInputted, name: "Data Diinput" },
 			{ prop: pmb?.initialFollowUp, name: "Follow Up Awal" },
+			{ prop: pmb?.docKtp, name: "Dokumen KTP" },
+			{ prop: pmb?.docKk, name: "Dokumen KK" },
+			{ prop: pmb?.docCv, name: "Dokumen CV" },
+			{ prop: pmb?.docIjazah, name: "Dokumen Ijazah" },
+			{ prop: pmb?.docTranskrip, name: "Dokumen Transkrip" },
+			{ prop: pmb?.docPassportDepan, name: "Dokumen Paspor Depan" },
+			{ prop: pmb?.docPassportVisa, name: "Dokumen Paspor Visa" },
+			{ prop: pmb?.docSkbm, name: "Dokumen SKBM" },
+			{ prop: pmb?.docMcu, name: "Dokumen MCU" },
+			{ prop: pmb?.docSertifikasiBahasa, name: "Dokumen Sertifikasi Bahasa" },
 		];
 		const pmbCompleted = pmbItems.filter((i) => i.prop).length;
 		pmbItems
@@ -110,17 +120,17 @@ export const statusRoutes = new Elysia().get(
 			id: "pmb",
 			name: "PMB",
 			completed: pmbCompleted,
-			total: 4,
+			total: 14,
 			status:
-				pmbCompleted === 4
+				pmbCompleted === 14
 					? "AMAN"
-					: pmbCompleted >= 2
+					: pmbCompleted >= 7
 						? "PERLU_PERHATIAN"
 						: "TIDAK_AMAN",
 			isAcc: pmb?.isAcc,
 		});
 		totalCompleted += pmbCompleted;
-		totalIndicators += 4;
+		totalIndicators += 14;
 
 		// 2. CRM
 		const crmItems = [

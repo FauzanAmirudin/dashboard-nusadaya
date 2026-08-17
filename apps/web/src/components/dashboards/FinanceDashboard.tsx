@@ -2,18 +2,34 @@
 
 import {
 	CheckCircle,
+	CheckCircle2,
 	Clock,
+	CreditCard,
+	DollarSign,
 	Download,
-	LayoutDashboard,
+	Eye,
+	HelpCircle,
 	Search,
+	ShieldAlert,
+	ShieldCheck,
 	Users,
+	Wallet,
 	XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import {
 	Table,
 	TableBody,
@@ -22,86 +38,123 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { api } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 
-const STATUS_COLORS = {
-	AMAN: {
-		bg: "bg-emerald-500/10",
-		text: "text-emerald-500",
-		border: "border-emerald-500/20",
-	},
-	PERLU_PERHATIAN: {
-		bg: "bg-amber-500/10",
-		text: "text-amber-500",
-		border: "border-amber-500/20",
-	},
-	TIDAK_AMAN: {
-		bg: "bg-rose-500/10",
-		text: "text-rose-500",
-		border: "border-rose-500/20",
-	},
-};
-
-const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
-
-export function FinanceDashboard({ user }: any) {
+export function FinanceDashboard({ user, data: propData }: any) {
 	const router = useRouter();
-	const [data, setData] = useState<any[]>([]);
-	const [kpi, setKpi] = useState<any>({});
+	const [data, setData] = useState<any[]>(propData || []);
+	const [isLoading, setIsLoading] = useState(
+		!propData || propData.length === 0,
+	);
+	const [selectedCohort, setSelectedCohort] = useState<string>("all");
+	const [selectedStatus, setSelectedStatus] = useState<string>("all");
 	const [searchQuery, setSearchQuery] = useState("");
-	const [isLoading, setIsLoading] = useState(true);
+
+	// Cohort years starting from 2022
+	const cohortYears = useMemo(() => {
+		const currentYear = new Date().getFullYear();
+		return Array.from(
+			{ length: currentYear - 2022 + 2 },
+			(_, i) => currentYear + 1 - i,
+		);
+	}, []);
 
 	useEffect(() => {
 		const fetchData = async () => {
 			try {
-				const { data: resData, error } = await api.finance.dashboard.get();
-				if (!error && resData?.success) {
-					setData(resData.data?.students || []);
-					setKpi(
-						resData.data?.kpi || {
-							unpaidRegistrations: 0,
-							unpaidInstallments: 0,
-							unpaidArrears: 0,
-							pendingBudgetRequests: 0,
-							activeRumahJuang: 0,
-						},
-					);
+				const { data: resData, error } = await api.students.get();
+				if (!error && resData?.data) {
+					setData(resData.data);
 				}
 			} catch (err) {
-				console.error(err);
+				console.error("Failed fetching finance dashboard data", err);
 			} finally {
 				setIsLoading(false);
 			}
 		};
-		fetchData();
-		const interval = setInterval(fetchData, 15000);
-		return () => clearInterval(interval);
-	}, []);
+		if (!propData || propData.length === 0) {
+			fetchData();
+		} else {
+			setData(propData);
+			setIsLoading(false);
+		}
+	}, [propData]);
 
-	const totalStudents = kpi.totalStudents || 0;
-	const countAman = kpi.aman || 0;
-	const countPerhatian = kpi.perhatian || 0;
-	const countTidakAman = kpi.tidakAman || 0;
+	// Filter by cohort first for reactive KPI
+	const cohortData = useMemo(() => {
+		if (!data) return [];
+		if (selectedCohort === "all") return data;
+		return data.filter(
+			(s: any) => s.student?.cohort?.toString() === selectedCohort,
+		);
+	}, [data, selectedCohort]);
+
+	// KPI Metrics based on cohortData
+	const totalStudents = cohortData.length;
+	const countAcc = cohortData.filter((s: any) => s.finance?.isAcc).length;
+	const countAman = cohortData.filter(
+		(s: any) => s.finance?.status === "AMAN",
+	).length;
+	const countPerhatian = cohortData.filter(
+		(s: any) => s.finance?.status === "PERLU_PERHATIAN" || !s.finance?.status,
+	).length;
+	const countTidakAman = cohortData.filter(
+		(s: any) => s.finance?.status === "TIDAK_AMAN",
+	).length;
+	const countLunasRegistrasi = cohortData.filter(
+		(s: any) => s.finance?.registrasiStatus || s.finance?.registrationPaid,
+	).length;
+
+	// Filtered students for Table
+	const filteredData = useMemo(() => {
+		const q = searchQuery.toLowerCase();
+		return cohortData.filter((s: any) => {
+			const matchSearch =
+				!q ||
+				(s.student?.name || "").toLowerCase().includes(q) ||
+				(s.student?.nim || "").toLowerCase().includes(q) ||
+				(s.student?.program || "").toLowerCase().includes(q);
+
+			const financeStatus = s.finance?.status || "PERLU_PERHATIAN";
+			let matchStatus = true;
+			if (selectedStatus === "aman") matchStatus = financeStatus === "AMAN";
+			if (selectedStatus === "perhatian")
+				matchStatus = financeStatus === "PERLU_PERHATIAN";
+			if (selectedStatus === "tidak_aman")
+				matchStatus = financeStatus === "TIDAK_AMAN";
+			if (selectedStatus === "acc") matchStatus = Boolean(s.finance?.isAcc);
+
+			return matchSearch && matchStatus;
+		});
+	}, [cohortData, searchQuery, selectedStatus]);
 
 	const handleExport = () => {
-		const exportData = data.map((s: any) => ({
-			NIM: s.nim,
-			"Nama Mahasiswa": s.name,
-			"Pendaftaran Dibayar": s.registrationPaid ? "Lunas" : "Belum",
-			"Semester Dibayar": s.semesterPaid ? "Lunas" : "Belum",
-			"Cicilan Lunas": s.installmentCleared ? "Ya" : "Tidak",
-			"Tunggakan Lunas": s.arrearsCleared ? "Ya" : "Tidak",
-			"Fee Mitra": s.vMitra || 0,
-			"Fee Koord": s.vKoordinator || 0,
-			"Invoice PMB": s.hasInvoice ? "Ada" : "Belum",
+		const exportData = filteredData.map((s: any) => ({
+			NIM: s.student?.nim || "-",
+			"Nama Mahasiswa": s.student?.name || "-",
+			Angkatan: s.student?.cohort || "-",
+			Program: s.student?.program || "-",
+			"Status Registrasi": s.finance?.registrasiStatus ? "Lunas" : "Belum",
+			"Cicilan Mandiri / T1":
+				s.finance?.mandiriSemesterStatus || s.finance?.t1SemesterStatus
+					? "Lunas"
+					: "Belum",
+			"Biaya TOEIC": s.finance?.toeicStatus ? "Lunas" : "Belum",
+			"Biaya Paspor": s.finance?.pasporStatus ? "Lunas" : "Belum",
 			"Status Finance":
-				s.status === "AMAN"
+				s.finance?.status === "AMAN"
 					? "Aman"
-					: s.status === "TIDAK_AMAN"
+					: s.finance?.status === "TIDAK_AMAN"
 						? "Tidak Aman"
 						: "Perlu Perhatian",
-			"Disetujui Admin Finance": s.isAcc ? "Sudah ACC" : "Belum",
+			"Status ACC Finance": s.finance?.isAcc ? "Sudah ACC" : "Belum",
 		}));
 		exportToCSV(
 			exportData,
@@ -109,254 +162,463 @@ export function FinanceDashboard({ user }: any) {
 		);
 	};
 
-	const pieData = [
-		{ name: "Aman", value: countAman },
-		{ name: "Perlu Perhatian", value: countPerhatian },
-		{ name: "Tidak Aman", value: countTidakAman },
-	];
-
-	const filteredData =
-		data?.filter(
-			(s: any) =>
-				s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				s.nim.includes(searchQuery),
-		) || [];
-
-	const formatRupiah = (val: number) => {
-		return new Intl.NumberFormat("id-ID", {
-			style: "currency",
-			currency: "IDR",
-			minimumFractionDigits: 0,
-			maximumFractionDigits: 0,
-		}).format(val || 0);
+	const getFinanceChecklist = (fin: any) => {
+		const items = [
+			{
+				name: "Registrasi / Pendaftaran",
+				done: Boolean(fin?.registrasiStatus || fin?.registrationPaid),
+			},
+			{
+				name: "Cicilan Semester Mandiri / T1",
+				done: Boolean(
+					fin?.mandiriSemesterStatus ||
+						fin?.t1SemesterStatus ||
+						fin?.semesterPaid,
+				),
+			},
+			{ name: "Biaya TOEIC / Ujian", done: Boolean(fin?.toeicStatus) },
+			{ name: "Biaya Paspor & Dokumen", done: Boolean(fin?.pasporStatus) },
+		];
+		const completed = items.filter((i) => i.done).length;
+		return {
+			items,
+			completed,
+			total: items.length,
+			isDone: completed === items.length,
+		};
 	};
 
-	const renderProgressBadge = (s: any) => {
-		const items = [
-			s?.registrationPaid,
-			s?.semesterPaid,
-			s?.installmentCleared,
-			s?.arrearsCleared,
-		];
-		const completedCount = items.filter(Boolean).length;
-		const total = items.length;
-
+	if (isLoading) {
 		return (
-			<div className="flex items-center gap-2 justify-center">
-				<span className="text-sm font-medium text-slate-700">
-					{completedCount}/{total}
-				</span>
-				<div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
-					<div
-						className={`h-full rounded-full ${completedCount === total ? "bg-emerald-500" : "bg-blue-500"}`}
-						style={{
-							width: `${(completedCount / total) * 100}%`,
-						}}
-					/>
-				</div>
+			<div className="flex flex-col justify-center items-center h-80 gap-3 text-slate-500">
+				<p className="text-sm font-semibold">
+					Memuat data keuangan mahasiswa...
+				</p>
 			</div>
 		);
-	};
+	}
 
 	return (
-		<div className="space-y-6 pb-10">
-			{/* Header */}
-			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+		<div className="space-y-6 pb-12">
+			{/* Top Header */}
+			<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
 				<div>
-					<h1 className="text-2xl font-bold text-slate-900">
-						Dashboard Divisi Finance
-					</h1>
-					<p className="text-slate-500 mt-1 text-sm">
-						Selamat datang, {user?.username}. Berikut ringkasan data keuangan
-						mahasiswa.
-					</p>
+					<div className="flex items-center gap-3">
+						<div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100">
+							<Wallet className="w-6 h-6" />
+						</div>
+						<div>
+							<h1 className="text-2xl font-bold text-slate-900">
+								Dashboard Divisi Finance
+							</h1>
+							<p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+								Monitoring pembayaran registrasi, skema cicilan mandiri/T1,
+								TOEIC, paspor, dan validasi keuangan.
+							</p>
+						</div>
+					</div>
 				</div>
-				<div className="flex items-center gap-3">
-					<button
-						type="button"
-						onClick={handleExport}
-						className="flex items-center gap-2 bg-[#0517B0] hover:bg-blue-800 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
+
+				<div className="flex flex-wrap items-center gap-2.5">
+					<Select
+						value={selectedCohort}
+						onValueChange={(val) => setSelectedCohort(val || "all")}
 					>
-						<Download className="h-4 w-4" />
+						<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
+							<SelectValue placeholder="Filter Angkatan" />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="all">Semua Angkatan</SelectItem>
+							{cohortYears.map((year) => (
+								<SelectItem key={year} value={year.toString()}>
+									Angkatan {year}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={handleExport}
+						className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
+					>
+						<Download className="w-3.5 h-3.5" />
 						Export Data Finance
-					</button>
+					</Button>
 				</div>
 			</div>
 
-			{/* KPI Cards */}
-			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+			{/* KPI Summary Cards */}
+			<div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
 				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
-					<CardContent className="p-5 flex items-start gap-4">
-						<div className="mt-0.5 text-[#0517B0]">
-							<Users className="h-6 w-6" />
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-blue-50 text-[#0517B0] mt-0.5">
+							<Users className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">
+							<p className="text-slate-500 text-xs font-semibold">
 								Total Mahasiswa
 							</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{totalStudents}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
-					<CardContent className="p-5 flex items-start gap-4">
-						<div className="mt-0.5 text-emerald-500">
-							<CheckCircle className="h-6 w-6" />
+
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-emerald-600">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 mt-0.5">
+							<ShieldCheck className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">
-								Data Lengkap (Aman)
+							<p className="text-emerald-700 text-xs font-bold">ACC Finance</p>
+							<p className="text-2xl font-black text-emerald-900 mt-0.5">
+								{countAcc}
 							</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 mt-0.5">
+							<CheckCircle className="h-5 w-5" />
+						</div>
+						<div>
+							<p className="text-slate-500 text-xs font-semibold">
+								🟢 Status Aman
+							</p>
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countAman}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
+
 				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-amber-500">
-					<CardContent className="p-5 flex items-start gap-4">
-						<div className="mt-0.5 text-amber-500">
-							<Clock className="h-6 w-6" />
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-amber-50 text-amber-600 mt-0.5">
+							<Clock className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">
-								Proses (Perhatian)
+							<p className="text-slate-500 text-xs font-semibold">
+								🟡 Cicilan Berjalan
 							</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countPerhatian}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
+
 				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-rose-500">
-					<CardContent className="p-5 flex items-start gap-4">
-						<div className="mt-0.5 text-rose-500">
-							<XCircle className="h-6 w-6" />
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-rose-50 text-rose-600 mt-0.5">
+							<XCircle className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">
-								Kendala Finance
+							<p className="text-slate-500 text-xs font-semibold">
+								⛔ Menunggak / Kendala
 							</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countTidakAman}
+							</p>
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-indigo-600">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 mt-0.5">
+							<CreditCard className="h-5 w-5" />
+						</div>
+						<div>
+							<p className="text-slate-500 text-xs font-semibold">
+								Lunas Registrasi
+							</p>
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
+								{countLunasRegistrasi}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
 			</div>
 
-			<div className="flex flex-col gap-6">
-				{/* List Mahasiswa dengan Kendala */}
-				<Card className="bg-white border-slate-200 shadow-sm w-full">
-					<CardHeader className="border-b border-slate-200 pb-4 bg-slate-50/50">
-						<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-							<CardTitle className="text-slate-800 text-lg">
-								Tabel Kelengkapan Finance
-							</CardTitle>
-							<div className="relative w-full md:w-72">
-								<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-								<Input
-									placeholder="Cari NIM atau Nama Mahasiswa..."
-									className="pl-9 bg-white"
-									value={searchQuery}
-									onChange={(e) => setSearchQuery(e.target.value)}
-								/>
-							</div>
+			{/* Main Monitoring Table */}
+			<Card className="bg-white border-slate-200 shadow-sm overflow-hidden">
+				<CardHeader className="border-b border-slate-200 bg-slate-50/70 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+					<div>
+						<CardTitle className="text-slate-900 text-base font-bold flex items-center gap-2">
+							<Wallet className="w-4 h-4 text-[#0517B0]" />
+							Monitoring Status Keuangan Mahasiswa
+						</CardTitle>
+						<p className="text-xs text-slate-500 mt-0.5">
+							Menampilkan {filteredData.length} dari {totalStudents} mahasiswa
+							terdaftar.
+						</p>
+					</div>
+
+					{/* Search & Filter */}
+					<div className="flex flex-wrap items-center gap-2.5">
+						<div className="relative w-full sm:w-60">
+							<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+							<Input
+								placeholder="Cari NIM, Nama, Program..."
+								className="pl-9 h-9 text-xs bg-white border-slate-200"
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+							/>
 						</div>
-					</CardHeader>
-					<CardContent className="p-4 sm:p-6">
-						<div className="overflow-y-auto max-h-[300px] border border-slate-200 rounded-md">
-							<Table>
-								<TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
-									<TableRow className="border-slate-200 hover:bg-slate-50">
-										<TableHead className="text-slate-500 font-semibold py-3">
-											NIM
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3">
-											Nama Lengkap
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3">
-											Angkatan
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold text-center py-3">
-											Status Finance
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3 text-right">
-											Fee Mitra
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3 text-center">
-											Invoice PMB
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold text-right py-3 pr-4">
-											Aksi
-										</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{filteredData.map((s: any) => (
+
+						<Select
+							value={selectedStatus}
+							onValueChange={(val) => setSelectedStatus(val || "all")}
+						>
+							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Status Finance" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">Semua Status</SelectItem>
+								<SelectItem value="aman">🟢 Aman</SelectItem>
+								<SelectItem value="perhatian">🟡 Berproses</SelectItem>
+								<SelectItem value="tidak_aman">🔴 Menunggak</SelectItem>
+								<SelectItem value="acc">🛡️ Sudah ACC Finance</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
+				</CardHeader>
+
+				<CardContent className="p-0">
+					<div className="overflow-x-auto">
+						<Table>
+							<TableHeader className="bg-slate-50 sticky top-0 z-10">
+								<TableRow className="border-slate-200">
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs w-28">
+										NIM
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
+										Nama & Program
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
+										Checklist Bayar (4)
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+										Registrasi
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-32">
+										Mandiri / T1
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+										Status Finance
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+										ACC Finance
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-28">
+										Aksi
+									</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{filteredData.map((s: any) => {
+									const { items, completed, total, isDone } =
+										getFinanceChecklist(s.finance);
+									const status = s.finance?.status || "PERLU_PERHATIAN";
+
+									return (
 										<TableRow
-											key={s.id}
-											className="border-slate-200 hover:bg-blue-50/50 transition-colors"
+											key={s.student.id}
+											className="border-slate-100 hover:bg-blue-50/40 transition-colors"
 										>
-											<TableCell className="font-medium text-slate-700">
-												{s.nim}
-											</TableCell>
-											<TableCell className="text-slate-900 font-semibold">
-												{s.name}
+											<TableCell className="font-mono text-xs font-bold text-slate-700">
+												{s.student.nim || "-"}
 											</TableCell>
 											<TableCell>
-												<Badge
-													variant="outline"
-													className="text-slate-500 border-slate-200"
-												>
-													{s.cohort}
-												</Badge>
+												<div className="font-bold text-slate-900 text-sm">
+													{s.student.name}
+												</div>
+												<div className="flex items-center gap-2 mt-0.5">
+													<Badge
+														variant="outline"
+														className="text-[10px] px-1.5 py-0 text-slate-500 border-slate-200"
+													>
+														Angkatan {s.student.cohort}
+													</Badge>
+													<span className="text-xs text-slate-500 font-medium truncate max-w-[200px]">
+														{s.student.program || "-"}
+													</span>
+												</div>
 											</TableCell>
+
+											{/* Checklist Progress with Tooltip */}
 											<TableCell className="text-center">
-												{renderProgressBadge(s)}
+												<TooltipProvider>
+													<Tooltip>
+														<TooltipTrigger className="w-full">
+															<div className="flex flex-col items-center gap-1">
+																<div className="flex items-center justify-between w-full text-[11px] font-bold text-slate-700 px-1">
+																	<span>
+																		{completed}/{total} Item
+																	</span>
+																	<span
+																		className={
+																			isDone
+																				? "text-emerald-600"
+																				: "text-slate-500"
+																		}
+																	>
+																		{Math.round((completed / total) * 100)}%
+																	</span>
+																</div>
+																<div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
+																	<div
+																		className={`h-full rounded-full transition-all duration-300 ${
+																			isDone
+																				? "bg-emerald-500"
+																				: completed >= 2
+																					? "bg-blue-500"
+																					: "bg-amber-500"
+																		}`}
+																		style={{
+																			width: `${(completed / total) * 100}%`,
+																		}}
+																	/>
+																</div>
+															</div>
+														</TooltipTrigger>
+														<TooltipContent className="w-64 p-3.5 bg-slate-950 text-white rounded-xl shadow-2xl border border-slate-800 text-xs flex flex-col space-y-2 z-50">
+															<div className="flex items-center justify-between border-b border-slate-800 pb-1.5 w-full">
+																<span className="font-bold text-slate-100 text-xs">
+																	Checklist Keuangan:
+																</span>
+																<span className="text-[11px] font-mono text-emerald-400 font-bold">
+																	{completed}/{total} Lunas
+																</span>
+															</div>
+															<div className="flex flex-col space-y-1.5 w-full">
+																{items.map((it) => (
+																	<div
+																		key={it.name}
+																		className="flex items-center justify-between text-[11px] w-full"
+																	>
+																		<span className="text-slate-300 font-medium">
+																			{it.name}
+																		</span>
+																		<span
+																			className={`font-semibold ${
+																				it.done
+																					? "text-emerald-400"
+																					: "text-slate-500"
+																			}`}
+																		>
+																			{it.done ? "✓ Lunas" : "Belum"}
+																		</span>
+																	</div>
+																))}
+															</div>
+														</TooltipContent>
+													</Tooltip>
+												</TooltipProvider>
 											</TableCell>
-											<TableCell className="text-right text-slate-700 font-medium">
-												{formatRupiah(s.vMitra)}
-											</TableCell>
+
+											{/* Registrasi Paid */}
 											<TableCell className="text-center">
-												{s.hasInvoice ? (
-													<Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
-														Ada
+												{s.finance?.registrasiStatus ||
+												s.finance?.registrationPaid ? (
+													<span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
+														<CheckCircle2 className="w-3.5 h-3.5" />
+														Lunas
+													</span>
+												) : (
+													<span className="text-xs text-rose-500 font-medium">
+														Belum
+													</span>
+												)}
+											</TableCell>
+
+											{/* Mandiri/T1 */}
+											<TableCell className="text-center">
+												{s.finance?.mandiriSemesterStatus ||
+												s.finance?.t1SemesterStatus ||
+												s.finance?.semesterPaid ? (
+													<span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
+														<CheckCircle2 className="w-3.5 h-3.5" />
+														Lunas
+													</span>
+												) : (
+													<span className="text-xs text-amber-600 font-medium">
+														Berjalan
+													</span>
+												)}
+											</TableCell>
+
+											{/* Status Badge */}
+											<TableCell className="text-center">
+												{status === "AMAN" ? (
+													<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold">
+														🟢 Aman
+													</Badge>
+												) : status === "PERLU_PERHATIAN" ? (
+													<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs font-semibold">
+														🟡 Berproses
 													</Badge>
 												) : (
-													<Badge className="bg-slate-100 text-slate-500 border-slate-200">
-														Belum
+													<Badge className="bg-rose-50 text-rose-700 border-rose-200 text-xs font-semibold">
+														⛔ Menunggak
 													</Badge>
 												)}
 											</TableCell>
-											<TableCell className="text-right pr-4">
-												<button
-													type="button"
+
+											{/* ACC Finance */}
+											<TableCell className="text-center">
+												{s.finance?.isAcc ? (
+													<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-bold">
+														✓ ACC
+													</Badge>
+												) : (
+													<span className="text-xs text-slate-400 italic">
+														Belum
+													</span>
+												)}
+											</TableCell>
+
+											{/* Action */}
+											<TableCell className="text-right pr-6">
+												<Button
+													size="sm"
+													variant="outline"
 													onClick={() =>
-														router.push(
-															`/dashboard/students/${s.id}?context=finance`,
-														)
+														router.push(`/dashboard/students/${s.student.id}`)
 													}
-													className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
+													className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5"
 												>
+													<Eye className="w-3.5 h-3.5" />
 													Periksa
-												</button>
+												</Button>
 											</TableCell>
 										</TableRow>
-									))}
-								</TableBody>
-							</Table>
-							{filteredData.length === 0 && (
-								<div className="text-center py-8 text-slate-500">
-									Tidak ada data mahasiswa ditemukan.
-								</div>
-							)}
-						</div>
-					</CardContent>
-				</Card>
-			</div>
+									);
+								})}
+							</TableBody>
+						</Table>
+
+						{filteredData.length === 0 && (
+							<div className="text-center py-12 text-slate-500">
+								<HelpCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+								<p className="text-sm font-semibold">
+									Tidak ada data keuangan mahasiswa ditemukan.
+								</p>
+								<p className="text-xs text-slate-400 mt-0.5">
+									Coba ubah kata kunci pencarian atau filter status yang
+									digunakan.
+								</p>
+							</div>
+						)}
+					</div>
+				</CardContent>
+			</Card>
 		</div>
 	);
 }

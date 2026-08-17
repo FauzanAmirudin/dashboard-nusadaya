@@ -1,4 +1,4 @@
-import { readdir, rm, readFile } from "node:fs/promises";
+import { readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { backupRepository } from "../repository/backup.repository";
 
@@ -23,27 +23,47 @@ export class RetentionService {
 	 * Menelusuri seluruh subdirektori di backups/ dan membersihkannya.
 	 */
 	async runRetentionCleanup(backupBasePath: string): Promise<void> {
-		console.log(`[RetentionService] Memulai rotasi backup di: ${backupBasePath}`);
+		console.log(
+			`[RetentionService] Memulai rotasi backup di: ${backupBasePath}`,
+		);
 
 		try {
 			// 1. Bersihkan backups/full/
-			await this.cleanupBackupGroup(join(backupBasePath, "full"), RETENTION_RULES.full.maxKeep);
+			await this.cleanupBackupGroup(
+				join(backupBasePath, "full"),
+				RETENTION_RULES.full.maxKeep,
+			);
 
 			// 2. Bersihkan backups/students/*/
-			await this.cleanupGroupOfGroups(join(backupBasePath, "students"), RETENTION_RULES.student.maxKeep);
+			await this.cleanupGroupOfGroups(
+				join(backupBasePath, "students"),
+				RETENTION_RULES.student.maxKeep,
+			);
 
 			// 3. Bersihkan backups/cohorts/*/
-			await this.cleanupGroupOfGroups(join(backupBasePath, "cohorts"), RETENTION_RULES.cohort.maxKeep);
+			await this.cleanupGroupOfGroups(
+				join(backupBasePath, "cohorts"),
+				RETENTION_RULES.cohort.maxKeep,
+			);
 
 			// 4. Bersihkan backups/programs/*/
-			await this.cleanupGroupOfGroups(join(backupBasePath, "programs"), RETENTION_RULES.program.maxKeep);
+			await this.cleanupGroupOfGroups(
+				join(backupBasePath, "programs"),
+				RETENTION_RULES.program.maxKeep,
+			);
 
 			// 5. Bersihkan backups/specializations/*/
-			await this.cleanupGroupOfGroups(join(backupBasePath, "specializations"), RETENTION_RULES.specialization.maxKeep);
+			await this.cleanupGroupOfGroups(
+				join(backupBasePath, "specializations"),
+				RETENTION_RULES.specialization.maxKeep,
+			);
 
 			console.log("[RetentionService] Rotasi backup selesai ✅");
 		} catch (error) {
-			console.error("[RetentionService] Gagal menjalankan rotasi backup:", error);
+			console.error(
+				"[RetentionService] Gagal menjalankan rotasi backup:",
+				error,
+			);
 			// Kita hanya me-log error agar tidak mengganggu proses backup utama
 		}
 	}
@@ -51,7 +71,10 @@ export class RetentionService {
 	/**
 	 * Membersihkan grup dari grup (misal: backups/students/42/, backups/students/43/)
 	 */
-	private async cleanupGroupOfGroups(baseDir: string, maxKeep: number): Promise<void> {
+	private async cleanupGroupOfGroups(
+		baseDir: string,
+		maxKeep: number,
+	): Promise<void> {
 		try {
 			const subdirs = await readdir(baseDir, { withFileTypes: true });
 			for (const dirent of subdirs) {
@@ -63,7 +86,10 @@ export class RetentionService {
 		} catch (error) {
 			// Folder mungkin belum ada (ENOENT), abaikan
 			if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-				console.error(`[RetentionService] Gagal membaca direktori ${baseDir}:`, error);
+				console.error(
+					`[RetentionService] Gagal membaca direktori ${baseDir}:`,
+					error,
+				);
 			}
 		}
 	}
@@ -71,10 +97,13 @@ export class RetentionService {
 	/**
 	 * Membersihkan satu grup folder backup (misal: backups/full/)
 	 */
-	private async cleanupBackupGroup(groupDir: string, maxKeep: number): Promise<void> {
+	private async cleanupBackupGroup(
+		groupDir: string,
+		maxKeep: number,
+	): Promise<void> {
 		try {
 			const entries = await readdir(groupDir, { withFileTypes: true });
-			
+
 			// Kumpulkan hanya folder yang memiliki timestamp/valid format
 			const backupFolders = [];
 
@@ -98,15 +127,17 @@ export class RetentionService {
 			// Jika jumlah folder valid melebihi batas maxKeep, hapus sisanya
 			if (backupFolders.length > maxKeep) {
 				const foldersToDelete = backupFolders.slice(maxKeep);
-				
+
 				for (const folder of foldersToDelete) {
-					console.log(`[RetentionService] Menghapus backup lama: ${folder.path}`);
-					
+					console.log(
+						`[RetentionService] Menghapus backup lama: ${folder.path}`,
+					);
+
 					// Hapus dari database terlebih dahulu (silang validasi)
 					// Pastikan path yang dicari cocok dengan pola path di DB
-					// Path di DB biasanya absolute atau menyesuaikan struktur, 
+					// Path di DB biasanya absolute atau menyesuaikan struktur,
 					// jadi kita gunakan pencarian dengan LIKE atau mencocokkan id dari nama folder (8 digit terakhir).
-					
+
 					// Ambil jobId dari 8 karakter terakhir nama folder
 					const jobIdSuffix = folder.name.split("-").pop();
 					if (jobIdSuffix) {
@@ -119,7 +150,10 @@ export class RetentionService {
 			}
 		} catch (error) {
 			if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-				console.error(`[RetentionService] Gagal membersihkan ${groupDir}:`, error);
+				console.error(
+					`[RetentionService] Gagal membersihkan ${groupDir}:`,
+					error,
+				);
 			}
 		}
 	}
@@ -132,7 +166,7 @@ export class RetentionService {
 			const manifestPath = join(folderPath, "manifest.json");
 			const content = await readFile(manifestPath, "utf-8");
 			const manifest = JSON.parse(content);
-			
+
 			// Syarat minimal: bisa diparse JSON dan punya backup_id
 			if (manifest && manifest.backup_id) {
 				return true;

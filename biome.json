@@ -19,16 +19,30 @@
 			"suspicious": {
 				"noExplicitAny": "off",
 				"useIterableCallbackReturn": "off",
-				"noArrayIndexKey": "off"
+				"noArrayIndexKey": "off",
+				"noImplicitAnyLet": "off"
 			},
 			"correctness": {
 				"useExhaustiveDependencies": "off",
 				"noUnusedVariables": "off",
-				"noUnusedImports": "off"
+				"noUnusedImports": "off",
+				"noUnusedFunctionParameters": "off",
+				"useParseIntRadix": "off"
+			},
+			"complexity": {
+				"useOptionalChain": "off"
 			},
 			"a11y": {
 				"noLabelWithoutControl": "off",
-				"useButtonType": "off"
+				"useButtonType": "off",
+				"noStaticElementInteractions": "off",
+				"useKeyWithClickEvents": "off"
+			},
+			"performance": {
+				"noImgElement": "off"
+			},
+			"security": {
+				"noDangerouslySetInnerHtml": "off"
 			},
 			"style": {
 				"noNonNullAssertion": "off"

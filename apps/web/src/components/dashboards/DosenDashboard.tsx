@@ -1,21 +1,34 @@
 "use client";
 
 import {
-	AlertTriangle,
-	ArrowRight,
 	BookOpen,
+	CheckCircle,
+	CheckCircle2,
 	Clock,
-	LayoutDashboard,
+	Eye,
+	GraduationCap,
+	HelpCircle,
 	Loader2,
 	Search,
+	ShieldAlert,
+	ShieldCheck,
 	Users,
+	XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import {
 	Table,
 	TableBody,
@@ -26,8 +39,6 @@ import {
 } from "@/components/ui/table";
 import { api } from "@/lib/eden";
 
-const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
-
 interface DosenDashboardProps {
 	user: { id: number; username: string; role: string; fullName?: string };
 }
@@ -37,6 +48,7 @@ interface CourseGradeRow {
 	studentId: number;
 	studentName: string;
 	studentNim: string;
+	studentCohort?: number;
 	courseCode: string;
 	courseName: string;
 	grade: string | null;
@@ -60,6 +72,17 @@ export function DosenDashboard({ user }: DosenDashboardProps) {
 	const [data, setData] = useState<DashboardData | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [searchQuery, setSearchQuery] = useState("");
+	const [selectedCohort, setSelectedCohort] = useState<string>("all");
+	const [selectedStatus, setSelectedStatus] = useState<string>("all");
+
+	// Cohort years starting from 2022
+	const cohortYears = useMemo(() => {
+		const currentYear = new Date().getFullYear();
+		return Array.from(
+			{ length: currentYear - 2022 + 2 },
+			(_, i) => currentYear + 1 - i,
+		);
+	}, []);
 
 	useEffect(() => {
 		const fetchDashboard = async () => {
@@ -73,280 +96,364 @@ export function DosenDashboard({ user }: DosenDashboardProps) {
 		fetchDashboard();
 	}, []);
 
+	// Filter by cohort for reactive stats
+	const cohortGrades = useMemo(() => {
+		if (!data?.courseGrades) return [];
+		if (selectedCohort === "all") return data.courseGrades;
+		return data.courseGrades.filter(
+			(g) => g.studentCohort?.toString() === selectedCohort,
+		);
+	}, [data, selectedCohort]);
+
+	// KPI Metrics based on cohortGrades
+	const totalGrades = cohortGrades.length;
+	const countAcc = cohortGrades.filter((g) => g.isAcc).length;
+	const countPending = cohortGrades.filter((g) => !g.isAcc).length;
+	const countLowAttendance = cohortGrades.filter(
+		(g) => (g.attendanceRate || 0) < 80,
+	).length;
+	const totalCourses = data?.kpi?.totalCourses || 0;
+
+	// Filtered for table
+	const filteredGrades = useMemo(() => {
+		const q = searchQuery.toLowerCase();
+		return cohortGrades.filter((g) => {
+			const matchSearch =
+				!q ||
+				g.studentName.toLowerCase().includes(q) ||
+				g.studentNim.toLowerCase().includes(q) ||
+				g.courseName.toLowerCase().includes(q) ||
+				g.courseCode.toLowerCase().includes(q);
+
+			let matchStatus = true;
+			if (selectedStatus === "aman") matchStatus = g.status === "AMAN";
+			if (selectedStatus === "perhatian")
+				matchStatus = g.status === "PERLU_PERHATIAN";
+			if (selectedStatus === "tidak_aman")
+				matchStatus = g.status === "TIDAK_AMAN";
+			if (selectedStatus === "acc") matchStatus = g.isAcc;
+
+			return matchSearch && matchStatus;
+		});
+	}, [cohortGrades, searchQuery, selectedStatus]);
+
 	if (isLoading) {
 		return (
-			<div className="flex flex-col justify-center items-center h-64 text-slate-400 gap-4">
-				<Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-				Memuat dashboard dosen...
+			<div className="flex flex-col justify-center items-center h-80 gap-3 text-slate-500">
+				<Loader2 className="w-8 h-8 animate-spin text-[#0517B0]" />
+				<p className="text-sm font-semibold">Memuat dashboard dosen...</p>
 			</div>
 		);
 	}
-
-	if (!data) {
-		return (
-			<div className="p-8 text-center text-rose-500">
-				Gagal memuat data dashboard.
-			</div>
-		);
-	}
-
-	const filteredGrades = data.courseGrades.filter(
-		(g) =>
-			g.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			g.studentNim.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			g.courseName.toLowerCase().includes(searchQuery.toLowerCase()),
-	);
-
-	const studentsMap = new Map<
-		number,
-		{
-			id: number;
-			name: string;
-			nim: string;
-			courses: CourseGradeRow[];
-			status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN";
-		}
-	>();
-
-	filteredGrades.forEach((g) => {
-		if (!studentsMap.has(g.studentId)) {
-			studentsMap.set(g.studentId, {
-				id: g.studentId,
-				name: g.studentName,
-				nim: g.studentNim,
-				courses: [],
-				status: "AMAN",
-			});
-		}
-		const student = studentsMap.get(g.studentId)!;
-		student.courses.push(g);
-	});
-
-	Array.from(studentsMap.values()).forEach((student) => {
-		let badGrades = 0;
-		let attentionGrades = 0;
-		student.courses.forEach((c) => {
-			if (c.status === "TIDAK_AMAN") badGrades++;
-			if (c.status === "PERLU_PERHATIAN") attentionGrades++;
-		});
-
-		if (badGrades > 0) student.status = "TIDAK_AMAN";
-		else if (attentionGrades > 0) student.status = "PERLU_PERHATIAN";
-		else student.status = "AMAN";
-	});
-
-	const groupedStudents = Array.from(studentsMap.values());
-
-	const countAman = groupedStudents.filter((s) => s.status === "AMAN").length;
-	const countPerhatian = groupedStudents.filter(
-		(s) => s.status === "PERLU_PERHATIAN",
-	).length;
-	const countTidakAman = groupedStudents.filter(
-		(s) => s.status === "TIDAK_AMAN",
-	).length;
-
-	const pieData = [
-		{ name: "Aman", value: countAman },
-		{ name: "Perlu Perhatian", value: countPerhatian },
-		{ name: "Tidak Aman", value: countTidakAman },
-	];
-
-	const renderStatusBadge = (status: string) => {
-		if (status === "AMAN") {
-			return (
-				<Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/10">
-					🟢 Aman
-				</Badge>
-			);
-		}
-		if (status === "TIDAK_AMAN") {
-			return (
-				<Badge className="bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/10">
-					🔴 Tdk Aman
-				</Badge>
-			);
-		}
-		return (
-			<Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/10">
-				🟡 Perhatian
-			</Badge>
-		);
-	};
 
 	return (
-		<div className="space-y-6 pb-10">
-			{/* Header */}
-			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+		<div className="space-y-6 pb-12">
+			{/* Top Header */}
+			<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
 				<div>
-					<h1 className="text-2xl font-bold text-slate-900">Dashboard Dosen</h1>
-					<p className="text-slate-500 mt-1 text-sm">
-						Selamat datang, {user?.fullName || user?.username}. Berikut
-						ringkasan mata kuliah yang Anda ampu.
-					</p>
+					<div className="flex items-center gap-3">
+						<div className="p-2.5 bg-orange-50 text-orange-600 rounded-lg border border-orange-100">
+							<BookOpen className="w-6 h-6" />
+						</div>
+						<div>
+							<h1 className="text-2xl font-bold text-slate-900">
+								Dashboard Dosen Pengampu
+							</h1>
+							<p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+								Selamat datang, {user?.fullName || user?.username}. Monitoring
+								kelas, rekap nilai UTS/UAS, dan presensi.
+							</p>
+						</div>
+					</div>
+				</div>
+
+				<div className="flex flex-wrap items-center gap-2.5">
+					<Select
+						value={selectedCohort}
+						onValueChange={(val) => setSelectedCohort(val || "all")}
+					>
+						<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
+							<SelectValue placeholder="Filter Angkatan" />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="all">Semua Angkatan</SelectItem>
+							{cohortYears.map((year) => (
+								<SelectItem key={year} value={year.toString()}>
+									Angkatan {year}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+
+					<Button
+						onClick={() => router.push("/dashboard/mata-kuliah")}
+						className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs gap-1.5 h-9 font-bold shadow-sm"
+					>
+						<BookOpen className="w-3.5 h-3.5" />
+						Kelola Mata Kuliah
+					</Button>
 				</div>
 			</div>
 
-			{/* KPI Cards */}
-			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+			{/* KPI Summary Cards */}
+			<div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
 				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
-					<CardContent className="p-5 flex items-start gap-4">
-						<div className="mt-0.5 text-[#0517B0]">
-							<BookOpen className="h-6 w-6" />
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-blue-50 text-[#0517B0] mt-0.5">
+							<BookOpen className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">
-								Total Kelas / MK
+							<p className="text-slate-500 text-xs font-semibold">
+								Total Kelas Diampu
 							</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">
-								{data.kpi.totalCourses}
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
+								{totalCourses}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
 
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-indigo-500">
-					<CardContent className="p-5 flex items-start gap-4">
-						<div className="mt-0.5 text-indigo-500">
-							<Users className="h-6 w-6" />
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-sky-500">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-sky-50 text-sky-600 mt-0.5">
+							<Users className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">
-								Total Mahasiswa
+							<p className="text-slate-500 text-xs font-semibold">
+								Total Nilai Mahasiswa
 							</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">
-								{data.kpi.totalStudents}
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
+								{totalGrades}
+							</p>
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-emerald-600">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 mt-0.5">
+							<ShieldCheck className="h-5 w-5" />
+						</div>
+						<div>
+							<p className="text-emerald-700 text-xs font-bold">
+								Sudah di-ACC Dosen
+							</p>
+							<p className="text-2xl font-black text-emerald-900 mt-0.5">
+								{countAcc}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
 
 				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-amber-500">
-					<CardContent className="p-5 flex items-start gap-4">
-						<div className="mt-0.5 text-amber-500">
-							<Clock className="h-6 w-6" />
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-amber-50 text-amber-600 mt-0.5">
+							<Clock className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">Menunggu ACC</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">
-								{data.kpi.pendingAcc}
+							<p className="text-slate-500 text-xs font-semibold">
+								🟡 Menunggu ACC
+							</p>
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
+								{countPending}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
 
 				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-rose-500">
-					<CardContent className="p-5 flex items-start gap-4">
-						<div className="mt-0.5 text-rose-500">
-							<AlertTriangle className="h-6 w-6" />
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-rose-50 text-rose-600 mt-0.5">
+							<XCircle className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-sm font-medium">
-								Kehadiran &lt; 70%
+							<p className="text-slate-500 text-xs font-semibold">
+								⛔ Absen &lt; 80%
 							</p>
-							<p className="text-3xl font-bold text-slate-900 mt-1">
-								{data.kpi.lowAttendance}
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
+								{countLowAttendance}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
 			</div>
 
-			<div className="flex flex-col gap-6">
-				{/* Data Table Section */}
-				<Card className="bg-white border-slate-200 shadow-sm w-full">
-					<CardHeader className="border-b border-slate-100 pb-4">
-						<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-							<CardTitle className="text-slate-800">
-								Tabel Status Mahasiswa
-							</CardTitle>
-							<div className="relative w-full md:w-72">
-								<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-								<Input
-									placeholder="Cari NIM atau Nama Mahasiswa..."
-									className="pl-9 bg-white border-slate-200 text-slate-900"
-									value={searchQuery}
-									onChange={(e) => setSearchQuery(e.target.value)}
-								/>
-							</div>
+			{/* Master Table */}
+			<Card className="bg-white border-slate-200 shadow-sm overflow-hidden">
+				<CardHeader className="border-b border-slate-200 bg-slate-50/70 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+					<div>
+						<CardTitle className="text-slate-900 text-base font-bold flex items-center gap-2">
+							<GraduationCap className="w-4 h-4 text-[#0517B0]" />
+							Daftar Nilai & Kehadiran Mahasiswa
+						</CardTitle>
+						<p className="text-xs text-slate-500 mt-0.5">
+							Menampilkan {filteredGrades.length} dari {totalGrades} entri nilai
+							mahasiswa.
+						</p>
+					</div>
+
+					{/* Search & Filter */}
+					<div className="flex flex-wrap items-center gap-2.5">
+						<div className="relative w-full sm:w-60">
+							<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+							<Input
+								placeholder="Cari Mahasiswa / MK..."
+								className="pl-9 h-9 text-xs bg-white border-slate-200"
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+							/>
 						</div>
-					</CardHeader>
-					<CardContent className="p-0">
-						<div className="overflow-x-auto max-h-[400px]">
-							<Table>
-								<TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-sm">
-									<TableRow className="border-slate-200 hover:bg-slate-50">
-										<TableHead className="text-slate-500 font-semibold py-3 pl-6">
-											NIM
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3">
-											Nama Mahasiswa
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3 text-center">
-											Jumlah MK Diambil
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold py-3 text-center">
-											Status Keseluruhan
-										</TableHead>
-										<TableHead className="text-slate-500 font-semibold text-right py-3 pr-6">
-											Aksi
-										</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{groupedStudents.slice(0, 5).map((s) => (
-										<TableRow
-											key={s.id}
-											className="border-slate-200 hover:bg-blue-50/50 transition-colors"
-										>
-											<TableCell className="pl-6 font-medium text-slate-700">
-												{s.nim}
-											</TableCell>
-											<TableCell>
-												<div className="text-slate-900 font-semibold">
-													{s.name}
-												</div>
-											</TableCell>
-											<TableCell className="text-center">
-												<span className="font-bold text-slate-700">
-													{s.courses.length} Mata Kuliah
-												</span>
-											</TableCell>
-											<TableCell className="text-center">
-												{renderStatusBadge(s.status)}
-											</TableCell>
-											<TableCell className="text-right pr-6">
-												<button
-													type="button"
-													className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
-													onClick={() =>
-														router.push(
-															`/dashboard/students/${s.id}?context=dosen`,
-														)
-													}
-												>
-													Periksa
-												</button>
-											</TableCell>
-										</TableRow>
-									))}
-									{groupedStudents.length === 0 && (
-										<TableRow>
-											<TableCell
-												colSpan={5}
-												className="h-32 text-center text-slate-500"
+
+						<Select
+							value={selectedStatus}
+							onValueChange={(val) => setSelectedStatus(val || "all")}
+						>
+							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Status Nilai" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">Semua Status</SelectItem>
+								<SelectItem value="aman">🟢 Aman</SelectItem>
+								<SelectItem value="perhatian">🟡 Perlu Perhatian</SelectItem>
+								<SelectItem value="tidak_aman">🔴 Tidak Aman</SelectItem>
+								<SelectItem value="acc">🛡️ Sudah ACC</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
+				</CardHeader>
+
+				<CardContent className="p-0">
+					<div className="overflow-x-auto">
+						<Table>
+							<TableHeader className="bg-slate-50 sticky top-0 z-10">
+								<TableRow className="border-slate-200">
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs w-28">
+										NIM
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
+										Nama Mahasiswa
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
+										Mata Kuliah
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+										Kehadiran
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-24">
+										Nilai
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+										Status
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+										ACC Dosen
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-28">
+										Aksi
+									</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{filteredGrades.map((g) => (
+									<TableRow
+										key={g.id}
+										className="border-slate-100 hover:bg-blue-50/40 transition-colors"
+									>
+										<TableCell className="font-mono text-xs font-bold text-slate-700">
+											{g.studentNim}
+										</TableCell>
+										<TableCell>
+											<div className="font-bold text-slate-900 text-sm">
+												{g.studentName}
+											</div>
+										</TableCell>
+										<TableCell>
+											<div className="text-xs font-semibold text-slate-800">
+												{g.courseName}
+											</div>
+											<div className="text-[11px] font-mono text-slate-400">
+												{g.courseCode}
+											</div>
+										</TableCell>
+
+										<TableCell className="text-center">
+											<Badge
+												variant="outline"
+												className={`text-xs font-semibold ${
+													(g.attendanceRate || 0) >= 80
+														? "bg-emerald-50 text-emerald-700 border-emerald-200"
+														: "bg-rose-50 text-rose-700 border-rose-200"
+												}`}
 											>
-												{searchQuery
-													? "Tidak ada mahasiswa yang cocok dengan pencarian."
-													: "Belum ada mahasiswa yang ditugaskan ke Anda."}
-											</TableCell>
-										</TableRow>
-									)}
-								</TableBody>
-							</Table>
-						</div>
-					</CardContent>
-				</Card>
-			</div>
+												{g.attendanceRate || 0}%
+											</Badge>
+										</TableCell>
+
+										<TableCell className="text-center font-bold text-sm text-slate-800">
+											{g.grade || "-"}
+										</TableCell>
+
+										<TableCell className="text-center">
+											{g.status === "AMAN" ? (
+												<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold">
+													🟢 Aman
+												</Badge>
+											) : g.status === "PERLU_PERHATIAN" ? (
+												<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs font-semibold">
+													🟡 Perhatian
+												</Badge>
+											) : (
+												<Badge className="bg-rose-50 text-rose-700 border-rose-200 text-xs font-semibold">
+													⛔ Tidak Aman
+												</Badge>
+											)}
+										</TableCell>
+
+										<TableCell className="text-center">
+											{g.isAcc ? (
+												<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-bold">
+													✓ ACC
+												</Badge>
+											) : (
+												<span className="text-xs text-slate-400 italic">
+													Belum
+												</span>
+											)}
+										</TableCell>
+
+										<TableCell className="text-right pr-6">
+											<Button
+												size="sm"
+												variant="outline"
+												onClick={() =>
+													router.push(`/dashboard/students/${g.studentId}`)
+												}
+												className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5"
+											>
+												<Eye className="w-3.5 h-3.5" />
+												Periksa
+											</Button>
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
+
+						{filteredGrades.length === 0 && (
+							<div className="text-center py-12 text-slate-500">
+								<HelpCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+								<p className="text-sm font-semibold">
+									Tidak ada data nilai mahasiswa ditemukan.
+								</p>
+								<p className="text-xs text-slate-400 mt-0.5">
+									Coba ubah kata kunci pencarian atau filter status yang
+									digunakan.
+								</p>
+							</div>
+						)}
+					</div>
+				</CardContent>
+			</Card>
 		</div>
 	);
 }

@@ -106,16 +106,18 @@ export class FileRepository {
 		studentIds: number[],
 		category?: string,
 	): Promise<FileRecord[]> {
-		return db.query.files.findMany({
-			where: and(
-				isNull(files.deletedAt),
-				category ? eq(files.category, category) : undefined,
-			),
-		}).then((rows) =>
-			rows.filter((r) =>
-				r.studentId !== null && studentIds.includes(r.studentId),
-			),
-		);
+		return db.query.files
+			.findMany({
+				where: and(
+					isNull(files.deletedAt),
+					category ? eq(files.category, category) : undefined,
+				),
+			})
+			.then((rows) =>
+				rows.filter(
+					(r) => r.studentId !== null && studentIds.includes(r.studentId),
+				),
+			);
 	}
 }
 

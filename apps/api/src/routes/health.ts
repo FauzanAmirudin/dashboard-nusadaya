@@ -1,11 +1,11 @@
-import { Elysia } from "elysia";
-import { join } from "node:path";
 import { stat } from "node:fs/promises";
-import { redis } from "../lib/redis";
+import { join } from "node:path";
+import { desc, sql } from "drizzle-orm";
+import { Elysia } from "elysia";
 import { db } from "../db";
-import { sql, desc } from "drizzle-orm";
 import { backupJobs } from "../db/schema";
 import { queueLength } from "../lib/queue";
+import { redis } from "../lib/redis";
 
 /**
  * Route: GET /health

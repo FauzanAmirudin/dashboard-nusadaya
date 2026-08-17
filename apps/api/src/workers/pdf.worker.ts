@@ -30,7 +30,9 @@ export async function startPdfWorker(workerId = 1): Promise<void> {
 			// TODO: Implementasi PDF generation di fase berikutnya
 			await new Promise((r) => setTimeout(r, 100));
 
-			console.log(`[PdfWorker#${workerId}] Job ${job.payload.jobId} completed ✅`);
+			console.log(
+				`[PdfWorker#${workerId}] Job ${job.payload.jobId} completed ✅`,
+			);
 		} catch (err) {
 			const error = err as Error;
 			console.error(`[PdfWorker#${workerId}] Error:`, error.message);

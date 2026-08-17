@@ -3,12 +3,15 @@
 import {
 	Building2,
 	CheckCircle,
+	CheckCircle2,
+	Clock,
 	Edit2,
 	FileText,
+	FolderCheck,
 	Loader2,
 	Save,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,11 +50,74 @@ interface TabChecklistProps {
 	onUpdate: () => void;
 }
 
+const ADDITIONAL_DOCS = [
+	{
+		key: "ktp",
+		propKey: "docKtp",
+		label: "KTP (Kartu Tanda Penduduk)",
+		desc: "Scan / Foto KTP asli yang masih berlaku dan terbaca jelas",
+	},
+	{
+		key: "kk",
+		propKey: "docKk",
+		label: "Kartu Keluarga (KK)",
+		desc: "Scan Kartu Keluarga terbaru sesuai data pendaftaran",
+	},
+	{
+		key: "cv",
+		propKey: "docCv",
+		label: "Curriculum Vitae (CV)",
+		desc: "Dokumen CV / Resume format PDF terbaru",
+	},
+	{
+		key: "ijazah",
+		propKey: "docIjazah",
+		label: "Ijazah Terakhir",
+		desc: "Scan Ijazah SMA / SMK / Sederajat asli",
+	},
+	{
+		key: "transkrip",
+		propKey: "docTranskrip",
+		label: "Transkrip Nilai Ijazah",
+		desc: "Scan Transkrip Nilai / SKHUN resmi",
+	},
+	{
+		key: "passport_depan",
+		propKey: "docPassportDepan",
+		label: "Passport (Halaman Depan)",
+		desc: "Scan halaman identitas dan foto paspor",
+	},
+	{
+		key: "passport_visa",
+		propKey: "docPassportVisa",
+		label: "Passport (Halaman Visa)",
+		desc: "Scan halaman visa atau stempel resmi keberangkatan",
+	},
+	{
+		key: "skbm",
+		propKey: "docSkbm",
+		label: "Surat Keterangan Belum Menikah (SKBM)",
+		desc: "Surat resmi dari kelurahan / desa setempat",
+	},
+	{
+		key: "mcu",
+		propKey: "docMcu",
+		label: "Hasil Pre Medical Checkup (MCU)",
+		desc: "Hasil pemeriksaan laboratorium dan rekomendasi dokter",
+	},
+	{
+		key: "sertifikasi_bahasa",
+		propKey: "docSertifikasiBahasa",
+		label: "Sertifikasi Bahasa",
+		desc: "Sertifikat TOEIC, TOCFL, JLPT, atau setara",
+	},
+];
+
 export function TabChecklist({
 	studentId,
 	pmbData,
 	canEdit,
-	documents,
+	documents = {},
 	fetchDocuments,
 	onUpdate,
 }: TabChecklistProps) {
@@ -60,12 +126,50 @@ export function TabChecklist({
 	const [notes, setNotes] = useState(pmbData?.notes || "");
 	const [loadingItem, setLoadingItem] = useState<string | null>(null);
 
-	const [localChecks, setLocalChecks] = useState({
+	const [localChecks, setLocalChecks] = useState<Record<string, boolean>>({
 		formReceived: !!pmbData?.formReceived,
 		documentsComplete: !!pmbData?.documentsComplete,
 		dataInputted: !!pmbData?.dataInputted,
 		initialFollowUp: !!pmbData?.initialFollowUp,
+		docKtp: !!pmbData?.docKtp,
+		docKk: !!pmbData?.docKk,
+		docCv: !!pmbData?.docCv,
+		docIjazah: !!pmbData?.docIjazah,
+		docTranskrip: !!pmbData?.docTranskrip,
+		docPassportDepan: !!pmbData?.docPassportDepan,
+		docPassportVisa: !!pmbData?.docPassportVisa,
+		docSkbm: !!pmbData?.docSkbm,
+		docMcu: !!pmbData?.docMcu,
+		docSertifikasiBahasa: !!pmbData?.docSertifikasiBahasa,
 	});
+
+	useEffect(() => {
+		setLocalChecks({
+			formReceived: !!pmbData?.formReceived,
+			documentsComplete: !!pmbData?.documentsComplete,
+			dataInputted: !!pmbData?.dataInputted,
+			initialFollowUp: !!pmbData?.initialFollowUp,
+			docKtp: !!pmbData?.docKtp,
+			docKk: !!pmbData?.docKk,
+			docCv: !!pmbData?.docCv,
+			docIjazah: !!pmbData?.docIjazah,
+			docTranskrip: !!pmbData?.docTranskrip,
+			docPassportDepan: !!pmbData?.docPassportDepan,
+			docPassportVisa: !!pmbData?.docPassportVisa,
+			docSkbm: !!pmbData?.docSkbm,
+			docMcu: !!pmbData?.docMcu,
+			docSertifikasiBahasa: !!pmbData?.docSertifikasiBahasa,
+		});
+		setNotes(pmbData?.notes || "");
+		setAcquisition({
+			rekomendasi: pmbData?.rekomendasi || "",
+			timVisit: pmbData?.timVisit || "",
+			timSosialisasi: pmbData?.timSosialisasi || "",
+			roReferral: pmbData?.roReferral || "",
+			mitraSponsor: pmbData?.mitraSponsor || "",
+			koordinator: pmbData?.koordinator || "",
+		});
+	}, [pmbData]);
 
 	const [acquisition, setAcquisition] = useState({
 		rekomendasi: pmbData?.rekomendasi || "",
@@ -76,62 +180,88 @@ export function TabChecklist({
 		koordinator: pmbData?.koordinator || "",
 	});
 
-	const checklist = [
+	const mainChecklist = [
 		{
 			id: "formReceived",
 			documentKey: "form_received",
 			label: "Formulir Masuk",
-			desc: "Formulir pendaftaran telah diterima",
+			desc: "Formulir pendaftaran telah diterima dan diverifikasi",
 			checked: localChecks.formReceived,
 		},
 		{
 			id: "documentsComplete",
 			documentKey: "documents_complete",
 			label: "Berkas Lengkap",
-			desc: "Semua dokumen fisik tersedia",
+			desc: "Semua dokumen fisik/digital mahasiswa telah lengkap",
 			checked: localChecks.documentsComplete,
 		},
 		{
 			id: "dataInputted",
 			documentKey: "data_inputted",
 			label: "Input Data Awal",
-			desc: "Data mahasiswa telah diinput ke sistem",
+			desc: "Data mahasiswa telah diinput ke sistem dashboard",
 			checked: localChecks.dataInputted,
 		},
 		{
 			id: "initialFollowUp",
 			documentKey: "initial_follow_up",
 			label: "Follow Up Awal",
-			desc: "Kontak awal dengan mahasiswa/orang tua selesai",
+			desc: "Kontak awal dan konfirmasi orang tua/wali selesai",
 			checked: localChecks.initialFollowUp,
 		},
 	];
 
-	const completedCount = Object.values(localChecks).filter(Boolean).length;
+	const completedMainCount = [
+		localChecks.formReceived,
+		localChecks.documentsComplete,
+		localChecks.dataInputted,
+		localChecks.initialFollowUp,
+	].filter(Boolean).length;
 
-	const handleCheckboxChange = async (id: string, checked: boolean) => {
+	const completedDocsCount = ADDITIONAL_DOCS.filter(
+		(d) => localChecks[d.propKey],
+	).length;
+
+	const totalCompleted14 = completedMainCount + completedDocsCount;
+
+	const handleCheckboxChange = async (propKey: string, checked: boolean) => {
 		if (!canEdit) return;
 
 		const prevState = { ...localChecks };
-		setLocalChecks((prev) => ({ ...prev, [id]: checked }));
-		setLoadingItem(id);
+		const newState = { ...prevState, [propKey]: checked };
+		setLocalChecks(newState);
+		setLoadingItem(propKey);
 
 		const payload = {
-			...prevState,
-			[id]: checked,
+			formReceived: newState.formReceived,
+			documentsComplete: newState.documentsComplete,
+			dataInputted: newState.dataInputted,
+			initialFollowUp: newState.initialFollowUp,
+			docKtp: newState.docKtp,
+			docKk: newState.docKk,
+			docCv: newState.docCv,
+			docIjazah: newState.docIjazah,
+			docTranskrip: newState.docTranskrip,
+			docPassportDepan: newState.docPassportDepan,
+			docPassportVisa: newState.docPassportVisa,
+			docSkbm: newState.docSkbm,
+			docMcu: newState.docMcu,
+			docSertifikasiBahasa: newState.docSertifikasiBahasa,
 			notes: notes,
 			rekomendasi: acquisition.rekomendasi,
 			timVisit: acquisition.timVisit,
 			timSosialisasi: acquisition.timSosialisasi,
 			roReferral: acquisition.roReferral,
+			mitraSponsor: acquisition.mitraSponsor,
+			koordinator: acquisition.koordinator,
 		};
 
 		const { error } = await api.students[studentId.toString()].pmb.put(payload);
 		if (error) {
 			setLocalChecks(prevState);
-			toast.error("Gagal menyimpan perubahan");
+			toast.error("Gagal menyimpan perubahan status checklist");
 		} else {
-			toast.success("Berhasil disimpan");
+			toast.success("Status checklist berhasil disimpan");
 			onUpdate();
 		}
 		setLoadingItem(null);
@@ -153,7 +283,20 @@ export function TabChecklist({
 		if (!canEdit) return;
 		setIsSaving(true);
 		const payload = {
-			...localChecks,
+			formReceived: localChecks.formReceived,
+			documentsComplete: localChecks.documentsComplete,
+			dataInputted: localChecks.dataInputted,
+			initialFollowUp: localChecks.initialFollowUp,
+			docKtp: localChecks.docKtp,
+			docKk: localChecks.docKk,
+			docCv: localChecks.docCv,
+			docIjazah: localChecks.docIjazah,
+			docTranskrip: localChecks.docTranskrip,
+			docPassportDepan: localChecks.docPassportDepan,
+			docPassportVisa: localChecks.docPassportVisa,
+			docSkbm: localChecks.docSkbm,
+			docMcu: localChecks.docMcu,
+			docSertifikasiBahasa: localChecks.docSertifikasiBahasa,
 			notes: notes,
 			rekomendasi: acquisition.rekomendasi,
 			timVisit: acquisition.timVisit,
@@ -164,7 +307,7 @@ export function TabChecklist({
 		};
 		const { error } = await api.students[studentId.toString()].pmb.put(payload);
 		if (error) {
-			toast.error("Gagal menyimpan data");
+			toast.error("Gagal menyimpan data akuisisi");
 		} else {
 			toast.success("Data Akuisisi & Catatan berhasil disimpan");
 			setIsEditingAcquisition(false);
@@ -175,23 +318,41 @@ export function TabChecklist({
 
 	return (
 		<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-			{/* Checklist Section */}
-			<div className="lg:col-span-2 space-y-4">
-				<Card className="border border-slate-200 shadow-sm">
-					<CardHeader className="bg-slate-50 border-b border-slate-100 py-3.5 px-4 flex flex-row items-center justify-between">
-						<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-							<CheckCircle className="w-4 h-4 text-[#0517B0]" />
-							Checklist Kelengkapan Berkas
-						</CardTitle>
-						<span className="text-xs font-semibold text-slate-500 bg-slate-200/60 px-2.5 py-1 rounded-full">
-							{completedCount} dari 4 Selesai
-						</span>
+			{/* Left & Center: Checklist & Dokumen Tambahan */}
+			<div className="lg:col-span-2 space-y-6">
+				{/* 1. Checklist Kelengkapan Berkas Utama */}
+				<Card className="border border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
+					<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+						<div>
+							<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+								<CheckCircle className="w-4 h-4 text-[#0517B0]" />
+								Checklist Kelengkapan Berkas Utama (4)
+							</CardTitle>
+							<p className="text-[11px] text-slate-500 mt-0.5">
+								Tahapan esensial registrasi dan verifikasi berkas awal PMB
+							</p>
+						</div>
+						<div className="flex items-center gap-2">
+							<Badge
+								className={`text-xs font-bold px-2.5 py-0.5 ${
+									completedMainCount === 4
+										? "bg-emerald-50 text-emerald-700 border-emerald-200"
+										: "bg-blue-50 text-[#0517B0] border-blue-200"
+								}`}
+							>
+								{completedMainCount}/4 Selesai
+							</Badge>
+						</div>
 					</CardHeader>
-					<CardContent className="p-4 space-y-4">
-						{checklist.map((item) => (
+					<CardContent className="p-4 sm:p-5 space-y-3.5">
+						{mainChecklist.map((item) => (
 							<div
 								key={item.id}
-								className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50/80 transition-colors space-y-3"
+								className={`p-3.5 rounded-xl border transition-colors space-y-2.5 ${
+									item.checked
+										? "border-emerald-200 bg-emerald-50/20"
+										: "border-slate-200 bg-white"
+								}`}
 							>
 								<div className="flex items-start justify-between">
 									<div className="flex items-start gap-3">
@@ -202,26 +363,26 @@ export function TabChecklist({
 											onCheckedChange={(checked) =>
 												handleCheckboxChange(item.id, !!checked)
 											}
-											className="mt-0.5"
+											className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
 										/>
 										<div>
 											<label
 												htmlFor={item.id}
-												className="text-sm font-bold text-slate-800 cursor-pointer block"
+												className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block"
 											>
 												{item.label}
 											</label>
-											<p className="text-xs text-slate-500 mt-0.5">
+											<p className="text-[11px] text-slate-500 mt-0.5">
 												{item.desc}
 											</p>
 										</div>
 									</div>
 									<div className="flex items-center gap-2">
 										{loadingItem === item.id ? (
-											<Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+											<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
 										) : item.checked ? (
-											<Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100 text-[10px]">
-												Selesai
+											<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+												✓ Selesai
 											</Badge>
 										) : (
 											<Badge
@@ -235,16 +396,21 @@ export function TabChecklist({
 								</div>
 
 								{/* Inline Document Upload Bukti per Item */}
-								<div className="pt-2 border-t border-slate-200/60">
-									<label className="text-[11px] font-semibold text-slate-500 mb-1.5 block uppercase tracking-wider flex items-center gap-1">
-										<FileText className="w-3.5 h-3.5 text-indigo-600" />
-										Bukti Dokumen {item.label} (PDF)
-									</label>
+								<div className="pt-2 border-t border-slate-100">
+									<div className="flex items-center justify-between mb-1.5">
+										<span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+											<FileText className="w-3 h-3 text-indigo-600" />
+											Upload Bukti Dokumen {item.label} (PDF/Gambar)
+										</span>
+									</div>
 									<DocumentUpload
 										studentId={studentId}
 										panel="pmb"
 										documentKey={item.documentKey}
-										onUploadSuccess={fetchDocuments}
+										onUploadSuccess={() => {
+											fetchDocuments();
+											handleCheckboxChange(item.id, true);
+										}}
 										canEdit={canEdit}
 									/>
 								</div>
@@ -253,51 +419,124 @@ export function TabChecklist({
 					</CardContent>
 				</Card>
 
-				<Card className="border border-slate-200 shadow-sm">
-					<CardHeader className="bg-slate-50 border-b border-slate-100 py-3.5 px-4">
-						<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-							<FileText className="w-4 h-4 text-indigo-600" />
-							Dokumen Mahasiswa Tambahan
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-						{[
-							{ key: "ktp", label: "KTP" },
-							{ key: "kk", label: "Kartu Keluarga (KK)" },
-							{ key: "cv", label: "Curriculum Vitae (CV)" },
-							{ key: "ijazah", label: "Ijazah Terakhir" },
-							{ key: "transkrip", label: "Transkrip Nilai Ijazah" },
-							{ key: "passport_depan", label: "Passport (Halaman Depan)" },
-							{ key: "passport_visa", label: "Passport (Halaman Visa)" },
-							{ key: "skbm", label: "Surat Keterangan Belum Menikah" },
-							{ key: "mcu", label: "Hasil Pre Medical Checkup" },
-							{ key: "sertifikasi_bahasa", label: "Sertifikasi Bahasa" },
-						].map((doc) => (
-							<div
-								key={doc.key}
-								className="p-3 rounded-lg border border-slate-200 bg-white"
+				{/* 2. Checklist Dokumen Mahasiswa Tambahan (10 Item Checklist Interaktif) */}
+				<Card className="border border-slate-200 shadow-sm border-l-4 border-l-indigo-600">
+					<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+						<div>
+							<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+								<FolderCheck className="w-4 h-4 text-indigo-600" />
+								Dokumen Mahasiswa Tambahan (10)
+							</CardTitle>
+							<p className="text-[11px] text-slate-500 mt-0.5">
+								Validasi berkas identitas, paspor, kesehatan, dan kualifikasi
+								akademik mahasiswa
+							</p>
+						</div>
+
+						<div className="flex items-center gap-2">
+							<Badge
+								className={`text-xs font-bold px-2.5 py-0.5 ${
+									completedDocsCount === 10
+										? "bg-emerald-50 text-emerald-700 border-emerald-200"
+										: completedDocsCount >= 5
+											? "bg-indigo-50 text-indigo-700 border-indigo-200"
+											: "bg-amber-50 text-amber-700 border-amber-200"
+								}`}
 							>
-								<label className="text-xs font-semibold text-slate-700 mb-2 block flex items-center gap-1.5">
-									<FileText className="w-3.5 h-3.5 text-slate-400" />
-									{doc.label}
-								</label>
-								<DocumentUpload
-									studentId={studentId}
-									panel="pmb"
-									documentKey={doc.key}
-									onUploadSuccess={fetchDocuments}
-									canEdit={canEdit}
-								/>
-							</div>
-						))}
+								{completedDocsCount}/10 Selesai
+							</Badge>
+						</div>
+					</CardHeader>
+
+					<CardContent className="p-4 sm:p-5 space-y-3.5">
+						{ADDITIONAL_DOCS.map((doc) => {
+							const docFiles = documents[doc.key] || [];
+							const isChecked = !!localChecks[doc.propKey];
+							const hasUploadedFile = docFiles.length > 0;
+
+							return (
+								<div
+									key={doc.key}
+									className={`p-3.5 rounded-xl border transition-colors space-y-2.5 ${
+										isChecked
+											? "border-emerald-200 bg-emerald-50/20"
+											: "border-slate-200 bg-white"
+									}`}
+								>
+									<div className="flex items-start justify-between">
+										<div className="flex items-start gap-3">
+											<Checkbox
+												id={`doc-${doc.key}`}
+												checked={isChecked}
+												disabled={!canEdit || loadingItem === doc.propKey}
+												onCheckedChange={(checked) =>
+													handleCheckboxChange(doc.propKey, !!checked)
+												}
+												className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+											/>
+											<div>
+												<label
+													htmlFor={`doc-${doc.key}`}
+													className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block"
+												>
+													{doc.label}
+												</label>
+												<p className="text-[11px] text-slate-500 mt-0.5">
+													{doc.desc}
+												</p>
+											</div>
+										</div>
+
+										<div className="flex items-center gap-2">
+											{loadingItem === doc.propKey ? (
+												<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+											) : isChecked ? (
+												<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+													✓ Selesai{" "}
+													{hasUploadedFile && `(${docFiles.length} File)`}
+												</Badge>
+											) : (
+												<Badge
+													variant="outline"
+													className="text-slate-400 border-slate-200 text-[10px]"
+												>
+													Belum
+												</Badge>
+											)}
+										</div>
+									</div>
+
+									{/* Inline Document Upload Bukti per Item */}
+									<div className="pt-2 border-t border-slate-100">
+										<div className="flex items-center justify-between mb-1.5">
+											<span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+												<FileText className="w-3 h-3 text-indigo-600" />
+												Upload Berkas {doc.label} (PDF/Gambar)
+											</span>
+										</div>
+										<DocumentUpload
+											studentId={studentId}
+											panel="pmb"
+											documentKey={doc.key}
+											onUploadSuccess={() => {
+												fetchDocuments();
+												handleCheckboxChange(doc.propKey, true);
+											}}
+											canEdit={canEdit}
+										/>
+									</div>
+								</div>
+							);
+						})}
 					</CardContent>
 				</Card>
 			</div>
 
-			{/* Akuisisi & Catatan Section */}
-			<div className="space-y-4">
-				<Card className="border border-slate-200 shadow-sm">
-					<CardHeader className="bg-slate-50 border-b border-slate-100 py-3 px-4 flex flex-row items-center justify-between">
+			{/* Right Column: Akuisisi & Catatan Section */}
+			<div className="space-y-6">
+				{/* Data Akuisisi */}
+				<Card className="border border-slate-200 shadow-sm border-l-4 border-l-emerald-600">
+					<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-4 flex flex-row items-center justify-between">
 						<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
 							<Building2 className="w-4 h-4 text-emerald-600" />
 							Data Akuisisi & Referral
@@ -308,9 +547,9 @@ export function TabChecklist({
 									<Button
 										onClick={() => setIsEditingAcquisition(true)}
 										size="sm"
-										className="bg-[#0517B0] hover:bg-[#04128d] text-white text-xs gap-1.5 h-8"
+										className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs gap-1.5 h-8 font-bold"
 									>
-										<Edit2 className="w-3.5 h-3.5" />
+										<Edit2 className="w-3 h-3" />
 										Edit Data
 									</Button>
 								) : (
@@ -328,21 +567,21 @@ export function TabChecklist({
 											onClick={saveAcquisitionAndNotes}
 											disabled={isSaving}
 											size="sm"
-											className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5 h-8"
+											className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 h-8 font-bold"
 										>
 											{isSaving ? (
 												<Loader2 className="w-3.5 h-3.5 animate-spin" />
 											) : (
 												<Save className="w-3.5 h-3.5" />
 											)}
-											Simpan Data
+											Simpan
 										</Button>
 									</>
 								)}
 							</div>
 						)}
 					</CardHeader>
-					<CardContent className="p-4 space-y-3">
+					<CardContent className="p-4 space-y-3.5">
 						<div>
 							<Label className="text-xs font-semibold text-slate-600">
 								Rekomendasi / Channel
@@ -354,7 +593,7 @@ export function TabChecklist({
 									if (val) setAcquisition({ ...acquisition, rekomendasi: val });
 								}}
 							>
-								<SelectTrigger className="mt-1 h-9 text-xs">
+								<SelectTrigger className="mt-1 h-9 text-xs bg-white border-slate-200">
 									<SelectValue placeholder="Pilih Rekomendasi" />
 								</SelectTrigger>
 								<SelectContent>
@@ -379,7 +618,7 @@ export function TabChecklist({
 									setAcquisition({ ...acquisition, timVisit: e.target.value })
 								}
 								placeholder="Nama tim visit..."
-								className="mt-1 h-9 text-xs"
+								className="mt-1 h-9 text-xs bg-white border-slate-200"
 							/>
 						</div>
 
@@ -397,7 +636,7 @@ export function TabChecklist({
 									})
 								}
 								placeholder="Nama tim sosialisasi..."
-								className="mt-1 h-9 text-xs"
+								className="mt-1 h-9 text-xs bg-white border-slate-200"
 							/>
 						</div>
 
@@ -412,7 +651,7 @@ export function TabChecklist({
 									setAcquisition({ ...acquisition, roReferral: e.target.value })
 								}
 								placeholder="Nama RO referral..."
-								className="mt-1 h-9 text-xs"
+								className="mt-1 h-9 text-xs bg-white border-slate-200"
 							/>
 						</div>
 
@@ -430,7 +669,7 @@ export function TabChecklist({
 									})
 								}
 								placeholder="Nama mitra..."
-								className="mt-1 h-9 text-xs"
+								className="mt-1 h-9 text-xs bg-white border-slate-200"
 							/>
 						</div>
 
@@ -448,15 +687,15 @@ export function TabChecklist({
 									})
 								}
 								placeholder="Nama koordinator..."
-								className="mt-1 h-9 text-xs"
+								className="mt-1 h-9 text-xs bg-white border-slate-200"
 							/>
 						</div>
 					</CardContent>
 				</Card>
 
-				{/* Catatan Internal */}
-				<Card className="border border-slate-200 shadow-sm">
-					<CardHeader className="bg-slate-50 border-b border-slate-100 py-3.5 px-4">
+				{/* Catatan Internal PMB */}
+				<Card className="border border-slate-200 shadow-sm border-l-4 border-l-amber-500">
+					<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-4">
 						<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
 							<FileText className="w-4 h-4 text-amber-600" />
 							Catatan Internal PMB
@@ -468,21 +707,21 @@ export function TabChecklist({
 							value={notes}
 							onChange={(e) => setNotes(e.target.value)}
 							placeholder="Tambahkan catatan tindak lanjut atau kendala pendaftaran..."
-							className="text-xs min-h-[100px]"
+							className="text-xs min-h-[110px] bg-white border-slate-200"
 						/>
 						{canEdit && (
 							<Button
 								onClick={saveAcquisitionAndNotes}
 								disabled={isSaving}
 								size="sm"
-								className="w-full bg-[#0517B0] hover:bg-[#04128d] text-white text-xs gap-2"
+								className="w-full bg-[#0517B0] hover:bg-blue-800 text-white text-xs gap-1.5 h-9 font-bold shadow-sm"
 							>
 								{isSaving ? (
 									<Loader2 className="w-3.5 h-3.5 animate-spin" />
 								) : (
 									<Save className="w-3.5 h-3.5" />
 								)}
-								Simpan Data Akuisisi & Catatan
+								Simpan Catatan PMB
 							</Button>
 						)}
 					</CardContent>

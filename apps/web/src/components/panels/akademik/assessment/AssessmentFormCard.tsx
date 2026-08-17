@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	CheckCircle2,
 	Clock,
@@ -16,6 +15,7 @@ import {
 	UploadCloud,
 	X,
 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
 	AlertDialog,
@@ -77,7 +77,11 @@ function formatFileSize(bytes: number): string {
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function getGrade(score: number): { letter: string; color: string; bg: string } {
+function getGrade(score: number): {
+	letter: string;
+	color: string;
+	bg: string;
+} {
 	if (score >= 90) return { letter: "A", color: "#059669", bg: "#d1fae5" };
 	if (score >= 80) return { letter: "B+", color: "#0517B0", bg: "#dbeafe" };
 	if (score >= 70) return { letter: "B", color: "#2563eb", bg: "#eff6ff" };
@@ -258,11 +262,7 @@ function ScoreCard({
 										value={scoreInput}
 										className="w-36 h-9"
 										onKeyDown={(e) => {
-											if (
-												e.key === "-" ||
-												e.key === "e" ||
-												e.key === "E"
-											)
+											if (e.key === "-" || e.key === "e" || e.key === "E")
 												e.preventDefault();
 										}}
 										onChange={(e) => {
@@ -537,7 +537,9 @@ function PdfCard({
 									) : (
 										<UploadCloud className="w-4 h-4" />
 									)}
-									{isUploading ? "Mengunggah..." : "Pilih file PDF (maks. 10MB)"}
+									{isUploading
+										? "Mengunggah..."
+										: "Pilih file PDF (maks. 10MB)"}
 								</button>
 							)}
 						</div>
@@ -572,7 +574,9 @@ function PdfCard({
 							disabled={isDeleting}
 							className="bg-rose-600 hover:bg-rose-700 text-white"
 						>
-							{isDeleting && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+							{isDeleting && (
+								<Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+							)}
 							Hapus Permanen
 						</AlertDialogAction>
 					</AlertDialogFooter>
@@ -733,7 +737,9 @@ function NotesSection({
 								<StickyNote className="w-3 h-3 text-amber-600" />
 							</span>
 							Catatan
-							<span className="text-xs font-normal text-slate-400">(opsional)</span>
+							<span className="text-xs font-normal text-slate-400">
+								(opsional)
+							</span>
 							{notes.length > 0 && (
 								<span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">
 									{notes.length}
@@ -817,10 +823,12 @@ function NotesSection({
 							<div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
 								<StickyNote className="w-5 h-5 text-slate-300" />
 							</div>
-							<p className="text-sm text-slate-500 font-medium">Belum ada catatan</p>
+							<p className="text-sm text-slate-500 font-medium">
+								Belum ada catatan
+							</p>
 							<p className="text-xs text-slate-400">
 								{canEdit
-									? "Klik \"Tambah Catatan\" untuk menambahkan catatan pertama"
+									? 'Klik "Tambah Catatan" untuk menambahkan catatan pertama'
 									: "Tidak ada catatan untuk assessment ini"}
 							</p>
 						</div>
@@ -834,7 +842,10 @@ function NotesSection({
 									{/* Left accent bar */}
 									<div
 										className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full"
-										style={{ backgroundColor: index % 2 === 0 ? "#0517B0" : "#d97706", left: "12px" }}
+										style={{
+											backgroundColor: index % 2 === 0 ? "#0517B0" : "#d97706",
+											left: "12px",
+										}}
 									/>
 
 									{editingId === note.id ? (
@@ -887,7 +898,9 @@ function NotesSection({
 											<div className="flex items-center justify-between mt-2.5 gap-2">
 												<div className="flex items-center gap-1.5 text-[11px] text-slate-400 flex-wrap">
 													<span className="font-medium text-slate-500">
-														{note.author?.fullName ?? note.author?.username ?? "Pengguna"}
+														{note.author?.fullName ??
+															note.author?.username ??
+															"Pengguna"}
 													</span>
 													<span>·</span>
 													<span
@@ -898,7 +911,9 @@ function NotesSection({
 														{getRelativeTime(note.createdAt)}
 													</span>
 													{note.updatedAt !== note.createdAt && (
-														<span className="text-slate-300 italic">(diedit)</span>
+														<span className="text-slate-300 italic">
+															(diedit)
+														</span>
 													)}
 												</div>
 												{canEdit && (
@@ -954,7 +969,8 @@ function NotesSection({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Hapus Catatan?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Catatan ini akan dihapus secara permanen dan tidak dapat dipulihkan.
+							Catatan ini akan dihapus secara permanen dan tidak dapat
+							dipulihkan.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -964,7 +980,9 @@ function NotesSection({
 							disabled={!!deletingId}
 							className="bg-rose-600 hover:bg-rose-700 text-white"
 						>
-							{deletingId && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+							{deletingId && (
+								<Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+							)}
 							Hapus
 						</AlertDialogAction>
 					</AlertDialogFooter>
@@ -1003,10 +1021,7 @@ export function AssessmentFormCard({
 			</div>
 
 			{/* Notes — full width, independent data fetch */}
-			<NotesSection
-				studentId={studentId}
-				canEdit={canEdit}
-			/>
+			<NotesSection studentId={studentId} canEdit={canEdit} />
 		</div>
 	);
 }

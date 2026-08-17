@@ -36,8 +36,8 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
-import { fileService } from "../../modules/file/service/file.service";
 import { requireRole } from "../../middleware/rbac";
+import { fileService } from "../../modules/file/service/file.service";
 
 export async function createStudentPipeline(body: any, userId: number) {
 	// 1. Validasi email & nim

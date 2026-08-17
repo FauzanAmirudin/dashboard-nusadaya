@@ -24,7 +24,6 @@ const ROLE_COLORS: Record<string, string> = {
 	dosen: "bg-orange-100 text-orange-700 border-orange-500/30",
 	pa: "bg-teal-100 text-teal-700 border-teal-500/30",
 	magang: "bg-cyan-100 text-cyan-700 border-cyan-500/30",
-	evaluator: "bg-rose-100 text-rose-700 border-rose-500/30",
 };
 
 function getInitials(name: string) {

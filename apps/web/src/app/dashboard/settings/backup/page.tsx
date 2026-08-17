@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { History, Settings2 } from "lucide-react";
+import { useState } from "react";
 import { BackupHistoryTable } from "@/components/backup/BackupHistoryTable";
 import { BackupManualForm } from "@/components/backup/BackupManualForm";
 
@@ -15,7 +15,8 @@ export default function BackupSettingsPage() {
 					Backup & Sistem
 				</h1>
 				<p className="text-sm text-slate-500 mt-1">
-					Kelola pencadangan data, lihat riwayat, dan pantau penggunaan storage server.
+					Kelola pencadangan data, lihat riwayat, dan pantau penggunaan storage
+					server.
 				</p>
 			</div>
 

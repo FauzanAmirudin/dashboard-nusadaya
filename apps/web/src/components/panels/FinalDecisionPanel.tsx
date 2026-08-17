@@ -194,8 +194,7 @@ export function FinalDecisionPanel({
 			)
 		: false;
 
-	const canEdit =
-		(userRole === "evaluator" || userRole === "superadmin") && isAllPanelsAcc;
+	const canEdit = userRole === "superadmin" && isAllPanelsAcc;
 	const canApproveDirector = userRole === "superadmin" && isAllPanelsAcc;
 
 	const fetchData = async () => {
@@ -744,9 +743,9 @@ export function FinalDecisionPanel({
 						{!canEdit && (
 							<p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
 								<AlertTriangle className="w-4 h-4" />
-								{userRole === "evaluator" || userRole === "superadmin"
+								{userRole === "superadmin"
 									? "Akses ditolak. Seluruh 7 proses divisi wajib di-ACC terlebih dahulu."
-									: "Akses ditolak. Hanya Evaluator yang dapat mengubah form ini."}
+									: "Akses ditolak. Hanya Super Admin yang dapat mengubah form ini."}
 							</p>
 						)}
 					</CardHeader>

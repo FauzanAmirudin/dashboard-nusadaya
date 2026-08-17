@@ -1,9 +1,9 @@
 "use client";
 
 import { Eye } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
 import {
 	Table,
 	TableBody,
@@ -23,14 +23,11 @@ export function TabRespons() {
 
 	const fetchResponses = async () => {
 		try {
-			const res = await fetch(
-				`${API_URL}/pmb/form-responses`,
-				{
-					headers: {
-						Authorization: `Bearer ${getToken()}`,
-					},
+			const res = await fetch(`${API_URL}/pmb/form-responses`, {
+				headers: {
+					Authorization: `Bearer ${getToken()}`,
 				},
-			);
+			});
 			const data = await res.json();
 			if (data.success) {
 				setResponses(data.data);
@@ -45,8 +42,6 @@ export function TabRespons() {
 	useEffect(() => {
 		fetchResponses();
 	}, []);
-
-
 
 	return (
 		<div className="space-y-4">
@@ -114,7 +109,9 @@ export function TabRespons() {
 											<Button
 												variant="outline"
 												size="sm"
-												onClick={() => router.push(`/dashboard/pmb/responses/${r.id}`)}
+												onClick={() =>
+													router.push(`/dashboard/pmb/responses/${r.id}`)
+												}
 												className="border-slate-200 hover:bg-slate-50"
 											>
 												<Eye className="w-4 h-4 mr-2" />
@@ -128,7 +125,6 @@ export function TabRespons() {
 					</TableBody>
 				</Table>
 			</div>
-
 		</div>
 	);
 }

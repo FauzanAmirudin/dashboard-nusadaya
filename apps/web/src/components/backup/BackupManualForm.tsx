@@ -1,7 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Play, DatabaseBackup, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
+import {
+	AlertTriangle,
+	CheckCircle,
+	DatabaseBackup,
+	Loader2,
+	Play,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/eden";
 
 export function BackupManualForm() {
@@ -9,10 +15,10 @@ export function BackupManualForm() {
 	const [nim, setNim] = useState("");
 	const [cohortId, setCohortId] = useState("");
 	const [programId, setProgramId] = useState("");
-	
+
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
-	
+
 	// Progress state
 	const [jobId, setJobId] = useState<string | null>(null);
 	const [progress, setProgress] = useState<any>(null);
@@ -29,7 +35,7 @@ export function BackupManualForm() {
 					// Hentikan polling jika sudah selesai/gagal
 					const dataObj = res.data?.data as any;
 					const status = dataObj?.status;
-					if (status === 'completed' || status === 'failed') {
+					if (status === "completed" || status === "failed") {
 						clearInterval(interval);
 						setLoading(false);
 					}
@@ -75,11 +81,11 @@ export function BackupManualForm() {
 			}
 
 			const res = await api.backups.post(payload);
-			
+
 			if (res.data?.success) {
 				setJobId(res.data?.data?.jobId ?? null);
 				// Awal progress
-				setProgress({ status: 'queued', percentage: 0 });
+				setProgress({ status: "queued", percentage: 0 });
 			} else {
 				setError(res.data?.message || "Gagal memulai backup.");
 				setLoading(false);
@@ -102,28 +108,41 @@ export function BackupManualForm() {
 
 			{/* Progress Card (tampil jika sedang berjalan atau baru selesai) */}
 			{progress && (
-				<div className={`mb-6 p-5 rounded-xl border ${
-					progress.status === 'completed' ? 'bg-green-50 border-green-200' :
-					progress.status === 'failed' ? 'bg-red-50 border-red-200' :
-					'bg-indigo-50 border-indigo-200'
-				}`}>
+				<div
+					className={`mb-6 p-5 rounded-xl border ${
+						progress.status === "completed"
+							? "bg-green-50 border-green-200"
+							: progress.status === "failed"
+								? "bg-red-50 border-red-200"
+								: "bg-indigo-50 border-indigo-200"
+					}`}
+				>
 					<div className="flex items-center justify-between mb-3">
 						<div className="flex items-center gap-2">
-							{progress.status === 'processing' || progress.status === 'queued' ? (
+							{progress.status === "processing" ||
+							progress.status === "queued" ? (
 								<Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
-							) : progress.status === 'completed' ? (
+							) : progress.status === "completed" ? (
 								<CheckCircle className="w-5 h-5 text-green-600" />
 							) : (
 								<AlertTriangle className="w-5 h-5 text-red-600" />
 							)}
-							<span className={`font-semibold capitalize ${
-								progress.status === 'completed' ? 'text-green-800' :
-								progress.status === 'failed' ? 'text-red-800' :
-								'text-indigo-800'
-							}`}>
-								{progress.status === 'queued' ? 'Menunggu Antrean...' : 
-								 progress.status === 'processing' ? 'Sedang Memproses...' :
-								 progress.status === 'completed' ? 'Backup Selesai!' : 'Backup Gagal'}
+							<span
+								className={`font-semibold capitalize ${
+									progress.status === "completed"
+										? "text-green-800"
+										: progress.status === "failed"
+											? "text-red-800"
+											: "text-indigo-800"
+								}`}
+							>
+								{progress.status === "queued"
+									? "Menunggu Antrean..."
+									: progress.status === "processing"
+										? "Sedang Memproses..."
+										: progress.status === "completed"
+											? "Backup Selesai!"
+											: "Backup Gagal"}
 							</span>
 						</div>
 						<span className="font-mono text-sm font-bold text-slate-700">
@@ -132,12 +151,14 @@ export function BackupManualForm() {
 					</div>
 
 					<div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
-						<div 
+						<div
 							className={`h-2.5 rounded-full transition-all duration-500 ease-out ${
-								progress.status === 'completed' ? 'bg-green-500' :
-								progress.status === 'failed' ? 'bg-red-500' :
-								'bg-indigo-600'
-							}`} 
+								progress.status === "completed"
+									? "bg-green-500"
+									: progress.status === "failed"
+										? "bg-red-500"
+										: "bg-indigo-600"
+							}`}
 							style={{ width: `${progress.percentage ?? 0}%` }}
 						/>
 					</div>
@@ -146,7 +167,7 @@ export function BackupManualForm() {
 						<span>
 							File diproses: {progress.processed || 0} / {progress.total || 0}
 						</span>
-						{progress.status === 'failed' && (
+						{progress.status === "failed" && (
 							<span className="text-red-600">{progress.errorMessage}</span>
 						)}
 					</div>
@@ -231,8 +252,8 @@ export function BackupManualForm() {
 						type="submit"
 						disabled={loading}
 						className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-white font-medium shadow-sm transition-all ${
-							loading 
-								? "bg-slate-400 cursor-not-allowed" 
+							loading
+								? "bg-slate-400 cursor-not-allowed"
 								: "bg-indigo-600 hover:bg-indigo-700 hover:shadow-md"
 						}`}
 					>

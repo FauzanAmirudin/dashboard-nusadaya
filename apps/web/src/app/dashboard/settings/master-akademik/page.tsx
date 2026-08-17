@@ -3,12 +3,6 @@
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -17,6 +11,12 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
 	Table,
@@ -52,7 +52,10 @@ export default function MasterAkademikSettings() {
 	});
 
 	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-	const [itemToDelete, setItemToDelete] = useState<{ id: number; type: string } | null>(null);
+	const [itemToDelete, setItemToDelete] = useState<{
+		id: number;
+		type: string;
+	} | null>(null);
 
 	const fetchData = async () => {
 		setIsLoading(true);
@@ -424,13 +427,13 @@ export default function MasterAkademikSettings() {
 							Apakah Anda yakin ingin menghapus data ini?
 						</p>
 						<div className="flex justify-end gap-3 pt-4">
-							<Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+							<Button
+								variant="outline"
+								onClick={() => setIsDeleteDialogOpen(false)}
+							>
 								Batal
 							</Button>
-							<Button
-								variant="destructive"
-								onClick={executeDelete}
-							>
+							<Button variant="destructive" onClick={executeDelete}>
 								Hapus
 							</Button>
 						</div>

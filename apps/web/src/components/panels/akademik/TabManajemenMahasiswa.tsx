@@ -1,21 +1,16 @@
 "use client";
 
-import { CheckCircle, Loader2, XCircle, Save } from "lucide-react";
+import { CheckCircle, Loader2, Save, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DocumentUpload } from "@/components/ui/DocumentUpload";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/eden";
-import { useState, useEffect } from "react";
-import {
-	Tabs,
-	TabsContent,
-	TabsList,
-	TabsTrigger,
-} from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
 
 interface TabManajemenMahasiswaProps {
 	studentId: number;
@@ -33,7 +28,7 @@ export function TabManajemenMahasiswa({
 	const [loadingItem, setLoadingItem] = useState<string | null>(null);
 	const [isSavingNotes, setIsSavingNotes] = useState(false);
 	const [notes, setNotes] = useState("");
-	
+
 	const [localChecks, setLocalChecks] = useState({
 		pddiktiInput: false,
 		utsPassed: false,
@@ -83,9 +78,11 @@ export function TabManajemenMahasiswa({
 		setLoadingItem(id);
 
 		try {
-			const { error } = await api.students[studentId.toString()].academic.patch({
-				[id]: checked,
-			});
+			const { error } = await api.students[studentId.toString()].academic.patch(
+				{
+					[id]: checked,
+				},
+			);
 			if (!error) {
 				toast.success("Status berhasil disimpan");
 				onRefresh();
@@ -105,9 +102,11 @@ export function TabManajemenMahasiswa({
 		if (!canEdit) return;
 		setIsSavingNotes(true);
 		try {
-			const { error } = await api.students[studentId.toString()].academic.patch({
-				notes,
-			});
+			const { error } = await api.students[studentId.toString()].academic.patch(
+				{
+					notes,
+				},
+			);
 			if (!error) {
 				toast.success("Catatan akademik disimpan");
 				onRefresh();
@@ -125,7 +124,10 @@ export function TabManajemenMahasiswa({
 		if (!canEdit) return;
 		setIsSavingAttendance(true);
 		try {
-			const { error } = await api.students[studentId.toString()].academic.patch(attendanceManual);
+			const { error } =
+				await api.students[studentId.toString()].academic.patch(
+					attendanceManual,
+				);
 			if (!error) {
 				toast.success("Data presensi berhasil disimpan");
 				onRefresh();
@@ -187,7 +189,8 @@ export function TabManajemenMahasiswa({
 	// Hitung presensi terintegrasi dari academicData (Mata Kuliah)
 	const mkTotal = acadState?.attendanceTotal || 0;
 	const mkPresent = acadState?.attendancePresent || 0;
-	const mkPercentage = mkTotal > 0 ? Math.round((mkPresent / mkTotal) * 100) : 0;
+	const mkPercentage =
+		mkTotal > 0 ? Math.round((mkPresent / mkTotal) * 100) : 0;
 
 	return (
 		<div className="space-y-6">
@@ -209,14 +212,18 @@ export function TabManajemenMahasiswa({
 								{/* Header & Checkbox */}
 								<div
 									className={`flex items-center justify-between p-4 transition-colors ${
-										isChecked ? "bg-emerald-50/50" : "bg-white hover:bg-slate-50/50"
+										isChecked
+											? "bg-emerald-50/50"
+											: "bg-white hover:bg-slate-50/50"
 									}`}
 								>
 									<div className="flex items-center gap-4">
 										<Checkbox
 											id={item.id}
 											checked={isChecked}
-											onCheckedChange={(c) => handleCheckboxChange(item.id, c as boolean)}
+											onCheckedChange={(c) =>
+												handleCheckboxChange(item.id, c as boolean)
+											}
 											disabled={!canEdit || loadingItem === item.id}
 											className={`w-6 h-6 rounded-md transition-all ${
 												isChecked
@@ -235,7 +242,9 @@ export function TabManajemenMahasiswa({
 													<Loader2 className="w-4 h-4 text-emerald-600 animate-spin ml-2" />
 												)}
 											</div>
-											<p className={`text-sm ${isChecked ? "text-emerald-700/80" : "text-slate-500"}`}>
+											<p
+												className={`text-sm ${isChecked ? "text-emerald-700/80" : "text-slate-500"}`}
+											>
 												{item.desc}
 											</p>
 										</label>
@@ -246,7 +255,10 @@ export function TabManajemenMahasiswa({
 												✔ Selesai
 											</Badge>
 										) : (
-											<Badge variant="outline" className="text-slate-500 border-slate-300">
+											<Badge
+												variant="outline"
+												className="text-slate-500 border-slate-300"
+											>
 												Belum Selesai
 											</Badge>
 										)}
@@ -279,45 +291,74 @@ export function TabManajemenMahasiswa({
 					<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
 						PEMANTAUAN PRESENSI MAHASISWA
 					</h3>
-					<p className="text-xs text-slate-500 mt-1">Data kehadiran terintegrasi dengan Panel Dosen & PA</p>
+					<p className="text-xs text-slate-500 mt-1">
+						Data kehadiran terintegrasi dengan Panel Dosen & PA
+					</p>
 				</div>
 				<div className="p-5">
 					<Tabs defaultValue="matakuliah" className="w-full">
 						<TabsList className="grid w-full grid-cols-4 bg-slate-100 p-1.5 rounded-xl border border-slate-200 h-auto gap-1 mb-6">
-							<TabsTrigger value="matakuliah" className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm">
+							<TabsTrigger
+								value="matakuliah"
+								className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm"
+							>
 								Mata Kuliah
 							</TabsTrigger>
-							<TabsTrigger value="piket" className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm">
+							<TabsTrigger
+								value="piket"
+								className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm"
+							>
 								Piket
 							</TabsTrigger>
-							<TabsTrigger value="ods" className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm">
+							<TabsTrigger
+								value="ods"
+								className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm"
+							>
 								One Day Service
 							</TabsTrigger>
-							<TabsTrigger value="pramagang" className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm">
+							<TabsTrigger
+								value="pramagang"
+								className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm"
+							>
 								PraMagang
 							</TabsTrigger>
 						</TabsList>
 
 						<TabsContent value="matakuliah" className="space-y-4">
 							<div className="bg-blue-50/50 border border-blue-100 p-6 rounded-lg text-center">
-								<h4 className="text-lg font-semibold text-slate-800 mb-2">Presensi Mata Kuliah</h4>
+								<h4 className="text-lg font-semibold text-slate-800 mb-2">
+									Presensi Mata Kuliah
+								</h4>
 								<p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
-									Data ini ditarik secara otomatis dari pencatatan presensi oleh Dosen melalui Panel Dosen.
+									Data ini ditarik secara otomatis dari pencatatan presensi oleh
+									Dosen melalui Panel Dosen.
 								</p>
 								<div className="flex items-center justify-center gap-8">
 									<div className="text-center">
-										<p className="text-3xl font-bold text-[#0517B0]">{mkPresent}</p>
-										<p className="text-xs text-slate-500 font-medium uppercase mt-1">Hadir</p>
+										<p className="text-3xl font-bold text-[#0517B0]">
+											{mkPresent}
+										</p>
+										<p className="text-xs text-slate-500 font-medium uppercase mt-1">
+											Hadir
+										</p>
 									</div>
 									<div className="text-center">
-										<p className="text-3xl font-bold text-slate-700">{mkTotal}</p>
-										<p className="text-xs text-slate-500 font-medium uppercase mt-1">Total Pertemuan</p>
+										<p className="text-3xl font-bold text-slate-700">
+											{mkTotal}
+										</p>
+										<p className="text-xs text-slate-500 font-medium uppercase mt-1">
+											Total Pertemuan
+										</p>
 									</div>
 									<div className="text-center">
-										<p className={`text-3xl font-bold ${mkPercentage >= 90 ? 'text-emerald-600' : 'text-rose-600'}`}>
+										<p
+											className={`text-3xl font-bold ${mkPercentage >= 90 ? "text-emerald-600" : "text-rose-600"}`}
+										>
 											{mkPercentage}%
 										</p>
-										<p className="text-xs text-slate-500 font-medium uppercase mt-1">Persentase</p>
+										<p className="text-xs text-slate-500 font-medium uppercase mt-1">
+											Persentase
+										</p>
 									</div>
 								</div>
 							</div>
@@ -325,32 +366,62 @@ export function TabManajemenMahasiswa({
 
 						<TabsContent value="piket" className="space-y-4">
 							<div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
-								<h4 className="text-md font-semibold text-slate-800 mb-4">Input Presensi Piket</h4>
+								<h4 className="text-md font-semibold text-slate-800 mb-4">
+									Input Presensi Piket
+								</h4>
 								<div className="grid grid-cols-2 gap-4 max-w-md">
 									<div>
-										<label className="text-xs font-medium text-slate-500 mb-1 block">Total Kehadiran</label>
-										<Input 
-											type="number" 
+										<label className="text-xs font-medium text-slate-500 mb-1 block">
+											Total Kehadiran
+										</label>
+										<Input
+											type="number"
 											min={0}
 											value={attendanceManual.attendancePiketPresent}
-											onChange={(e) => setAttendanceManual({...attendanceManual, attendancePiketPresent: Math.max(0, Number(e.target.value))})}
+											onChange={(e) =>
+												setAttendanceManual({
+													...attendanceManual,
+													attendancePiketPresent: Math.max(
+														0,
+														Number(e.target.value),
+													),
+												})
+											}
 											disabled={!canEdit}
 										/>
 									</div>
 									<div>
-										<label className="text-xs font-medium text-slate-500 mb-1 block">Total Jadwal</label>
-										<Input 
-											type="number" 
+										<label className="text-xs font-medium text-slate-500 mb-1 block">
+											Total Jadwal
+										</label>
+										<Input
+											type="number"
 											min={0}
 											value={attendanceManual.attendancePiketTotal}
-											onChange={(e) => setAttendanceManual({...attendanceManual, attendancePiketTotal: Math.max(0, Number(e.target.value))})}
+											onChange={(e) =>
+												setAttendanceManual({
+													...attendanceManual,
+													attendancePiketTotal: Math.max(
+														0,
+														Number(e.target.value),
+													),
+												})
+											}
 											disabled={!canEdit}
 										/>
 									</div>
 								</div>
 								{canEdit && (
-									<Button onClick={handleSaveAttendance} disabled={isSavingAttendance} className="mt-4 bg-[#0517B0] hover:bg-blue-800 text-white">
-										{isSavingAttendance ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+									<Button
+										onClick={handleSaveAttendance}
+										disabled={isSavingAttendance}
+										className="mt-4 bg-[#0517B0] hover:bg-blue-800 text-white"
+									>
+										{isSavingAttendance ? (
+											<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+										) : (
+											<Save className="w-4 h-4 mr-2" />
+										)}
 										Simpan Presensi
 									</Button>
 								)}
@@ -359,32 +430,62 @@ export function TabManajemenMahasiswa({
 
 						<TabsContent value="ods" className="space-y-4">
 							<div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
-								<h4 className="text-md font-semibold text-slate-800 mb-4">Input Presensi One Day Service</h4>
+								<h4 className="text-md font-semibold text-slate-800 mb-4">
+									Input Presensi One Day Service
+								</h4>
 								<div className="grid grid-cols-2 gap-4 max-w-md">
 									<div>
-										<label className="text-xs font-medium text-slate-500 mb-1 block">Total Kehadiran</label>
-										<Input 
-											type="number" 
+										<label className="text-xs font-medium text-slate-500 mb-1 block">
+											Total Kehadiran
+										</label>
+										<Input
+											type="number"
 											min={0}
 											value={attendanceManual.attendanceOdsPresent}
-											onChange={(e) => setAttendanceManual({...attendanceManual, attendanceOdsPresent: Math.max(0, Number(e.target.value))})}
+											onChange={(e) =>
+												setAttendanceManual({
+													...attendanceManual,
+													attendanceOdsPresent: Math.max(
+														0,
+														Number(e.target.value),
+													),
+												})
+											}
 											disabled={!canEdit}
 										/>
 									</div>
 									<div>
-										<label className="text-xs font-medium text-slate-500 mb-1 block">Total Jadwal</label>
-										<Input 
-											type="number" 
+										<label className="text-xs font-medium text-slate-500 mb-1 block">
+											Total Jadwal
+										</label>
+										<Input
+											type="number"
 											min={0}
 											value={attendanceManual.attendanceOdsTotal}
-											onChange={(e) => setAttendanceManual({...attendanceManual, attendanceOdsTotal: Math.max(0, Number(e.target.value))})}
+											onChange={(e) =>
+												setAttendanceManual({
+													...attendanceManual,
+													attendanceOdsTotal: Math.max(
+														0,
+														Number(e.target.value),
+													),
+												})
+											}
 											disabled={!canEdit}
 										/>
 									</div>
 								</div>
 								{canEdit && (
-									<Button onClick={handleSaveAttendance} disabled={isSavingAttendance} className="mt-4 bg-[#0517B0] hover:bg-blue-800 text-white">
-										{isSavingAttendance ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+									<Button
+										onClick={handleSaveAttendance}
+										disabled={isSavingAttendance}
+										className="mt-4 bg-[#0517B0] hover:bg-blue-800 text-white"
+									>
+										{isSavingAttendance ? (
+											<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+										) : (
+											<Save className="w-4 h-4 mr-2" />
+										)}
 										Simpan Presensi
 									</Button>
 								)}
@@ -393,32 +494,62 @@ export function TabManajemenMahasiswa({
 
 						<TabsContent value="pramagang" className="space-y-4">
 							<div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
-								<h4 className="text-md font-semibold text-slate-800 mb-4">Input Presensi PraMagang</h4>
+								<h4 className="text-md font-semibold text-slate-800 mb-4">
+									Input Presensi PraMagang
+								</h4>
 								<div className="grid grid-cols-2 gap-4 max-w-md">
 									<div>
-										<label className="text-xs font-medium text-slate-500 mb-1 block">Total Kehadiran</label>
-										<Input 
-											type="number" 
+										<label className="text-xs font-medium text-slate-500 mb-1 block">
+											Total Kehadiran
+										</label>
+										<Input
+											type="number"
 											min={0}
 											value={attendanceManual.attendancePramagangPresent}
-											onChange={(e) => setAttendanceManual({...attendanceManual, attendancePramagangPresent: Math.max(0, Number(e.target.value))})}
+											onChange={(e) =>
+												setAttendanceManual({
+													...attendanceManual,
+													attendancePramagangPresent: Math.max(
+														0,
+														Number(e.target.value),
+													),
+												})
+											}
 											disabled={!canEdit}
 										/>
 									</div>
 									<div>
-										<label className="text-xs font-medium text-slate-500 mb-1 block">Total Jadwal</label>
-										<Input 
-											type="number" 
+										<label className="text-xs font-medium text-slate-500 mb-1 block">
+											Total Jadwal
+										</label>
+										<Input
+											type="number"
 											min={0}
 											value={attendanceManual.attendancePramagangTotal}
-											onChange={(e) => setAttendanceManual({...attendanceManual, attendancePramagangTotal: Math.max(0, Number(e.target.value))})}
+											onChange={(e) =>
+												setAttendanceManual({
+													...attendanceManual,
+													attendancePramagangTotal: Math.max(
+														0,
+														Number(e.target.value),
+													),
+												})
+											}
 											disabled={!canEdit}
 										/>
 									</div>
 								</div>
 								{canEdit && (
-									<Button onClick={handleSaveAttendance} disabled={isSavingAttendance} className="mt-4 bg-[#0517B0] hover:bg-blue-800 text-white">
-										{isSavingAttendance ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+									<Button
+										onClick={handleSaveAttendance}
+										disabled={isSavingAttendance}
+										className="mt-4 bg-[#0517B0] hover:bg-blue-800 text-white"
+									>
+										{isSavingAttendance ? (
+											<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+										) : (
+											<Save className="w-4 h-4 mr-2" />
+										)}
 										Simpan Presensi
 									</Button>
 								)}

@@ -1,10 +1,14 @@
-import { mkdir } from "node:fs/promises";
-import { join, extname } from "node:path";
-import { unlink } from "node:fs/promises";
+import { mkdir, unlink } from "node:fs/promises";
+import { extname, join } from "node:path";
 import { asc, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../../db";
-import { departureAssessments, departureAssessmentNotes, students, users } from "../../db/schema";
+import {
+	departureAssessmentNotes,
+	departureAssessments,
+	students,
+	users,
+} from "../../db/schema";
 
 function computeStatus(
 	score: number | null | undefined,
@@ -33,33 +37,42 @@ export const departureAssessmentRoutes = new Elysia()
 			return { success: false, message: "Forbidden" };
 		}
 
-		const allStudents = await db.query.students.findMany({
-			where: eq(students.isArchived, false),
-			columns: {
-				id: true,
-				name: true,
-				nim: true,
-				program: true,
-				cohort: true,
-				academicYear: true,
-				subProgram: true,
-				period: true,
-			},
-			with: {
-				departureAssessment: true,
-			},
-			orderBy: [asc(students.name)],
-		}).catch(async (err) => {
-			console.error("Drizzle Query API failed for allStudents, falling back:", err);
-			// Standard select fallback
-			const baseStudents = await db.select().from(students).where(eq(students.isArchived, false));
-			const assessments = await db.select().from(departureAssessments);
+		const allStudents = await db.query.students
+			.findMany({
+				where: eq(students.isArchived, false),
+				columns: {
+					id: true,
+					name: true,
+					nim: true,
+					program: true,
+					cohort: true,
+					academicYear: true,
+					subProgram: true,
+					period: true,
+				},
+				with: {
+					departureAssessment: true,
+				},
+				orderBy: [asc(students.name)],
+			})
+			.catch(async (err) => {
+				console.error(
+					"Drizzle Query API failed for allStudents, falling back:",
+					err,
+				);
+				// Standard select fallback
+				const baseStudents = await db
+					.select()
+					.from(students)
+					.where(eq(students.isArchived, false));
+				const assessments = await db.select().from(departureAssessments);
 
-			return baseStudents.map(s => ({
-				...s,
-				departureAssessment: assessments.find(a => a.studentId === s.id) || null
-			}));
-		});
+				return baseStudents.map((s) => ({
+					...s,
+					departureAssessment:
+						assessments.find((a) => a.studentId === s.id) || null,
+				}));
+			});
 
 		return { success: true, data: allStudents };
 	})
@@ -112,7 +125,10 @@ export const departureAssessmentRoutes = new Elysia()
 					},
 				});
 			} catch (qErr) {
-				console.error("Drizzle Query API failed, falling back to select:", qErr);
+				console.error(
+					"Drizzle Query API failed, falling back to select:",
+					qErr,
+				);
 				const results = await db
 					.select()
 					.from(departureAssessments)
@@ -121,11 +137,17 @@ export const departureAssessmentRoutes = new Elysia()
 				assessment = results[0] || null;
 			}
 
-			return { success: true, data: { student, assessment: assessment ?? null } };
+			return {
+				success: true,
+				data: { student, assessment: assessment ?? null },
+			};
 		} catch (error: any) {
 			console.error("GET departure-assessment error:", error);
 			set.status = 500;
-			return { success: false, message: error.message || "Internal Server Error" };
+			return {
+				success: false,
+				message: error.message || "Internal Server Error",
+			};
 		}
 	})
 
@@ -374,11 +396,7 @@ export const departureAssessmentRoutes = new Elysia()
 		}
 
 		try {
-			const filePath = join(
-				process.cwd(),
-				"uploads",
-				existing.resultFileUrl,
-			);
+			const filePath = join(process.cwd(), "uploads", existing.resultFileUrl);
 			await unlink(filePath);
 		} catch (_) {
 			// lanjutkan meski file fisik tidak ada

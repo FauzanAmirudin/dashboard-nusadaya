@@ -6,26 +6,11 @@ import {
 	Plus,
 	Search,
 	Trash2,
-	UserCog,
 	Upload,
+	UserCog,
 } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -36,6 +21,16 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -53,7 +48,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { api, API_URL, getToken } from "@/lib/eden";
+import { API_URL, api, getToken } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 
 type UserData = {
@@ -76,7 +71,6 @@ const ROLE_LABELS: Record<string, string> = {
 	dosen: "Dosen",
 	pa: "Pembimbing Akademik",
 	magang: "Tim Magang",
-	evaluator: "Evaluator",
 };
 
 export default function UsersManagementPage() {
@@ -167,7 +161,7 @@ export default function UsersManagementPage() {
 
 			if (!res.ok) throw new Error("Gagal mengunggah foto");
 			const json = await res.json();
-			
+
 			if (json.success && json.url) {
 				setFormData((prev) => ({ ...prev, profilePhotoUrl: json.url }));
 				toast.success("Foto berhasil diunggah");
@@ -190,20 +184,19 @@ export default function UsersManagementPage() {
 
 		try {
 			setIsSubmitting(true);
-			const { error } = await api["manage-users"].post(
-				{
-					username: formData.username,
-					password: formData.password,
-					fullName: formData.fullName,
-					role: formData.role,
-					email: formData.email || undefined,
-					phone: formData.phone || undefined,
-					profilePhotoUrl: formData.profilePhotoUrl || undefined,
-				}
-			);
+			const { error } = await api["manage-users"].post({
+				username: formData.username,
+				password: formData.password,
+				fullName: formData.fullName,
+				role: formData.role,
+				email: formData.email || undefined,
+				phone: formData.phone || undefined,
+				profilePhotoUrl: formData.profilePhotoUrl || undefined,
+			});
 
 			if (error) {
-				const errMsg = (error.value as any)?.message || "Gagal menambahkan pengguna";
+				const errMsg =
+					(error.value as any)?.message || "Gagal menambahkan pengguna";
 				throw new Error(errMsg);
 			}
 
@@ -228,7 +221,7 @@ export default function UsersManagementPage() {
 
 		try {
 			setIsSubmitting(true);
-			
+
 			// Only send fields that are present
 			const payload: any = {
 				fullName: formData.fullName,
@@ -238,15 +231,17 @@ export default function UsersManagementPage() {
 				phone: formData.phone || undefined,
 				profilePhotoUrl: formData.profilePhotoUrl || undefined,
 			};
-			
+
 			if (formData.password) {
 				payload.password = formData.password;
 			}
 
-			const { error } = await api["manage-users"][editingUser.id.toString()].patch(payload);
+			const { error } =
+				await api["manage-users"][editingUser.id.toString()].patch(payload);
 
 			if (error) {
-				const errMsg = (error.value as any)?.message || "Gagal memperbarui pengguna";
+				const errMsg =
+					(error.value as any)?.message || "Gagal memperbarui pengguna";
 				throw new Error(errMsg);
 			}
 
@@ -266,10 +261,12 @@ export default function UsersManagementPage() {
 		if (!userToDelete) return;
 
 		try {
-			const { error } = await api["manage-users"][userToDelete.toString()].delete();
+			const { error } =
+				await api["manage-users"][userToDelete.toString()].delete();
 
 			if (error) {
-				const errMsg = (error.value as any)?.message || "Gagal menghapus pengguna";
+				const errMsg =
+					(error.value as any)?.message || "Gagal menghapus pengguna";
 				throw new Error(errMsg);
 			}
 
@@ -351,7 +348,10 @@ export default function UsersManagementPage() {
 									onChange={(e) => setSearchQuery(e.target.value)}
 								/>
 							</div>
-							<Select value={selectedRole} onValueChange={(val) => setSelectedRole(val || "all")}>
+							<Select
+								value={selectedRole}
+								onValueChange={(val) => setSelectedRole(val || "all")}
+							>
 								<SelectTrigger className="w-[180px] bg-white">
 									<SelectValue placeholder="Semua Peran" />
 								</SelectTrigger>
@@ -600,7 +600,11 @@ export default function UsersManagementPage() {
 							<div className="space-y-2 md:col-span-2">
 								<Label className="flex flex-col items-start text-left gap-1">
 									<span>Password {isAddOpen && " *"}</span>
-									{isEditOpen && <span className="text-xs text-slate-400 font-normal">(Kosongkan jika tidak diubah)</span>}
+									{isEditOpen && (
+										<span className="text-xs text-slate-400 font-normal">
+											(Kosongkan jika tidak diubah)
+										</span>
+									)}
 								</Label>
 								<Input
 									type="password"
@@ -620,7 +624,10 @@ export default function UsersManagementPage() {
 									required={isAddOpen || formData.password.length > 0}
 									value={formData.confirmPassword}
 									onChange={(e) =>
-										setFormData({ ...formData, confirmPassword: e.target.value })
+										setFormData({
+											...formData,
+											confirmPassword: e.target.value,
+										})
 									}
 								/>
 							</div>
@@ -658,12 +665,19 @@ export default function UsersManagementPage() {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Hapus Pengguna?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Apakah Anda yakin ingin menghapus pengguna ini? Tindakan ini tidak dapat dibatalkan dan semua data terkait pengguna ini (termasuk riwayat yang diinput) berisiko kehilangan referensi pembuatnya.
+							Apakah Anda yakin ingin menghapus pengguna ini? Tindakan ini tidak
+							dapat dibatalkan dan semua data terkait pengguna ini (termasuk
+							riwayat yang diinput) berisiko kehilangan referensi pembuatnya.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel onClick={() => setUserToDelete(null)}>Batal</AlertDialogCancel>
-						<AlertDialogAction onClick={handleDelete} className="bg-rose-600 hover:bg-rose-700">
+						<AlertDialogCancel onClick={() => setUserToDelete(null)}>
+							Batal
+						</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={handleDelete}
+							className="bg-rose-600 hover:bg-rose-700"
+						>
 							Ya, Hapus
 						</AlertDialogAction>
 					</AlertDialogFooter>

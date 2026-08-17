@@ -1,21 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import {
 	AlertTriangle,
 	CheckCircle,
 	ChevronDown,
 	ChevronUp,
 	Clock,
+	Loader2,
 	MessageCircle,
 	MessageSquare,
-	Loader2,
 	Plus,
 	Save,
 	Trash2,
 	Users,
 	X,
 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
 	AlertDialog,
@@ -167,10 +167,7 @@ function SectionCard({
 								className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
 								style={{ backgroundColor: `${accentColor}20` }}
 							>
-								<Icon
-									className="w-3.5 h-3.5"
-									style={{ color: accentColor }}
-								/>
+								<Icon className="w-3.5 h-3.5" style={{ color: accentColor }} />
 							</span>
 							{title}
 							{count > 0 && (
@@ -357,9 +354,7 @@ function CounselingSection({
 							/>
 						</div>
 						<div className="flex justify-between items-center gap-2">
-							<Badge
-								className={`${condCfg.className} border text-xs`}
-							>
+							<Badge className={`${condCfg.className} border text-xs`}>
 								{condCfg.label}
 							</Badge>
 							<div className="flex gap-2">
@@ -404,8 +399,7 @@ function CounselingSection({
 					<div className="space-y-2">
 						{logs.map((log) => {
 							const cfg =
-								CONDITION_CONFIG[log.condition] ??
-								CONDITION_CONFIG.Stabil;
+								CONDITION_CONFIG[log.condition] ?? CONDITION_CONFIG.Stabil;
 							const CondIcon = cfg.icon;
 							return (
 								<div
@@ -490,8 +484,7 @@ function TripartiteSection({
 }) {
 	const [showForm, setShowForm] = useState(false);
 	const [formData, setFormData] = useState({
-		contactType:
-			filterType === "orang-tua" ? "Orang Tua" : "Mitra PJTKI",
+		contactType: filterType === "orang-tua" ? "Orang Tua" : "Mitra PJTKI",
 		contactName: "",
 		contactDate: new Date().toISOString().split("T")[0],
 		summary: "",
@@ -588,9 +581,7 @@ function TripartiteSection({
 							backgroundColor: `${accentColor}08`,
 						}}
 					>
-						<p className="text-xs font-semibold text-slate-600">
-							Tambah Log
-						</p>
+						<p className="text-xs font-semibold text-slate-600">Tambah Log</p>
 						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 							{filterType === "lapangan" && (
 								<div className="space-y-1.5">
@@ -610,9 +601,7 @@ function TripartiteSection({
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="Mitra PJTKI">
-												Mitra PJTKI
-											</SelectItem>
+											<SelectItem value="Mitra PJTKI">Mitra PJTKI</SelectItem>
 											<SelectItem value="Koordinator Lapangan">
 												Koordinator Lapangan
 											</SelectItem>
@@ -747,8 +736,7 @@ function TripartiteSection({
 										</p>
 										{log.result && (
 											<p className="text-xs text-slate-500 mt-1">
-												<span className="font-medium">Hasil:</span>{" "}
-												{log.result}
+												<span className="font-medium">Hasil:</span> {log.result}
 											</p>
 										)}
 									</div>
@@ -818,23 +806,20 @@ function InterviewSection({
 		}
 		setIsSaving(true);
 		try {
-			const res = await fetch(
-				`${API_URL}/students/${studentId}/pa/interview`,
-				{
-					method: "POST",
-					headers: {
-						Authorization: `Bearer ${getToken()}`,
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify({
-						interviewDate: new Date(formData.interviewDate).toISOString(),
-						companyName: formData.companyName,
-						country: formData.country || null,
-						result: formData.result,
-						notes: formData.notes || null,
-					}),
+			const res = await fetch(`${API_URL}/students/${studentId}/pa/interview`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${getToken()}`,
+					"Content-Type": "application/json",
 				},
-			);
+				body: JSON.stringify({
+					interviewDate: new Date(formData.interviewDate).toISOString(),
+					companyName: formData.companyName,
+					country: formData.country || null,
+					result: formData.result,
+					notes: formData.notes || null,
+				}),
+			});
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			toast.success("Log interview ditambahkan");
 			setShowForm(false);
@@ -875,192 +860,192 @@ function InterviewSection({
 
 	return (
 		<div className="space-y-4">
-				{canEdit && showForm && (
-					<div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 space-y-3">
-						<p className="text-xs font-semibold text-slate-600">
-							Tambah Log Interview
-						</p>
-						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-							<div className="space-y-1.5">
-								<Label className="text-xs font-medium text-slate-600">
-									Tanggal Interview
-								</Label>
-								<Input
-									type="date"
-									value={formData.interviewDate}
-									onChange={(e) =>
-										setFormData((p) => ({
-											...p,
-											interviewDate: e.target.value,
-										}))
-									}
-									className="h-9 text-sm"
-								/>
-							</div>
-							<div className="space-y-1.5">
-								<Label className="text-xs font-medium text-slate-600">
-									Nama Perusahaan
-								</Label>
-								<Input
-									placeholder="Nama perusahaan..."
-									value={formData.companyName}
-									onChange={(e) =>
-										setFormData((p) => ({
-											...p,
-											companyName: e.target.value,
-										}))
-									}
-									className="h-9 text-sm"
-								/>
-							</div>
-							<div className="space-y-1.5">
-								<Label className="text-xs font-medium text-slate-600">
-									Negara (opsional)
-								</Label>
-								<Input
-									placeholder="Negara tujuan..."
-									value={formData.country}
-									onChange={(e) =>
-										setFormData((p) => ({
-											...p,
-											country: e.target.value,
-										}))
-									}
-									className="h-9 text-sm"
-								/>
-							</div>
-							<div className="space-y-1.5">
-								<Label className="text-xs font-medium text-slate-600">
-									Hasil
-								</Label>
-								<Select
-									value={formData.result}
-									onValueChange={(v) =>
-										setFormData((p) => ({ ...p, result: v ?? "Menunggu" }))
-									}
-								>
-									<SelectTrigger className="h-9 text-sm">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="Menunggu">Menunggu</SelectItem>
-										<SelectItem value="Lulus">Lulus</SelectItem>
-										<SelectItem value="Tidak Lulus">Tidak Lulus</SelectItem>
-									</SelectContent>
-								</Select>
-							</div>
+			{canEdit && showForm && (
+				<div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 space-y-3">
+					<p className="text-xs font-semibold text-slate-600">
+						Tambah Log Interview
+					</p>
+					<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+						<div className="space-y-1.5">
+							<Label className="text-xs font-medium text-slate-600">
+								Tanggal Interview
+							</Label>
+							<Input
+								type="date"
+								value={formData.interviewDate}
+								onChange={(e) =>
+									setFormData((p) => ({
+										...p,
+										interviewDate: e.target.value,
+									}))
+								}
+								className="h-9 text-sm"
+							/>
 						</div>
 						<div className="space-y-1.5">
 							<Label className="text-xs font-medium text-slate-600">
-								Catatan (opsional)
+								Nama Perusahaan
 							</Label>
-							<Textarea
-								placeholder="Catatan hasil pendampingan..."
-								value={formData.notes}
+							<Input
+								placeholder="Nama perusahaan..."
+								value={formData.companyName}
 								onChange={(e) =>
-									setFormData((p) => ({ ...p, notes: e.target.value }))
+									setFormData((p) => ({
+										...p,
+										companyName: e.target.value,
+									}))
 								}
-								rows={2}
-								className="resize-none text-sm"
+								className="h-9 text-sm"
 							/>
 						</div>
-						<div className="flex justify-end gap-2">
-							<Button
-								size="sm"
-								variant="outline"
-								onClick={() => setShowForm(false)}
-								className="h-8 text-xs gap-1"
+						<div className="space-y-1.5">
+							<Label className="text-xs font-medium text-slate-600">
+								Negara (opsional)
+							</Label>
+							<Input
+								placeholder="Negara tujuan..."
+								value={formData.country}
+								onChange={(e) =>
+									setFormData((p) => ({
+										...p,
+										country: e.target.value,
+									}))
+								}
+								className="h-9 text-sm"
+							/>
+						</div>
+						<div className="space-y-1.5">
+							<Label className="text-xs font-medium text-slate-600">
+								Hasil
+							</Label>
+							<Select
+								value={formData.result}
+								onValueChange={(v) =>
+									setFormData((p) => ({ ...p, result: v ?? "Menunggu" }))
+								}
 							>
-								<X className="w-3.5 h-3.5" />
-								Batal
-							</Button>
-							<Button
-								size="sm"
-								onClick={handleAdd}
-								disabled={isSaving}
-								className="h-8 text-xs gap-1.5 bg-violet-600 hover:bg-violet-700 text-white"
-							>
-								{isSaving ? (
-									<Loader2 className="w-3.5 h-3.5 animate-spin" />
-								) : (
-									<Save className="w-3.5 h-3.5" />
-								)}
-								Simpan
-							</Button>
+								<SelectTrigger className="h-9 text-sm">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="Menunggu">Menunggu</SelectItem>
+									<SelectItem value="Lulus">Lulus</SelectItem>
+									<SelectItem value="Tidak Lulus">Tidak Lulus</SelectItem>
+								</SelectContent>
+							</Select>
 						</div>
 					</div>
-				)}
-
-				{logs.length === 0 && !showForm ? (
-					<div className="text-center py-6 text-slate-400">
-						<MessageSquare className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-						<p className="text-sm">Belum ada log pendampingan interview</p>
+					<div className="space-y-1.5">
+						<Label className="text-xs font-medium text-slate-600">
+							Catatan (opsional)
+						</Label>
+						<Textarea
+							placeholder="Catatan hasil pendampingan..."
+							value={formData.notes}
+							onChange={(e) =>
+								setFormData((p) => ({ ...p, notes: e.target.value }))
+							}
+							rows={2}
+							className="resize-none text-sm"
+						/>
 					</div>
-				) : (
-					<div className="space-y-2">
-						{logs.map((log) => (
-							<div
-								key={log.id}
-								className="p-3.5 rounded-lg border border-slate-100 bg-slate-50/60 hover:bg-white hover:border-slate-200 hover:shadow-sm transition-all duration-150 group"
-							>
-								<div className="flex items-start justify-between gap-2">
-									<div className="flex-1 min-w-0">
-										<div className="flex flex-wrap items-center gap-2 mb-1.5">
-											<span className="text-sm font-semibold text-slate-800">
-												{log.companyName}
+					<div className="flex justify-end gap-2">
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={() => setShowForm(false)}
+							className="h-8 text-xs gap-1"
+						>
+							<X className="w-3.5 h-3.5" />
+							Batal
+						</Button>
+						<Button
+							size="sm"
+							onClick={handleAdd}
+							disabled={isSaving}
+							className="h-8 text-xs gap-1.5 bg-violet-600 hover:bg-violet-700 text-white"
+						>
+							{isSaving ? (
+								<Loader2 className="w-3.5 h-3.5 animate-spin" />
+							) : (
+								<Save className="w-3.5 h-3.5" />
+							)}
+							Simpan
+						</Button>
+					</div>
+				</div>
+			)}
+
+			{logs.length === 0 && !showForm ? (
+				<div className="text-center py-6 text-slate-400">
+					<MessageSquare className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+					<p className="text-sm">Belum ada log pendampingan interview</p>
+				</div>
+			) : (
+				<div className="space-y-2">
+					{logs.map((log) => (
+						<div
+							key={log.id}
+							className="p-3.5 rounded-lg border border-slate-100 bg-slate-50/60 hover:bg-white hover:border-slate-200 hover:shadow-sm transition-all duration-150 group"
+						>
+							<div className="flex items-start justify-between gap-2">
+								<div className="flex-1 min-w-0">
+									<div className="flex flex-wrap items-center gap-2 mb-1.5">
+										<span className="text-sm font-semibold text-slate-800">
+											{log.companyName}
+										</span>
+										{log.country && (
+											<span className="text-xs text-slate-500">
+												· {log.country}
 											</span>
-											{log.country && (
-												<span className="text-xs text-slate-500">
-													· {log.country}
-												</span>
-											)}
-											<span className="text-xs text-slate-400 flex items-center gap-1">
-												<Clock className="w-3 h-3" />
-												{formatDate(log.interviewDate)}
-											</span>
-											<Badge
-												className={`${RESULT_CONFIG[log.result] ?? "bg-slate-100 text-slate-600 border-slate-200"} border text-[10px] px-1.5 py-0`}
-											>
-												{log.result}
-											</Badge>
-										</div>
-										{log.notes && (
-											<p className="text-sm text-slate-600 leading-relaxed">
-												{log.notes}
-											</p>
 										)}
-									</div>
-									{canEdit && (
-										<button
-											type="button"
-											onClick={() => handleDelete(log.id)}
-											disabled={deletingId === log.id}
-											className="shrink-0 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-all disabled:opacity-50"
+										<span className="text-xs text-slate-400 flex items-center gap-1">
+											<Clock className="w-3 h-3" />
+											{formatDate(log.interviewDate)}
+										</span>
+										<Badge
+											className={`${RESULT_CONFIG[log.result] ?? "bg-slate-100 text-slate-600 border-slate-200"} border text-[10px] px-1.5 py-0`}
 										>
-											{deletingId === log.id ? (
-												<Loader2 className="w-3.5 h-3.5 animate-spin" />
-											) : (
-												<Trash2 className="w-3.5 h-3.5" />
-											)}
-										</button>
+											{log.result}
+										</Badge>
+									</div>
+									{log.notes && (
+										<p className="text-sm text-slate-600 leading-relaxed">
+											{log.notes}
+										</p>
 									)}
 								</div>
+								{canEdit && (
+									<button
+										type="button"
+										onClick={() => handleDelete(log.id)}
+										disabled={deletingId === log.id}
+										className="shrink-0 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-all disabled:opacity-50"
+									>
+										{deletingId === log.id ? (
+											<Loader2 className="w-3.5 h-3.5 animate-spin" />
+										) : (
+											<Trash2 className="w-3.5 h-3.5" />
+										)}
+									</button>
+								)}
 							</div>
-						))}
-					</div>
-				)}
+						</div>
+					))}
+				</div>
+			)}
 
-				{canEdit && !showForm && (
-					<button
-						type="button"
-						onClick={() => setShowForm(true)}
-						className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-slate-200 rounded-lg text-xs text-slate-400 hover:border-slate-300 hover:text-slate-600 hover:bg-slate-50 transition-colors"
-					>
-						<Plus className="w-3.5 h-3.5" />
-						Tambah Log Interview
-					</button>
-				)}
-			</div>
+			{canEdit && !showForm && (
+				<button
+					type="button"
+					onClick={() => setShowForm(true)}
+					className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-slate-200 rounded-lg text-xs text-slate-400 hover:border-slate-300 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+				>
+					<Plus className="w-3.5 h-3.5" />
+					Tambah Log Interview
+				</button>
+			)}
+		</div>
 	);
 }
 
@@ -1146,21 +1131,21 @@ function StudentNotesSection({
 	return (
 		<>
 			<div className="space-y-4">
-			<div className="flex items-center justify-between">
-				<h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-					<AlertTriangle className="w-4 h-4" style={{ color: accentColor }} />
-					{title}
-					{notes.length > 0 && (
-						<span
-							className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white"
-							style={{ backgroundColor: accentColor }}
-						>
-							{notes.length}
-						</span>
-					)}
-				</h4>
-			</div>
-			<div className="space-y-4">
+				<div className="flex items-center justify-between">
+					<h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+						<AlertTriangle className="w-4 h-4" style={{ color: accentColor }} />
+						{title}
+						{notes.length > 0 && (
+							<span
+								className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white"
+								style={{ backgroundColor: accentColor }}
+							>
+								{notes.length}
+							</span>
+						)}
+					</h4>
+				</div>
+				<div className="space-y-4">
 					{canEdit && showForm && (
 						<div
 							className="rounded-xl border p-4 space-y-3"
@@ -1271,10 +1256,7 @@ function StudentNotesSection({
 				</div>
 			</div>
 
-			<AlertDialog
-				open={showDeleteDialog}
-				onOpenChange={setShowDeleteDialog}
-			>
+			<AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
 						<AlertDialogTitle>Hapus Catatan?</AlertDialogTitle>
@@ -1283,9 +1265,7 @@ function StudentNotesSection({
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel disabled={!!deletingId}>
-							Batal
-						</AlertDialogCancel>
+						<AlertDialogCancel disabled={!!deletingId}>Batal</AlertDialogCancel>
 						<AlertDialogAction
 							onClick={handleDelete}
 							disabled={!!deletingId}
@@ -1312,10 +1292,9 @@ export function TabKonseling({ studentId, canEdit }: Props) {
 	const fetchData = useCallback(async () => {
 		setIsLoading(true);
 		try {
-			const res = await fetch(
-				`${API_URL}/students/${studentId}/pa`,
-				{ headers: { Authorization: `Bearer ${getToken()}` } },
-			);
+			const res = await fetch(`${API_URL}/students/${studentId}/pa`, {
+				headers: { Authorization: `Bearer ${getToken()}` },
+			});
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const json = await res.json();
 			const d = json.data;

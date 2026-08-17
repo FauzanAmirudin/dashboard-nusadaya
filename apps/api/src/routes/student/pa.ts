@@ -87,7 +87,10 @@ export const paRoutes = new Elysia()
 				orderBy: [desc(paHafalanSessions.createdAt)],
 			})
 			.catch(() =>
-				db.select().from(paHafalanSessions).where(eq(paHafalanSessions.studentId, id)),
+				db
+					.select()
+					.from(paHafalanSessions)
+					.where(eq(paHafalanSessions.studentId, id)),
 			);
 
 		const studentNotes = await db.query.paStudentNotes
@@ -99,7 +102,10 @@ export const paRoutes = new Elysia()
 				orderBy: [desc(paStudentNotes.createdAt)],
 			})
 			.catch(() =>
-				db.select().from(paStudentNotes).where(eq(paStudentNotes.studentId, id)),
+				db
+					.select()
+					.from(paStudentNotes)
+					.where(eq(paStudentNotes.studentId, id)),
 			);
 
 		return {
@@ -122,7 +128,12 @@ export const paRoutes = new Elysia()
 			const user = (context as any).user;
 			const id = Number(params.id);
 
-			if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+			if (
+				!user ||
+				(user.role !== "pa" &&
+					user.role !== "superadmin" &&
+					user.role !== "akademik")
+			) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -182,7 +193,12 @@ export const paRoutes = new Elysia()
 			const user = (context as any).user;
 			const id = Number(params.id);
 
-			if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+			if (
+				!user ||
+				(user.role !== "pa" &&
+					user.role !== "superadmin" &&
+					user.role !== "akademik")
+			) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -209,7 +225,12 @@ export const paRoutes = new Elysia()
 		const user = (context as any).user;
 		const logId = Number(params.logId);
 
-		if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+		if (
+			!user ||
+			(user.role !== "pa" &&
+				user.role !== "superadmin" &&
+				user.role !== "akademik")
+		) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -224,7 +245,12 @@ export const paRoutes = new Elysia()
 			const user = (context as any).user;
 			const id = Number(params.id);
 
-			if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+			if (
+				!user ||
+				(user.role !== "pa" &&
+					user.role !== "superadmin" &&
+					user.role !== "akademik")
+			) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -239,21 +265,26 @@ export const paRoutes = new Elysia()
 
 			return { success: true };
 		},
-			{
-				body: t.Object({
-					type: t.Optional(t.String()),
-					condition: t.String(),
-					date: t.String(),
-					notes: t.String(),
-				}),
-			},
-		)
+		{
+			body: t.Object({
+				type: t.Optional(t.String()),
+				condition: t.String(),
+				date: t.String(),
+				notes: t.String(),
+			}),
+		},
+	)
 	.delete("/:id/pa/counseling/:logId", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
 		const logId = Number(params.logId);
 
-		if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+		if (
+			!user ||
+			(user.role !== "pa" &&
+				user.role !== "superadmin" &&
+				user.role !== "akademik")
+		) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -267,11 +298,17 @@ export const paRoutes = new Elysia()
 			const { params, body, set } = context;
 			const user = (context as any).user;
 			const id = Number(params.id);
-			if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+			if (
+				!user ||
+				(user.role !== "pa" &&
+					user.role !== "superadmin" &&
+					user.role !== "akademik")
+			) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
-			const { language, languageCustom, vocabCount, sentenceCount } = body as any;
+			const { language, languageCustom, vocabCount, sentenceCount } =
+				body as any;
 			const inserted = await db
 				.insert(paHafalanSessions)
 				.values({
@@ -299,12 +336,18 @@ export const paRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+			if (
+				!user ||
+				(user.role !== "pa" &&
+					user.role !== "superadmin" &&
+					user.role !== "akademik")
+			) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
 			const logId = Number(params.logId);
-			const { language, languageCustom, vocabCount, sentenceCount } = body as any;
+			const { language, languageCustom, vocabCount, sentenceCount } =
+				body as any;
 			await db
 				.update(paHafalanSessions)
 				.set({
@@ -329,11 +372,18 @@ export const paRoutes = new Elysia()
 	.delete("/:id/pa/hafalan/:logId", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+		if (
+			!user ||
+			(user.role !== "pa" &&
+				user.role !== "superadmin" &&
+				user.role !== "akademik")
+		) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
-		await db.delete(paHafalanSessions).where(eq(paHafalanSessions.id, Number(params.logId)));
+		await db
+			.delete(paHafalanSessions)
+			.where(eq(paHafalanSessions.id, Number(params.logId)));
 		return { success: true };
 	})
 	.post(
@@ -342,7 +392,12 @@ export const paRoutes = new Elysia()
 			const { params, body, set } = context;
 			const user = (context as any).user;
 			const id = Number(params.id);
-			if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+			if (
+				!user ||
+				(user.role !== "pa" &&
+					user.role !== "superadmin" &&
+					user.role !== "akademik")
+			) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -370,7 +425,12 @@ export const paRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+			if (
+				!user ||
+				(user.role !== "pa" &&
+					user.role !== "superadmin" &&
+					user.role !== "akademik")
+			) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -389,11 +449,18 @@ export const paRoutes = new Elysia()
 	.delete("/:id/pa/student-notes/:noteId", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!user || (user.role !== "pa" && user.role !== "superadmin" && user.role !== "akademik")) {
+		if (
+			!user ||
+			(user.role !== "pa" &&
+				user.role !== "superadmin" &&
+				user.role !== "akademik")
+		) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
-		await db.delete(paStudentNotes).where(eq(paStudentNotes.id, Number(params.noteId)));
+		await db
+			.delete(paStudentNotes)
+			.where(eq(paStudentNotes.id, Number(params.noteId)));
 		return { success: true };
 	})
 	.post("/:id/pa/acc", async ({ params, set, user }: any) => {
@@ -431,7 +498,11 @@ export const paRoutes = new Elysia()
 		return { success: true };
 	})
 	.post("/:id/pa/tripartite", async ({ params, body, set, user }: any) => {
-		if (user?.role !== "pa" && user?.role !== "superadmin" && user?.role !== "akademik") {
+		if (
+			user?.role !== "pa" &&
+			user?.role !== "superadmin" &&
+			user?.role !== "akademik"
+		) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -447,7 +518,11 @@ export const paRoutes = new Elysia()
 		return { success: true };
 	})
 	.delete("/:id/pa/tripartite/:logId", async ({ params, set, user }: any) => {
-		if (user?.role !== "pa" && user?.role !== "superadmin" && user?.role !== "akademik") {
+		if (
+			user?.role !== "pa" &&
+			user?.role !== "superadmin" &&
+			user?.role !== "akademik"
+		) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -457,7 +532,11 @@ export const paRoutes = new Elysia()
 		return { success: true };
 	})
 	.post("/:id/pa/interview", async ({ params, body, set, user }: any) => {
-		if (user?.role !== "pa" && user?.role !== "superadmin" && user?.role !== "akademik") {
+		if (
+			user?.role !== "pa" &&
+			user?.role !== "superadmin" &&
+			user?.role !== "akademik"
+		) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -473,7 +552,11 @@ export const paRoutes = new Elysia()
 		return { success: true };
 	})
 	.delete("/:id/pa/interview/:logId", async ({ params, set, user }: any) => {
-		if (user?.role !== "pa" && user?.role !== "superadmin" && user?.role !== "akademik") {
+		if (
+			user?.role !== "pa" &&
+			user?.role !== "superadmin" &&
+			user?.role !== "akademik"
+		) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}

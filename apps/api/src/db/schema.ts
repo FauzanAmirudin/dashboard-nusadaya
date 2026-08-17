@@ -67,10 +67,7 @@ export const formResponseStatusEnum = pgEnum("form_response_status", [
 	"REJECTED",
 ]);
 
-export const courseTypeEnum = pgEnum("course_type", [
-	"teori",
-	"praktik",
-]);
+export const courseTypeEnum = pgEnum("course_type", ["teori", "praktik"]);
 
 export const meetingTypeEnum = pgEnum("meeting_type", [
 	"pkkmb",
@@ -219,6 +216,18 @@ export const pmbData = pgTable("pmb_data", {
 	roReferral: text("ro_referral"),
 	mitraSponsor: text("mitra_sponsor"),
 	koordinator: text("koordinator"),
+
+	// 10 Dokumen Tambahan PMB Validation Checks
+	docKtp: boolean("doc_ktp").default(false),
+	docKk: boolean("doc_kk").default(false),
+	docCv: boolean("doc_cv").default(false),
+	docIjazah: boolean("doc_ijazah").default(false),
+	docTranskrip: boolean("doc_transkrip").default(false),
+	docPassportDepan: boolean("doc_passport_depan").default(false),
+	docPassportVisa: boolean("doc_passport_visa").default(false),
+	docSkbm: boolean("doc_skbm").default(false),
+	docMcu: boolean("doc_mcu").default(false),
+	docSertifikasiBahasa: boolean("doc_sertifikasi_bahasa").default(false),
 
 	// Finance Integration
 	rumahJuang: boolean("rumah_juang").default(false),
@@ -552,8 +561,9 @@ export const practicesBudgetRequests = pgTable("practices_budget_requests", {
 	dosenId: integer("dosen_id")
 		.references(() => users.id)
 		.notNull(),
-	namaKelas: text("nama_kelas"),
-	mataKuliah: text("mata_kuliah").notNull(),
+	courseId: integer("course_id")
+		.references(() => courses.id)
+		.notNull(),
 	daftarKebutuhan: jsonb("daftar_kebutuhan").notNull(), // array of { namaItem, jumlah, satuanHarga }
 	totalNominal: integer("total_nominal").default(0),
 	status: text("status").default("menunggu"), // "menunggu" | "disetujui" | "ditolak"
@@ -578,6 +588,39 @@ export const practicesMaterialReports = pgTable("practices_material_reports", {
 	fileName: text("file_name"),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const practicesBudgetRequestsRelations = relations(
+	practicesBudgetRequests,
+	({ one, many }) => ({
+		dosen: one(users, {
+			fields: [practicesBudgetRequests.dosenId],
+			references: [users.id],
+		}),
+		course: one(courses, {
+			fields: [practicesBudgetRequests.courseId],
+			references: [courses.id],
+		}),
+		approvedBy: one(users, {
+			fields: [practicesBudgetRequests.approvedBy],
+			references: [users.id],
+		}),
+		materialReports: many(practicesMaterialReports),
+	}),
+);
+
+export const practicesMaterialReportsRelations = relations(
+	practicesMaterialReports,
+	({ one }) => ({
+		budgetRequest: one(practicesBudgetRequests, {
+			fields: [practicesMaterialReports.budgetRequestId],
+			references: [practicesBudgetRequests.id],
+		}),
+		dosen: one(users, {
+			fields: [practicesMaterialReports.dosenId],
+			references: [users.id],
+		}),
+	}),
+);
 
 // 6. Academic Data
 export const academicData = pgTable("academic_data", {
@@ -608,7 +651,9 @@ export const academicData = pgTable("academic_data", {
 	attendanceOdsTotal: integer("attendance_ods_total").default(0),
 	attendanceOdsPresent: integer("attendance_ods_present").default(0),
 	attendancePramagangTotal: integer("attendance_pramagang_total").default(0),
-	attendancePramagangPresent: integer("attendance_pramagang_present").default(0),
+	attendancePramagangPresent: integer("attendance_pramagang_present").default(
+		0,
+	),
 
 	isAcc: boolean("is_acc").default(false),
 	accAt: timestamp("acc_at"),
@@ -617,26 +662,31 @@ export const academicData = pgTable("academic_data", {
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const overseasProgramChecklists = pgTable("overseas_program_checklists", {
-	id: serial("id").primaryKey(),
-	studentId: integer("student_id").references(() => students.id).notNull(),
-	programType: text("program_type").notNull().default("taiwan"), // e.g., 'taiwan'
-	cohort: text("cohort"), // e.g. '13/14'
-	pasFotoChecked: boolean("pas_foto_checked").default(false),
-	cvChecked: boolean("cv_checked").default(false),
-	ktmChecked: boolean("ktm_checked").default(false),
-	khsChecked: boolean("khs_checked").default(false),
-	sl21Checked: boolean("sl21_checked").default(false),
-	aktifChecked: boolean("aktif_checked").default(false),
-	gapYearChecked: boolean("gap_year_checked").default(false),
-	pddiktiChecked: boolean("pddikti_checked").default(false),
-	pribadiChecked: boolean("pribadi_checked").default(false),
-	lolChecked: boolean("lol_checked").default(false),
-	loaChecked: boolean("loa_checked").default(false),
-	suhhanChecked: boolean("suhhan_checked").default(false),
-	createdAt: timestamp("created_at").defaultNow().notNull(),
-	updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const overseasProgramChecklists = pgTable(
+	"overseas_program_checklists",
+	{
+		id: serial("id").primaryKey(),
+		studentId: integer("student_id")
+			.references(() => students.id)
+			.notNull(),
+		programType: text("program_type").notNull().default("taiwan"), // e.g., 'taiwan'
+		cohort: text("cohort"), // e.g. '13/14'
+		pasFotoChecked: boolean("pas_foto_checked").default(false),
+		cvChecked: boolean("cv_checked").default(false),
+		ktmChecked: boolean("ktm_checked").default(false),
+		khsChecked: boolean("khs_checked").default(false),
+		sl21Checked: boolean("sl21_checked").default(false),
+		aktifChecked: boolean("aktif_checked").default(false),
+		gapYearChecked: boolean("gap_year_checked").default(false),
+		pddiktiChecked: boolean("pddikti_checked").default(false),
+		pribadiChecked: boolean("pribadi_checked").default(false),
+		lolChecked: boolean("lol_checked").default(false),
+		loaChecked: boolean("loa_checked").default(false),
+		suhhanChecked: boolean("suhhan_checked").default(false),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+);
 
 export const academicDocuments = pgTable("academic_documents", {
 	id: serial("id").primaryKey(),
@@ -1227,23 +1277,29 @@ export const financeDocumentsRelations = relations(
 	}),
 );
 
-export const academicDataRelations = relations(academicData, ({ one, many }) => ({
-	student: one(students, {
-		fields: [academicData.studentId],
-		references: [students.id],
+export const academicDataRelations = relations(
+	academicData,
+	({ one, many }) => ({
+		student: one(students, {
+			fields: [academicData.studentId],
+			references: [students.id],
+		}),
+		accBy: one(users, {
+			fields: [academicData.accBy],
+			references: [users.id],
+		}),
 	}),
-	accBy: one(users, {
-		fields: [academicData.accBy],
-		references: [users.id],
-	}),
-}));
+);
 
-export const overseasProgramChecklistsRelations = relations(overseasProgramChecklists, ({ one }) => ({
-	student: one(students, {
-		fields: [overseasProgramChecklists.studentId],
-		references: [students.id],
+export const overseasProgramChecklistsRelations = relations(
+	overseasProgramChecklists,
+	({ one }) => ({
+		student: one(students, {
+			fields: [overseasProgramChecklists.studentId],
+			references: [students.id],
+		}),
 	}),
-}));
+);
 
 export const academicDocumentsRelations = relations(
 	academicDocuments,
@@ -1378,37 +1434,58 @@ export const studentsRelations = relations(students, ({ one, many }) => ({
 	}),
 }));
 
-export const departureAssessmentsRelations = relations(departureAssessments, ({ one, many }) => ({
-	student: one(students, {
-		fields: [departureAssessments.studentId],
-		references: [students.id],
+export const departureAssessmentsRelations = relations(
+	departureAssessments,
+	({ one, many }) => ({
+		student: one(students, {
+			fields: [departureAssessments.studentId],
+			references: [students.id],
+		}),
+		assessedByUser: one(users, {
+			fields: [departureAssessments.assessedBy],
+			references: [users.id],
+		}),
+		notes: many(departureAssessmentNotes),
 	}),
-	assessedByUser: one(users, {
-		fields: [departureAssessments.assessedBy],
-		references: [users.id],
-	}),
-	notes: many(departureAssessmentNotes),
-}));
+);
 
-export const departureAssessmentNotesRelations = relations(departureAssessmentNotes, ({ one }) => ({
-	assessment: one(departureAssessments, {
-		fields: [departureAssessmentNotes.assessmentId],
-		references: [departureAssessments.id],
+export const departureAssessmentNotesRelations = relations(
+	departureAssessmentNotes,
+	({ one }) => ({
+		assessment: one(departureAssessments, {
+			fields: [departureAssessmentNotes.assessmentId],
+			references: [departureAssessments.id],
+		}),
+		author: one(users, {
+			fields: [departureAssessmentNotes.createdBy],
+			references: [users.id],
+		}),
 	}),
-	author: one(users, {
-		fields: [departureAssessmentNotes.createdBy],
-		references: [users.id],
-	}),
-}));
+);
 
-export const paHafalanSessionsRelations = relations(paHafalanSessions, ({ one }) => ({
-	student: one(students, { fields: [paHafalanSessions.studentId], references: [students.id] }),
-	createdByUser: one(users, { fields: [paHafalanSessions.createdBy], references: [users.id] }),
-}));
+export const paHafalanSessionsRelations = relations(
+	paHafalanSessions,
+	({ one }) => ({
+		student: one(students, {
+			fields: [paHafalanSessions.studentId],
+			references: [students.id],
+		}),
+		createdByUser: one(users, {
+			fields: [paHafalanSessions.createdBy],
+			references: [users.id],
+		}),
+	}),
+);
 
 export const paStudentNotesRelations = relations(paStudentNotes, ({ one }) => ({
-	student: one(students, { fields: [paStudentNotes.studentId], references: [students.id] }),
-	createdByUser: one(users, { fields: [paStudentNotes.createdBy], references: [users.id] }),
+	student: one(students, {
+		fields: [paStudentNotes.studentId],
+		references: [students.id],
+	}),
+	createdByUser: one(users, {
+		fields: [paStudentNotes.createdBy],
+		references: [users.id],
+	}),
 }));
 
 export const studentParentsRelations = relations(studentParents, ({ one }) => ({
@@ -1767,7 +1844,9 @@ export const academicCalendars = pgTable("academic_calendars", {
 
 export const academicPeriods = pgTable("academic_periods", {
 	id: serial("id").primaryKey(),
-	calendarId: integer("calendar_id").notNull().references(() => academicCalendars.id, { onDelete: "cascade" }),
+	calendarId: integer("calendar_id")
+		.notNull()
+		.references(() => academicCalendars.id, { onDelete: "cascade" }),
 	title: text("title").notNull(), // e.g. "Pertemuan 1", "UTS", dsb
 	description: text("description"), // Custom Deskripsi (sesuai UI)
 	periodType: academicPeriodTypeEnum("period_type").notNull(),
@@ -1780,7 +1859,9 @@ export const academicPeriods = pgTable("academic_periods", {
 
 export const academicEvents = pgTable("academic_events", {
 	id: serial("id").primaryKey(),
-	calendarId: integer("calendar_id").notNull().references(() => academicCalendars.id, { onDelete: "cascade" }),
+	calendarId: integer("calendar_id")
+		.notNull()
+		.references(() => academicCalendars.id, { onDelete: "cascade" }),
 	title: text("title").notNull(),
 	description: text("description"),
 	startDate: date("start_date").notNull(),
@@ -1789,21 +1870,27 @@ export const academicEvents = pgTable("academic_events", {
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const academicCalendarsRelations = relations(academicCalendars, ({ many, one }) => ({
-	creator: one(users, {
-		fields: [academicCalendars.createdBy],
-		references: [users.id],
+export const academicCalendarsRelations = relations(
+	academicCalendars,
+	({ many, one }) => ({
+		creator: one(users, {
+			fields: [academicCalendars.createdBy],
+			references: [users.id],
+		}),
+		periods: many(academicPeriods),
+		events: many(academicEvents),
 	}),
-	periods: many(academicPeriods),
-	events: many(academicEvents),
-}));
+);
 
-export const academicPeriodsRelations = relations(academicPeriods, ({ one }) => ({
-	calendar: one(academicCalendars, {
-		fields: [academicPeriods.calendarId],
-		references: [academicCalendars.id],
+export const academicPeriodsRelations = relations(
+	academicPeriods,
+	({ one }) => ({
+		calendar: one(academicCalendars, {
+			fields: [academicPeriods.calendarId],
+			references: [academicCalendars.id],
+		}),
 	}),
-}));
+);
 
 export const academicEventsRelations = relations(academicEvents, ({ one }) => ({
 	calendar: one(academicCalendars, {
@@ -1825,7 +1912,7 @@ export const classSchedules = pgTable("class_schedules", {
 	dayOfWeek: text("day_of_week").notNull(),
 	sessionDate: date("session_date"),
 	startTime: text("start_time").notNull(), // HH:MM format
-	endTime: text("end_time").notNull(),     // HH:MM format
+	endTime: text("end_time").notNull(), // HH:MM format
 	calendarId: integer("calendar_id").references(() => academicCalendars.id),
 	notes: text("notes"),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1886,16 +1973,19 @@ export const classSchedulesRelations = relations(classSchedules, ({ one }) => ({
 	}),
 }));
 
-export const practicumSchedulesRelations = relations(practicumSchedules, ({ one }) => ({
-	dosen: one(users, {
-		fields: [practicumSchedules.dosenId],
-		references: [users.id],
+export const practicumSchedulesRelations = relations(
+	practicumSchedules,
+	({ one }) => ({
+		dosen: one(users, {
+			fields: [practicumSchedules.dosenId],
+			references: [users.id],
+		}),
+		calendar: one(academicCalendars, {
+			fields: [practicumSchedules.calendarId],
+			references: [academicCalendars.id],
+		}),
 	}),
-	calendar: one(academicCalendars, {
-		fields: [practicumSchedules.calendarId],
-		references: [academicCalendars.id],
-	}),
-}));
+);
 
 export const dutySchedulesRelations = relations(dutySchedules, ({ one }) => ({
 	calendar: one(academicCalendars, {
@@ -1914,9 +2004,15 @@ export const announcementsRelations = relations(announcements, ({ one }) => ({
 export const attendanceSessions = pgTable("attendance_sessions", {
 	id: serial("id").primaryKey(),
 	sessionType: text("session_type").notNull(), // "kelas" | "praktikum" | "piket"
-	classScheduleId: integer("class_schedule_id").references(() => classSchedules.id),
-	practicumScheduleId: integer("practicum_schedule_id").references(() => practicumSchedules.id),
-	dutyScheduleId: integer("duty_schedule_id").references(() => dutySchedules.id),
+	classScheduleId: integer("class_schedule_id").references(
+		() => classSchedules.id,
+	),
+	practicumScheduleId: integer("practicum_schedule_id").references(
+		() => practicumSchedules.id,
+	),
+	dutyScheduleId: integer("duty_schedule_id").references(
+		() => dutySchedules.id,
+	),
 	cohort: integer("cohort").notNull(),
 	subject: text("subject").notNull(),
 	sessionDate: date("session_date").notNull(),
@@ -1931,52 +2027,64 @@ export const attendanceSessions = pgTable("attendance_sessions", {
 
 export const attendanceRecords = pgTable("attendance_records", {
 	id: serial("id").primaryKey(),
-	sessionId: integer("session_id").references(() => attendanceSessions.id, { onDelete: "cascade" }).notNull(),
-	studentId: integer("student_id").references(() => students.id).notNull(),
+	sessionId: integer("session_id")
+		.references(() => attendanceSessions.id, { onDelete: "cascade" })
+		.notNull(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
 	status: text("status").notNull(), // "hadir" | "alpha" | "sakit" | "izin"
 	notes: text("notes"),
 	recordedBy: integer("recorded_by").references(() => users.id),
 	recordedAt: timestamp("recorded_at").defaultNow().notNull(),
 });
 
-export const attendanceSessionsRelations = relations(attendanceSessions, ({ one, many }) => ({
-	classSchedule: one(classSchedules, {
-		fields: [attendanceSessions.classScheduleId],
-		references: [classSchedules.id],
+export const attendanceSessionsRelations = relations(
+	attendanceSessions,
+	({ one, many }) => ({
+		classSchedule: one(classSchedules, {
+			fields: [attendanceSessions.classScheduleId],
+			references: [classSchedules.id],
+		}),
+		practicumSchedule: one(practicumSchedules, {
+			fields: [attendanceSessions.practicumScheduleId],
+			references: [practicumSchedules.id],
+		}),
+		dutySchedule: one(dutySchedules, {
+			fields: [attendanceSessions.dutyScheduleId],
+			references: [dutySchedules.id],
+		}),
+		creator: one(users, {
+			fields: [attendanceSessions.createdBy],
+			references: [users.id],
+		}),
+		records: many(attendanceRecords),
 	}),
-	practicumSchedule: one(practicumSchedules, {
-		fields: [attendanceSessions.practicumScheduleId],
-		references: [practicumSchedules.id],
-	}),
-	dutySchedule: one(dutySchedules, {
-		fields: [attendanceSessions.dutyScheduleId],
-		references: [dutySchedules.id],
-	}),
-	creator: one(users, {
-		fields: [attendanceSessions.createdBy],
-		references: [users.id],
-	}),
-	records: many(attendanceRecords),
-}));
+);
 
-export const attendanceRecordsRelations = relations(attendanceRecords, ({ one }) => ({
-	session: one(attendanceSessions, {
-		fields: [attendanceRecords.sessionId],
-		references: [attendanceSessions.id],
+export const attendanceRecordsRelations = relations(
+	attendanceRecords,
+	({ one }) => ({
+		session: one(attendanceSessions, {
+			fields: [attendanceRecords.sessionId],
+			references: [attendanceSessions.id],
+		}),
+		student: one(students, {
+			fields: [attendanceRecords.studentId],
+			references: [students.id],
+		}),
+		recorder: one(users, {
+			fields: [attendanceRecords.recordedBy],
+			references: [users.id],
+		}),
 	}),
-	student: one(students, {
-		fields: [attendanceRecords.studentId],
-		references: [students.id],
-	}),
-	recorder: one(users, {
-		fields: [attendanceRecords.recordedBy],
-		references: [users.id],
-	}),
-}));
+);
 
 export const odsAttendanceRecords = pgTable("ods_attendance_records", {
 	id: serial("id").primaryKey(),
-	studentId: integer("student_id").references(() => students.id).notNull(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
 	date: date("date").notNull(),
 	status: text("status").notNull(), // "hadir" | "alpha" | "sakit" | "izin"
 	notes: text("notes"),
@@ -1984,37 +2092,48 @@ export const odsAttendanceRecords = pgTable("ods_attendance_records", {
 	recordedAt: timestamp("recorded_at").defaultNow().notNull(),
 });
 
-export const pramagangAttendanceRecords = pgTable("pramagang_attendance_records", {
-	id: serial("id").primaryKey(),
-	studentId: integer("student_id").references(() => students.id).notNull(),
-	date: date("date").notNull(),
-	status: text("status").notNull(), // "hadir" | "alpha" | "sakit" | "izin"
-	notes: text("notes"),
-	recordedBy: integer("recorded_by").references(() => users.id),
-	recordedAt: timestamp("recorded_at").defaultNow().notNull(),
-});
+export const pramagangAttendanceRecords = pgTable(
+	"pramagang_attendance_records",
+	{
+		id: serial("id").primaryKey(),
+		studentId: integer("student_id")
+			.references(() => students.id)
+			.notNull(),
+		date: date("date").notNull(),
+		status: text("status").notNull(), // "hadir" | "alpha" | "sakit" | "izin"
+		notes: text("notes"),
+		recordedBy: integer("recorded_by").references(() => users.id),
+		recordedAt: timestamp("recorded_at").defaultNow().notNull(),
+	},
+);
 
-export const odsAttendanceRecordsRelations = relations(odsAttendanceRecords, ({ one }) => ({
-	student: one(students, {
-		fields: [odsAttendanceRecords.studentId],
-		references: [students.id],
+export const odsAttendanceRecordsRelations = relations(
+	odsAttendanceRecords,
+	({ one }) => ({
+		student: one(students, {
+			fields: [odsAttendanceRecords.studentId],
+			references: [students.id],
+		}),
+		recorder: one(users, {
+			fields: [odsAttendanceRecords.recordedBy],
+			references: [users.id],
+		}),
 	}),
-	recorder: one(users, {
-		fields: [odsAttendanceRecords.recordedBy],
-		references: [users.id],
-	}),
-}));
+);
 
-export const pramagangAttendanceRecordsRelations = relations(pramagangAttendanceRecords, ({ one }) => ({
-	student: one(students, {
-		fields: [pramagangAttendanceRecords.studentId],
-		references: [students.id],
+export const pramagangAttendanceRecordsRelations = relations(
+	pramagangAttendanceRecords,
+	({ one }) => ({
+		student: one(students, {
+			fields: [pramagangAttendanceRecords.studentId],
+			references: [students.id],
+		}),
+		recorder: one(users, {
+			fields: [pramagangAttendanceRecords.recordedBy],
+			references: [users.id],
+		}),
 	}),
-	recorder: one(users, {
-		fields: [pramagangAttendanceRecords.recordedBy],
-		references: [users.id],
-	}),
-}));
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MANAJEMEN MATA KULIAH (COURSES)
@@ -2024,7 +2143,9 @@ export const courses = pgTable("courses", {
 	id: serial("id").primaryKey(),
 	code: text("code").unique().notNull(),
 	name: text("name").notNull(),
-	dosenId: integer("dosen_id").references(() => users.id).notNull(),
+	dosenId: integer("dosen_id")
+		.references(() => users.id)
+		.notNull(),
 	peminatan: text("peminatan"),
 	cohort: integer("cohort").notNull(),
 	type: courseTypeEnum("type").default("teori").notNull(),
@@ -2035,7 +2156,9 @@ export const courses = pgTable("courses", {
 
 export const courseMeetings = pgTable("course_meetings", {
 	id: serial("id").primaryKey(),
-	courseId: integer("course_id").references(() => courses.id).notNull(),
+	courseId: integer("course_id")
+		.references(() => courses.id)
+		.notNull(),
 	meetingNumber: integer("meeting_number").notNull(), // 0=PKKMB, 1=Beginning, 2-17
 	meetingType: meetingTypeEnum("meeting_type").notNull(),
 	meetingLabel: text("meeting_label").notNull(),
@@ -2047,7 +2170,9 @@ export const courseMeetings = pgTable("course_meetings", {
 
 export const courseMeetingActivities = pgTable("course_meeting_activities", {
 	id: serial("id").primaryKey(),
-	meetingId: integer("meeting_id").references(() => courseMeetings.id).notNull(),
+	meetingId: integer("meeting_id")
+		.references(() => courseMeetings.id)
+		.notNull(),
 	activityType: activityTypeEnum("activity_type").notNull(),
 	score: integer("score"),
 	notes: text("notes"),
@@ -2059,8 +2184,12 @@ export const courseMeetingActivities = pgTable("course_meeting_activities", {
 
 export const courseMeetingAttendances = pgTable("course_meeting_attendances", {
 	id: serial("id").primaryKey(),
-	meetingId: integer("meeting_id").references(() => courseMeetings.id).notNull(),
-	studentId: integer("student_id").references(() => students.id).notNull(),
+	meetingId: integer("meeting_id")
+		.references(() => courseMeetings.id)
+		.notNull(),
+	studentId: integer("student_id")
+		.references(() => students.id)
+		.notNull(),
 	status: text("status").notNull(), // hadir, izin, sakit, alpha
 	notes: text("notes"),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -2075,29 +2204,38 @@ export const coursesRelations = relations(courses, ({ one, many }) => ({
 	meetings: many(courseMeetings),
 }));
 
-export const courseMeetingsRelations = relations(courseMeetings, ({ one, many }) => ({
-	course: one(courses, {
-		fields: [courseMeetings.courseId],
-		references: [courses.id],
+export const courseMeetingsRelations = relations(
+	courseMeetings,
+	({ one, many }) => ({
+		course: one(courses, {
+			fields: [courseMeetings.courseId],
+			references: [courses.id],
+		}),
+		activities: many(courseMeetingActivities),
+		attendances: many(courseMeetingAttendances),
 	}),
-	activities: many(courseMeetingActivities),
-	attendances: many(courseMeetingAttendances),
-}));
+);
 
-export const courseMeetingActivitiesRelations = relations(courseMeetingActivities, ({ one }) => ({
-	meeting: one(courseMeetings, {
-		fields: [courseMeetingActivities.meetingId],
-		references: [courseMeetings.id],
+export const courseMeetingActivitiesRelations = relations(
+	courseMeetingActivities,
+	({ one }) => ({
+		meeting: one(courseMeetings, {
+			fields: [courseMeetingActivities.meetingId],
+			references: [courseMeetings.id],
+		}),
 	}),
-}));
+);
 
-export const courseMeetingAttendancesRelations = relations(courseMeetingAttendances, ({ one }) => ({
-	meeting: one(courseMeetings, {
-		fields: [courseMeetingAttendances.meetingId],
-		references: [courseMeetings.id],
+export const courseMeetingAttendancesRelations = relations(
+	courseMeetingAttendances,
+	({ one }) => ({
+		meeting: one(courseMeetings, {
+			fields: [courseMeetingAttendances.meetingId],
+			references: [courseMeetings.id],
+		}),
+		student: one(students, {
+			fields: [courseMeetingAttendances.studentId],
+			references: [students.id],
+		}),
 	}),
-	student: one(students, {
-		fields: [courseMeetingAttendances.studentId],
-		references: [students.id],
-	}),
-}));
+);

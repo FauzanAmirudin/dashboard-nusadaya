@@ -40,7 +40,9 @@ export async function startBackupWorker(): Promise<void> {
 			await backupService.executeBackup(
 				job.payload.jobId,
 				job.payload.backupType,
-				job.payload.filters as Parameters<typeof backupService.executeBackup>[2],
+				job.payload.filters as Parameters<
+					typeof backupService.executeBackup
+				>[2],
 			);
 
 			console.log(`[BackupWorker] Job ${job.payload.jobId} completed ✅`);

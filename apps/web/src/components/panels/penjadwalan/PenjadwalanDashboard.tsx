@@ -1,13 +1,12 @@
 "use client";
 
-import { useAuthStore } from "@/store";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, BookOpen, Clock, Megaphone } from "lucide-react";
-
+import { BookOpen, CalendarDays, Clock, Megaphone } from "lucide-react";
 import { TabJadwalKelas } from "@/components/panels/penjadwalan/TabJadwalKelas";
-import { TabJadwalPraktikum } from "@/components/panels/penjadwalan/TabJadwalPraktikum";
 import { TabJadwalPiket } from "@/components/panels/penjadwalan/TabJadwalPiket";
+import { TabJadwalPraktikum } from "@/components/panels/penjadwalan/TabJadwalPraktikum";
 import { TabPengumuman } from "@/components/panels/penjadwalan/TabPengumuman";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuthStore } from "@/store";
 
 export function PenjadwalanDashboard() {
 	const { user } = useAuthStore();

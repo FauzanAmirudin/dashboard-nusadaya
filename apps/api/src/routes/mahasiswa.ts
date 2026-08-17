@@ -440,7 +440,9 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				academicCommunication: academic?.academicCommunication,
 				notes: academic?.notes,
 
-				taiwanCohort: overseasChecklist?.cohort === "13/14" || overseasChecklist?.programType === "taiwan",
+				taiwanCohort:
+					overseasChecklist?.cohort === "13/14" ||
+					overseasChecklist?.programType === "taiwan",
 				taiwanPasFotoChecked: overseasChecklist?.pasFotoChecked,
 				taiwanCvChecked: overseasChecklist?.cvChecked,
 				taiwanKtmChecked: overseasChecklist?.ktmChecked,

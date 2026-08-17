@@ -41,12 +41,17 @@ export const formRegisterRoutes = new Elysia()
 
 			// Format data
 			const insertData: any = { ...body };
-			if (insertData.birthDate) insertData.birthDate = new Date(insertData.birthDate);
-			if (insertData.ayahBirthDate) insertData.ayahBirthDate = new Date(insertData.ayahBirthDate);
-			if (insertData.ibuBirthDate) insertData.ibuBirthDate = new Date(insertData.ibuBirthDate);
-			if (insertData.waliBirthDate) insertData.waliBirthDate = new Date(insertData.waliBirthDate);
-			
-			if (insertData.graduationYear) insertData.graduationYear = Number(insertData.graduationYear);
+			if (insertData.birthDate)
+				insertData.birthDate = new Date(insertData.birthDate);
+			if (insertData.ayahBirthDate)
+				insertData.ayahBirthDate = new Date(insertData.ayahBirthDate);
+			if (insertData.ibuBirthDate)
+				insertData.ibuBirthDate = new Date(insertData.ibuBirthDate);
+			if (insertData.waliBirthDate)
+				insertData.waliBirthDate = new Date(insertData.waliBirthDate);
+
+			if (insertData.graduationYear)
+				insertData.graduationYear = Number(insertData.graduationYear);
 			if (insertData.batch) insertData.batch = Number(insertData.batch);
 			if (insertData.height) insertData.height = Number(insertData.height);
 			if (insertData.weight) insertData.weight = Number(insertData.weight);

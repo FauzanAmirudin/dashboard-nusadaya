@@ -1,8 +1,8 @@
 import { monotonicFactory } from "ulidx";
-import { enqueue } from "../../../lib/queue";
-import { getJobProgress, setJobProgress } from "../../../lib/job";
 import type { JobProgress } from "../../../lib/job";
+import { getJobProgress, setJobProgress } from "../../../lib/job";
 import { isLocked } from "../../../lib/lock";
+import { enqueue } from "../../../lib/queue";
 
 const ulid = monotonicFactory();
 
@@ -10,7 +10,10 @@ export class ExportService {
 	/**
 	 * Buat job ekspor data mahasiswa ke ZIP.
 	 */
-	async createExportStudentJob(studentId: number, userId: number): Promise<{ jobId: string; status: string; message?: string }> {
+	async createExportStudentJob(
+		studentId: number,
+		userId: number,
+	): Promise<{ jobId: string; status: string; message?: string }> {
 		const exportType = "student_zip";
 		const lockKey = `export:${exportType}:${studentId}`;
 

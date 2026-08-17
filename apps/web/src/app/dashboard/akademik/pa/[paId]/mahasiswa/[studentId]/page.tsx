@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense } from "react";
-import { useParams } from "next/navigation";
-import { PAStudentDetailView } from "@/components/panels/akademik/pa/PAStudentDetailView";
 import { Loader2 } from "lucide-react";
+import { useParams } from "next/navigation";
+import { Suspense } from "react";
+import { PAStudentDetailView } from "@/components/panels/akademik/pa/PAStudentDetailView";
 
 function Inner() {
 	const params = useParams();

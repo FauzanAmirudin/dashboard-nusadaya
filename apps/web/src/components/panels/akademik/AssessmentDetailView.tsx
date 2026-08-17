@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
 	ArrowLeft,
 	CalendarDays,
@@ -11,12 +9,14 @@ import {
 	Loader2,
 	User,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import type { AssessmentRecord } from "@/components/panels/akademik/assessment/AssessmentFormCard";
+import { AssessmentFormCard } from "@/components/panels/akademik/assessment/AssessmentFormCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { AssessmentFormCard } from "@/components/panels/akademik/assessment/AssessmentFormCard";
-import type { AssessmentRecord } from "@/components/panels/akademik/assessment/AssessmentFormCard";
 import { API_URL, getToken } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 
@@ -210,14 +210,14 @@ export function AssessmentDetailView({ studentId }: AssessmentDetailViewProps) {
 						<h1 className="text-xl font-bold text-slate-900 leading-none">
 							Detail Assessment
 						</h1>
-						<p className="text-xs text-slate-500 mt-0.5">
-							Pra-keberangkatan
-						</p>
+						<p className="text-xs text-slate-500 mt-0.5">Pra-keberangkatan</p>
 					</div>
 				</div>
 
 				<div className="flex items-center gap-2">
-					<Badge className={`${statusCfg.className} border text-xs px-2.5 py-1`}>
+					<Badge
+						className={`${statusCfg.className} border text-xs px-2.5 py-1`}
+					>
 						{statusCfg.label}
 					</Badge>
 					<Button
@@ -230,7 +230,7 @@ export function AssessmentDetailView({ studentId }: AssessmentDetailViewProps) {
 						{isExportingPdf ? (
 							<Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
 						) : (
-<Download className="w-4 h-4 mr-1.5" />
+							<Download className="w-4 h-4 mr-1.5" />
 						)}
 						Export PDF
 					</Button>

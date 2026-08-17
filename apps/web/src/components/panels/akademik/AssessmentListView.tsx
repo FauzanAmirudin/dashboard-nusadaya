@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
 	AlertCircle,
 	CheckCircle2,
@@ -11,6 +9,8 @@ import {
 	Search,
 	Users,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,10 +75,13 @@ const STATUS_LABEL: Record<AssessmentStatus, string> = {
 };
 
 const STATUS_BADGE_CLASS: Record<AssessmentStatus, string> = {
-	belum_dimulai: "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-100",
-	nilai_diisi: "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100",
+	belum_dimulai:
+		"bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-100",
+	nilai_diisi:
+		"bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100",
 	pdf_diunggah: "bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100",
-	selesai: "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100",
+	selesai:
+		"bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100",
 };
 
 function getEffectiveStatus(s: StudentWithAssessment): AssessmentStatus {
@@ -132,8 +135,9 @@ export function AssessmentListView() {
 	// ── Derived Values ────────────────────────────────────────────────────────
 
 	const programs = Array.from(new Set(students.map((s) => s.program))).sort();
-	const cohorts = Array.from(new Set(students.map((s) => s.cohort))).sort(
-		(a, b) => b - a,
+	const cohorts = Array.from(
+		{ length: new Date().getFullYear() - 2022 + 2 },
+		(_, i) => new Date().getFullYear() + 1 - i,
 	);
 
 	const filteredData = students.filter((s) => {
@@ -146,10 +150,14 @@ export function AssessmentListView() {
 			if (!matchName && !matchNim) return false;
 		}
 		if (programFilter !== "all" && s.program !== programFilter) return false;
-		if (cohortFilter !== "all" && s.cohort !== Number(cohortFilter)) return false;
+		if (cohortFilter !== "all" && s.cohort !== Number(cohortFilter))
+			return false;
 		if (statusFilter !== "all") {
 			if (statusFilter === "dalam_proses") {
-				if (effectiveStatus !== "nilai_diisi" && effectiveStatus !== "pdf_diunggah")
+				if (
+					effectiveStatus !== "nilai_diisi" &&
+					effectiveStatus !== "pdf_diunggah"
+				)
 					return false;
 			} else if (effectiveStatus !== statusFilter) {
 				return false;
@@ -165,7 +173,9 @@ export function AssessmentListView() {
 
 	// KPI counts (always from full student list, not filtered)
 	const kpiTotal = students.length;
-	const kpiSelesai = students.filter((s) => getEffectiveStatus(s) === "selesai").length;
+	const kpiSelesai = students.filter(
+		(s) => getEffectiveStatus(s) === "selesai",
+	).length;
 	const kpiDalamProses = students.filter((s) => {
 		const st = getEffectiveStatus(s);
 		return st === "nilai_diisi" || st === "pdf_diunggah";
@@ -217,7 +227,8 @@ export function AssessmentListView() {
 							Assessment Pra-keberangkatan
 						</h1>
 						<p className="text-slate-500 text-sm">
-							Monitoring nilai dan status assessment mahasiswa sebelum keberangkatan
+							Monitoring nilai dan status assessment mahasiswa sebelum
+							keberangkatan
 						</p>
 					</div>
 				</div>
@@ -265,7 +276,9 @@ export function AssessmentListView() {
 						</div>
 						<div>
 							<p className="text-xs text-slate-500">Dalam Proses</p>
-							<p className="text-2xl font-bold text-slate-900">{kpiDalamProses}</p>
+							<p className="text-2xl font-bold text-slate-900">
+								{kpiDalamProses}
+							</p>
 						</div>
 					</CardContent>
 				</Card>
@@ -276,7 +289,9 @@ export function AssessmentListView() {
 						</div>
 						<div>
 							<p className="text-xs text-slate-500">Belum Dimulai</p>
-							<p className="text-2xl font-bold text-slate-900">{kpiBelumDimulai}</p>
+							<p className="text-2xl font-bold text-slate-900">
+								{kpiBelumDimulai}
+							</p>
 						</div>
 					</CardContent>
 				</Card>
@@ -400,9 +415,13 @@ export function AssessmentListView() {
 														{s.nim ?? "-"}
 													</TableCell>
 													<TableCell>
-														<div className="text-sm text-slate-700">{s.program}</div>
+														<div className="text-sm text-slate-700">
+															{s.program}
+														</div>
 														{s.subProgram && (
-															<div className="text-xs text-slate-500">{s.subProgram}</div>
+															<div className="text-xs text-slate-500">
+																{s.subProgram}
+															</div>
 														)}
 													</TableCell>
 													<TableCell className="text-sm text-slate-700">
@@ -412,7 +431,9 @@ export function AssessmentListView() {
 														{s.academicYear ?? "-"}
 													</TableCell>
 													<TableCell className="text-center text-sm font-semibold text-slate-900">
-														{score !== null && score !== undefined ? score : "-"}
+														{score !== null && score !== undefined
+															? score
+															: "-"}
 													</TableCell>
 													<TableCell>
 														<Badge className={STATUS_BADGE_CLASS[status]}>
@@ -446,10 +467,13 @@ export function AssessmentListView() {
 								<p className="text-sm text-slate-500">
 									Menampilkan{" "}
 									<span className="font-medium text-slate-700">
-										{startIdx + 1}–{Math.min(startIdx + PAGE_SIZE, filteredData.length)}
+										{startIdx + 1}–
+										{Math.min(startIdx + PAGE_SIZE, filteredData.length)}
 									</span>{" "}
 									dari{" "}
-									<span className="font-medium text-slate-700">{filteredData.length}</span>{" "}
+									<span className="font-medium text-slate-700">
+										{filteredData.length}
+									</span>{" "}
 									data
 								</p>
 								<div className="flex gap-2">

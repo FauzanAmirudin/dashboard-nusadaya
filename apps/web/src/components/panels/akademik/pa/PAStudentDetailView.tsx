@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, BookMarked, BookOpen, ClipboardCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { useAuthStore } from "@/store";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { TabHafalan } from "@/components/panels/akademik/pa/tabs/TabHafalan";
 import { TabKehadiran } from "@/components/panels/akademik/pa/tabs/TabKehadiran";
 import { TabKonseling } from "@/components/panels/akademik/pa/tabs/TabKonseling";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -64,9 +64,7 @@ export function PAStudentDetailView({ paId, studentId }: Props) {
 					Kembali
 				</Button>
 				<div>
-					<h1 className="text-xl font-bold text-slate-900">
-						Detail Mahasiswa
-					</h1>
+					<h1 className="text-xl font-bold text-slate-900">Detail Mahasiswa</h1>
 					<p className="text-sm text-slate-500 mt-0.5">
 						Panel Akademik — Manajemen PA
 					</p>
@@ -139,9 +137,7 @@ export function PAStudentDetailView({ paId, studentId }: Props) {
 
 			{/* Tab Content */}
 			<div>
-				{activeTab === "kehadiran" && (
-					<TabKehadiran studentId={studentId} />
-				)}
+				{activeTab === "kehadiran" && <TabKehadiran studentId={studentId} />}
 				{activeTab === "konseling" && (
 					<TabKonseling studentId={studentId} canEdit={canEdit} />
 				)}

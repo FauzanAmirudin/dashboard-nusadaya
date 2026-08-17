@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { cn } from "@/lib/utils";
 import { TabMataKuliah } from "@/components/panels/kehadiran/detail/TabMataKuliah";
 import { TabODS } from "@/components/panels/kehadiran/detail/TabODS";
 import { TabPiket } from "@/components/panels/kehadiran/detail/TabPiket";
 import { TabPramagang } from "@/components/panels/kehadiran/detail/TabPramagang";
+import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -49,9 +49,7 @@ export function TabKehadiran({ studentId }: Props) {
 			</div>
 
 			{/* Sub-tab content — reuse komponen kehadiran yang sudah ada */}
-			{subTab === "mata-kuliah" && (
-				<TabMataKuliah studentId={studentId} />
-			)}
+			{subTab === "mata-kuliah" && <TabMataKuliah studentId={studentId} />}
 			{subTab === "piket" && <TabPiket studentId={studentId} />}
 			{subTab === "ods" && <TabODS studentId={studentId} />}
 			{subTab === "pramagang" && <TabPramagang studentId={studentId} />}

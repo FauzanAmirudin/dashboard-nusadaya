@@ -1,21 +1,28 @@
 "use client";
 
 import {
-	AlertTriangle,
-	ArrowRight,
+	Building2,
+	CheckCircle,
+	CheckCircle2,
 	Clock,
 	Download,
-	LayoutDashboard,
-	PlaneTakeoff,
+	Eye,
+	HelpCircle,
+	MapPin,
+	Plane,
 	Search,
+	ShieldAlert,
+	ShieldCheck,
 	Users,
+	XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import {
 	Select,
 	SelectContent,
@@ -31,37 +38,15 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { api } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 import { useAuthStore } from "@/store";
-
-interface DashboardData {
-	kpi: {
-		totalStudents: number;
-		readyToDepart: number;
-		processing: number;
-		actionNeeded: number;
-	};
-	students: Array<{
-		id: number;
-		nim: string;
-		name: string;
-		program: string;
-		subProgram: string | null;
-		cohort: number;
-		academicYear: string | null;
-		phone: string | null;
-		destinationCity: string;
-		internshipCompany: string;
-		estDepartureDate?: string;
-		passportReady?: boolean;
-		visaReady?: boolean;
-		mcuReady?: boolean;
-		completedDocs: number;
-		totalDocs?: number;
-		status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN";
-	}>;
-}
 
 export function MagangDashboard({
 	hideHeader = false,
@@ -70,357 +55,571 @@ export function MagangDashboard({
 } = {}) {
 	const router = useRouter();
 	const { user } = useAuthStore();
-	const [data, setData] = useState<DashboardData | null>(null);
+	const [data, setData] = useState<any[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCohort, setSelectedCohort] = useState<string>("all");
-	const [selectedSubProgram, setSelectedSubProgram] = useState<string>("all");
+	const [selectedStatus, setSelectedStatus] = useState<string>("all");
 
-	useEffect(() => {
-		const fetchDashboard = async () => {
-			setIsLoading(true);
-			// Currently not implementing search on backend for simplicity in this iteration,
-			// but we will filter on the frontend for now or just fetch all.
-			// Let's assume frontend filtering for small data size.
-			const { data: res, error } = await api.magang.dashboard.get();
-			if (!error && res?.data) {
-				setData(res.data as unknown as DashboardData);
-			}
-			setIsLoading(false);
-		};
-
-		fetchDashboard();
+	// Cohort years starting from 2022
+	const cohortYears = useMemo(() => {
+		const currentYear = new Date().getFullYear();
+		return Array.from(
+			{ length: currentYear - 2022 + 2 },
+			(_, i) => currentYear + 1 - i,
+		);
 	}, []);
 
-	const handleExport = async () => {
-		const { data: resData } = await api.students.get();
-		if (resData?.data) {
-			const exportData = (resData.data as any[]).map((s: any) => ({
-				NIM: s.student.nim,
-				"Nama Mahasiswa": s.student.name,
-				Paspor: s.internship?.passportReady ? "Selesai" : "Belum",
-				Visa: s.internship?.visaReady ? "Selesai" : "Belum",
-				MCU: s.internship?.mcuReady ? "Selesai" : "Belum",
-				Tiket: s.internship?.ticketReady ? "Selesai" : "Belum",
-				LoA: s.internship?.loaConfirmed ? "Selesai" : "Belum",
-				"Kontrak Kerja": s.internship?.contractReady ? "Selesai" : "Belum",
-				Interview: s.internship?.interviewReady ? "Selesai" : "Belum",
-				"Hotel/Perusahaan": s.internship?.internshipCompany || "-",
-				"Estimasi Keberangkatan": s.internship?.estDepartureDate
-					? new Date(s.internship.estDepartureDate).toLocaleDateString()
-					: s.decision?.departureDate
-						? new Date(s.decision.departureDate).toLocaleDateString()
-						: "-",
-				"Disetujui Admin Magang": s.internship?.isAcc ? "Sudah ACC" : "Belum",
-			}));
-			exportToCSV(
-				exportData,
-				`Data_Magang_${new Date().toISOString().split("T")[0]}`,
-			);
-		}
+	useEffect(() => {
+		const fetchStudents = async () => {
+			try {
+				const { data: resData, error } = await api.students.get();
+				if (!error && resData?.data) {
+					setData(resData.data);
+				}
+			} catch (err) {
+				console.error("Failed loading magang dashboard data", err);
+			} finally {
+				setIsLoading(false);
+			}
+		};
+		fetchStudents();
+	}, []);
+
+	// Filter by cohort first for reactive KPI
+	const cohortData = useMemo(() => {
+		if (!data) return [];
+		if (selectedCohort === "all") return data;
+		return data.filter(
+			(s: any) => s.student?.cohort?.toString() === selectedCohort,
+		);
+	}, [data, selectedCohort]);
+
+	// KPI Metrics based on cohortData
+	const totalStudents = cohortData.length;
+	const countAcc = cohortData.filter((s: any) => s.internship?.isAcc).length;
+	const countAman = cohortData.filter(
+		(s: any) => s.internship?.status === "AMAN",
+	).length;
+	const countPerhatian = cohortData.filter(
+		(s: any) =>
+			s.internship?.status === "PERLU_PERHATIAN" || !s.internship?.status,
+	).length;
+	const countTidakAman = cohortData.filter(
+		(s: any) => s.internship?.status === "TIDAK_AMAN",
+	).length;
+	const countPassportReady = cohortData.filter(
+		(s: any) => s.internship?.passportReady || s.finance?.pasporStatus,
+	).length;
+
+	// Filtered students for Table
+	const filteredData = useMemo(() => {
+		const q = searchQuery.toLowerCase();
+		return cohortData.filter((s: any) => {
+			const matchSearch =
+				!q ||
+				(s.student?.name || "").toLowerCase().includes(q) ||
+				(s.student?.nim || "").toLowerCase().includes(q) ||
+				(s.student?.program || "").toLowerCase().includes(q) ||
+				(s.internship?.internshipCompany || "").toLowerCase().includes(q);
+
+			const internshipStatus = s.internship?.status || "PERLU_PERHATIAN";
+			let matchStatus = true;
+			if (selectedStatus === "aman") matchStatus = internshipStatus === "AMAN";
+			if (selectedStatus === "perhatian")
+				matchStatus = internshipStatus === "PERLU_PERHATIAN";
+			if (selectedStatus === "tidak_aman")
+				matchStatus = internshipStatus === "TIDAK_AMAN";
+			if (selectedStatus === "acc") matchStatus = Boolean(s.internship?.isAcc);
+
+			return matchSearch && matchStatus;
+		});
+	}, [cohortData, searchQuery, selectedStatus]);
+
+	const handleExport = () => {
+		const exportData = filteredData.map((s: any) => ({
+			NIM: s.student?.nim || "-",
+			"Nama Mahasiswa": s.student?.name || "-",
+			Angkatan: s.student?.cohort || "-",
+			Program: s.student?.program || "-",
+			Paspor: s.internship?.passportReady ? "Selesai" : "Belum",
+			Visa: s.internship?.visaReady ? "Selesai" : "Belum",
+			MCU: s.internship?.mcuReady ? "Selesai" : "Belum",
+			Tiket: s.internship?.ticketReady ? "Selesai" : "Belum",
+			LoA: s.internship?.loaConfirmed ? "Selesai" : "Belum",
+			"Kontrak Kerja": s.internship?.contractReady ? "Selesai" : "Belum",
+			Interview: s.internship?.interviewReady ? "Selesai" : "Belum",
+			"Hotel / Perusahaan": s.internship?.internshipCompany || "-",
+			"Estimasi Keberangkatan": s.internship?.estDepartureDate
+				? new Date(s.internship.estDepartureDate).toLocaleDateString("id-ID")
+				: s.decision?.departureDate
+					? new Date(s.decision.departureDate).toLocaleDateString("id-ID")
+					: "-",
+			"Status Magang":
+				s.internship?.status === "AMAN"
+					? "Aman"
+					: s.internship?.status === "TIDAK_AMAN"
+						? "Tidak Aman"
+						: "Perlu Perhatian",
+			"Status ACC Magang": s.internship?.isAcc ? "Sudah ACC" : "Belum",
+		}));
+		exportToCSV(
+			exportData,
+			`Data_Magang_${new Date().toISOString().split("T")[0]}`,
+		);
 	};
 
-	if (isLoading && !data) {
+	const getInternshipChecklist = (internship: any) => {
+		const items = [
+			{
+				name: "Pembekalan & CV",
+				done: Boolean(internship?.pembekalanStatus || internship?.cvStatus),
+			},
+			{ name: "Paspor Siap", done: Boolean(internship?.passportReady) },
+			{ name: "Medical Checkup (MCU)", done: Boolean(internship?.mcuReady) },
+			{ name: "Visa Kerja / Pelajar", done: Boolean(internship?.visaReady) },
+			{ name: "Tiket Keberangkatan", done: Boolean(internship?.ticketReady) },
+			{
+				name: "LoA & Kontrak Kerja",
+				done: Boolean(internship?.loaConfirmed || internship?.contractReady),
+			},
+		];
+		const completed = items.filter((i) => i.done).length;
+		return {
+			items,
+			completed,
+			total: items.length,
+			isDone: completed === items.length,
+		};
+	};
+
+	if (isLoading) {
 		return (
-			<div className="flex justify-center items-center h-64 text-slate-500">
-				Memuat dashboard Magang...
+			<div className="flex flex-col justify-center items-center h-80 gap-3 text-slate-500">
+				<p className="text-sm font-semibold">
+					Memuat data magang & penempatan...
+				</p>
 			</div>
 		);
 	}
 
-	if (!data) return null;
-
-	const cohorts = Array.from(
-		new Set(data.students.map((s) => s.cohort).filter(Boolean)),
-	).sort((a, b) => b - a);
-
-	// Peminatan sudah ditetapkan, jadi kita gunakan daftar tetap (hardcoded)
-	const subPrograms = [
-		{ value: "Malaysia-Hospitality", flag: "https://flagcdn.com/w20/my.png" },
-		{ value: "Taiwan-Hospitality", flag: "https://flagcdn.com/w20/tw.png" },
-		{ value: "Timur tengah-Barista", flag: "https://flagcdn.com/w20/sa.png" },
-		{ value: "Indonesia-Reguler", flag: "https://flagcdn.com/w20/id.png" },
-	];
-
-	const filteredStudents = data.students.filter((s) => {
-		const matchSearch =
-			s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			s.nim.toLowerCase().includes(searchQuery.toLowerCase());
-		const matchCohort =
-			selectedCohort === "all" || s.cohort?.toString() === selectedCohort;
-		const matchSubProgram =
-			selectedSubProgram === "all" || s.subProgram === selectedSubProgram;
-		return matchSearch && matchCohort && matchSubProgram;
-	});
-
-	const computedKpi = {
-		totalStudents: filteredStudents.length,
-		readyToDepart: filteredStudents.filter((s) => s.status === "AMAN").length,
-		processing: filteredStudents.filter((s) => s.status === "PERLU_PERHATIAN")
-			.length,
-		actionNeeded: filteredStudents.filter((s) => s.status === "TIDAK_AMAN")
-			.length,
-	};
-
 	return (
-		<div className="space-y-6 pb-10">
+		<div className="space-y-6 pb-12">
+			{/* Top Header */}
 			{!hideHeader && (
-				<>
-					{/* Header */}
-					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-						<div>
-							<h1 className="text-2xl font-bold text-slate-900">
-								Dashboard Tim Magang Internasional
-							</h1>
-							<p className="text-slate-500 mt-1 text-sm">
-								Selamat datang, {(user as any)?.fullName || user?.username}.
-								Pantau progres dokumen keberangkatan mahasiswa.
-							</p>
-						</div>
+				<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+					<div>
 						<div className="flex items-center gap-3">
-							<button
-								type="button"
-								onClick={handleExport}
-								className="flex items-center gap-2 bg-[#0517B0] hover:bg-blue-800 text-white px-4 py-2 rounded-md transition-colors text-sm font-medium"
-							>
-								<Download className="h-4 w-4" />
-								Export Data Magang
-							</button>
-						</div>
-					</div>
-
-					{/* KPI Cards */}
-					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-						<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
-							<CardContent className="p-5 flex items-start gap-4">
-								<div className="mt-0.5 text-[#0517B0]">
-									<Users className="h-6 w-6" />
-								</div>
-								<div>
-									<p className="text-slate-500 text-sm font-medium">
-										Total Mahasiswa
-									</p>
-									<p className="text-3xl font-bold text-slate-900 mt-1">
-										{computedKpi.totalStudents}
-									</p>
-								</div>
-							</CardContent>
-						</Card>
-
-						<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
-							<CardContent className="p-5 flex items-start gap-4">
-								<div className="mt-0.5 text-emerald-500">
-									<PlaneTakeoff className="h-6 w-6" />
-								</div>
-								<div>
-									<p className="text-slate-500 text-sm font-medium">
-										Siap Berangkat (Aman)
-									</p>
-									<p className="text-3xl font-bold text-slate-900 mt-1">
-										{computedKpi.readyToDepart}
-									</p>
-								</div>
-							</CardContent>
-						</Card>
-
-						<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-amber-500">
-							<CardContent className="p-5 flex items-start gap-4">
-								<div className="mt-0.5 text-amber-500">
-									<Clock className="h-6 w-6" />
-								</div>
-								<div>
-									<p className="text-slate-500 text-sm font-medium">
-										Sedang Proses (Perhatian)
-									</p>
-									<p className="text-3xl font-bold text-slate-900 mt-1">
-										{computedKpi.processing}
-									</p>
-								</div>
-							</CardContent>
-						</Card>
-
-						<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-rose-500">
-							<CardContent className="p-5 flex items-start gap-4">
-								<div className="mt-0.5 text-rose-500">
-									<AlertTriangle className="h-6 w-6" />
-								</div>
-								<div>
-									<p className="text-slate-500 text-sm font-medium">
-										Perlu Tindakan (Tdk Aman)
-									</p>
-									<p className="text-3xl font-bold text-slate-900 mt-1">
-										{computedKpi.actionNeeded}
-									</p>
-								</div>
-							</CardContent>
-						</Card>
-					</div>
-				</>
-			)}
-
-			{/* Main Content */}
-			<div className="grid grid-cols-1 gap-6">
-				{/* Table */}
-				<Card className="bg-white border-slate-200 shadow-sm col-span-1 overflow-hidden">
-					<CardHeader className="border-b border-slate-200 pb-4 bg-slate-50/50">
-						<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-							<CardTitle className="text-slate-800 text-lg">
-								Daftar Kesiapan Dokumen Mahasiswa
-							</CardTitle>
-							<div className="flex flex-col sm:flex-row items-center gap-3">
-								<Select
-									value={selectedCohort}
-									onValueChange={(val) => setSelectedCohort(val || "all")}
-								>
-									<SelectTrigger className="w-full sm:w-[160px] bg-white">
-										<SelectValue placeholder="Angkatan" />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="all">Semua Angkatan</SelectItem>
-										{cohorts.map((c) => (
-											<SelectItem key={c} value={c.toString()}>
-												Angkatan {c}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-
-								<Select
-									value={selectedSubProgram}
-									onValueChange={(val) => setSelectedSubProgram(val || "all")}
-								>
-									<SelectTrigger className="w-full sm:w-[180px] bg-white">
-										<SelectValue placeholder="Peminatan" />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="all">Semua Peminatan</SelectItem>
-										{subPrograms.map((p) => (
-											<SelectItem key={p.value} value={p.value}>
-												<div className="flex items-center gap-2">
-													{/* biome-ignore lint/performance/noImgElement: <explanation> */}
-													<img
-														src={p.flag}
-														alt="flag"
-														className="w-4 h-3 object-cover"
-													/>
-													{p.value}
-												</div>
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-
-								<div className="relative w-full sm:w-64">
-									<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-									<Input
-										placeholder="Cari NIM atau Nama..."
-										className="pl-9 bg-white"
-										value={searchQuery}
-										onChange={(e) => setSearchQuery(e.target.value)}
-									/>
-								</div>
+							<div className="p-2.5 bg-cyan-50 text-cyan-600 rounded-lg border border-cyan-100">
+								<Plane className="w-6 h-6" />
+							</div>
+							<div>
+								<h1 className="text-2xl font-bold text-slate-900">
+									Dashboard Divisi Magang & Penempatan
+								</h1>
+								<p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+									Monitoring kesiapan keberangkatan internasional, paspor, visa,
+									MCU, tiket, kontrak kerja, dan penempatan industri.
+								</p>
 							</div>
 						</div>
-					</CardHeader>
-					<CardContent className="p-0">
+					</div>
+
+					<div className="flex flex-wrap items-center gap-2.5">
+						<Select
+							value={selectedCohort}
+							onValueChange={(val) => setSelectedCohort(val || "all")}
+						>
+							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
+								<SelectValue placeholder="Filter Angkatan" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">Semua Angkatan</SelectItem>
+								{cohortYears.map((year) => (
+									<SelectItem key={year} value={year.toString()}>
+										Angkatan {year}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={handleExport}
+							className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
+						>
+							<Download className="w-3.5 h-3.5" />
+							Export Data Magang
+						</Button>
+					</div>
+				</div>
+			)}
+
+			{/* KPI Summary Cards */}
+			<div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-blue-50 text-[#0517B0] mt-0.5">
+							<Users className="h-5 w-5" />
+						</div>
+						<div>
+							<p className="text-slate-500 text-xs font-semibold">
+								Total Mahasiswa
+							</p>
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
+								{totalStudents}
+							</p>
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-cyan-600">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-cyan-50 text-cyan-600 mt-0.5">
+							<ShieldCheck className="h-5 w-5" />
+						</div>
+						<div>
+							<p className="text-cyan-700 text-xs font-bold">ACC Magang</p>
+							<p className="text-2xl font-black text-cyan-900 mt-0.5">
+								{countAcc}
+							</p>
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 mt-0.5">
+							<CheckCircle className="h-5 w-5" />
+						</div>
+						<div>
+							<p className="text-slate-500 text-xs font-semibold">
+								🟢 Status Aman
+							</p>
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
+								{countAman}
+							</p>
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-amber-500">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-amber-50 text-amber-600 mt-0.5">
+							<Clock className="h-5 w-5" />
+						</div>
+						<div>
+							<p className="text-slate-500 text-xs font-semibold">
+								🟡 Berproses
+							</p>
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
+								{countPerhatian}
+							</p>
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-rose-500">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-rose-50 text-rose-600 mt-0.5">
+							<XCircle className="h-5 w-5" />
+						</div>
+						<div>
+							<p className="text-slate-500 text-xs font-semibold">
+								⛔ Kendala Dokumen
+							</p>
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
+								{countTidakAman}
+							</p>
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-indigo-600">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 mt-0.5">
+							<Plane className="h-5 w-5" />
+						</div>
+						<div>
+							<p className="text-slate-500 text-xs font-semibold">
+								Paspor Ready
+							</p>
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
+								{countPassportReady}
+							</p>
+						</div>
+					</CardContent>
+				</Card>
+			</div>
+
+			{/* Main Monitoring Table */}
+			<Card className="bg-white border-slate-200 shadow-sm overflow-hidden">
+				<CardHeader className="border-b border-slate-200 bg-slate-50/70 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+					<div>
+						<CardTitle className="text-slate-900 text-base font-bold flex items-center gap-2">
+							<Plane className="w-4 h-4 text-[#0517B0]" />
+							Daftar Monitoring Keberangkatan Magang
+						</CardTitle>
+						<p className="text-xs text-slate-500 mt-0.5">
+							Menampilkan {filteredData.length} dari {totalStudents} mahasiswa
+							terdaftar.
+						</p>
+					</div>
+
+					{/* Search & Filter */}
+					<div className="flex flex-wrap items-center gap-2.5">
+						<div className="relative w-full sm:w-60">
+							<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+							<Input
+								placeholder="Cari Mahasiswa, Hotel, Mitra..."
+								className="pl-9 h-9 text-xs bg-white border-slate-200"
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+							/>
+						</div>
+
+						<Select
+							value={selectedStatus}
+							onValueChange={(val) => setSelectedStatus(val || "all")}
+						>
+							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Status Magang" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">Semua Status</SelectItem>
+								<SelectItem value="aman">🟢 Aman</SelectItem>
+								<SelectItem value="perhatian">🟡 Berproses</SelectItem>
+								<SelectItem value="tidak_aman">🔴 Kendala</SelectItem>
+								<SelectItem value="acc">🛡️ Sudah ACC Magang</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
+				</CardHeader>
+
+				<CardContent className="p-0">
+					<div className="overflow-x-auto">
 						<Table>
-							<TableHeader className="bg-slate-50">
-								<TableRow>
-									<TableHead className="font-semibold text-slate-600">
-										Nama
+							<TableHeader className="bg-slate-50 sticky top-0 z-10">
+								<TableRow className="border-slate-200">
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs w-28">
+										NIM
 									</TableHead>
-									<TableHead className="font-semibold text-slate-600">
-										Angkatan
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
+										Nama & Program
 									</TableHead>
-									<TableHead className="font-semibold text-slate-600">
-										Tahun Ajaran
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
+										Checklist Berkas (6)
 									</TableHead>
-									<TableHead className="font-semibold text-slate-600">
-										Program Studi/Peminatan
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
+										Penempatan Industri
 									</TableHead>
-									<TableHead className="font-semibold text-slate-600">
-										No HP
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-32">
+										Est. Berangkat
 									</TableHead>
-									<TableHead className="font-semibold text-slate-600">
-										Progres Panel
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+										Status Magang
 									</TableHead>
-									<TableHead className="text-right font-semibold text-slate-600">
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+										ACC Magang
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-28">
 										Aksi
 									</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{filteredStudents.length > 0 ? (
-									filteredStudents.map((s) => (
-										<TableRow key={s.id} className="hover:bg-slate-50/50">
+								{filteredData.map((s: any) => {
+									const { items, completed, total, isDone } =
+										getInternshipChecklist(s.internship);
+									const status = s.internship?.status || "PERLU_PERHATIAN";
+									const departureDate =
+										s.internship?.estDepartureDate || s.decision?.departureDate;
+
+									return (
+										<TableRow
+											key={s.student.id}
+											className="border-slate-100 hover:bg-blue-50/40 transition-colors"
+										>
+											<TableCell className="font-mono text-xs font-bold text-slate-700">
+												{s.student.nim || "-"}
+											</TableCell>
 											<TableCell>
-												<div className="font-medium text-slate-900">
-													{s.name}
+												<div className="font-bold text-slate-900 text-sm">
+													{s.student.name}
 												</div>
-												<div className="text-xs text-slate-500">{s.nim}</div>
+												<div className="flex items-center gap-2 mt-0.5">
+													<Badge
+														variant="outline"
+														className="text-[10px] px-1.5 py-0 text-slate-500 border-slate-200"
+													>
+														Angkatan {s.student.cohort}
+													</Badge>
+													<span className="text-xs text-slate-500 font-medium truncate max-w-[200px]">
+														{s.student.program || "-"}
+													</span>
+												</div>
 											</TableCell>
-											<TableCell className="text-slate-600">
-												{s.cohort}
+
+											{/* Checklist Progress with Tooltip */}
+											<TableCell className="text-center">
+												<TooltipProvider>
+													<Tooltip>
+														<TooltipTrigger className="w-full">
+															<div className="flex flex-col items-center gap-1">
+																<div className="flex items-center justify-between w-full text-[11px] font-bold text-slate-700 px-1">
+																	<span>
+																		{completed}/{total} Berkas
+																	</span>
+																	<span
+																		className={
+																			isDone
+																				? "text-emerald-600"
+																				: "text-slate-500"
+																		}
+																	>
+																		{Math.round((completed / total) * 100)}%
+																	</span>
+																</div>
+																<div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
+																	<div
+																		className={`h-full rounded-full transition-all duration-300 ${
+																			isDone
+																				? "bg-emerald-500"
+																				: completed >= 3
+																					? "bg-blue-500"
+																					: "bg-amber-500"
+																		}`}
+																		style={{
+																			width: `${(completed / total) * 100}%`,
+																		}}
+																	/>
+																</div>
+															</div>
+														</TooltipTrigger>
+														<TooltipContent className="w-64 p-3.5 bg-slate-950 text-white rounded-xl shadow-2xl border border-slate-800 text-xs flex flex-col space-y-2 z-50">
+															<div className="flex items-center justify-between border-b border-slate-800 pb-1.5 w-full">
+																<span className="font-bold text-slate-100 text-xs">
+																	Kesiapan Berkas:
+																</span>
+																<span className="text-[11px] font-mono text-emerald-400 font-bold">
+																	{completed}/{total} Siap
+																</span>
+															</div>
+															<div className="flex flex-col space-y-1.5 w-full">
+																{items.map((it) => (
+																	<div
+																		key={it.name}
+																		className="flex items-center justify-between text-[11px] w-full"
+																	>
+																		<span className="text-slate-300 font-medium">
+																			{it.name}
+																		</span>
+																		<span
+																			className={`font-semibold ${
+																				it.done
+																					? "text-emerald-400"
+																					: "text-slate-500"
+																			}`}
+																		>
+																			{it.done ? "✓ Siap" : "Belum"}
+																		</span>
+																	</div>
+																))}
+															</div>
+														</TooltipContent>
+													</Tooltip>
+												</TooltipProvider>
 											</TableCell>
-											<TableCell className="text-slate-600">
-												{s.academicYear || "-"}
-											</TableCell>
-											<TableCell className="text-slate-600">
-												<div>{s.program}</div>
-												{s.subProgram && (
-													<div className="text-xs text-slate-500">
-														{s.subProgram}
+
+											<TableCell className="text-xs">
+												{s.internship?.internshipCompany ? (
+													<div className="flex items-center gap-1.5 text-slate-800 font-medium">
+														<Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+														<span className="truncate max-w-[170px]">
+															{s.internship.internshipCompany}
+														</span>
 													</div>
+												) : (
+													<span className="text-slate-400 italic">
+														Belum ditentukan
+													</span>
 												)}
 											</TableCell>
-											<TableCell className="text-slate-600">
-												{s.phone || "-"}
+
+											<TableCell className="text-center text-xs font-mono text-slate-700">
+												{departureDate ? (
+													new Date(departureDate).toLocaleDateString("id-ID")
+												) : (
+													<span className="text-slate-400 italic">-</span>
+												)}
 											</TableCell>
-											<TableCell>
-												<div className="flex items-center gap-2">
-													<span className="text-sm font-medium text-slate-700">
-														{s.completedDocs}/{s.totalDocs || 23}
+
+											{/* Status Badge */}
+											<TableCell className="text-center">
+												{status === "AMAN" ? (
+													<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold">
+														🟢 Aman
+													</Badge>
+												) : status === "PERLU_PERHATIAN" ? (
+													<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs font-semibold">
+														🟡 Berproses
+													</Badge>
+												) : (
+													<Badge className="bg-rose-50 text-rose-700 border-rose-200 text-xs font-semibold">
+														⛔ Kendala
+													</Badge>
+												)}
+											</TableCell>
+
+											{/* ACC Magang */}
+											<TableCell className="text-center">
+												{s.internship?.isAcc ? (
+													<Badge className="bg-cyan-50 text-cyan-700 border-cyan-200 text-xs font-bold">
+														✓ ACC
+													</Badge>
+												) : (
+													<span className="text-xs text-slate-400 italic">
+														Belum
 													</span>
-													<div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
-														<div
-															className={`h-full rounded-full ${s.completedDocs === (s.totalDocs || 23) ? "bg-emerald-500" : "bg-blue-500"}`}
-															style={{
-																width: `${(s.completedDocs / (s.totalDocs || 23)) * 100}%`,
-															}}
-														/>
-													</div>
-												</div>
+												)}
 											</TableCell>
-											<TableCell className="text-right">
-												<button
-													type="button"
-													className="text-[#0517B0] hover:text-blue-800 hover:underline text-sm font-medium"
+
+											{/* Action */}
+											<TableCell className="text-right pr-6">
+												<Button
+													size="sm"
+													variant="outline"
 													onClick={() =>
-														router.push(
-															`/dashboard/students/${s.id}?context=magang`,
-														)
+														router.push(`/dashboard/students/${s.student.id}`)
 													}
+													className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5"
 												>
+													<Eye className="w-3.5 h-3.5" />
 													Periksa
-												</button>
+												</Button>
 											</TableCell>
 										</TableRow>
-									))
-								) : (
-									<TableRow>
-										<TableCell
-											colSpan={6}
-											className="h-32 text-center text-slate-500"
-										>
-											Tidak ada mahasiswa ditemukan.
-										</TableCell>
-									</TableRow>
-								)}
+									);
+								})}
 							</TableBody>
 						</Table>
-					</CardContent>
-				</Card>
-			</div>
+
+						{filteredData.length === 0 && (
+							<div className="text-center py-12 text-slate-500">
+								<HelpCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+								<p className="text-sm font-semibold">
+									Tidak ada data magang ditemukan.
+								</p>
+								<p className="text-xs text-slate-400 mt-0.5">
+									Coba ubah kata kunci pencarian atau filter status yang
+									digunakan.
+								</p>
+							</div>
+						)}
+					</div>
+				</CardContent>
+			</Card>
 		</div>
 	);
 }

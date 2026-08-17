@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { AkademikDashboard } from "@/components/dashboards/AkademikDashboard";
 import { CrmDashboard } from "@/components/dashboards/CrmDashboard";
 import { DosenDashboard } from "@/components/dashboards/DosenDashboard";
-import { EvaluatorDashboard } from "@/components/dashboards/EvaluatorDashboard";
+import { EvaluasiFinalisasiDashboard } from "@/components/dashboards/EvaluasiFinalisasiDashboard";
 import { FinanceDashboard } from "@/components/dashboards/FinanceDashboard";
 import { MagangDashboard } from "@/components/dashboards/MagangDashboard";
 import { PaDashboard } from "@/components/dashboards/PaDashboard";
@@ -88,11 +88,16 @@ export function SharedDashboardLoader({
 	if (module === "finance") return <FinanceDashboard user={user} />;
 	if (module === "evaluator")
 		return (
-			<EvaluatorDashboard
+			<EvaluasiFinalisasiDashboard
 				data={data}
 				searchQuery={searchQuery}
 				setSearchQuery={setSearchQuery}
 				user={user}
+				onUpdate={() => {
+					api.students.get().then((res) => {
+						if (res.data?.data) setData(res.data.data);
+					});
+				}}
 			/>
 		);
 
