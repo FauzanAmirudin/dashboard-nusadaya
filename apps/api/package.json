@@ -6,7 +6,8 @@
 		"dev": "bun run --watch src/index.ts",
 		"db:push": "bunx drizzle-kit push",
 		"db:studio": "bunx drizzle-kit studio",
-		"seed": "bun run seed.ts"
+		"seed": "bun run seed.ts",
+		"seed:batch": "bun run scripts/seed-users-batch.ts"
 	},
 	"dependencies": {
 		"@elysiajs/cookie": "latest",
