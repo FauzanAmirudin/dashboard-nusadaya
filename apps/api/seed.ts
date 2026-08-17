@@ -17,32 +17,35 @@ import {
 
 async function seed() {
 	// Ensure all required columns exist in database before seeding
-	try {
-		await db.execute(sql`
-			ALTER TABLE users ADD COLUMN IF NOT EXISTS email text;
-			ALTER TABLE users ADD COLUMN IF NOT EXISTS phone text;
-			ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_url text;
+	const ddlStatements = [
+		sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email text;`,
+		sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone text;`,
+		sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_url text;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_ktp boolean DEFAULT false;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_kk boolean DEFAULT false;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_cv boolean DEFAULT false;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_ijazah boolean DEFAULT false;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_transkrip boolean DEFAULT false;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_passport_depan boolean DEFAULT false;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_passport_visa boolean DEFAULT false;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_skbm boolean DEFAULT false;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_mcu boolean DEFAULT false;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_sertifikasi_bahasa boolean DEFAULT false;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS rumah_juang boolean DEFAULT false;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS rekomendasi text;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS tim_visit text;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS tim_sosialisasi text;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS ro_referral text;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS mitra_sponsor text;`,
+		sql`ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS koordinator text;`,
+	];
 
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_ktp boolean DEFAULT false;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_kk boolean DEFAULT false;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_cv boolean DEFAULT false;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_ijazah boolean DEFAULT false;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_transkrip boolean DEFAULT false;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_passport_depan boolean DEFAULT false;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_passport_visa boolean DEFAULT false;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_skbm boolean DEFAULT false;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_mcu boolean DEFAULT false;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS doc_sertifikasi_bahasa boolean DEFAULT false;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS rumah_juang boolean DEFAULT false;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS rekomendasi text;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS tim_visit text;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS tim_sosialisasi text;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS ro_referral text;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS mitra_sponsor text;
-			ALTER TABLE pmb_data ADD COLUMN IF NOT EXISTS koordinator text;
-		`);
-	} catch (err) {
-		console.log("Auto-column migration check passed.");
+	for (const stmt of ddlStatements) {
+		try {
+			await db.execute(stmt);
+		} catch (_err) {
+			// Column might already exist
+		}
 	}
 
 	// Wipe existing data
