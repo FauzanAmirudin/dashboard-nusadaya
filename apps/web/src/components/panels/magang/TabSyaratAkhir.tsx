@@ -1,11 +1,23 @@
 "use client";
 
-import { CheckCircle } from "lucide-react";
-import { useState } from "react";
+import {
+	BookOpen,
+	CheckCircle,
+	CheckCircle2,
+	Clock,
+	FileCheck,
+	GraduationCap,
+	Link2,
+	Loader2,
+	Video,
+} from "lucide-react";
+import React from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { api } from "@/lib/eden";
 
 interface TabSyaratAkhirProps {
@@ -13,10 +25,11 @@ interface TabSyaratAkhirProps {
 	data: any;
 	postInternshipDocs: any[];
 	canEditPostInternship: boolean;
+	loadingItem?: string | null;
 	setPostInternshipDocs: (docs: any[]) => void;
-	handleToggleField: (field: string, value: any) => void;
+	handleToggleField: (field: string, value: any) => Promise<void> | void;
 	handleLocalChange: (field: string, value: any) => void;
-	handleBlurField: (field: string) => void;
+	handleBlurField: (field: string) => Promise<void> | void;
 }
 
 export function TabSyaratAkhir({
@@ -24,13 +37,12 @@ export function TabSyaratAkhir({
 	data,
 	postInternshipDocs,
 	canEditPostInternship,
+	loadingItem = null,
 	setPostInternshipDocs,
 	handleToggleField,
 	handleLocalChange,
 	handleBlurField,
 }: TabSyaratAkhirProps) {
-	const [isEditMode, setIsEditMode] = useState(false);
-
 	const fetchDocs = () => {
 		api.students[studentId.toString()]["post-internship"].documents
 			.get()
@@ -39,259 +51,257 @@ export function TabSyaratAkhir({
 			});
 	};
 
+	const completedCount = [
+		data?.logbookReady,
+		data?.laporanAkhirReady,
+		data?.videoDokumentasiReady,
+	].filter(Boolean).length;
+
+	const isAllCompleted = completedCount === 3;
+
 	return (
-		<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-8">
-			<div className="bg-slate-50 border-b border-slate-200 px-5 py-4 flex items-center justify-between">
-				<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-					DOKUMEN SYARAT KELULUSAN AKHIR (POST-INTERNSHIP)
-				</h3>
-				<Button
-					variant={isEditMode ? "default" : "outline"}
-					size="sm"
-					onClick={() => setIsEditMode(!isEditMode)}
-					className={
-						isEditMode ? "bg-[#0517B0] hover:bg-blue-800 text-white" : ""
-					}
-					disabled={!canEditPostInternship}
-				>
-					{isEditMode ? "Tutup Mode Edit" : "Edit Dokumen"}
-				</Button>
-			</div>
-
-			<div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-				{/* 1. Logbook */}
-				<div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 shadow-sm flex flex-col justify-between">
+		<div className="space-y-6">
+			<Card className="border border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
+				<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 					<div>
-						<div className="flex items-center gap-3 mb-3 border-b pb-2">
-							<div className="shrink-0 flex items-center">
-								{canEditPostInternship && isEditMode ? (
-									<button
-										onClick={() =>
-											handleToggleField("logbookReady", !data?.logbookReady)
-										}
-										className="focus:outline-none hover:scale-110 transition-transform"
-									>
-										{data?.logbookReady ? (
-											<CheckCircle className="w-5 h-5 text-emerald-500" />
-										) : (
-											<div className="w-5 h-5 rounded-full border-2 border-slate-300 bg-white hover:border-[#0517B0] transition-colors" />
-										)}
-									</button>
-								) : data?.logbookReady ? (
-									<CheckCircle className="w-5 h-5 text-emerald-500" />
-								) : (
-									<div className="w-5 h-5 rounded-full border-2 border-slate-300 bg-white" />
-								)}
-							</div>
-							<h4
-								className={`text-sm font-bold ${
-									data?.logbookReady ? "text-slate-800" : "text-slate-600"
-								}`}
-							>
-								Buku Harian Magang (Logbook)
-							</h4>
-						</div>
-						<p className="text-xs text-slate-500 mb-4">
-							PDF, disahkan pembimbing lapangan.
+						<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+							<GraduationCap className="w-4 h-4 text-[#0517B0]" />
+							Dokumen Syarat Kelulusan Akhir / Post-Internship (3)
+						</CardTitle>
+						<p className="text-[11px] text-slate-500 mt-0.5">
+							Verifikasi laporan, logbook, dan bukti luaran portofolio pasca
+							masa magang selesai
 						</p>
 					</div>
-
-					<div className="mt-auto pt-4 border-t border-slate-200/60">
-						<div className="flex items-center justify-between mb-3">
-							<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
-								File Dokumen
-							</span>
-							{postInternshipDocs.some((d) => d.documentKey === "logbook") ? (
-								<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none text-[10px]">
-									Tersimpan
-								</Badge>
-							) : (
-								<Badge className="bg-slate-200 text-slate-600 hover:bg-slate-200 border-none text-[10px]">
-									Belum Ada
-								</Badge>
-							)}
-						</div>
-						<DocumentUpload
-							studentId={studentId}
-							panel="post-internship"
-							documentKey="logbook"
-							canEdit={canEditPostInternship && isEditMode}
-							onUploadSuccess={fetchDocs}
-						/>
+					<div className="flex items-center gap-2">
+						<Badge
+							className={`text-xs font-bold px-2.5 py-0.5 ${
+								isAllCompleted
+									? "bg-emerald-50 text-emerald-700 border-emerald-200"
+									: "bg-blue-50 text-[#0517B0] border-blue-200"
+							}`}
+						>
+							{completedCount}/3 Selesai
+						</Badge>
 					</div>
-				</div>
+				</CardHeader>
 
-				{/* 2. Laporan Akhir */}
-				<div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 shadow-sm flex flex-col justify-between">
-					<div>
-						<div className="flex items-center gap-3 mb-3 border-b pb-2">
-							<div className="shrink-0 flex items-center">
-								{canEditPostInternship && isEditMode ? (
-									<button
-										onClick={() =>
-											handleToggleField(
-												"laporanAkhirReady",
-												!data?.laporanAkhirReady,
-											)
-										}
-										className="focus:outline-none hover:scale-110 transition-transform"
-									>
-										{data?.laporanAkhirReady ? (
-											<CheckCircle className="w-5 h-5 text-emerald-500" />
-										) : (
-											<div className="w-5 h-5 rounded-full border-2 border-slate-300 bg-white hover:border-[#0517B0] transition-colors" />
-										)}
-									</button>
-								) : data?.laporanAkhirReady ? (
-									<CheckCircle className="w-5 h-5 text-emerald-500" />
-								) : (
-									<div className="w-5 h-5 rounded-full border-2 border-slate-300 bg-white" />
-								)}
-							</div>
-							<h4
-								className={`text-sm font-bold ${
-									data?.laporanAkhirReady ? "text-slate-800" : "text-slate-600"
-								}`}
-							>
-								Laporan Akhir Magang
-							</h4>
-						</div>
-						<p className="text-xs text-slate-500 mb-4">
-							Laporan komprehensif akhir dalam format PDF.
-						</p>
-					</div>
-
-					<div className="mt-auto pt-4 border-t border-slate-200/60">
-						<div className="flex items-center justify-between mb-3">
-							<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
-								File Dokumen
-							</span>
-							{postInternshipDocs.some(
-								(d) => d.documentKey === "laporan_akhir",
-							) ? (
-								<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none text-[10px]">
-									Tersimpan
-								</Badge>
-							) : (
-								<Badge className="bg-slate-200 text-slate-600 hover:bg-slate-200 border-none text-[10px]">
-									Belum Ada
-								</Badge>
-							)}
-						</div>
-						<DocumentUpload
-							studentId={studentId}
-							panel="post-internship"
-							documentKey="laporan_akhir"
-							canEdit={canEditPostInternship && isEditMode}
-							onUploadSuccess={fetchDocs}
-						/>
-					</div>
-				</div>
-
-				{/* 3. Video Dokumentasi */}
-				<div className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 shadow-sm flex flex-col justify-between">
-					<div>
-						<div className="flex items-center gap-3 mb-3 border-b pb-2">
-							<div className="shrink-0 flex items-center">
-								{canEditPostInternship && isEditMode ? (
-									<button
-										onClick={() =>
-											handleToggleField(
-												"videoDokumentasiReady",
-												!data?.videoDokumentasiReady,
-											)
-										}
-										className="focus:outline-none hover:scale-110 transition-transform"
-									>
-										{data?.videoDokumentasiReady ? (
-											<CheckCircle className="w-5 h-5 text-emerald-500" />
-										) : (
-											<div className="w-5 h-5 rounded-full border-2 border-slate-300 bg-white hover:border-[#0517B0] transition-colors" />
-										)}
-									</button>
-								) : data?.videoDokumentasiReady ? (
-									<CheckCircle className="w-5 h-5 text-emerald-500" />
-								) : (
-									<div className="w-5 h-5 rounded-full border-2 border-slate-300 bg-white" />
-								)}
-							</div>
-							<h4
-								className={`text-sm font-bold ${
-									data?.videoDokumentasiReady
-										? "text-slate-800"
-										: "text-slate-600"
-								}`}
-							>
-								Video Dokumentasi Magang
-							</h4>
-						</div>
-
-						<div className="space-y-3 mb-4">
-							<div className="space-y-1">
-								<label className="text-xs font-medium text-slate-500">
-									Tautan Video
-								</label>
-								{!canEditPostInternship || !isEditMode ? (
-									<div className="h-8 flex items-center bg-slate-50 border-transparent px-3 rounded-md">
-										{data?.videoDokumentasiLink ? (
-											<a
-												href={data.videoDokumentasiLink}
-												target="_blank"
-												rel="noopener noreferrer"
-												className="text-sm font-semibold text-blue-600 hover:underline truncate"
+				<CardContent className="p-4 sm:p-5 space-y-4">
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+						{/* 1. Logbook */}
+						<div
+							className={`p-4 rounded-xl border transition-colors flex flex-col justify-between space-y-3 ${
+								data?.logbookReady
+									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
+									: "border-slate-200 bg-white shadow-xs"
+							}`}
+						>
+							<div>
+								<div className="flex items-start justify-between gap-3 mb-2">
+									<div className="flex items-start gap-3">
+										<Checkbox
+											id="chk-logbookReady"
+											checked={!!data?.logbookReady}
+											disabled={
+												!canEditPostInternship || loadingItem === "logbookReady"
+											}
+											onCheckedChange={(checked) =>
+												handleToggleField("logbookReady", !!checked)
+											}
+											className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+										/>
+										<div>
+											<label
+												htmlFor="chk-logbookReady"
+												className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
 											>
-												{data.videoDokumentasiLink}
-											</a>
+												1. Logbook Harian Magang
+											</label>
+											<p className="text-[11px] text-slate-500 mt-0.5">
+												Buku harian yang telah ditandatangani supervisor
+												industri
+											</p>
+										</div>
+									</div>
+									<div className="flex items-center gap-2 shrink-0">
+										{loadingItem === "logbookReady" ? (
+											<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+										) : data?.logbookReady ? (
+											<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+												✓ Selesai
+											</Badge>
 										) : (
-											<span className="text-sm font-semibold text-slate-800">
-												-
-											</span>
+											<Badge
+												variant="outline"
+												className="text-slate-400 border-slate-200 text-[10px]"
+											>
+												Belum
+											</Badge>
 										)}
 									</div>
-								) : (
+								</div>
+							</div>
+
+							<div className="pt-3 border-t border-slate-100 mt-auto">
+								<DocumentUpload
+									studentId={studentId}
+									panel="post-internship"
+									documentKey="logbook"
+									canEdit={canEditPostInternship}
+									onUploadSuccess={fetchDocs}
+								/>
+							</div>
+						</div>
+
+						{/* 2. Laporan Akhir Magang */}
+						<div
+							className={`p-4 rounded-xl border transition-colors flex flex-col justify-between space-y-3 ${
+								data?.laporanAkhirReady
+									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
+									: "border-slate-200 bg-white shadow-xs"
+							}`}
+						>
+							<div>
+								<div className="flex items-start justify-between gap-3 mb-2">
+									<div className="flex items-start gap-3">
+										<Checkbox
+											id="chk-laporanAkhirReady"
+											checked={!!data?.laporanAkhirReady}
+											disabled={
+												!canEditPostInternship ||
+												loadingItem === "laporanAkhirReady"
+											}
+											onCheckedChange={(checked) =>
+												handleToggleField("laporanAkhirReady", !!checked)
+											}
+											className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+										/>
+										<div>
+											<label
+												htmlFor="chk-laporanAkhirReady"
+												className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
+											>
+												2. Laporan Akhir Magang
+											</label>
+											<p className="text-[11px] text-slate-500 mt-0.5">
+												Laporan komprehensif pelaksanaan magang format PDF
+											</p>
+										</div>
+									</div>
+									<div className="flex items-center gap-2 shrink-0">
+										{loadingItem === "laporanAkhirReady" ? (
+											<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+										) : data?.laporanAkhirReady ? (
+											<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+												✓ Selesai
+											</Badge>
+										) : (
+											<Badge
+												variant="outline"
+												className="text-slate-400 border-slate-200 text-[10px]"
+											>
+												Belum
+											</Badge>
+										)}
+									</div>
+								</div>
+							</div>
+
+							<div className="pt-3 border-t border-slate-100 mt-auto">
+								<DocumentUpload
+									studentId={studentId}
+									panel="post-internship"
+									documentKey="laporan_akhir"
+									canEdit={canEditPostInternship}
+									onUploadSuccess={fetchDocs}
+								/>
+							</div>
+						</div>
+
+						{/* 3. Video Dokumentasi & Portofolio */}
+						<div
+							className={`p-4 rounded-xl border transition-colors flex flex-col justify-between space-y-3 ${
+								data?.videoDokumentasiReady
+									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
+									: "border-slate-200 bg-white shadow-xs"
+							}`}
+						>
+							<div>
+								<div className="flex items-start justify-between gap-3 mb-2">
+									<div className="flex items-start gap-3">
+										<Checkbox
+											id="chk-videoDokumentasiReady"
+											checked={!!data?.videoDokumentasiReady}
+											disabled={
+												!canEditPostInternship ||
+												loadingItem === "videoDokumentasiReady"
+											}
+											onCheckedChange={(checked) =>
+												handleToggleField("videoDokumentasiReady", !!checked)
+											}
+											className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+										/>
+										<div>
+											<label
+												htmlFor="chk-videoDokumentasiReady"
+												className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
+											>
+												3. Video Portofolio / Luaran
+											</label>
+											<p className="text-[11px] text-slate-500 mt-0.5">
+												Video dokumentasi recap pengalaman kerja dan hasil
+												luaran
+											</p>
+										</div>
+									</div>
+									<div className="flex items-center gap-2 shrink-0">
+										{loadingItem === "videoDokumentasiReady" ? (
+											<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+										) : data?.videoDokumentasiReady ? (
+											<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+												✓ Selesai
+											</Badge>
+										) : (
+											<Badge
+												variant="outline"
+												className="text-slate-400 border-slate-200 text-[10px]"
+											>
+												Belum
+											</Badge>
+										)}
+									</div>
+								</div>
+
+								<div className="space-y-1 my-2">
+									<Label className="text-[11px] font-semibold text-slate-600">
+										Link Video Portofolio
+									</Label>
 									<Input
-										disabled={!canEditPostInternship || !isEditMode}
-										type="url"
+										placeholder="https://youtube.com/... atau Drive"
+										className="h-8 text-xs bg-white"
 										value={data?.videoDokumentasiLink || ""}
+										disabled={!canEditPostInternship}
 										onChange={(e) =>
 											handleLocalChange("videoDokumentasiLink", e.target.value)
 										}
 										onBlur={() => handleBlurField("videoDokumentasiLink")}
-										className="bg-white h-8 text-sm"
-										placeholder="https://youtube.com/..."
 									/>
-								)}
+								</div>
+							</div>
+
+							<div className="pt-3 border-t border-slate-100 mt-auto">
+								<DocumentUpload
+									studentId={studentId}
+									panel="post-internship"
+									documentKey="video_portofolio"
+									canEdit={canEditPostInternship}
+									onUploadSuccess={fetchDocs}
+								/>
 							</div>
 						</div>
 					</div>
-
-					<div className="mt-auto pt-4 border-t border-slate-200/60">
-						<div className="flex items-center justify-between mb-3">
-							<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
-								Lampiran Dokumen / Foto
-							</span>
-							{postInternshipDocs.some(
-								(d) => d.documentKey === "video_dokumentasi",
-							) ? (
-								<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none text-[10px]">
-									Tersimpan
-								</Badge>
-							) : (
-								<Badge className="bg-slate-200 text-slate-600 hover:bg-slate-200 border-none text-[10px]">
-									Belum Ada
-								</Badge>
-							)}
-						</div>
-						<DocumentUpload
-							studentId={studentId}
-							panel="post-internship"
-							documentKey="video_dokumentasi"
-							canEdit={canEditPostInternship && isEditMode}
-							onUploadSuccess={fetchDocs}
-						/>
-					</div>
-				</div>
-			</div>
+				</CardContent>
+			</Card>
 		</div>
 	);
 }

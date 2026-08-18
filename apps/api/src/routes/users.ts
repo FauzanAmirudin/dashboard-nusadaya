@@ -6,12 +6,13 @@ import { users } from "../db/schema";
 export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 	.derive((context) => {
 		const user = (context as any).user;
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
 		return { user };
 	})
 	.get("/", async ({ user, set }: any) => {
+		if (!user) {
+			set.status = 401;
+			return { success: false, message: "Unauthorized" };
+		}
 		if (user.role !== "superadmin" && user.role !== "akademik") {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };

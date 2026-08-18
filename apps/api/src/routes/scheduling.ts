@@ -22,9 +22,6 @@ function isTimeOverlap(
 export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 	.derive((context) => {
 		const user = (context as any).user;
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
 		return { user };
 	})
 

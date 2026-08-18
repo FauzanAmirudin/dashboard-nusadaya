@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AkademikDashboard } from "@/components/dashboards/AkademikDashboard";
 import { CrmDashboard } from "@/components/dashboards/CrmDashboard";
-import { DosenDashboard } from "@/components/dashboards/DosenDashboard";
 import { EvaluasiFinalisasiDashboard } from "@/components/dashboards/EvaluasiFinalisasiDashboard";
 import { FinanceDashboard } from "@/components/dashboards/FinanceDashboard";
 import { MagangDashboard } from "@/components/dashboards/MagangDashboard";
@@ -20,7 +19,6 @@ export function SharedDashboardLoader({
 		| "pmb"
 		| "crm"
 		| "akademik"
-		| "dosen"
 		| "pa"
 		| "magang"
 		| "finance"
@@ -82,7 +80,6 @@ export function SharedDashboardLoader({
 				user={user}
 			/>
 		);
-	if (module === "dosen") return <DosenDashboard user={user!} />;
 	if (module === "pa") return <PaDashboard user={user} />;
 	if (module === "magang") return <MagangDashboard />;
 	if (module === "finance") return <FinanceDashboard user={user} />;

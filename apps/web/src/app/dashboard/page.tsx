@@ -152,7 +152,7 @@ export default function DashboardPage() {
 		}
 
 		if (user?.role === "dosen") {
-			router.push("/dashboard/akademik");
+			router.push("/dashboard/mata-kuliah");
 			return;
 		}
 

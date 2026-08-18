@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
 	Select,
@@ -750,16 +751,18 @@ export function EvaluasiFinalisasiDashboard({
 													<div className="font-bold text-slate-900 text-sm">
 														{s.student.name}
 													</div>
-													<div className="flex items-center gap-2 mt-0.5">
+													<div className="flex flex-wrap items-center gap-1.5 mt-0.5">
 														<Badge
 															variant="outline"
 															className="text-[10px] px-1.5 py-0 text-slate-500 border-slate-200"
 														>
 															Angkatan {s.student.cohort}
 														</Badge>
-														<span className="text-xs text-slate-500 font-medium truncate max-w-[200px]">
-															{s.student.program}
-														</span>
+														<PeminatanBadge
+															subProgram={s.student.subProgram}
+															destinationCountry={s.student.destinationCountry}
+															program={s.student.program}
+														/>
 													</div>
 												</TableCell>
 
@@ -993,11 +996,18 @@ export function EvaluasiFinalisasiDashboard({
 													)}
 												</TableCell>
 												<TableCell>
-													<div className="text-xs font-semibold text-slate-800">
-														{s.student.program}
-													</div>
-													<div className="text-[11px] text-slate-500 mt-0.5">
-														Angkatan {s.student.cohort}
+													<div className="flex flex-wrap items-center gap-1.5">
+														<Badge
+															variant="outline"
+															className="text-[10px] px-1.5 py-0 text-slate-500 border-slate-200"
+														>
+															Angkatan {s.student.cohort}
+														</Badge>
+														<PeminatanBadge
+															subProgram={s.student.subProgram}
+															destinationCountry={s.student.destinationCountry}
+															program={s.student.program}
+														/>
 													</div>
 												</TableCell>
 												<TableCell className="text-center font-medium">

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { DosenPanel } from "@/components/panels/DosenPanel";
+import { TabMataKuliah } from "@/components/panels/kehadiran/detail/TabMataKuliah";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -603,9 +603,9 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 				{activeTab === "penilaian" && (
 					<div className="mt-2">
 						<h3 className="text-xl font-bold text-slate-800 mb-4 px-1 border-l-4 border-[#0517B0] pl-3">
-							Modul Vokasi & Penilaian Dosen
+							Rekap Nilai & Kehadiran Mata Kuliah
 						</h3>
-						<DosenPanel studentId={studentId} onUpdate={onUpdate} />
+						<TabMataKuliah studentId={studentId} />
 					</div>
 				)}
 

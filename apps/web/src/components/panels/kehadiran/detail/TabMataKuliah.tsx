@@ -96,17 +96,25 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 		);
 	}
 
-	if (!data || data.grades.length === 0) {
+	const visibleGrades = data?.grades
+		? user?.role === "dosen"
+			? data.grades.filter((g: any) => g.dosenId === user.id)
+			: data.grades
+		: [];
+
+	if (!data || visibleGrades.length === 0) {
 		return (
 			<div className="text-center py-8 text-slate-500">
-				Belum ada data mata kuliah yang terdaftar.
+				{user?.role === "dosen"
+					? "Mahasiswa ini tidak mengambil mata kuliah yang Anda ampu."
+					: "Belum ada data mata kuliah yang terdaftar."}
 			</div>
 		);
 	}
 
 	return (
 		<div className="space-y-4">
-			{data.grades.map((g: any, index: number) => {
+			{visibleGrades.map((g: any, index: number) => {
 				const isExpanded = expandedCourse === g.id;
 				const isEditing = editingCourse === g.id;
 				const rate =

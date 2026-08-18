@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import {
 	Table,
 	TableBody,
@@ -266,9 +267,13 @@ export default function StudentsPage() {
 										<TableCell>
 											{s.student.batch ? `Batch ${s.student.batch}` : "-"}
 										</TableCell>
-										<TableCell>{s.student.academicYear || "-"}</TableCell>
 										<TableCell>{s.student.program || "-"}</TableCell>
-										<TableCell>{s.student.subProgram || "-"}</TableCell>
+										<TableCell>
+											<PeminatanBadge
+												subProgram={s.student.subProgram}
+												program={s.student.program}
+											/>
+										</TableCell>
 										<TableCell>{s.student.phone || "-"}</TableCell>
 										<TableCell className="text-right">
 											<div className="flex justify-end gap-2">

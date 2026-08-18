@@ -307,7 +307,7 @@ export const paRoutes = new Elysia()
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
-			const { language, languageCustom, vocabCount, sentenceCount } =
+			const { language, languageCustom, vocabCount, sentenceCount, date } =
 				body as any;
 			const inserted = await db
 				.insert(paHafalanSessions)
@@ -317,6 +317,7 @@ export const paRoutes = new Elysia()
 					languageCustom: languageCustom ?? null,
 					vocabCount: vocabCount ?? 0,
 					sentenceCount: sentenceCount ?? 0,
+					createdAt: date ? new Date(date) : new Date(),
 					createdBy: user.id,
 				})
 				.returning();
@@ -328,6 +329,7 @@ export const paRoutes = new Elysia()
 				languageCustom: t.Optional(t.Nullable(t.String())),
 				vocabCount: t.Optional(t.Number()),
 				sentenceCount: t.Optional(t.Number()),
+				date: t.Optional(t.String()),
 			}),
 		},
 	)
@@ -346,17 +348,21 @@ export const paRoutes = new Elysia()
 				return { success: false, message: "Forbidden" };
 			}
 			const logId = Number(params.logId);
-			const { language, languageCustom, vocabCount, sentenceCount } =
+			const { language, languageCustom, vocabCount, sentenceCount, date } =
 				body as any;
+			const updateData: any = {
+				language,
+				languageCustom: languageCustom ?? null,
+				vocabCount,
+				sentenceCount,
+				updatedAt: new Date(),
+			};
+			if (date) {
+				updateData.createdAt = new Date(date);
+			}
 			await db
 				.update(paHafalanSessions)
-				.set({
-					language,
-					languageCustom: languageCustom ?? null,
-					vocabCount,
-					sentenceCount,
-					updatedAt: new Date(),
-				})
+				.set(updateData)
 				.where(eq(paHafalanSessions.id, logId));
 			return { success: true };
 		},
@@ -366,6 +372,7 @@ export const paRoutes = new Elysia()
 				languageCustom: t.Optional(t.Nullable(t.String())),
 				vocabCount: t.Number(),
 				sentenceCount: t.Number(),
+				date: t.Optional(t.String()),
 			}),
 		},
 	)
@@ -506,13 +513,14 @@ export const paRoutes = new Elysia()
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
+		const b = body as any;
 		await db.insert(paTripartiteLogs).values({
 			studentId: Number(params.id),
-			contactDate: new Date((body as any).contactDate),
-			contactName: (body as any).parentName, // frontend might send parentName
-			contactType: (body as any).contactMethod || "Orang Tua", // frontend contactMethod -> contactType
-			summary: (body as any).topic, // frontend topic -> summary
-			result: (body as any).result,
+			contactDate: new Date(b.contactDate || b.date || Date.now()),
+			contactName: b.contactName || b.parentName || null,
+			contactType: b.contactType || b.contactMethod || "Orang Tua",
+			summary: b.summary || b.topic || "-",
+			result: b.result || null,
 			createdBy: user.id,
 		});
 		return { success: true };
@@ -540,13 +548,14 @@ export const paRoutes = new Elysia()
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
+		const b = body as any;
 		await db.insert(paInterviewLogs).values({
 			studentId: Number(params.id),
-			interviewDate: new Date((body as any).interviewDate),
-			companyName: "N/A", // Default if frontend doesn't send it yet
-			country: (body as any).country,
-			result: (body as any).result,
-			notes: (body as any).notes,
+			interviewDate: new Date(b.interviewDate || b.date || Date.now()),
+			companyName: b.companyName || b.company || "N/A",
+			country: b.country || null,
+			result: b.result || "Menunggu",
+			notes: b.notes || null,
 			createdBy: user.id,
 		});
 		return { success: true };

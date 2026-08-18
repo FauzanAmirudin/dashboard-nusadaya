@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import {
 	Select,
 	SelectContent,
@@ -296,9 +297,14 @@ export function KehadiranDashboard() {
 													</div>
 												</TableCell>
 												<TableCell>
-													<div className="text-sm">{s.program || "-"}</div>
-													<div className="text-xs text-slate-500">
-														{s.subProgram || ""}
+													<div className="text-sm font-medium text-slate-800">
+														{s.program || "-"}
+													</div>
+													<div className="mt-0.5">
+														<PeminatanBadge
+															subProgram={s.subProgram}
+															program={s.program}
+														/>
 													</div>
 												</TableCell>
 												<TableCell>Angkatan {s.cohort}</TableCell>

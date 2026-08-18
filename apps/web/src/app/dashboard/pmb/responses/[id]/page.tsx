@@ -19,6 +19,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { Textarea } from "@/components/ui/textarea";
 import { getToken } from "@/lib/eden";
 
@@ -294,9 +295,12 @@ export default function ResponseDetailPage() {
 							{data.program || "-"}
 						</span>
 						<span className="text-slate-500">Peminatan</span>
-						<span className="col-span-2 font-medium">
-							{data.subProgram || "-"}
-						</span>
+						<div className="col-span-2">
+							<PeminatanBadge
+								subProgram={data.subProgram}
+								program={data.program}
+							/>
+						</div>
 						<span className="text-slate-500">Pilihan Kelas</span>
 						<span className="col-span-2 font-medium">
 							{data.classType || "-"}

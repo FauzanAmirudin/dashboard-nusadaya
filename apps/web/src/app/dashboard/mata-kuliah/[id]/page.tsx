@@ -6,16 +6,20 @@ import {
 	Calendar,
 	Check,
 	CheckCircle,
+	CheckSquare,
 	ChevronDown,
 	Download,
 	Edit,
 	FileText,
 	GraduationCap,
+	Layers,
 	Loader2,
 	Paperclip,
 	Plus,
 	Save,
+	Sparkles,
 	Users,
+	Wrench,
 	X,
 } from "lucide-react";
 import Link from "next/link";
@@ -74,14 +78,17 @@ type CourseDetail = {
 type MeetingData = {
 	id: number;
 	meetingNumber: number;
-	meetingType: string;
+	meetingType: "pkkmb" | "beginning" | "regular" | "uts" | "uas";
+	sessionType: "teori" | "praktik" | "keduanya" | null;
 	meetingLabel: string;
 	description: string | null;
 	meetingDate: string | null;
 	activities: any[];
 	attendances: {
 		studentId: number;
-		status: string;
+		status: string | null;
+		theoryScore?: number | null;
+		practicalScore?: number | null;
 		notes: string | null;
 		student: { name: string; nim: string };
 	}[];
@@ -92,6 +99,13 @@ type StudentRecord = {
 	nim: string;
 	name: string;
 };
+
+interface StudentAttendanceInput {
+	status: string | null;
+	theoryScore: string | number;
+	practicalScore: string | number;
+	notes: string;
+}
 
 export default function MataKuliahDetailPage() {
 	const params = useParams();
@@ -108,32 +122,19 @@ export default function MataKuliahDetailPage() {
 	const [editingMeeting, setEditingMeeting] = useState<number | null>(null);
 	const [meetingForm, setMeetingForm] = useState({
 		label: "",
+		sessionType: "" as "teori" | "praktik" | "keduanya" | "",
 		date: "",
 		desc: "",
 	});
 
-	// Inline editing state for Activities
-	const [editingActivity, setEditingActivity] = useState<{
-		meetingId: number;
-		type: string;
-		actId?: number;
-	} | null>(null);
-	const [activityForm, setActivityForm] = useState<{
-		activityType: "teori" | "tugas" | "praktik" | "ujian";
-		score?: number;
-		notes?: string;
-		documentUrl?: string;
-		documentName?: string;
-		file?: File | null;
-	}>({ activityType: "teori" });
-
-	// Attendance State
+	// Attendance State: Record<meetingId, Record<studentId, StudentAttendanceInput>>
 	const [attendanceData, setAttendanceData] = useState<
-		Record<number, Record<number, { status: string; notes: string }>>
+		Record<number, Record<number, StudentAttendanceInput>>
 	>({});
 	const [isSavingAttendance, setIsSavingAttendance] = useState<number | null>(
 		null,
 	);
+	const [isSavingInfo, setIsSavingInfo] = useState<number | null>(null);
 
 	const fetchData = async () => {
 		setIsLoading(true);
@@ -152,22 +153,34 @@ export default function MataKuliahDetailPage() {
 			const { data: mData, error: mErr } =
 				await api.courses[courseId].meetings.get();
 			if (!mErr && mData?.success) {
-				const meets = mData.data as any[];
+				const meets = (mData.data as any[]) || [];
+				// Sort by meetingNumber ascending
+				meets.sort((a, b) => (a.meetingNumber ?? 0) - (b.meetingNumber ?? 0));
 				setMeetings(meets);
 
 				// Prepare attendance state
 				const attState: Record<
 					number,
-					Record<number, { status: string; notes: string }>
+					Record<number, StudentAttendanceInput>
 				> = {};
 				meets.forEach((m) => {
 					attState[m.id] = {};
-					m.attendances.forEach((a: any) => {
-						attState[m.id][a.studentId] = {
-							status: a.status,
-							notes: a.notes || "",
-						};
-					});
+					if (m.attendances && Array.isArray(m.attendances)) {
+						m.attendances.forEach((a: any) => {
+							attState[m.id][a.studentId] = {
+								status: a.status || null,
+								theoryScore:
+									a.theoryScore !== null && a.theoryScore !== undefined
+										? a.theoryScore
+										: "",
+								practicalScore:
+									a.practicalScore !== null && a.practicalScore !== undefined
+										? a.practicalScore
+										: "",
+								notes: a.notes || "",
+							};
+						});
+					}
 				});
 				setAttendanceData(attState);
 			}
@@ -178,8 +191,9 @@ export default function MataKuliahDetailPage() {
 					$query: { cohort: courseInfo.cohort.toString(), isArchived: "false" },
 				});
 				if (!sErr && sData?.data) {
-					// map students data from eden
 					const sList = (sData.data as any[]).map((item) => item.student);
+					// Sort students by name
+					sList.sort((a, b) => a.name.localeCompare(b.name));
 					setStudents(sList);
 				}
 			}
@@ -196,27 +210,30 @@ export default function MataKuliahDetailPage() {
 		}
 	}, [hasHydrated, user, courseId]);
 
-	// Save Meeting Info
+	// Save Meeting Info & Session Type
 	const saveMeetingInfo = async (meetingId: number) => {
+		setIsSavingInfo(meetingId);
 		try {
 			const { error } = await api.courses[courseId].meetings[
 				meetingId.toString()
 			].patch({
 				meetingLabel: meetingForm.label,
+				sessionType: meetingForm.sessionType || null,
 				meetingDate: meetingForm.date || undefined,
 				description: meetingForm.desc,
 			});
 			if (error) throw error;
-			toast.success("Info pertemuan tersimpan");
+			toast.success("Informasi pertemuan & jenis sesi berhasil disimpan");
 			setEditingMeeting(null);
 
-			// Update local state without refetching all
+			// Update local state
 			setMeetings((prev) =>
 				prev.map((m) =>
 					m.id === meetingId
 						? {
 								...m,
 								meetingLabel: meetingForm.label,
+								sessionType: (meetingForm.sessionType as any) || null,
 								meetingDate: meetingForm.date || null,
 								description: meetingForm.desc,
 							}
@@ -225,78 +242,36 @@ export default function MataKuliahDetailPage() {
 			);
 		} catch (err: any) {
 			toast.error("Gagal menyimpan info pertemuan");
+		} finally {
+			setIsSavingInfo(null);
 		}
 	};
 
-	// Save Activity
-	const saveActivity = async (
-		meetingId: number,
-		actType: string,
-		actId?: number,
-	) => {
-		try {
-			let docUrl = activityForm.documentUrl;
-			let docName = activityForm.documentName;
-
-			if (activityForm.file) {
-				const formData = new FormData();
-				formData.append("file", activityForm.file);
-				formData.append("category", "academic");
-				const uploadRes = await fetch(
-					`${process.env.NEXT_PUBLIC_API_URL}/files/upload`,
-					{
-						method: "POST",
-						headers: {
-							Authorization: `Bearer ${localStorage.getItem("token")}`,
-						},
-						body: formData,
-					},
-				);
-				const uploadData = await uploadRes.json();
-				if (!uploadRes.ok) throw new Error("Gagal upload file");
-				docUrl = uploadData.data.fileUrl;
-				docName = uploadData.data.originalName;
-			}
-
-			const payload = {
-				activityType: actType as any,
-				score: activityForm.score,
-				notes: activityForm.notes,
-				documentUrl: docUrl,
-				documentName: docName,
-			};
-
-			if (actId) {
-				const { error } =
-					await api.courses[courseId].meetings[meetingId.toString()].activities[
-						actId.toString()
-					].patch(payload);
-				if (error) throw error;
-			} else {
-				const { error } =
-					await api.courses[courseId].meetings[
-						meetingId.toString()
-					].activities.post(payload);
-				if (error) throw error;
-			}
-			toast.success("Data kegiatan tersimpan");
-			setEditingActivity(null);
-			fetchData();
-		} catch (err) {
-			toast.error("Gagal menyimpan kegiatan");
-		}
-	};
-
-	// Save Attendances
+	// Save Attendances & Scores
 	const saveAttendances = async (meetingId: number) => {
 		setIsSavingAttendance(meetingId);
 		try {
 			const meetingAtt = attendanceData[meetingId] || {};
-			const payload = Object.keys(meetingAtt).map((sId) => ({
-				studentId: parseInt(sId, 10),
-				status: meetingAtt[parseInt(sId, 10)].status,
-				notes: meetingAtt[parseInt(sId, 10)].notes,
-			}));
+			const payload = students.map((s) => {
+				const entry = meetingAtt[s.id];
+				return {
+					studentId: s.id,
+					status: entry?.status || null,
+					theoryScore:
+						entry?.theoryScore !== undefined &&
+						entry?.theoryScore !== null &&
+						entry?.theoryScore !== ""
+							? Math.max(0, Math.min(100, Number(entry.theoryScore) || 0))
+							: null,
+					practicalScore:
+						entry?.practicalScore !== undefined &&
+						entry?.practicalScore !== null &&
+						entry?.practicalScore !== ""
+							? Math.max(0, Math.min(100, Number(entry.practicalScore) || 0))
+							: null,
+					notes: entry?.notes || null,
+				};
+			});
 
 			const { error } = await api.courses[courseId].meetings[
 				meetingId.toString()
@@ -304,7 +279,10 @@ export default function MataKuliahDetailPage() {
 				attendances: payload,
 			});
 			if (error) throw error;
-			toast.success("Presensi berhasil disimpan");
+			toast.success(
+				"Presensi dan nilai harian berhasil disimpan & disinkronisasi!",
+			);
+			fetchData();
 		} catch (err) {
 			toast.error("Gagal menyimpan presensi");
 		} finally {
@@ -320,6 +298,14 @@ export default function MataKuliahDetailPage() {
 		meetings.forEach((m) => {
 			const baseRow = {
 				Pertemuan: m.meetingLabel,
+				"Jenis Sesi":
+					m.sessionType === "teori"
+						? "Teori"
+						: m.sessionType === "praktik"
+							? "Praktik"
+							: m.sessionType === "keduanya"
+								? "Teori & Praktik"
+								: "-",
 				Tanggal: m.meetingDate || "-",
 				Deskripsi: m.description || "-",
 			};
@@ -328,12 +314,20 @@ export default function MataKuliahDetailPage() {
 				exportData.push(baseRow);
 			} else {
 				students.forEach((s) => {
-					const att = m.attendances.find((a) => a.studentId === s.id);
+					const att = m.attendances?.find((a) => a.studentId === s.id);
 					exportData.push({
 						...baseRow,
 						NIM: s.nim,
 						Mahasiswa: s.name,
-						Kehadiran: att ? att.status : "-",
+						Kehadiran: att?.status ? att.status.toUpperCase() : "BELUM DIISI",
+						"Nilai Teori":
+							att?.theoryScore !== null && att?.theoryScore !== undefined
+								? att.theoryScore
+								: "-",
+						"Nilai Praktik":
+							att?.practicalScore !== null && att?.practicalScore !== undefined
+								? att.practicalScore
+								: "-",
 						"Catatan Kehadiran": att?.notes || "-",
 					});
 				});
@@ -342,8 +336,40 @@ export default function MataKuliahDetailPage() {
 
 		exportToCSV(
 			exportData,
-			`Rekap_${course.code}_${course.name.replace(/\s+/g, "_")}`,
+			`Rekap_Nilai_Presensi_${course.code}_${course.name.replace(/\s+/g, "_")}`,
 		);
+	};
+
+	const getSessionTypeBadge = (type: string | null | undefined) => {
+		switch (type) {
+			case "teori":
+				return (
+					<Badge className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 font-medium">
+						📘 Teori
+					</Badge>
+				);
+			case "praktik":
+				return (
+					<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 font-medium">
+						🛠️ Praktik
+					</Badge>
+				);
+			case "keduanya":
+				return (
+					<Badge className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 font-medium">
+						⚡ Teori & Praktik
+					</Badge>
+				);
+			default:
+				return (
+					<Badge
+						variant="outline"
+						className="text-slate-400 border-slate-300 font-normal"
+					>
+						⚪ Sesi Belum Diatur
+					</Badge>
+				);
+		}
 	};
 
 	if (!hasHydrated || isLoading) {
@@ -356,7 +382,7 @@ export default function MataKuliahDetailPage() {
 
 	if (!course)
 		return (
-			<div className="p-6 text-center text-red-500">
+			<div className="p-6 text-center text-red-500 font-medium">
 				Mata kuliah tidak ditemukan
 			</div>
 		);
@@ -364,109 +390,209 @@ export default function MataKuliahDetailPage() {
 	return (
 		<div className="p-6 max-w-7xl mx-auto space-y-6">
 			{/* Header */}
-			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
 				<div className="flex items-center gap-3">
-					<Button variant="ghost" size="icon" onClick={() => router.back()}>
+					<Button
+						variant="outline"
+						size="icon"
+						onClick={() => router.push("/dashboard/mata-kuliah")}
+						className="h-10 w-10 border-slate-200 text-slate-600 hover:bg-slate-50"
+					>
 						<ArrowLeft className="h-5 w-5" />
 					</Button>
 					<div>
 						<div className="flex items-center gap-2">
-							<h1 className="text-2xl font-bold">{course.name}</h1>
-							<Badge variant="outline" className="bg-slate-50">
+							<h1 className="text-2xl font-bold text-slate-800">
+								{course.name}
+							</h1>
+							<Badge className="bg-blue-50 text-blue-700 border-blue-200 font-semibold">
 								{course.code}
 							</Badge>
+							{course.peminatan && (
+								<Badge
+									variant="secondary"
+									className="bg-slate-100 text-slate-700"
+								>
+									{course.peminatan}
+								</Badge>
+							)}
 						</div>
-						<p className="text-slate-500">
-							Dosen Pengampu: {course.dosen.fullName}
+						<p className="text-sm text-slate-500 mt-0.5">
+							Dosen Pengampu:{" "}
+							<span className="font-semibold text-slate-700">
+								{course.dosen.fullName}
+							</span>
 						</p>
 					</div>
 				</div>
-				<Button variant="outline" onClick={handleExportDetail}>
-					<Download className="mr-2 h-4 w-4" /> Export Rekap
+				<Button
+					variant="outline"
+					onClick={handleExportDetail}
+					className="border-slate-300 text-slate-700 hover:bg-slate-50 shadow-sm"
+				>
+					<Download className="mr-2 h-4 w-4 text-blue-600" /> Export Rekap &
+					Nilai
 				</Button>
 			</div>
 
-			<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-				<Card>
+			{/* Stat Cards */}
+			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+				<Card className="border-slate-200 shadow-sm hover:shadow transition-shadow">
 					<CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-1">
-						<GraduationCap className="h-6 w-6 text-slate-400 mb-1" />
-						<p className="text-sm text-slate-500 font-medium">Angkatan</p>
-						<p className="text-lg font-bold">{course.cohort}</p>
-					</CardContent>
-				</Card>
-				<Card>
-					<CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-1">
-						<BookOpen className="h-6 w-6 text-slate-400 mb-1" />
-						<p className="text-sm text-slate-500 font-medium">Jenis</p>
-						<p className="text-lg font-bold capitalize">{course.type}</p>
-					</CardContent>
-				</Card>
-				<Card>
-					<CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-1">
-						<Users className="h-6 w-6 text-slate-400 mb-1" />
-						<p className="text-sm text-slate-500 font-medium">Mahasiswa</p>
-						<p className="text-lg font-bold">{students.length} Orang</p>
-					</CardContent>
-				</Card>
-				<Card>
-					<CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-1">
-						<Calendar className="h-6 w-6 text-slate-400 mb-1" />
-						<p className="text-sm text-slate-500 font-medium">
-							Total Pertemuan
+						<div className="p-2.5 rounded-full bg-blue-50 text-blue-600 mb-1">
+							<GraduationCap className="h-5 w-5" />
+						</div>
+						<p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
+							Angkatan
 						</p>
-						<p className="text-lg font-bold">18 Sesi</p>
+						<p className="text-xl font-bold text-slate-800">{course.cohort}</p>
+					</CardContent>
+				</Card>
+				<Card className="border-slate-200 shadow-sm hover:shadow transition-shadow">
+					<CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-1">
+						<div className="p-2.5 rounded-full bg-emerald-50 text-emerald-600 mb-1">
+							<BookOpen className="h-5 w-5" />
+						</div>
+						<p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
+							Kategori MK
+						</p>
+						<p className="text-xl font-bold text-slate-800 capitalize">
+							{course.type}
+						</p>
+					</CardContent>
+				</Card>
+				<Card className="border-slate-200 shadow-sm hover:shadow transition-shadow">
+					<CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-1">
+						<div className="p-2.5 rounded-full bg-purple-50 text-purple-600 mb-1">
+							<Users className="h-5 w-5" />
+						</div>
+						<p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
+							Peserta Aktif
+						</p>
+						<p className="text-xl font-bold text-slate-800">
+							{students.length} Mahasiswa
+						</p>
+					</CardContent>
+				</Card>
+				<Card className="border-slate-200 shadow-sm hover:shadow transition-shadow">
+					<CardContent className="p-4 flex flex-col items-center justify-center text-center space-y-1">
+						<div className="p-2.5 rounded-full bg-amber-50 text-amber-600 mb-1">
+							<Calendar className="h-5 w-5" />
+						</div>
+						<p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
+							Total Sesi
+						</p>
+						<p className="text-xl font-bold text-slate-800">
+							{meetings.length} Sesi Pertemuan
+						</p>
 					</CardContent>
 				</Card>
 			</div>
 
+			{/* Main Content Tabs */}
 			<Tabs defaultValue="jadwal" className="w-full">
-				<TabsList className="mb-4">
-					<TabsTrigger value="jadwal">Jadwal Mengajar</TabsTrigger>
+				<TabsList className="mb-4 bg-slate-100 p-1 rounded-xl border border-slate-200">
+					<TabsTrigger
+						value="jadwal"
+						className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-semibold text-sm px-6"
+					>
+						Jadwal Pertemuan & Input Nilai Harian
+					</TabsTrigger>
 					{course.type === "praktik" && (
-						<TabsTrigger value="anggaran">Anggaran Praktik</TabsTrigger>
+						<TabsTrigger
+							value="anggaran"
+							className="data-[state=active]:bg-white data-[state=active]:shadow-sm font-semibold text-sm px-6"
+						>
+							Anggaran Praktik
+						</TabsTrigger>
 					)}
 				</TabsList>
 
 				<TabsContent value="jadwal">
-					<Card>
-						<CardHeader className="pb-3 border-b">
-							<CardTitle className="text-xl">
-								Jadwal Mengajar & Jurnal Perkuliahan
-							</CardTitle>
-							<CardDescription>
-								Pilih pertemuan untuk mengisi presensi, materi, dan nilai
-							</CardDescription>
+					<Card className="border-slate-200 shadow-sm">
+						<CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
+							<div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+								<div>
+									<CardTitle className="text-xl text-slate-800">
+										Manajemen Perkuliahan & Penilaian Per Pertemuan
+									</CardTitle>
+									<CardDescription className="text-slate-500">
+										Tentukan jenis sesi (Teori/Praktik/Keduanya), input presensi
+										kehadiran, dan nilai harian mahasiswa. Nilai agregat akan
+										dihitung secara otomatis.
+									</CardDescription>
+								</div>
+								<Badge
+									variant="outline"
+									className="bg-white border-blue-200 text-blue-700 self-start md:self-auto font-medium"
+								>
+									PKKMB • Beginning Class • Pertemuan 1–16 • UTS (P8) • UAS
+									(P16)
+								</Badge>
+							</div>
 						</CardHeader>
 						<CardContent className="p-4">
-							<Accordion type="single" collapsible className="w-full space-y-2">
+							<Accordion type="single" collapsible className="w-full space-y-3">
 								{meetings.map((meet) => {
 									const isEditingInfo = editingMeeting === meet.id;
-									const isUtsUas =
-										meet.meetingType === "uts" || meet.meetingType === "uas";
+									const isPkkmb =
+										meet.meetingType === "pkkmb" || meet.meetingNumber === -1;
+									const isBeginning =
+										meet.meetingType === "beginning" ||
+										meet.meetingNumber === 0;
+									const isUts =
+										meet.meetingNumber === 8 || meet.meetingType === "uts";
+									const isUas =
+										meet.meetingNumber === 16 || meet.meetingType === "uas";
+
+									const meetAtt = attendanceData[meet.id] || {};
+									const filledAttendances = Object.values(meetAtt).filter(
+										(a) => a.status !== null && a.status !== "",
+									);
+									const presentCount = filledAttendances.filter(
+										(a) => a.status === "hadir",
+									).length;
 
 									return (
 										<AccordionItem
 											value={`meet-${meet.id}`}
 											key={meet.id}
-											className="border rounded-lg px-4 py-2 bg-white data-[state=open]:border-blue-200 data-[state=open]:shadow-sm transition-all"
+											className="border border-slate-200 rounded-xl px-4 py-1.5 bg-white data-[state=open]:border-blue-300 data-[state=open]:shadow-md transition-all"
 										>
-											<AccordionTrigger className="hover:no-underline py-2">
+											<AccordionTrigger className="hover:no-underline py-2.5">
 												<div className="flex items-center gap-3 w-full justify-between pr-4">
-													<div className="flex items-center gap-3 text-left">
+													<div className="flex items-center gap-3.5 text-left">
 														<div
-															className={`p-2 rounded-full ${isUtsUas ? "bg-amber-100 text-amber-600" : "bg-blue-100 text-blue-600"}`}
+															className={`min-w-12 h-10 px-2 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-sm ${
+																isPkkmb
+																	? "bg-indigo-100 text-indigo-800 border border-indigo-300"
+																	: isBeginning
+																		? "bg-teal-100 text-teal-800 border border-teal-300"
+																		: isUts
+																			? "bg-amber-100 text-amber-800 border border-amber-300"
+																			: isUas
+																				? "bg-purple-100 text-purple-800 border border-purple-300"
+																				: "bg-blue-50 text-blue-700 border border-blue-200"
+															}`}
 														>
-															{isUtsUas ? (
-																<FileText className="h-4 w-4" />
-															) : (
-																<BookOpen className="h-4 w-4" />
-															)}
+															{isPkkmb
+																? "PKKMB"
+																: isBeginning
+																	? "BC"
+																	: isUts
+																		? "UTS"
+																		: isUas
+																			? "UAS"
+																			: `P${meet.meetingNumber}`}
 														</div>
 														<div>
-															<p className="font-semibold">
-																{meet.meetingLabel}
-															</p>
-															<p className="text-sm text-slate-500 font-normal">
+															<div className="flex items-center gap-2 flex-wrap">
+																<p className="font-bold text-slate-800 text-base">
+																	{meet.meetingLabel}
+																</p>
+																{getSessionTypeBadge(meet.sessionType)}
+															</div>
+															<p className="text-xs text-slate-500 font-normal mt-0.5">
 																{meet.meetingDate
 																	? new Date(
 																			meet.meetingDate,
@@ -476,40 +602,45 @@ export default function MataKuliahDetailPage() {
 																			month: "long",
 																			year: "numeric",
 																		})
-																	: "Tanggal belum diatur"}
+																	: "Tanggal perkuliahan belum diatur"}
 															</p>
 														</div>
 													</div>
-													<Badge
-														variant="secondary"
-														className="font-normal shrink-0"
-													>
-														{
-															Object.keys(attendanceData[meet.id] || {}).filter(
-																(k) =>
-																	attendanceData[meet.id][parseInt(k)]
-																		.status === "hadir",
-															).length
-														}{" "}
-														Hadir
-													</Badge>
+													<div className="flex items-center gap-2 shrink-0">
+														<Badge
+															variant="secondary"
+															className={`font-semibold text-xs px-2.5 py-1 ${
+																presentCount > 0
+																	? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+																	: "bg-slate-100 text-slate-600"
+															}`}
+														>
+															{presentCount} / {students.length} Hadir
+														</Badge>
+													</div>
 												</div>
 											</AccordionTrigger>
 
-											<AccordionContent className="pt-4 pb-4 space-y-6">
-												{/* Info Pertemuan */}
-												<div className="bg-slate-50 p-4 rounded-md border border-slate-100 space-y-3">
-													<div className="flex justify-between items-center">
-														<h3 className="font-semibold text-slate-700 flex items-center gap-2">
-															Info Pertemuan
-														</h3>
+											<AccordionContent className="pt-3 pb-4 space-y-6">
+												{/* Info Pertemuan & Jenis Sesi Card */}
+												<div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+													<div className="flex justify-between items-center border-b border-slate-200 pb-3">
+														<div className="flex items-center gap-2">
+															<span className="font-bold text-slate-700 text-sm">
+																Informasi & Pengaturan Sesi Pertemuan
+															</span>
+															{meet.sessionType &&
+																getSessionTypeBadge(meet.sessionType)}
+														</div>
 														{!isEditingInfo ? (
 															<Button
-																variant="ghost"
+																variant="outline"
 																size="sm"
+																className="h-8 border-slate-300 bg-white text-slate-700 hover:bg-slate-100 shadow-sm"
 																onClick={() => {
 																	setMeetingForm({
 																		label: meet.meetingLabel,
+																		sessionType: meet.sessionType || "",
 																		date: meet.meetingDate
 																			? meet.meetingDate.split("T")[0]
 																			: "",
@@ -518,33 +649,44 @@ export default function MataKuliahDetailPage() {
 																	setEditingMeeting(meet.id);
 																}}
 															>
-																<Edit className="h-4 w-4 mr-2" /> Edit Info
+																<Edit className="h-3.5 w-3.5 mr-1.5 text-blue-600" />{" "}
+																Edit Sesi
 															</Button>
 														) : (
 															<div className="flex gap-2">
 																<Button
 																	variant="ghost"
 																	size="sm"
+																	className="h-8 text-slate-600"
 																	onClick={() => setEditingMeeting(null)}
 																>
 																	Batal
 																</Button>
 																<Button
 																	size="sm"
+																	className="h-8 bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+																	disabled={isSavingInfo === meet.id}
 																	onClick={() => saveMeetingInfo(meet.id)}
 																>
-																	<Save className="h-4 w-4 mr-2" /> Simpan
+																	{isSavingInfo === meet.id ? (
+																		<Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+																	) : (
+																		<Save className="h-3.5 w-3.5 mr-1.5" />
+																	)}
+																	Simpan Sesi
 																</Button>
 															</div>
 														)}
 													</div>
 
 													{isEditingInfo ? (
-														<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-															<div className="space-y-2">
-																<Label>Judul / Label Pertemuan</Label>
+														<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+															<div className="space-y-1.5">
+																<Label className="text-xs font-semibold text-slate-700">
+																	Judul / Label Pertemuan
+																</Label>
 																<Input
-																	className="border-2 border-slate-200"
+																	className="border-slate-300 bg-white h-9 text-sm"
 																	value={meetingForm.label}
 																	onChange={(e) =>
 																		setMeetingForm({
@@ -554,11 +696,42 @@ export default function MataKuliahDetailPage() {
 																	}
 																/>
 															</div>
-															<div className="space-y-2">
-																<Label>Tanggal Pertemuan</Label>
+															<div className="space-y-1.5">
+																<Label className="text-xs font-semibold text-slate-700">
+																	Jenis Sesi Pembelajaran
+																</Label>
+																<Select
+																	value={meetingForm.sessionType || "teori"}
+																	onValueChange={(val: any) =>
+																		setMeetingForm({
+																			...meetingForm,
+																			sessionType: val,
+																		})
+																	}
+																>
+																	<SelectTrigger className="border-slate-300 bg-white h-9 text-sm">
+																		<SelectValue placeholder="Pilih jenis sesi..." />
+																	</SelectTrigger>
+																	<SelectContent>
+																		<SelectItem value="teori">
+																			📘 Teori
+																		</SelectItem>
+																		<SelectItem value="praktik">
+																			🛠️ Praktik
+																		</SelectItem>
+																		<SelectItem value="keduanya">
+																			⚡ Teori & Praktik
+																		</SelectItem>
+																	</SelectContent>
+																</Select>
+															</div>
+															<div className="space-y-1.5">
+																<Label className="text-xs font-semibold text-slate-700">
+																	Tanggal Perkuliahan
+																</Label>
 																<Input
 																	type="date"
-																	className="border-2 border-slate-200"
+																	className="border-slate-300 bg-white h-9 text-sm"
 																	value={meetingForm.date}
 																	onChange={(e) =>
 																		setMeetingForm({
@@ -568,11 +741,14 @@ export default function MataKuliahDetailPage() {
 																	}
 																/>
 															</div>
-															<div className="space-y-2 md:col-span-2">
-																<Label>Deskripsi / Materi / Topik</Label>
+															<div className="space-y-1.5 sm:col-span-3">
+																<Label className="text-xs font-semibold text-slate-700">
+																	Deskripsi / Materi Pokok Perkuliahan
+																</Label>
 																<Textarea
-																	className="border-2 border-slate-200"
+																	className="border-slate-300 bg-white min-h-[60px] text-sm"
 																	value={meetingForm.desc}
+																	placeholder="Masukkan pokok bahasan atau materi..."
 																	onChange={(e) =>
 																		setMeetingForm({
 																			...meetingForm,
@@ -584,188 +760,315 @@ export default function MataKuliahDetailPage() {
 															</div>
 														</div>
 													) : (
-														<div className="text-sm text-slate-600 space-y-1">
-															<p>
-																<strong>Topik / Deskripsi:</strong>{" "}
+														<div className="text-sm text-slate-600 grid grid-cols-1 sm:grid-cols-2 gap-2">
+															<div>
+																<span className="font-semibold text-slate-700">
+																	Jenis Sesi:
+																</span>{" "}
+																{meet.sessionType
+																	? meet.sessionType.toUpperCase()
+																	: "Belum ditentukan (default: Teori & Praktik)"}
+															</div>
+															<div>
+																<span className="font-semibold text-slate-700">
+																	Materi Pokok:
+																</span>{" "}
 																{meet.description || (
 																	<span className="italic text-slate-400">
-																		Belum ada deskripsi
+																		Belum ada deskripsi materi
 																	</span>
 																)}
-															</p>
+															</div>
 														</div>
 													)}
 												</div>
 
-												{/* Kegiatan Pembelajaran & Ujian */}
+												{/* Presensi & Input Nilai Harian Mahasiswa */}
 												<div className="space-y-3">
-													<h3 className="font-semibold text-slate-700 flex items-center gap-2 border-b pb-2">
-														{isUtsUas ? "Hasil Ujian" : "Kegiatan Pembelajaran"}
-													</h3>
-
-													<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-														{isUtsUas ? (
-															<ActivityCard
-																title="Ujian"
-																type="ujian"
-																meet={meet}
-																editingState={editingActivity}
-																setEditing={setEditingActivity}
-																form={activityForm}
-																setForm={setActivityForm}
-																onSave={(actId?: number) =>
-																	saveActivity(meet.id, "ujian", actId)
-																}
-															/>
-														) : (
-															<>
-																<ActivityCard
-																	title="Teori"
-																	type="teori"
-																	meet={meet}
-																	editingState={editingActivity}
-																	setEditing={setEditingActivity}
-																	form={activityForm}
-																	setForm={setActivityForm}
-																	onSave={(actId?: number) =>
-																		saveActivity(meet.id, "teori", actId)
-																	}
-																/>
-																<ActivityCard
-																	title="Praktik"
-																	type="praktik"
-																	meet={meet}
-																	editingState={editingActivity}
-																	setEditing={setEditingActivity}
-																	form={activityForm}
-																	setForm={setActivityForm}
-																	onSave={(actId?: number) =>
-																		saveActivity(meet.id, "praktik", actId)
-																	}
-																/>
-																<ActivityCard
-																	title="Tugas"
-																	type="tugas"
-																	meet={meet}
-																	editingState={editingActivity}
-																	setEditing={setEditingActivity}
-																	form={activityForm}
-																	setForm={setActivityForm}
-																	onSave={(actId?: number) =>
-																		saveActivity(meet.id, "tugas", actId)
-																	}
-																/>
-															</>
-														)}
-													</div>
-												</div>
-
-												{/* Presensi Mahasiswa */}
-												<div className="space-y-3 pt-2">
-													<div className="flex justify-between items-center border-b pb-2">
-														<h3 className="font-semibold text-slate-700">
-															Presensi Kelas
-														</h3>
+													<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-2.5">
+														<div>
+															<h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
+																<span>📋</span> Presensi Kehadiran & Penilaian
+																Harian
+															</h3>
+															<p className="text-xs text-slate-500 mt-0.5">
+																Isi kehadiran dan nilai harian per mahasiswa.
+																Nilai tersimpan langsung dan otomatis
+																memperbarui nilai agregat mahasiswa.
+															</p>
+														</div>
 														<Button
 															size="sm"
 															onClick={() => saveAttendances(meet.id)}
 															disabled={isSavingAttendance === meet.id}
+															className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm h-9 px-4"
 														>
 															{isSavingAttendance === meet.id ? (
 																<Loader2 className="h-4 w-4 animate-spin mr-2" />
 															) : (
 																<Save className="h-4 w-4 mr-2" />
 															)}
-															Simpan Presensi
+															Simpan Presensi & Nilai
 														</Button>
 													</div>
 
 													{students.length === 0 ? (
-														<div className="text-center py-6 text-slate-500 text-sm bg-slate-50 rounded-md border border-dashed">
+														<div className="text-center py-8 text-slate-500 text-sm bg-slate-50 rounded-xl border border-dashed border-slate-200">
 															Tidak ada mahasiswa aktif di angkatan{" "}
 															{course.cohort}
 														</div>
 													) : (
-														<div className="border rounded-md overflow-x-auto">
+														<div className="border border-slate-200 rounded-xl overflow-x-auto shadow-sm">
 															<Table>
 																<TableHeader>
-																	<TableRow className="bg-slate-50">
-																		<TableHead className="w-[100px]">
+																	<TableRow className="bg-slate-50/90 text-slate-700">
+																		<TableHead className="w-[110px] font-bold">
 																			NIM
 																		</TableHead>
-																		<TableHead>Nama Mahasiswa</TableHead>
-																		<TableHead className="w-[180px]">
-																			Status
+																		<TableHead className="min-w-[180px] font-bold">
+																			Nama Mahasiswa
 																		</TableHead>
-																		<TableHead>Catatan</TableHead>
+																		<TableHead className="w-[160px] font-bold">
+																			Status Kehadiran
+																		</TableHead>
+																		{(!meet.sessionType ||
+																			meet.sessionType === "teori" ||
+																			meet.sessionType === "keduanya") && (
+																			<TableHead className="w-[120px] font-bold">
+																				Nilai Teori
+																			</TableHead>
+																		)}
+																		{(!meet.sessionType ||
+																			meet.sessionType === "praktik" ||
+																			meet.sessionType === "keduanya") && (
+																			<TableHead className="w-[120px] font-bold">
+																				Nilai Praktik
+																			</TableHead>
+																		)}
+																		<TableHead className="min-w-[200px] font-bold">
+																			Catatan Dosen
+																		</TableHead>
 																	</TableRow>
 																</TableHeader>
 																<TableBody>
 																	{students.map((s) => {
-																		const att = attendanceData[meet.id]?.[
-																			s.id
-																		] || { status: "hadir", notes: "" };
+																		const currentEntry: StudentAttendanceInput =
+																			attendanceData[meet.id]?.[s.id] || {
+																				status: null,
+																				theoryScore: "",
+																				practicalScore: "",
+																				notes: "",
+																			};
+
 																		return (
-																			<TableRow key={s.id}>
-																				<TableCell className="font-medium text-slate-500">
-																					{s.nim}
+																			<TableRow
+																				key={s.id}
+																				className="hover:bg-slate-50/60 transition-colors"
+																			>
+																				<TableCell className="font-mono text-xs font-semibold text-slate-600">
+																					{s.nim || "-"}
 																				</TableCell>
-																				<TableCell>{s.name}</TableCell>
+																				<TableCell className="font-medium text-slate-800 text-sm">
+																					{s.name}
+																				</TableCell>
 																				<TableCell>
 																					<Select
-																						value={att.status || "hadir"}
+																						value={
+																							currentEntry.status ||
+																							"unassigned"
+																						}
 																						onValueChange={(val) => {
+																							const finalStatus =
+																								val === "unassigned"
+																									? null
+																									: val;
 																							setAttendanceData((prev) => {
-																								const meetData =
+																								const meetMap =
 																									prev[meet.id] || {};
 																								return {
 																									...prev,
 																									[meet.id]: {
-																										...meetData,
+																										...meetMap,
 																										[s.id]: {
-																											...att,
-																											status: val || "hadir",
+																											...currentEntry,
+																											status: finalStatus,
 																										},
 																									},
 																								};
 																							});
 																						}}
 																					>
-																						<SelectTrigger className="border-2 border-slate-200 h-8 text-xs">
+																						<SelectTrigger
+																							className={`border-slate-300 h-8 text-xs font-medium ${
+																								currentEntry.status === "hadir"
+																									? "bg-emerald-50 text-emerald-800 border-emerald-300"
+																									: currentEntry.status ===
+																											"izin"
+																										? "bg-amber-50 text-amber-800 border-amber-300"
+																										: currentEntry.status ===
+																												"sakit"
+																											? "bg-blue-50 text-blue-800 border-blue-300"
+																											: currentEntry.status ===
+																													"alpha"
+																												? "bg-rose-50 text-rose-800 border-rose-300"
+																												: "bg-white text-slate-500"
+																							}`}
+																						>
 																							<SelectValue />
 																						</SelectTrigger>
 																						<SelectContent>
+																							<SelectItem value="unassigned">
+																								⚪ - Belum Diisi -
+																							</SelectItem>
 																							<SelectItem value="hadir">
-																								Hadir
+																								✅ Hadir
 																							</SelectItem>
 																							<SelectItem value="izin">
-																								Izin
+																								🟡 Izin
 																							</SelectItem>
 																							<SelectItem value="sakit">
-																								Sakit
+																								🔵 Sakit
 																							</SelectItem>
 																							<SelectItem value="alpha">
-																								Alpha
+																								🔴 Alpha
 																							</SelectItem>
 																						</SelectContent>
 																					</Select>
 																				</TableCell>
+
+																				{(!meet.sessionType ||
+																					meet.sessionType === "teori" ||
+																					meet.sessionType === "keduanya") && (
+																					<TableCell>
+																						<Input
+																							type="number"
+																							min={0}
+																							max={100}
+																							placeholder="0 - 100"
+																							className="border-slate-300 bg-white h-8 text-xs w-24 font-mono font-semibold"
+																							value={
+																								currentEntry.theoryScore !==
+																									undefined &&
+																								currentEntry.theoryScore !==
+																									null
+																									? currentEntry.theoryScore
+																									: ""
+																							}
+																							onKeyDown={(e) => {
+																								if (
+																									e.key === "-" ||
+																									e.key === "e" ||
+																									e.key === "E"
+																								)
+																									e.preventDefault();
+																							}}
+																							onChange={(e) => {
+																								const val =
+																									e.target.value === ""
+																										? ""
+																										: Math.max(
+																												0,
+																												Math.min(
+																													100,
+																													Number(
+																														e.target.value,
+																													) || 0,
+																												),
+																											);
+																								setAttendanceData((prev) => {
+																									const meetMap =
+																										prev[meet.id] || {};
+																									return {
+																										...prev,
+																										[meet.id]: {
+																											...meetMap,
+																											[s.id]: {
+																												...currentEntry,
+																												theoryScore: val,
+																											},
+																										},
+																									};
+																								});
+																							}}
+																						/>
+																					</TableCell>
+																				)}
+
+																				{(!meet.sessionType ||
+																					meet.sessionType === "praktik" ||
+																					meet.sessionType === "keduanya") && (
+																					<TableCell>
+																						<Input
+																							type="number"
+																							min={0}
+																							max={100}
+																							placeholder="0 - 100"
+																							className="border-slate-300 bg-white h-8 text-xs w-24 font-mono font-semibold text-emerald-700"
+																							value={
+																								currentEntry.practicalScore !==
+																									undefined &&
+																								currentEntry.practicalScore !==
+																									null
+																									? currentEntry.practicalScore
+																									: ""
+																							}
+																							onKeyDown={(e) => {
+																								if (
+																									e.key === "-" ||
+																									e.key === "e" ||
+																									e.key === "E"
+																								)
+																									e.preventDefault();
+																							}}
+																							onChange={(e) => {
+																								const val =
+																									e.target.value === ""
+																										? ""
+																										: Math.max(
+																												0,
+																												Math.min(
+																													100,
+																													Number(
+																														e.target.value,
+																													) || 0,
+																												),
+																											);
+																								setAttendanceData((prev) => {
+																									const meetMap =
+																										prev[meet.id] || {};
+																									return {
+																										...prev,
+																										[meet.id]: {
+																											...meetMap,
+																											[s.id]: {
+																												...currentEntry,
+																												practicalScore: val,
+																											},
+																										},
+																									};
+																								});
+																							}}
+																						/>
+																					</TableCell>
+																				)}
+
 																				<TableCell>
 																					<Input
-																						placeholder="Opsional..."
-																						className="border-2 border-slate-200 h-8 text-xs"
-																						value={att.notes || ""}
+																						placeholder="Catatan keaktifan/kinerja..."
+																						className="border-slate-300 bg-white h-8 text-xs"
+																						value={currentEntry.notes || ""}
 																						onChange={(e) => {
+																							const noteVal = e.target.value;
 																							setAttendanceData((prev) => {
-																								const meetData =
+																								const meetMap =
 																									prev[meet.id] || {};
 																								return {
 																									...prev,
 																									[meet.id]: {
-																										...meetData,
+																										...meetMap,
 																										[s.id]: {
-																											...att,
-																											notes: e.target.value,
+																											...currentEntry,
+																											notes: noteVal,
 																										},
 																									},
 																								};
@@ -794,6 +1097,7 @@ export default function MataKuliahDetailPage() {
 					<TabsContent value="anggaran">
 						<TabAnggaranPraktik
 							courseId={courseId}
+							currentCourse={course}
 							canEdit={
 								user?.role === "dosen" ||
 								user?.role === "akademik" ||
@@ -803,150 +1107,6 @@ export default function MataKuliahDetailPage() {
 					</TabsContent>
 				)}
 			</Tabs>
-		</div>
-	);
-}
-
-// Helper Component for Activity Card
-function ActivityCard({
-	title,
-	type,
-	meet,
-	editingState,
-	setEditing,
-	form,
-	setForm,
-	onSave,
-}: any) {
-	const act = meet.activities.find((a: any) => a.activityType === type);
-	const isEditing =
-		editingState?.meetingId === meet.id && editingState?.type === type;
-
-	return (
-		<div className="border rounded-md p-3 space-y-2 bg-white relative">
-			<div className="flex justify-between items-center mb-1">
-				<span className="font-medium text-sm text-slate-700">{title}</span>
-				{!isEditing ? (
-					<Button
-						variant="ghost"
-						size="icon"
-						className="h-6 w-6"
-						onClick={() => {
-							setForm({
-								score: act?.score?.toString() || "",
-								notes: act?.notes || "",
-								documentUrl: act?.documentUrl,
-								documentName: act?.documentName,
-								file: null,
-							});
-							setEditing({ meetingId: meet.id, type, actId: act?.id });
-						}}
-					>
-						<Edit className="h-3 w-3" />
-					</Button>
-				) : null}
-			</div>
-
-			{isEditing ? (
-				<div className="space-y-2">
-					<Input
-						type="number"
-						placeholder="Nilai (0-100)"
-						className="border-2 border-slate-200 h-8 text-sm"
-						value={form.score}
-						onChange={(e) => setForm({ ...form, score: e.target.value })}
-					/>
-					<Textarea
-						placeholder="Catatan..."
-						className="border-2 border-slate-200 min-h-[60px] text-sm"
-						value={form.notes}
-						onChange={(e) => setForm({ ...form, notes: e.target.value })}
-					/>
-					<div>
-						<Label className="text-xs">Dokumen Lampiran</Label>
-						{form.documentUrl && !form.file && (
-							<div className="flex items-center gap-2 p-2 bg-slate-50 border rounded-md text-xs mb-1">
-								<Paperclip className="h-3 w-3 text-blue-500" />
-								<span className="flex-1 truncate">
-									{form.documentName || "Dokumen tersimpan"}
-								</span>
-								<Button
-									variant="ghost"
-									size="sm"
-									className="h-5 w-5 p-0"
-									onClick={() =>
-										setForm((prev: any) => ({
-											...prev,
-											documentUrl: undefined,
-											documentName: undefined,
-										}))
-									}
-								>
-									<X className="h-3 w-3" />
-								</Button>
-							</div>
-						)}
-						<Input
-							type="file"
-							className="h-8 text-xs p-1"
-							onChange={(e) =>
-								setForm({ ...form, file: e.target.files?.[0] || null })
-							}
-						/>
-					</div>
-					<div className="flex gap-1 justify-end pt-1">
-						<Button
-							variant="ghost"
-							size="sm"
-							className="h-7 text-xs px-2"
-							onClick={() => setEditing(null)}
-						>
-							Batal
-						</Button>
-						<Button
-							size="sm"
-							className="h-7 text-xs px-2"
-							onClick={() => onSave(act?.id)}
-						>
-							Simpan
-						</Button>
-					</div>
-				</div>
-			) : (
-				<div className="space-y-2">
-					<div className="flex justify-between items-center">
-						<span className="text-xs text-slate-500">Nilai:</span>
-						<Badge
-							variant="outline"
-							className={
-								act?.score ? "font-bold" : "text-slate-400 font-normal"
-							}
-						>
-							{act?.score !== null && act?.score !== undefined
-								? act.score
-								: "-"}
-						</Badge>
-					</div>
-					<div className="text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100 min-h-[40px]">
-						{act?.notes || (
-							<span className="italic text-slate-400">Belum ada catatan</span>
-						)}
-					</div>
-					{act?.documentUrl && (
-						<div className="mt-2">
-							<a
-								href={act.documentUrl}
-								target="_blank"
-								rel="noreferrer"
-								className="inline-flex items-center text-xs text-blue-600 hover:underline bg-blue-50 px-2 py-1 rounded"
-							>
-								<Paperclip className="h-3 w-3 mr-1" />
-								{act.documentName || "Dokumen Lampiran"}
-							</a>
-						</div>
-					)}
-				</div>
-			)}
 		</div>
 	);
 }

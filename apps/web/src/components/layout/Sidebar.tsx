@@ -110,7 +110,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 			{
 				label: "Manajemen Kehadiran",
 				href: "/dashboard/kehadiran",
-				roles: ["superadmin", "akademik", "dosen"],
+				roles: ["superadmin", "akademik"],
 				icon: ClipboardCheck,
 			},
 			{
@@ -120,6 +120,12 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 				icon: BookOpen,
 			},
 			{
+				label: "Rekap Nilai & Presensi",
+				href: "/dashboard/mata-kuliah/rekap",
+				roles: ["superadmin", "akademik", "dosen"],
+				icon: CheckSquare,
+			},
+			{
 				label: "Manajemen PA",
 				href: "/dashboard/akademik/pa",
 				roles: ["superadmin", "akademik"],
@@ -127,12 +133,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 			},
 		],
 	},
-	{
-		icon: BookOpen,
-		label: "Panel Dosen",
-		href: "/dashboard/dosen",
-		roles: ["dosen"],
-	},
+
 	{
 		icon: HeartHandshake,
 		label: "Panel PA",
@@ -338,6 +339,52 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 	);
 }
 
+function checkItemActive(
+	href: string | undefined,
+	pathname: string,
+	context: string | null,
+): boolean {
+	if (!href) return false;
+
+	if (context && pathname.startsWith("/dashboard/students/")) {
+		if (href === "/dashboard/students") {
+			return false;
+		}
+		if (href === `/dashboard/${context}`) {
+			return true;
+		}
+		if (
+			context === "final-decision" &&
+			(href === "/dashboard/evaluator" || href === "/dashboard/finalisasi")
+		) {
+			return true;
+		}
+		return false;
+	}
+
+	if (href === "/dashboard") {
+		return pathname === "/dashboard";
+	}
+
+	if (href === "/dashboard/mata-kuliah") {
+		return (
+			(pathname === "/dashboard/mata-kuliah" ||
+				pathname.startsWith("/dashboard/mata-kuliah/")) &&
+			!pathname.startsWith("/dashboard/mata-kuliah/rekap")
+		);
+	}
+
+	if (href === "/dashboard/akademik") {
+		return (
+			(pathname === "/dashboard/akademik" ||
+				pathname.startsWith("/dashboard/akademik/")) &&
+			!pathname.startsWith("/dashboard/akademik/pa")
+		);
+	}
+
+	return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 function NavItem({
 	item,
 	pathname,
@@ -352,36 +399,15 @@ function NavItem({
 	const { user } = useAuthStore();
 	const [isOpen, setIsOpen] = useState(false);
 
-	const isSubActive = item.subItems?.some(
-		(sub) => pathname === sub.href || pathname.startsWith(`${sub.href}/`),
+	const isSubActive = item.subItems?.some((sub) =>
+		checkItemActive(sub.href, pathname, context),
 	);
 
 	useEffect(() => {
 		if (isSubActive) setIsOpen(true);
 	}, [isSubActive]);
 
-	let isActive = false;
-
-	if (item.href) {
-		if (context && pathname.startsWith("/dashboard/students/")) {
-			if (item.href === "/dashboard/students") {
-				isActive = false;
-			} else if (item.href === `/dashboard/${context}`) {
-				isActive = true;
-			} else if (
-				context === "final-decision" &&
-				(item.href === "/dashboard/evaluator" ||
-					item.href === "/dashboard/finalisasi")
-			) {
-				isActive = true;
-			}
-		} else {
-			isActive =
-				item.href === "/dashboard"
-					? pathname === "/dashboard"
-					: pathname === item.href || pathname.startsWith(`${item.href}/`);
-		}
-	}
+	const isActive = checkItemActive(item.href, pathname, context);
 
 	const Icon = item.icon;
 
@@ -428,8 +454,11 @@ function NavItem({
 				{!collapsed && isOpen && (
 					<div className="pl-9 pr-2 space-y-1 mt-1">
 						{visibleSubItems.map((sub) => {
-							const isSubItemActive =
-								pathname === sub.href || pathname.startsWith(`${sub.href}/`);
+							const isSubItemActive = checkItemActive(
+								sub.href,
+								pathname,
+								context,
+							);
 							return (
 								<Link
 									key={sub.href}

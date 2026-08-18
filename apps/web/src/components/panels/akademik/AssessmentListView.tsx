@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import {
 	Select,
 	SelectContent,
@@ -415,14 +416,15 @@ export function AssessmentListView() {
 														{s.nim ?? "-"}
 													</TableCell>
 													<TableCell>
-														<div className="text-sm text-slate-700">
+														<div className="text-sm font-medium text-slate-800">
 															{s.program}
 														</div>
-														{s.subProgram && (
-															<div className="text-xs text-slate-500">
-																{s.subProgram}
-															</div>
-														)}
+														<div className="mt-0.5">
+															<PeminatanBadge
+																subProgram={s.subProgram}
+																program={s.program}
+															/>
+														</div>
 													</TableCell>
 													<TableCell className="text-sm text-slate-700">
 														{s.cohort}

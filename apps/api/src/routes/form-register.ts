@@ -357,13 +357,27 @@ export const formRegisterRoutes = new Elysia()
 				schoolMajor: response.schoolMajor,
 				graduationYear: response.graduationYear,
 				program: response.program || "Reguler", // Fallback
-				subProgram: response.subProgram,
+				subProgram: response.subProgram || "Indonesia-Reguler",
+				destinationCountry:
+					response.subProgram === "Malaysia-Hospitality"
+						? "Malaysia"
+						: response.subProgram === "Taiwan-Hospitality"
+							? "Taiwan"
+							: response.subProgram === "Timur tengah-Barista"
+								? "Timur Tengah"
+								: "Indonesia",
 				classType: response.classType,
 				batch: response.batch,
-				academicYear: response.academicYear,
-				cohort: response.academicYear
-					? response.academicYear.split("/")[0]
-					: new Date().getFullYear().toString(),
+				academicYear: response.academicYear || undefined,
+				cohort: (() => {
+					if (response.academicYear) {
+						const startYear = parseInt(response.academicYear.split("/")[0], 10);
+						if (!isNaN(startYear)) {
+							return startYear >= 2000 ? startYear - 2010 : startYear;
+						}
+					}
+					return new Date().getFullYear() - 2010;
+				})(),
 
 				bloodType: response.bloodType,
 				diseaseHistory: response.diseaseHistory,

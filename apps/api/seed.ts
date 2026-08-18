@@ -5,6 +5,8 @@ import {
 	academicData,
 	counselingLogs,
 	courseGrades,
+	courseMeetings,
+	courses,
 	crmData,
 	finalDecision,
 	financeData,
@@ -336,11 +338,188 @@ async function seed() {
 	});
 	await db.insert(finalDecision).values({ studentId: newStudents[2].id });
 
-	// Seed Course Grades for Student 1
+	// Seed Master Courses & 18 Meetings for Dosen User
 	if (dosenUser) {
+		const masterCourses = [
+			{
+				code: "FO101",
+				name: "Front Office",
+				type: "praktik" as const,
+				peminatan: "Taiwan-Hospitality",
+				cohort: 2024,
+			},
+			{
+				code: "HK101",
+				name: "Housekeeping",
+				type: "praktik" as const,
+				peminatan: "Malaysia-Hospitality",
+				cohort: 2024,
+			},
+			{
+				code: "FB101",
+				name: "Food & Beverage",
+				type: "praktik" as const,
+				peminatan: "Malaysia-Hospitality",
+				cohort: 2024,
+			},
+			{
+				code: "ENG101",
+				name: "Bahasa Inggris",
+				type: "teori" as const,
+				peminatan: "Indonesia-Reguler",
+				cohort: 2024,
+			},
+			{
+				code: "ETH101",
+				name: "Etika Profesi",
+				type: "teori" as const,
+				peminatan: "Indonesia-Reguler",
+				cohort: 2024,
+			},
+			{
+				code: "GRO101",
+				name: "Grooming",
+				type: "praktik" as const,
+				peminatan: "Malaysia-Hospitality",
+				cohort: 2024,
+			},
+		];
+
+		const createdMasterCourses: any[] = [];
+		for (const mc of masterCourses) {
+			const [inserted] = await db
+				.insert(courses)
+				.values({
+					code: mc.code,
+					name: mc.name,
+					dosenId: dosenUser.id,
+					peminatan: mc.peminatan,
+					cohort: mc.cohort,
+					type: mc.type,
+					createdBy: dosenUser.id,
+				})
+				.returning();
+			createdMasterCourses.push(inserted);
+
+			// Generate 18 meetings (PKKMB, Beginning, 1-14, UTS, UAS)
+			const meetingsToInsert = [
+				{
+					courseId: inserted.id,
+					meetingNumber: 0,
+					meetingType: "pkkmb" as const,
+					meetingLabel: "PKKMB - Pengenalan Program",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 1,
+					meetingType: "beginning" as const,
+					meetingLabel: "Beginning Class & Kontrak Kuliah",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 2,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 1: Pengantar & Teori Dasar",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 3,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 2: SOP & Standar Operasional",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 4,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 3: Praktik Mandiri Tahap 1",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 5,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 4: Praktik Terbimbing",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 6,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 5: Studi Kasus Lapangan",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 7,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 6: Simulasi & Roleplay",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 8,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 7: Review & Evaluasi Tengah",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 9,
+					meetingType: "uts" as const,
+					meetingLabel: "Ujian Tengah Semester (UTS)",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 10,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 8: Pendalaman Materi Lanjutan",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 11,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 9: Praktik Lanjutan Tahap 2",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 12,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 10: Service Excellence & Quality",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 13,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 11: Problem Solving & Handling",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 14,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 12: Project Work Kelompok",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 15,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 13: Presentasi Project",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 16,
+					meetingType: "regular" as const,
+					meetingLabel: "Pertemuan 14: Review Akhir Semester",
+				},
+				{
+					courseId: inserted.id,
+					meetingNumber: 17,
+					meetingType: "uas" as const,
+					meetingLabel: "Ujian Akhir Semester (UAS)",
+				},
+			];
+			await db.insert(courseMeetings).values(meetingsToInsert);
+		}
+
+		// Seed Course Grades for Student 1 linked with courseId
 		await db.insert(courseGrades).values([
 			{
 				studentId: newStudents[0].id,
+				courseId: createdMasterCourses[0]?.id,
 				courseCode: "FO101",
 				courseName: "Front Office",
 				dosenId: dosenUser.id,
@@ -351,6 +530,7 @@ async function seed() {
 			},
 			{
 				studentId: newStudents[0].id,
+				courseId: createdMasterCourses[1]?.id,
 				courseCode: "HK101",
 				courseName: "Housekeeping",
 				dosenId: dosenUser.id,
@@ -361,6 +541,7 @@ async function seed() {
 			},
 			{
 				studentId: newStudents[0].id,
+				courseId: createdMasterCourses[2]?.id,
 				courseCode: "FB101",
 				courseName: "Food & Beverage",
 				dosenId: dosenUser.id,
@@ -371,6 +552,7 @@ async function seed() {
 			},
 			{
 				studentId: newStudents[0].id,
+				courseId: createdMasterCourses[3]?.id,
 				courseCode: "ENG101",
 				courseName: "Bahasa Inggris",
 				dosenId: dosenUser.id,
@@ -381,6 +563,7 @@ async function seed() {
 			},
 			{
 				studentId: newStudents[0].id,
+				courseId: createdMasterCourses[4]?.id,
 				courseCode: "ETH101",
 				courseName: "Etika Profesi",
 				dosenId: dosenUser.id,
@@ -391,6 +574,7 @@ async function seed() {
 			},
 			{
 				studentId: newStudents[0].id,
+				courseId: createdMasterCourses[5]?.id,
 				courseCode: "GRO101",
 				courseName: "Grooming",
 				dosenId: dosenUser.id,

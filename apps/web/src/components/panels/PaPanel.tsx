@@ -1,98 +1,38 @@
 "use client";
 
 import {
-	CheckCircle,
+	BookMarked,
+	Briefcase,
 	CheckSquare,
-	ChevronDown,
-	Clock,
-	Edit2,
 	Loader2,
-	PlusCircle,
-	Save,
-	Square,
-	Trash2,
-	X,
-	XCircle,
+	MessageCircle,
+	Users,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogTitle,
-	AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { DocumentUpload } from "@/components/ui/DocumentUpload";
-import { Input } from "@/components/ui/input";
+import { CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { api } from "@/lib/eden";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { API_URL, api, getToken } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 
-interface PaData {
-	counselingDone: boolean;
-	mentalStable: boolean;
-	disciplineGood: boolean;
-	vocabTarget: number;
-	disciplineNotes: string | null;
-	status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN";
-	isAcc: boolean;
-	accAt: string | null;
-	accBy: { fullName: string } | null;
-	updatedAt?: string;
-}
-
-interface VocabLog {
-	id: number;
-	date: string;
-	addedWords: number;
-	notes: string | null;
-}
-
-interface CounselingLog {
-	id: number;
-	date: string;
-	notes: string;
-	condition: string;
-}
-
-interface TripartiteLog {
-	id: number;
-	contactType: string;
-	contactName: string | null;
-	contactDate: string;
-	summary: string;
-	result: string | null;
-}
-
-interface InterviewLog {
-	id: number;
-	interviewDate: string;
-	companyName: string;
-	country: string | null;
-	result: string;
-	notes: string | null;
-}
+import { TabChecklistPa } from "./pa/TabChecklistPa";
+import { TabHafalan } from "./pa/TabHafalan";
+import { TabInterview } from "./pa/TabInterview";
+import { TabKonseling } from "./pa/TabKonseling";
+import { TabTripartit } from "./pa/TabTripartit";
+import type {
+	CounselingFormState,
+	CounselingLog,
+	HafalanFormState,
+	HafalanSession,
+	InterviewFormState,
+	InterviewLog,
+	PaData,
+	TripartiteFormState,
+	TripartiteLog,
+} from "./pa/types";
 
 interface PaPanelProps {
 	studentId: number;
@@ -101,43 +41,52 @@ interface PaPanelProps {
 
 export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 	const { user } = useAuthStore();
-	const isPa = user?.role === "pa" || user?.role === "superadmin";
+	const isPa =
+		user?.role === "pa" ||
+		user?.role === "superadmin" ||
+		user?.role === "akademik";
 	const isSuperadmin = user?.role === "superadmin";
 
 	const [paData, setPaData] = useState<PaData | null>(null);
-	const [vocabLogs, setVocabLogs] = useState<VocabLog[]>([]);
+	const [hafalanSessions, setHafalanSessions] = useState<HafalanSession[]>([]);
 	const [counselingLogs, setCounselingLogs] = useState<CounselingLog[]>([]);
 	const [tripartiteLogs, setTripartiteLogs] = useState<TripartiteLog[]>([]);
 	const [interviewLogs, setInterviewLogs] = useState<InterviewLog[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSaving, setIsSaving] = useState(false);
 	const [loadingItem, setLoadingItem] = useState<string | null>(null);
+	const [activeTab, setActiveTab] = useState("checklist");
 
-	const canEdit = (isPa || isSuperadmin) && !paData?.isAcc;
+	// Role PA, Akademik, and Superadmin have full CRUD permissions to manage hafalan, counseling, tripartite, interview, etc.
+	const canEdit = isPa || isSuperadmin;
 
 	const fetchPaData = async () => {
-		const { data, error } = await api.students[studentId.toString()].pa.get();
-		if (!error && data) {
-			setPaData(data.data.data as unknown as PaData);
-			setVocabLogs((data.data.vocabLogs || []) as unknown as VocabLog[]);
-			setCounselingLogs(
-				(data.data.counselingLogs || []) as unknown as CounselingLog[],
-			);
-			setTripartiteLogs(
-				((data.data as any).tripartiteLogs || []) as TripartiteLog[],
-			);
-			setInterviewLogs(
-				((data.data as any).interviewLogs || []) as InterviewLog[],
-			);
+		try {
+			const res = await fetch(`${API_URL}/students/${studentId}/pa`, {
+				headers: { Authorization: `Bearer ${getToken()}` },
+			});
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const json = await res.json();
+			const d = json.data;
+			if (d) {
+				setPaData(d.data as unknown as PaData);
+				setHafalanSessions(d.hafalanSessions || []);
+				setCounselingLogs(d.counselingLogs || []);
+				setTripartiteLogs(d.tripartiteLogs || []);
+				setInterviewLogs(d.interviewLogs || []);
+			}
+		} catch (err) {
+			console.error("Gagal memuat data PA:", err);
+		} finally {
+			setIsLoading(false);
 		}
-		setIsLoading(false);
 	};
 
 	useEffect(() => {
 		fetchPaData();
 	}, [studentId]);
 
-	// Checklist Forms
+	// Checklist Change Handler
 	const handleChecklistChange = async (field: string, value: boolean) => {
 		if (!canEdit) return;
 		setLoadingItem(field);
@@ -147,187 +96,165 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 		setLoadingItem(null);
 	};
 
-	// Discipline Notes
-	const [disciplineNotes, setDisciplineNotes] = useState("");
-	const [isEditingNotes, setIsEditingNotes] = useState(false);
-
-	useEffect(() => {
-		if (paData) setDisciplineNotes(paData.disciplineNotes || "");
-	}, [paData]);
-
-	const handleSaveNotes = async () => {
+	// Save Discipline Notes
+	const handleSaveNotes = async (notes: string) => {
 		setIsSaving(true);
-		await api.students[studentId.toString()].pa.patch({ disciplineNotes });
-		setIsEditingNotes(false);
+		await api.students[studentId.toString()].pa.patch({
+			disciplineNotes: notes,
+		});
 		await fetchPaData();
 		onUpdate();
 		setIsSaving(false);
 	};
 
-	// Vocab Logic
-	const totalVocab = vocabLogs.reduce((acc, log) => acc + log.addedWords, 0);
-	const targetVocab = paData?.vocabTarget || 500;
-	const vocabProgress = Math.min(
-		100,
-		Math.round((totalVocab / targetVocab) * 100),
-	);
-
-	const vocabProgressColor =
-		vocabProgress >= 80
-			? "bg-emerald-500"
-			: vocabProgress >= 50
-				? "bg-amber-500"
-				: "bg-rose-500";
-
-	const [vocabForm, setVocabForm] = useState<{
-		addedWords: number | string;
-		date: string;
-		notes: string;
-	}>({
-		addedWords: 0,
-		date: new Date().toISOString().split("T")[0],
-		notes: "",
-	});
-
-	const handleAddVocab = async () => {
-		if (Number(vocabForm.addedWords) <= 0) {
-			toast.error("Jumlah kata harus lebih besar dari 0");
-			return;
-		}
+	// Hafalan Handlers (Kosakata & Kalimat)
+	const handleAddHafalan = async (form: HafalanFormState) => {
 		setIsSaving(true);
-		const { error } = await api.students[
-			studentId.toString()
-		].pa.vocabulary.post({
-			addedWords: Number(vocabForm.addedWords) || 0,
-			date: vocabForm.date,
-			notes: vocabForm.notes,
-		});
-
-		if (error) {
-			toast.error(error.value?.message || "Gagal menyimpan setoran vocab");
-		} else {
-			toast.success("Setoran vocab berhasil disimpan");
-			setVocabForm({
-				addedWords: "",
-				date: new Date().toISOString().split("T")[0],
-				notes: "",
+		try {
+			const res = await fetch(`${API_URL}/students/${studentId}/pa/hafalan`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${getToken()}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					language: form.language,
+					languageCustom:
+						form.language === "lainnya" ? form.languageCustom.trim() : null,
+					vocabCount: Number(form.vocabCount) || 0,
+					sentenceCount: Number(form.sentenceCount) || 0,
+					date: form.date
+						? new Date(form.date).toISOString()
+						: new Date().toISOString(),
+				}),
 			});
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			toast.success("Setoran hafalan berhasil disimpan");
 			await fetchPaData();
 			onUpdate();
+		} catch {
+			toast.error("Gagal menyimpan setoran hafalan");
+		} finally {
+			setIsSaving(false);
 		}
-		setIsSaving(false);
 	};
 
-	const handleDeleteVocab = async (logId: number) => {
+	const handleEditHafalan = async (logId: number, form: HafalanFormState) => {
 		setIsSaving(true);
-		const { error } =
-			await api.students[studentId.toString()].pa.vocabulary[
-				logId.toString()
-			].delete();
-		if (error) {
-			toast.error(error.value?.message || "Gagal menghapus log vocab");
-		} else {
-			toast.success("Log vocab berhasil dihapus");
-			await fetchPaData();
-			onUpdate();
-		}
-		setIsSaving(false);
-	};
-
-	// Counseling Logic
-	const [counselingForm, setCounselingForm] = useState({
-		date: new Date().toISOString().split("T")[0],
-		condition: "Stabil",
-		notes: "",
-	});
-
-	const handleAddCounseling = async () => {
-		if (!counselingForm.notes) {
-			toast.error("Catatan konseling harus diisi");
-			return;
-		}
-		const wordCount = counselingForm.notes
-			.trim()
-			.split(/\s+/)
-			.filter(Boolean).length;
-		if (wordCount < 50) {
-			toast.error(
-				`Catatan terlalu singkat. Minimal 50 kata (sekarang: ${wordCount} kata).`,
+		try {
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/pa/hafalan/${logId}`,
+				{
+					method: "PATCH",
+					headers: {
+						Authorization: `Bearer ${getToken()}`,
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						language: form.language,
+						languageCustom:
+							form.language === "lainnya" ? form.languageCustom.trim() : null,
+						vocabCount: Number(form.vocabCount) || 0,
+						sentenceCount: Number(form.sentenceCount) || 0,
+						date: form.date ? new Date(form.date).toISOString() : undefined,
+					}),
+				},
 			);
-			return;
-		}
-		setIsSaving(true);
-		const { error } = await api.students[
-			studentId.toString()
-		].pa.counseling.post({
-			date: counselingForm.date,
-			condition: counselingForm.condition,
-			notes: counselingForm.notes,
-		});
-
-		if (error) {
-			toast.error(error.value?.message || "Gagal menyimpan log konseling");
-		} else {
-			toast.success("Log konseling berhasil disimpan");
-			setCounselingForm({
-				date: new Date().toISOString().split("T")[0],
-				condition: "Stabil",
-				notes: "",
-			});
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			toast.success("Setoran hafalan berhasil diperbarui");
 			await fetchPaData();
 			onUpdate();
+		} catch {
+			toast.error("Gagal memperbarui setoran hafalan");
+		} finally {
+			setIsSaving(false);
 		}
-		setIsSaving(false);
+	};
+
+	const handleDeleteHafalan = async (logId: number) => {
+		setIsSaving(true);
+		try {
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/pa/hafalan/${logId}`,
+				{
+					method: "DELETE",
+					headers: { Authorization: `Bearer ${getToken()}` },
+				},
+			);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			toast.success("Setoran hafalan berhasil dihapus");
+			await fetchPaData();
+			onUpdate();
+		} catch {
+			toast.error("Gagal menghapus setoran hafalan");
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	// Counseling Handlers
+	const handleAddCounseling = async (form: CounselingFormState) => {
+		setIsSaving(true);
+		try {
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/pa/counseling`,
+				{
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${getToken()}`,
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						type: form.type || "konseling",
+						date: new Date(form.date).toISOString(),
+						condition: form.condition,
+						notes: form.notes,
+					}),
+				},
+			);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			toast.success("Log konseling berhasil disimpan");
+			await fetchPaData();
+			onUpdate();
+		} catch {
+			toast.error("Gagal menyimpan log konseling");
+		} finally {
+			setIsSaving(false);
+		}
 	};
 
 	const handleDeleteCounseling = async (logId: number) => {
 		setIsSaving(true);
-		const { error } =
-			await api.students[studentId.toString()].pa.counseling[
-				logId.toString()
-			].delete();
-		if (error) {
-			toast.error(error.value?.message || "Gagal menghapus log konseling");
-		} else {
+		try {
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/pa/counseling/${logId}`,
+				{
+					method: "DELETE",
+					headers: { Authorization: `Bearer ${getToken()}` },
+				},
+			);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			toast.success("Log konseling berhasil dihapus");
 			await fetchPaData();
 			onUpdate();
+		} catch {
+			toast.error("Gagal menghapus log konseling");
+		} finally {
+			setIsSaving(false);
 		}
-		setIsSaving(false);
 	};
 
-	// Tripartite Logic
-	const [tripartiteForm, setTripartiteForm] = useState({
-		contactType: "Orang Tua",
-		contactName: "",
-		contactDate: new Date().toISOString().split("T")[0],
-		summary: "",
-		result: "",
-	});
-
-	const handleAddTripartite = async () => {
-		if (!tripartiteForm.summary) {
-			toast.error("Ringkasan pembicaraan harus diisi");
-			return;
-		}
+	// Tripartite Handlers
+	const handleAddTripartite = async (form: TripartiteFormState) => {
 		setIsSaving(true);
 		const { error } = await (
 			api.students[studentId.toString()].pa as any
-		).tripartite.post({
-			...tripartiteForm,
-		});
+		).tripartite.post(form);
 
 		if (error) {
 			toast.error(error.value?.message || "Gagal menyimpan log tripartit");
 		} else {
 			toast.success("Log tripartit berhasil disimpan");
-			setTripartiteForm({
-				contactType: "Orang Tua",
-				contactName: "",
-				contactDate: new Date().toISOString().split("T")[0],
-				summary: "",
-				result: "",
-			});
 			await fetchPaData();
 			onUpdate();
 		}
@@ -349,38 +276,17 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 		setIsSaving(false);
 	};
 
-	// Interview Logic
-	const [interviewForm, setInterviewForm] = useState({
-		interviewDate: new Date().toISOString().split("T")[0],
-		companyName: "",
-		country: "",
-		result: "Menunggu",
-		notes: "",
-	});
-
-	const handleAddInterview = async () => {
-		if (!interviewForm.companyName) {
-			toast.error("Nama perusahaan harus diisi");
-			return;
-		}
+	// Interview Handlers
+	const handleAddInterview = async (form: InterviewFormState) => {
 		setIsSaving(true);
 		const { error } = await (
 			api.students[studentId.toString()].pa as any
-		).interview.post({
-			...interviewForm,
-		});
+		).interview.post(form);
 
 		if (error) {
-			toast.error(error.value?.message || "Gagal menyimpan log wawancara");
+			toast.error(error.value?.message || "Gagal menyimpan log interview");
 		} else {
-			toast.success("Log wawancara berhasil disimpan");
-			setInterviewForm({
-				interviewDate: new Date().toISOString().split("T")[0],
-				companyName: "",
-				country: "",
-				result: "Menunggu",
-				notes: "",
-			});
+			toast.success("Log interview berhasil disimpan");
 			await fetchPaData();
 			onUpdate();
 		}
@@ -393,15 +299,16 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 			api.students[studentId.toString()].pa as any
 		).interview[logId.toString()].delete();
 		if (error) {
-			toast.error(error.value?.message || "Gagal menghapus log wawancara");
+			toast.error(error.value?.message || "Gagal menghapus log interview");
 		} else {
-			toast.success("Log wawancara berhasil dihapus");
+			toast.success("Log interview berhasil dihapus");
 			await fetchPaData();
 			onUpdate();
 		}
 		setIsSaving(false);
 	};
 
+	// ACC Handlers
 	const handleAcc = async () => {
 		setIsSaving(true);
 		await api.students[studentId.toString()].pa.acc.post();
@@ -418,38 +325,23 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 		setIsSaving(false);
 	};
 
-	const checklistItems = [
-		{
-			id: "counselingDone",
-			label: "Sesi Konseling",
-			desc: `${counselingLogs.length} sesi telah terlaksana`,
-			checked: !!paData?.counselingDone,
-			docKey: "counseling_done",
-			showBadge: counselingLogs.length >= 3 && !paData?.counselingDone,
-		},
-		{
-			id: "mentalStable",
-			label: "Kondisi Mental Stabil",
-			desc: "Tidak ada indikasi masalah psikologis",
-			checked: !!paData?.mentalStable,
-			docKey: "mental_stable",
-			showBadge: false,
-		},
-		{
-			id: "disciplineGood",
-			label: "Kedisiplinan Baik",
-			desc: "Berdasarkan pemantauan asrama/harian",
-			checked: !!paData?.disciplineGood,
-			docKey: "discipline_good",
-			showBadge: false,
-		},
-	];
+	// Progress Calculations
+	const totalVocab = hafalanSessions.reduce((acc, s) => acc + s.vocabCount, 0);
+	const totalSentence = hafalanSessions.reduce(
+		(acc, s) => acc + s.sentenceCount,
+		0,
+	);
+	const targetVocab = paData?.vocabTarget || 500;
+	const isVocabDone = totalVocab >= targetVocab;
 
-	const completedCount = checklistItems.filter((i) => i.checked).length;
-	const isVocabDone = vocabProgress >= 100;
-	const totalProgressItems = completedCount + (isVocabDone ? 1 : 0);
+	const completedChecklistCount = [
+		paData?.counselingDone,
+		paData?.mentalStable,
+		paData?.disciplineGood,
+	].filter(Boolean).length;
+
+	const totalProgressItems = completedChecklistCount + (isVocabDone ? 1 : 0);
 	const totalChecklistProgress = Math.round((totalProgressItems / 4) * 100);
-	const canAcc = completedCount === 3 && isVocabDone;
 
 	if (isLoading) {
 		return (
@@ -480,912 +372,171 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 	}
 
 	return (
-		<>
-			<div className="space-y-6">
-				<div>
-					<div className="border-b border-slate-200 pb-4 mb-6">
-						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-							<div>
-								<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
-									<span className="text-xl">🤝</span> PA — Pendamping Akademik
-									<span className="ml-2 text-sm font-normal text-slate-500">
-										[{completedCount}/4]
-									</span>
-								</CardTitle>
-								<p className="text-sm text-slate-500 mt-1">
-									Dikelola oleh: Admin PA
-								</p>
-							</div>
-							<div className="flex items-center gap-3">
-								{isSuperadmin && !isPa && (
-									<Badge
-										variant="outline"
-										className="text-slate-400 border-slate-300"
-									>
-										👁 Mode Lihat Saja
-									</Badge>
-								)}
-								{panelStatusBadge}
-							</div>
-						</div>
-						<div className="mt-4 flex items-center gap-4">
-							<span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
-								Total Progress:
+		<div className="space-y-6">
+			{/* Header */}
+			<div className="border-b border-slate-200 pb-4 mb-6">
+				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+					<div>
+						<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
+							<span className="text-xl">🤝</span> PA — Pendamping Akademik
+							<span className="ml-2 text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+								Progres: {totalProgressItems}/4 Item ({completedChecklistCount}
+								/3 Checklist • {totalVocab} Kosakata • {totalSentence} Kalimat)
 							</span>
-							<Progress
-								value={totalChecklistProgress}
-								className="h-2 flex-1"
-								indicatorClassName={
-									totalChecklistProgress === 100
-										? "bg-emerald-500"
-										: "bg-blue-500"
-								}
-							/>
-							<span className="text-sm font-bold text-slate-700">
-								{totalChecklistProgress}%
-							</span>
-						</div>
+						</CardTitle>
+						<p className="text-sm text-slate-500 mt-1">
+							Dikelola oleh: Admin PA & Pendamping Akademik
+						</p>
 					</div>
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-						{/* LEFT COLUMN: CHECKLIST & DISCIPLINE */}
-						<div className="space-y-8">
-							<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-8">
-								<div className="bg-slate-50 border-b border-slate-200 px-5 py-4">
-									<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-										CHECKLIST PA
-									</h3>
-								</div>
-								<div className="p-5 space-y-4">
-									{checklistItems.map((item) => (
-										<div
-											key={item.id}
-											className="flex flex-col rounded-lg border bg-white overflow-hidden border-slate-200"
-										>
-											<div
-												className={`flex items-center gap-4 p-4 transition-colors ${
-													item.checked
-														? "bg-emerald-50 border-b border-emerald-200"
-														: "bg-slate-50 border-b border-slate-200"
-												}`}
-											>
-												<Checkbox
-													id={item.id}
-													checked={item.checked}
-													onCheckedChange={(checked) =>
-														handleChecklistChange(item.id, checked === true)
-													}
-													disabled={!canEdit || loadingItem === item.id}
-													className="w-5 h-5 data-[state=checked]:bg-emerald-500 data-[state=checked]:text-white data-[state=checked]:border-emerald-500 border-slate-300"
-												/>
-												<label
-													htmlFor={item.id}
-													className="flex-1 cursor-pointer block"
-												>
-													<div className="text-sm font-bold text-slate-800 flex items-center gap-2">
-														{item.label}
-														{/* Badge "Klik untuk Centang" has been removed based on request */}
-														{loadingItem === item.id && (
-															<Loader2 className="w-3 h-3 text-emerald-600 animate-spin" />
-														)}
-													</div>
-													<p className="text-xs text-slate-500 mt-0.5">
-														{item.desc}
-													</p>
-												</label>
-												<div>
-													{item.checked ? (
-														<Tooltip>
-															<TooltipTrigger>
-																<CheckCircle className="w-5 h-5 text-emerald-500" />
-															</TooltipTrigger>
-															<TooltipContent>
-																Terakhir diperbarui:{" "}
-																{paData?.updatedAt
-																	? new Date(paData.updatedAt).toLocaleString(
-																			"id-ID",
-																		)
-																	: "-"}
-															</TooltipContent>
-														</Tooltip>
-													) : (
-														<Clock className="w-5 h-5 text-slate-400" />
-													)}
-												</div>
-											</div>
-											<div className="p-4 bg-white border-t border-slate-100">
-												<div className="flex items-center justify-between mb-2">
-													<span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
-														Lampiran Dokumen
-													</span>
-												</div>
-												<DocumentUpload
-													studentId={studentId}
-													panel="pa"
-													documentKey={item.docKey}
-													canEdit={canEdit}
-												/>
-											</div>
-										</div>
-									))}
-								</div>
-							</div>
-
-							<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-								<div className="bg-slate-50 border-b border-slate-200 px-5 py-4 flex items-center justify-between">
-									<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-										CATATAN KEDISIPLINAN
-									</h3>
-									{canEdit && !isEditingNotes && (
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() => setIsEditingNotes(true)}
-											className="h-8 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-										>
-											<Edit2 className="w-4 h-4 mr-1" /> Edit
-										</Button>
-									)}
-								</div>
-								<div className="p-5">
-									{isEditingNotes ? (
-										<div className="space-y-3">
-											<Textarea
-												value={disciplineNotes}
-												onChange={(e) => setDisciplineNotes(e.target.value)}
-												placeholder="Ketik catatan pelanggaran atau penghargaan..."
-												className="min-h-[120px]"
-											/>
-											<div className="flex justify-end gap-2">
-												<Button
-													variant="outline"
-													size="sm"
-													onClick={() => setIsEditingNotes(false)}
-												>
-													Batal
-												</Button>
-												<Button
-													size="sm"
-													onClick={handleSaveNotes}
-													disabled={isSaving}
-												>
-													Simpan Catatan
-												</Button>
-											</div>
-										</div>
-									) : (
-										<div className="p-4 rounded-lg bg-slate-50 border border-slate-200 min-h-[120px] text-sm text-slate-700 whitespace-pre-wrap">
-											{paData?.disciplineNotes || (
-												<span className="text-slate-400 italic">
-													Belum ada catatan kedisiplinan.
-												</span>
-											)}
-										</div>
-									)}
-								</div>
-							</div>
-
-							{/* TRIPARTITE LOGS */}
-							<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-								<div className="bg-slate-50 border-b border-slate-200 px-5 py-4">
-									<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-										LOG KOMUNIKASI TRIPARTIT
-									</h3>
-								</div>
-								<div className="p-5">
-									{canEdit && (
-										<div className="p-4 rounded-lg bg-indigo-50 border border-indigo-100 mb-4 space-y-3">
-											<h4 className="text-xs font-bold text-indigo-800 uppercase tracking-wider">
-												Tambah Catatan Komunikasi
-											</h4>
-											<div className="flex gap-2">
-												<Select
-													value={tripartiteForm.contactType}
-													onValueChange={(val) =>
-														setTripartiteForm({
-															...tripartiteForm,
-															contactType: val as string,
-														})
-													}
-												>
-													<SelectTrigger className="w-[180px] bg-white">
-														<SelectValue placeholder="Pihak Dihubungi" />
-													</SelectTrigger>
-													<SelectContent>
-														<SelectItem value="Orang Tua">Orang Tua</SelectItem>
-														<SelectItem value="Mitra PJTKI">
-															Mitra PJTKI
-														</SelectItem>
-														<SelectItem value="Koordinator Lapangan">
-															Koordinator Lapangan
-														</SelectItem>
-													</SelectContent>
-												</Select>
-												<Input
-													type="date"
-													className="w-[140px] bg-white"
-													value={tripartiteForm.contactDate}
-													onChange={(e) =>
-														setTripartiteForm({
-															...tripartiteForm,
-															contactDate: e.target.value,
-														})
-													}
-												/>
-											</div>
-											<Input
-												placeholder="Nama Kontak (opsional)..."
-												className="bg-white"
-												value={tripartiteForm.contactName}
-												onChange={(e) =>
-													setTripartiteForm({
-														...tripartiteForm,
-														contactName: e.target.value,
-													})
-												}
-											/>
-											<Textarea
-												placeholder="Ringkasan pembicaraan..."
-												className="min-h-[60px] bg-white"
-												value={tripartiteForm.summary}
-												onChange={(e) =>
-													setTripartiteForm({
-														...tripartiteForm,
-														summary: e.target.value,
-													})
-												}
-											/>
-											<Input
-												placeholder="Tindak lanjut / Hasil (opsional)..."
-												className="bg-white"
-												value={tripartiteForm.result}
-												onChange={(e) =>
-													setTripartiteForm({
-														...tripartiteForm,
-														result: e.target.value,
-													})
-												}
-											/>
-											<div className="flex justify-end">
-												<Button
-													size="sm"
-													onClick={handleAddTripartite}
-													disabled={isSaving}
-													className="bg-indigo-600 hover:bg-indigo-700 text-white"
-												>
-													Simpan Log
-												</Button>
-											</div>
-										</div>
-									)}
-
-									<div className="space-y-4">
-										{tripartiteLogs.map((log) => (
-											<div
-												key={log.id}
-												className="relative pl-6 pb-2 border-l-2 border-slate-200 last:border-transparent"
-											>
-												<div className="absolute left-[-5px] top-1 w-2 h-2 rounded-full bg-slate-300 ring-4 ring-white"></div>
-												<div className="flex items-center justify-between mb-2">
-													<h5 className="font-bold text-slate-800 text-sm">
-														{log.contactType}{" "}
-														{log.contactName ? `(${log.contactName})` : ""}
-													</h5>
-													<div className="flex items-center gap-2">
-														<span className="text-xs text-slate-500 font-medium">
-															{new Date(log.contactDate).toLocaleDateString(
-																"id-ID",
-																{
-																	day: "2-digit",
-																	month: "short",
-																	year: "numeric",
-																},
-															)}
-														</span>
-														{canEdit && (
-															<button
-																type="button"
-																onClick={() => handleDeleteTripartite(log.id)}
-																className="text-slate-400 hover:text-rose-500 transition-colors"
-															>
-																<Trash2 className="w-4 h-4" />
-															</button>
-														)}
-													</div>
-												</div>
-												<div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm text-slate-600 mb-2 whitespace-pre-wrap">
-													"{log.summary}"
-												</div>
-												{log.result && (
-													<div className="flex items-center gap-2 mt-2">
-														<span className="text-xs text-slate-500 font-semibold uppercase">
-															Hasil:
-														</span>
-														<span className="text-sm text-indigo-700 font-medium">
-															{log.result}
-														</span>
-													</div>
-												)}
-											</div>
-										))}
-										{tripartiteLogs.length === 0 && (
-											<p className="text-sm text-slate-500 italic py-2">
-												Belum ada riwayat komunikasi tripartit.
-											</p>
-										)}
-									</div>
-								</div>
-							</div>
-						</div>
-
-						{/* RIGHT COLUMN: VOCAB & COUNSELING LOGS */}
-						<div className="space-y-8">
-							{/* VOCABULARY */}
-							<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-8">
-								<div className="bg-slate-50 border-b border-slate-200 px-5 py-4">
-									<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-										SETORAN VOCABULARY
-									</h3>
-								</div>
-								<div className="p-5">
-									<div className="p-5 rounded-lg border border-slate-200 bg-white shadow-sm mb-4">
-										<div className="flex justify-between text-sm font-medium mb-2">
-											<span className="text-slate-500">
-												Target: {targetVocab} kata
-											</span>
-											<span className="text-blue-700">
-												Tercapai: {totalVocab} kata
-											</span>
-										</div>
-										<div className="flex items-center gap-3">
-											<Progress
-												value={vocabProgress}
-												className="h-2 flex-1"
-												indicatorClassName={vocabProgressColor}
-											/>
-											<span className="text-sm font-bold text-slate-700 w-10 text-right">
-												{vocabProgress}%
-											</span>
-										</div>
-									</div>
-
-									{canEdit && (
-										<div className="p-4 rounded-lg bg-blue-50 border border-blue-100 mb-4 space-y-3">
-											<h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider">
-												Update Setoran Baru
-											</h4>
-											<div className="flex gap-2">
-												<Input
-													type="number"
-													placeholder="Jumlah kata"
-													className="w-32 bg-white"
-													value={vocabForm.addedWords || ""}
-													onChange={(e) =>
-														setVocabForm({
-															...vocabForm,
-															addedWords:
-																e.target.value === ""
-																	? ""
-																	: Number(e.target.value),
-														})
-													}
-												/>
-												<Input
-													type="date"
-													className="flex-1 bg-white"
-													value={vocabForm.date}
-													onChange={(e) =>
-														setVocabForm({ ...vocabForm, date: e.target.value })
-													}
-												/>
-											</div>
-											<div className="flex gap-2">
-												<Input
-													type="text"
-													placeholder="Catatan opsional (ex: Unit 1-5)"
-													className="flex-1 bg-white"
-													value={vocabForm.notes}
-													onChange={(e) =>
-														setVocabForm({
-															...vocabForm,
-															notes: e.target.value,
-														})
-													}
-												/>
-												<Button
-													size="sm"
-													onClick={handleAddVocab}
-													disabled={isSaving}
-													className="shrink-0 bg-blue-600 hover:bg-blue-700"
-												>
-													<PlusCircle className="w-4 h-4 mr-1" /> Tambah
-												</Button>
-											</div>
-										</div>
-									)}
-
-									<div className="max-h-[160px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-										{vocabLogs.map((log) => (
-											<div
-												key={log.id}
-												className="flex justify-between items-center p-3 rounded-md bg-slate-50 border border-slate-100 text-sm"
-											>
-												<div className="flex items-center gap-3">
-													<span className="w-2 h-2 rounded-full bg-blue-400"></span>
-													<span className="text-slate-600 font-medium">
-														{new Date(log.date).toLocaleDateString("id-ID", {
-															day: "2-digit",
-															month: "short",
-															year: "numeric",
-														})}
-													</span>
-													{log.notes && (
-														<span className="text-slate-400 text-xs italic">
-															— {log.notes}
-														</span>
-													)}
-												</div>
-												<div className="flex items-center gap-2">
-													<span className="font-bold text-slate-700">
-														+{log.addedWords} kata
-													</span>
-													{canEdit && (
-														<button
-															type="button"
-															onClick={() => handleDeleteVocab(log.id)}
-															className="text-slate-400 hover:text-rose-500 transition-colors"
-														>
-															<Trash2 className="w-4 h-4" />
-														</button>
-													)}
-												</div>
-											</div>
-										))}
-										{vocabLogs.length === 0 && (
-											<p className="text-sm text-slate-500 italic text-center py-4">
-												Belum ada riwayat setoran.
-											</p>
-										)}
-									</div>
-								</div>
-							</div>
-
-							{/* COUNSELING */}
-							<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-								<div className="bg-slate-50 border-b border-slate-200 px-5 py-4">
-									<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-										LOG SESI KONSELING
-									</h3>
-								</div>
-								<div className="p-5">
-									{canEdit && (
-										<div className="p-4 rounded-lg bg-amber-50 border border-amber-100 mb-4 space-y-3">
-											<h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider">
-												Tambah Log Sesi
-											</h4>
-											<div className="flex gap-2">
-												<Input
-													type="date"
-													className="flex-1 bg-white"
-													value={counselingForm.date}
-													onChange={(e) =>
-														setCounselingForm({
-															...counselingForm,
-															date: e.target.value,
-														})
-													}
-												/>
-												<Select
-													value={counselingForm.condition ?? ""}
-													onValueChange={(val) =>
-														setCounselingForm({
-															...counselingForm,
-															condition: val as string,
-														})
-													}
-												>
-													<SelectTrigger className="w-[160px] bg-white">
-														<SelectValue placeholder="Kondisi" />
-													</SelectTrigger>
-													<SelectContent>
-														<SelectItem value="Stabil">🟢 Stabil</SelectItem>
-														<SelectItem value="Perlu Perhatian">
-															🟡 Perlu Perhatian
-														</SelectItem>
-														<SelectItem value="Kritis">🔴 Kritis</SelectItem>
-													</SelectContent>
-												</Select>
-											</div>
-											<Textarea
-												placeholder="Catatan hasil konseling..."
-												className="min-h-[80px] bg-white"
-												value={counselingForm.notes}
-												onChange={(e) =>
-													setCounselingForm({
-														...counselingForm,
-														notes: e.target.value,
-													})
-												}
-											/>
-											<div className="flex justify-end">
-												<Button
-													size="sm"
-													onClick={handleAddCounseling}
-													disabled={isSaving}
-													className="bg-amber-600 hover:bg-amber-700 text-white"
-												>
-													Simpan Sesi
-												</Button>
-											</div>
-										</div>
-									)}
-
-									<div className="space-y-4">
-										{counselingLogs.map((log, idx) => {
-											const isStabil = log.condition === "Stabil";
-											const isPerhatian = log.condition === "Perlu Perhatian";
-											const conditionColor = isStabil
-												? "bg-emerald-100 text-emerald-700"
-												: isPerhatian
-													? "bg-amber-100 text-amber-700"
-													: "bg-rose-100 text-rose-700";
-
-											return (
-												<div
-													key={log.id}
-													className="relative pl-6 pb-2 border-l-2 border-slate-200 last:border-transparent"
-												>
-													<div className="absolute left-[-5px] top-1 w-2 h-2 rounded-full bg-slate-300 ring-4 ring-white"></div>
-													<div className="flex items-center justify-between mb-2">
-														<h5 className="font-bold text-slate-800 text-sm">
-															Sesi #{counselingLogs.length - idx}
-														</h5>
-														<div className="flex items-center gap-2">
-															<span className="text-xs text-slate-500 font-medium">
-																{new Date(log.date).toLocaleDateString(
-																	"id-ID",
-																	{
-																		day: "2-digit",
-																		month: "long",
-																		year: "numeric",
-																	},
-																)}
-															</span>
-															{canEdit && (
-																<button
-																	type="button"
-																	onClick={() => handleDeleteCounseling(log.id)}
-																	className="text-slate-400 hover:text-rose-500 transition-colors"
-																>
-																	<Trash2 className="w-4 h-4" />
-																</button>
-															)}
-														</div>
-													</div>
-													<div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm text-slate-600 mb-2 whitespace-pre-wrap">
-														"{log.notes}"
-													</div>
-													<div className="flex items-center gap-2">
-														<span className="text-xs text-slate-500">
-															Status Kondisi:
-														</span>
-														<Badge
-															variant="secondary"
-															className={`${conditionColor} hover:${conditionColor} border-none font-medium`}
-														>
-															{log.condition}
-														</Badge>
-													</div>
-												</div>
-											);
-										})}
-										{counselingLogs.length === 0 && (
-											<p className="text-sm text-slate-500 italic py-2">
-												Belum ada riwayat konseling.
-											</p>
-										)}
-									</div>
-								</div>
-							</div>
-
-							{/* INTERVIEW LOGS */}
-							<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-								<div className="bg-slate-50 border-b border-slate-200 px-5 py-4">
-									<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-										LOG PENDAMPINGAN INTERVIEW
-									</h3>
-								</div>
-								<div className="p-5">
-									{canEdit && (
-										<div className="p-4 rounded-lg bg-teal-50 border border-teal-100 mb-4 space-y-3">
-											<h4 className="text-xs font-bold text-teal-800 uppercase tracking-wider">
-												Tambah Log Interview
-											</h4>
-											<div className="flex gap-2">
-												<Input
-													type="date"
-													className="w-[140px] bg-white"
-													value={interviewForm.interviewDate}
-													onChange={(e) =>
-														setInterviewForm({
-															...interviewForm,
-															interviewDate: e.target.value,
-														})
-													}
-												/>
-												<Input
-													placeholder="Nama Perusahaan..."
-													className="flex-1 bg-white"
-													value={interviewForm.companyName}
-													onChange={(e) =>
-														setInterviewForm({
-															...interviewForm,
-															companyName: e.target.value,
-														})
-													}
-												/>
-											</div>
-											<div className="flex gap-2">
-												<Input
-													placeholder="Negara Tujuan..."
-													className="flex-1 bg-white"
-													value={interviewForm.country}
-													onChange={(e) =>
-														setInterviewForm({
-															...interviewForm,
-															country: e.target.value,
-														})
-													}
-												/>
-												<Select
-													value={interviewForm.result}
-													onValueChange={(val) =>
-														setInterviewForm({
-															...interviewForm,
-															result: val as string,
-														})
-													}
-												>
-													<SelectTrigger className="w-[160px] bg-white">
-														<SelectValue placeholder="Hasil" />
-													</SelectTrigger>
-													<SelectContent>
-														<SelectItem value="Menunggu">
-															⏳ Menunggu
-														</SelectItem>
-														<SelectItem value="Lulus">✅ Lulus</SelectItem>
-														<SelectItem value="Tidak Lulus">
-															❌ Tidak Lulus
-														</SelectItem>
-													</SelectContent>
-												</Select>
-											</div>
-											<Textarea
-												placeholder="Catatan hasil interview..."
-												className="min-h-[60px] bg-white"
-												value={interviewForm.notes}
-												onChange={(e) =>
-													setInterviewForm({
-														...interviewForm,
-														notes: e.target.value,
-													})
-												}
-											/>
-											<div className="flex justify-end">
-												<Button
-													size="sm"
-													onClick={handleAddInterview}
-													disabled={isSaving}
-													className="bg-teal-600 hover:bg-teal-700 text-white"
-												>
-													Simpan Log
-												</Button>
-											</div>
-										</div>
-									)}
-
-									<div className="space-y-4">
-										{interviewLogs.map((log) => (
-											<div
-												key={log.id}
-												className="relative pl-6 pb-2 border-l-2 border-slate-200 last:border-transparent"
-											>
-												<div className="absolute left-[-5px] top-1 w-2 h-2 rounded-full bg-slate-300 ring-4 ring-white"></div>
-												<div className="flex items-center justify-between mb-2">
-													<h5 className="font-bold text-slate-800 text-sm">
-														{log.companyName}{" "}
-														{log.country ? `— ${log.country}` : ""}
-													</h5>
-													<div className="flex items-center gap-2">
-														<span className="text-xs text-slate-500 font-medium">
-															{new Date(log.interviewDate).toLocaleDateString(
-																"id-ID",
-																{
-																	day: "2-digit",
-																	month: "short",
-																	year: "numeric",
-																},
-															)}
-														</span>
-														{canEdit && (
-															<button
-																type="button"
-																onClick={() => handleDeleteInterview(log.id)}
-																className="text-slate-400 hover:text-rose-500 transition-colors"
-															>
-																<Trash2 className="w-4 h-4" />
-															</button>
-														)}
-													</div>
-												</div>
-												{log.notes && (
-													<div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm text-slate-600 mb-2 whitespace-pre-wrap">
-														"{log.notes}"
-													</div>
-												)}
-												<div className="flex items-center gap-2 mt-2">
-													<span className="text-xs text-slate-500 font-semibold uppercase">
-														Hasil:
-													</span>
-													<Badge
-														variant="outline"
-														className={
-															log.result === "Lulus"
-																? "border-emerald-500 text-emerald-600 bg-emerald-50"
-																: log.result === "Tidak Lulus"
-																	? "border-rose-500 text-rose-600 bg-rose-50"
-																	: "border-amber-500 text-amber-600 bg-amber-50"
-														}
-													>
-														{log.result}
-													</Badge>
-												</div>
-											</div>
-										))}
-										{interviewLogs.length === 0 && (
-											<p className="text-sm text-slate-500 italic py-2">
-												Belum ada riwayat interview.
-											</p>
-										)}
-									</div>
-								</div>
-							</div>
-						</div>
+					<div className="flex items-center gap-3">
+						{isSuperadmin && !isPa && (
+							<Badge
+								variant="outline"
+								className="text-slate-400 border-slate-300"
+							>
+								👁 Mode Lihat Saja
+							</Badge>
+						)}
+						{panelStatusBadge}
 					</div>
 				</div>
-
-				{/* Status ACC Panel Card */}
-				<Card
-					className={`border shadow-sm overflow-hidden ${paData?.isAcc ? "bg-slate-50 border-slate-200" : "bg-blue-50 border-blue-200"}`}
-				>
-					<CardContent className="p-0">
-						<div className="flex flex-col sm:flex-row items-center justify-between p-6">
-							<div className="flex items-center gap-4 mb-4 sm:mb-0">
-								{paData?.isAcc ? (
-									<>
-										<div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center">
-											<CheckCircle className="w-6 h-6 text-slate-600" />
-										</div>
-										<div>
-											<h4 className="text-slate-800 font-bold text-lg">
-												✅ Disetujui (ACC) oleh {paData.accBy?.fullName || "PA"}
-											</h4>
-											<p className="text-sm text-slate-600">
-												Pada{" "}
-												{new Date(paData.accAt!).toLocaleDateString("id-ID", {
-													day: "numeric",
-													month: "long",
-													year: "numeric",
-													hour: "2-digit",
-													minute: "2-digit",
-												})}{" "}
-												WIB
-											</p>
-										</div>
-									</>
-								) : (
-									<>
-										<div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-											<CheckCircle className="w-6 h-6 text-blue-600" />
-										</div>
-										<div>
-											<h4 className="text-blue-900 font-bold text-lg">
-												{completedCount < 3
-													? `⏳ Menunggu ACC PA (${3 - completedCount} item belum selesai)`
-													: "ACC Panel Pendamping Akademik"}
-											</h4>
-											<p className="text-sm text-blue-700 max-w-md">
-												{completedCount < 3
-													? "Selesaikan semua checklist pendampingan sebelum memberikan ACC."
-													: "Tandai bahwa progres pendampingan mahasiswa telah selesai atau mencapai target."}
-											</p>
-										</div>
-									</>
-								)}
-							</div>
-
-							{isPa && paData?.isAcc && (
-								<AlertDialog>
-									<AlertDialogTrigger
-										render={
-											<Button
-												variant="outline"
-												className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 shrink-0"
-												disabled={isSaving}
-											>
-												{isSaving ? "Membatalkan..." : "Batalkan ACC"}
-											</Button>
-										}
-									/>
-									<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
-										<AlertDialogTitle>
-											Konfirmasi Pembatalan ACC PA
-										</AlertDialogTitle>
-										<AlertDialogDescription className="text-slate-500">
-											Apakah Anda yakin ingin membatalkan status ACC untuk panel
-											Pendamping Akademik ini? Status mahasiswa akan kembali ke
-											tahap proses.
-										</AlertDialogDescription>
-										<div className="flex justify-end gap-3 mt-4">
-											<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50">
-												Batal
-											</AlertDialogCancel>
-											<AlertDialogAction
-												onClick={handleCancelAcc}
-												className="bg-rose-600 hover:bg-rose-700 text-white"
-											>
-												Ya, Batalkan ACC
-											</AlertDialogAction>
-										</div>
-									</AlertDialogContent>
-								</AlertDialog>
-							)}
-
-							{isPa && !paData?.isAcc && (
-								<Tooltip>
-									<TooltipTrigger render={<span className="inline-block" />}>
-										<span>
-											<AlertDialog>
-												<AlertDialogTrigger
-													render={
-														<Button
-															disabled={completedCount < 3}
-															className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px] disabled:opacity-50 disabled:cursor-not-allowed"
-														>
-															Berikan ACC
-														</Button>
-													}
-												/>
-												<AlertDialogContent>
-													<AlertDialogTitle>Konfirmasi ACC PA</AlertDialogTitle>
-													<AlertDialogDescription>
-														Apakah Anda yakin ingin memberikan ACC? Ini akan
-														mengunci seluruh data *Checklist*, Catatan, dan
-														Setoran Vocabulary agar tidak bisa diubah lagi.
-													</AlertDialogDescription>
-													<div className="flex justify-end gap-3 mt-4">
-														<AlertDialogCancel>Batal</AlertDialogCancel>
-														<AlertDialogAction
-															onClick={handleAcc}
-															className="bg-blue-600 hover:bg-blue-700"
-														>
-															Ya, Berikan ACC
-														</AlertDialogAction>
-													</div>
-												</AlertDialogContent>
-											</AlertDialog>
-										</span>
-									</TooltipTrigger>
-									{completedCount < 3 && (
-										<TooltipContent>
-											Selesaikan semua persyaratan pendampingan terlebih dahulu
-										</TooltipContent>
-									)}
-								</Tooltip>
-							)}
-						</div>
-					</CardContent>
-				</Card>
+				<div className="mt-4 flex items-center gap-4">
+					<span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
+						Total Progress:
+					</span>
+					<Progress
+						value={totalChecklistProgress}
+						className="h-2 flex-1"
+						indicatorClassName={
+							totalChecklistProgress === 100 ? "bg-emerald-500" : "bg-blue-500"
+						}
+					/>
+					<span className="text-sm font-bold text-slate-700">
+						{totalChecklistProgress}%
+					</span>
+				</div>
 			</div>
-		</>
+
+			{/* Tabs Container */}
+			<Tabs
+				value={activeTab}
+				onValueChange={setActiveTab}
+				className="w-full space-y-4"
+			>
+				<TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 bg-slate-100 p-1.5 rounded-xl border border-slate-200 h-auto gap-1">
+					<TabsTrigger
+						value="checklist"
+						className="flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
+					>
+						<CheckSquare className="w-4 h-4 text-emerald-600 shrink-0" />
+						<span>Checklist PA</span>
+						<span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-200">
+							{completedChecklistCount}/3
+						</span>
+					</TabsTrigger>
+					<TabsTrigger
+						value="hafalan"
+						className="flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
+					>
+						<BookMarked className="w-4 h-4 text-blue-600 shrink-0" />
+						<span>Setoran Hafalan</span>
+						<span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-200">
+							{totalVocab}k • {totalSentence}s
+						</span>
+					</TabsTrigger>
+					<TabsTrigger
+						value="konseling"
+						className="flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
+					>
+						<MessageCircle className="w-4 h-4 text-amber-600 shrink-0" />
+						<span>Log Konseling</span>
+						<span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-200">
+							{counselingLogs.length}
+						</span>
+					</TabsTrigger>
+					<TabsTrigger
+						value="tripartit"
+						className="flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
+					>
+						<Users className="w-4 h-4 text-indigo-600 shrink-0" />
+						<span>Log Tripartit</span>
+						<span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-200">
+							{tripartiteLogs.length}
+						</span>
+					</TabsTrigger>
+					<TabsTrigger
+						value="interview"
+						className="flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
+					>
+						<Briefcase className="w-4 h-4 text-teal-600 shrink-0" />
+						<span>Log Interview</span>
+						<span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-200">
+							{interviewLogs.length}
+						</span>
+					</TabsTrigger>
+				</TabsList>
+
+				<TabsContent value="checklist" className="mt-4">
+					<TabChecklistPa
+						studentId={studentId}
+						paData={paData}
+						counselingLogsCount={counselingLogs.length}
+						isPa={isPa}
+						canEdit={canEdit}
+						isSaving={isSaving}
+						loadingItem={loadingItem}
+						onChecklistChange={handleChecklistChange}
+						onSaveNotes={handleSaveNotes}
+						onAcc={handleAcc}
+						onCancelAcc={handleCancelAcc}
+					/>
+				</TabsContent>
+
+				<TabsContent value="hafalan" className="mt-4">
+					<TabHafalan
+						studentId={studentId}
+						hafalanSessions={hafalanSessions}
+						canEdit={canEdit}
+						isSaving={isSaving}
+						onAddHafalan={handleAddHafalan}
+						onEditHafalan={handleEditHafalan}
+						onDeleteHafalan={handleDeleteHafalan}
+					/>
+				</TabsContent>
+
+				<TabsContent value="konseling" className="mt-4">
+					<TabKonseling
+						studentId={studentId}
+						counselingLogs={counselingLogs}
+						canEdit={canEdit}
+						isSaving={isSaving}
+						onAddCounseling={handleAddCounseling}
+						onDeleteCounseling={handleDeleteCounseling}
+					/>
+				</TabsContent>
+
+				<TabsContent value="tripartit" className="mt-4">
+					<TabTripartit
+						studentId={studentId}
+						tripartiteLogs={tripartiteLogs}
+						canEdit={canEdit}
+						isSaving={isSaving}
+						onAddTripartite={handleAddTripartite}
+						onDeleteTripartite={handleDeleteTripartite}
+					/>
+				</TabsContent>
+
+				<TabsContent value="interview" className="mt-4">
+					<TabInterview
+						studentId={studentId}
+						interviewLogs={interviewLogs}
+						canEdit={canEdit}
+						isSaving={isSaving}
+						onAddInterview={handleAddInterview}
+						onDeleteInterview={handleDeleteInterview}
+					/>
+				</TabsContent>
+			</Tabs>
+		</div>
 	);
 }

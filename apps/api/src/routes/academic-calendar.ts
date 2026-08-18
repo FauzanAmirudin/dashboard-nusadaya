@@ -13,9 +13,6 @@ export const academicCalendarRoutes = new Elysia({
 	// Check Authentication
 	.derive((context) => {
 		const user = (context as any).user;
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
 		return { user };
 	})
 	// GET all calendars

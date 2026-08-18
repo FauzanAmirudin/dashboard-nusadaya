@@ -7,6 +7,7 @@ import { TabHafalan } from "@/components/panels/akademik/pa/tabs/TabHafalan";
 import { TabKehadiran } from "@/components/panels/akademik/pa/tabs/TabKehadiran";
 import { TabKonseling } from "@/components/panels/akademik/pa/tabs/TabKonseling";
 import { Button } from "@/components/ui/button";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store";
 
@@ -97,10 +98,10 @@ export function PAStudentDetailView({ paId, studentId }: Props) {
 							<p className="text-sm text-slate-700">{studentNim || "-"}</p>
 						</div>
 						<div>
-							<p className="text-[11px] text-slate-400 uppercase tracking-wide font-medium">
+							<p className="text-[11px] text-slate-400 uppercase tracking-wide font-medium mb-1">
 								Peminatan
 							</p>
-							<p className="text-sm text-slate-700">{studentProgram}</p>
+							<PeminatanBadge peminatan={studentProgram} size="sm" />
 						</div>
 						<div>
 							<p className="text-[11px] text-slate-400 uppercase tracking-wide font-medium">
