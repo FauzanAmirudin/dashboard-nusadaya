@@ -46,7 +46,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/eden";
-import { useAuthStore } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
 
 type StudentDetail = {
 	student: {
@@ -156,11 +156,11 @@ const NAV_LINKS = [
 	},
 	{ id: "pa", label: "PA", roles: ["superadmin", "pa"] },
 	{ id: "magang", label: "Tim Magang", roles: ["superadmin", "magang"] },
-	{ id: "status", label: "Status Akhir", roles: ["superadmin"] },
+	{ id: "status", label: "Status Akhir", roles: ["superadmin", "evaluator"] },
 	{
 		id: "final-decision",
 		label: "Keputusan Final",
-		roles: ["superadmin"],
+		roles: ["superadmin", "evaluator"],
 	},
 	{
 		id: "catatan",
@@ -366,6 +366,20 @@ function StudentDetailContent() {
 	const [departureDate, setDepartureDate] = useState<string>("");
 	const [directorNotes, setDirectorNotes] = useState<string>("");
 
+	const visibleLinks = NAV_LINKS.filter((link) => {
+		if (!mounted || !user) return false;
+		return hasRole(user, ...link.roles);
+	});
+
+	useEffect(() => {
+		if (mounted && visibleLinks.length > 0) {
+			const isCurrentActiveValid = visibleLinks.some((l) => l.id === activeTab);
+			if (!isCurrentActiveValid) {
+				setActiveTab(visibleLinks[0]?.id || "");
+			}
+		}
+	}, [mounted, visibleLinks, activeTab]);
+
 	const handleDirectorApproval = async () => {
 		if (!data) return;
 		setIsApprovingDirector(true);
@@ -446,12 +460,6 @@ function StudentDetailContent() {
 		data.parents?.find((p: any) => p.type === "ayah") ||
 		data.parents?.find((p: any) => p.type === "ibu") ||
 		data.parents?.find((p: any) => p.type === "wali");
-
-	const visibleLinks = NAV_LINKS.filter((link) => {
-		if (!mounted || !user?.role || !link.roles.includes(user.role))
-			return false;
-		return true;
-	});
 
 	const scrollToAnchor = (id: string) => {
 		setActiveTab(id);
@@ -558,7 +566,7 @@ function StudentDetailContent() {
 					>
 						Lihat Detail Profil
 					</Button>
-					{user?.role === "superadmin" && (
+					{hasRole(user, "superadmin") && (
 						<Button
 							variant="outline"
 							onClick={handleGenerateAccount}
@@ -572,7 +580,7 @@ function StudentDetailContent() {
 									: "Buat Akun Mahasiswa"}
 						</Button>
 					)}
-					{user?.role === "superadmin" && (
+					{hasRole(user, "superadmin") && (
 						<Button
 							variant="outline"
 							onClick={
@@ -597,7 +605,7 @@ function StudentDetailContent() {
 									: "Unduh Semua Berkas"}
 						</Button>
 					)}
-					{(user?.role === "superadmin" || user?.role === "pmb") && (
+					{hasRole(user, "superadmin", "pmb") && (
 						<>
 							<Button
 								variant="outline"

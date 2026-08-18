@@ -91,15 +91,88 @@ Fungsi operasional untuk Dosen Pembimbing Akademik (PA) telah diperbaiki dan dia
 
 ---
 
-## 6. Konsolidasi Modul Dosen & Pembersihan Struktur
+## 6. Integrasi Dashboard Khusus Dosen & Evaluator
 
-- Menghapus rute dan komponen redundan (`DosenDashboard.tsx`, `DosenPanel.tsx`, `/dashboard/dosen/page.tsx`) untuk mengintegrasikan alur kerja dosen pengampu langsung ke dalam Modul Mata Kuliah, Presensi Kehadiran Kelas, dan Penilaian Akademik.
-- Pembaruan skrip automasi database batch seeding akun dan penyesuaian jadwal pertemuan mata kuliah.
+- Pembuatan komponen `DosenDashboard.tsx` khusus untuk peran Dosen pengampu yang menampilkan daftar mata kuliah aktif, jadwal kelas, tautan presensi pertemuan, dan rekapitulasi nilai.
+- Pembuatan dan integrasi `EvaluatorDashboard.tsx` bagi tim penilai kelayakan akhir mahasiswa.
+- Pencegahan kebocoran tampilan dashboard superadmin (*fallback guard*) bagi pengguna non-superadmin.
+
+---
+
+## 7. Perbaikan Menyeluruh Sistem Backup Otomatis & Manual
+
+Sistem pencadangan (*backup*) data dan berkas mahasiswa telah disempurnakan agar berjalan andal baik di lingkungan lokal maupun kontainer server (*Docker*).
+
+### A. Perbaikan Fitur Backup Manual & Perhitungan Progres
+- **Koreksi Kalkulasi Persentase**: Memperbaiki logika penghitungan progres di `apps/api/src/lib/job.ts` sehingga proses pencadangan yang memiliki 0 berkas fisik (hanya struktur dan metadata) langsung mencapai status `completed` dengan persentase `100%` tanpa tertahan di `0%`.
+- **Penyempurnaan Eksekusi Worker**: `backup.service.ts` kini langsung memfinalisasi berkas `manifest.json`, mencatat riwayat ke database, dan memperbarui cache status secara akurat.
+- **Kompresi ZIP Portabel**: Mengganti pemanggilan binary OS (`zip` / `powershell`) dengan library JavaScript murni `archiver` pada endpoint `/backups/:id/download`, menjamin proses unduh berkas ZIP berjalan 100% sukses di lingkungan kontainer Docker/Linux tanpa dependensi eksternal.
+- **Kejelasan Antarmuka Web**: `BackupManualForm.tsx` kini menyajikan status dan catatan informatif saat pencadangan selesai.
+
+### B. Otomatisasi Backup Terjadwal (Scheduled Worker)
+- **Resolusi ID Superadmin Dinamis**: Menghapus `userId: 1` hardcoded pada `scheduled.worker.ts` dan menggantinya dengan query dinamis ke tabel pengguna untuk mencari akun Superadmin aktif.
+- **Mekanisme Retry Otomatis**: Menambahkan *retry loop* hingga 3 kali percobaan dengan jeda 5 detik saat inisialisasi awal server/Docker jika Redis atau database belum sepenuhnya siap (*race condition mitigation*).
+- **Exponential Backoff Worker**: Mencegah *log flooding* pada `backup.worker.ts` saat koneksi Redis terputus dengan jeda bertingkat (*exponential backoff* hingga 30 detik).
+
+---
+
+## 8. Pengelolaan Pengguna (Manage Users) & Dukungan Multi-Role
+
+Pembaruan pada manajemen pengguna untuk mendukung penugasan multi-peran (*multi-role assignment*) dan perbaikan query database:
+- **Perbaikan Query SQL Drizzle**: Memperbaiki filter pengecualian peran mahasiswa pada endpoint `GET /manage-users` (`ne(users.role, "mahasiswa")`) sehingga data seluruh staf dan dosen dapat diambil tanpa error syntax database.
+- **Kolom `roles` Multi-Peran**: Penambahan kolom `roles` (array JSON/text) pada tabel `users` di database backend untuk menyimpan seluruh peran yang dimiliki pengguna (contoh: seorang staf dapat memiliki peran `pa` sekaligus `crm` atau `akademik`).
+- **Modal Tambah & Edit Pengguna**: Formulir pengguna kini dilengkapi dengan pemilih peran utama dan peran tambahan (*checkbox multi-role*).
+- **Sinkronisasi JWT & Sesi Login**: Payload token autentikasi JWT dan state Zustand menyertakan array `roles` lengkap pengguna.
+
+---
+
+## 9. Halaman Profil Pengguna Mandiri & Ganti Password (`/dashboard/profile`)
+
+Disediakan halaman profil mandiri yang dapat diakses oleh seluruh pengguna untuk mengelola data akun pribadi:
+- **Pengubahan Biodata**: Pembaruan Nama Lengkap, Email, Nomor Telepon, dan Username secara mandiri.
+- **Unggah Foto Profil**: Fitur *upload* foto profil dengan kompresi dan integrasi layanan berkas server.
+- **Konfigurasi Ganti Password**: Keamanan pergantian password terproteksi dengan validasi Password Lama, Password Baru minimal 6 karakter, Konfirmasi Password Baru, serta visibilitas password (*eye toggle*).
+- **Backend API**: Penyediaan endpoint `PUT /auth/profile` dan `PUT /auth/change-password` dengan hashing aman `Bun.password`.
+
+---
+
+## 10. Perbaikan Menyeluruh Role-Based Access Control (RBAC) & Kepatuhan React Rules of Hooks
+
+Audit dan penyempurnaan keamanan otorisasi di seluruh layer aplikasi:
+- **Koreksi Logika Inti `hasRole`**: Memperbaiki bug pada fungsi `hasRole` di frontend (`store/index.ts`) dan backend (`lib/permissions.ts`) yang sebelumnya menyebabkan pengguna non-superadmin (seperti `crm`, `dosen`) dianggap superadmin akibat evaluasi ekspresi string `r === "superadmin"`.
+- **Isolasi Sidebar & Panel Modul**: Sidebar kini memfilter item menu secara ketat:
+  - Role `crm`: Hanya melihat **Dashboard**, **Semua Mahasiswa**, dan **Panel CRM**.
+  - Role `pmb`: Hanya melihat **Dashboard**, **Semua Mahasiswa**, dan **Panel PMB**.
+  - Role `dosen`: Hanya melihat **Dashboard**, **Manajemen Mata Kuliah**, dan **Rekap Nilai**.
+  - Role multi-role (misal `pa` + `crm`): Menampilkan kombinasi menu yang sesuai dengan kedua peran tersebut.
+- **Proteksi Rute Langsung (`SharedDashboardLoader`)**: Mencegah akses ilegal via URL langsung ke modul divisi lain dengan menyajikan tampilan **"Akses Ditolak"**.
+- **Proteksi Pengaturan & Master Data**: Penguncian `/dashboard/settings/backup` khusus untuk `superadmin`, dan `/dashboard/settings/master-akademik` untuk `superadmin` dan `akademik`.
+- **Kepatuhan Aturan React Hooks (`Rules of Hooks`)**: Memperbaiki urutan eksekusi hook pada `StudentDetailContent` (`/dashboard/students/[id]/page.tsx`) dengan memindahkan `visibleLinks` dan `useEffect` ke bagian paling atas komponen sebelum pernyataan *early return* bersyarat, menghilangkan error runtime *"Rendered more hooks than during the previous render"*.
 
 ---
 
 **Tanggal Perubahan:** 18 Agustus 2026  
 **Area Terdampak:**
+- `apps/web/src/store/index.ts` (Perbaikan logika fungsi helper `hasRole` & `getUserRoles`)
+- `apps/api/src/lib/permissions.ts` (Perbaikan logika fungsi helper `hasRole` backend)
+- `apps/api/src/routes/users.ts` (Perbaikan endpoint `manage-users` & dukungan kolom `roles`)
+- `apps/api/src/index.ts` (Penyertaan array `roles` pada payload login JWT)
+- `apps/web/src/app/dashboard/profile/page.tsx` *(BARU)* (Halaman profil mandiri & ganti password)
+- `apps/web/src/components/dashboards/DosenDashboard.tsx` *(BARU)* (Dashboard khusus dosen pengampu)
+- `apps/web/src/components/layout/Sidebar.tsx` (Penyaringan ketat menu sidebar berbasis peran & multi-role)
+- `apps/web/src/components/dashboards/SharedDashboardLoader.tsx` (Proteksi akses URL langsung modul & tampilan Akses Ditolak)
+- `apps/web/src/app/dashboard/page.tsx` (Routing role dashboard, DosenDashboard, EvaluatorDashboard, dan superadmin guard)
+- `apps/web/src/app/dashboard/students/[id]/page.tsx` (Penyelesaian React Rules of Hooks, filter tab per-role, & proteksi aksi)
+- `apps/web/src/app/dashboard/settings/backup/page.tsx` (Guard superadmin pada pengaturan backup)
+- `apps/web/src/app/dashboard/settings/master-akademik/page.tsx` (Guard superadmin & akademik pada master data)
+- `apps/api/src/routes/student/*` (`pmb.ts`, `internship.ts`, `finance.ts`, `crm.ts`, `core.ts`, `academic.ts`, `final-decision.ts`, `internal-notes.ts`, `departure-assessment.ts`)
+- `apps/api/src/routes/finance.ts` & `magang.ts` (Penyelarasan pengecekan peran backend dengan `hasRole`)
+- `apps/api/src/lib/job.ts` (Perbaikan formula persentase progress job Redis)
+- `apps/api/src/modules/backup/service/backup.service.ts` (Penanganan backup 0 berkas & sinkronisasi manifest)
+- `apps/api/src/modules/backup/routes/backup.routes.ts` (Kompresi zip streaming dengan archiver & guard superadmin)
+- `apps/api/src/workers/backup.worker.ts` (Exponential backoff & error recovery)
+- `apps/api/src/workers/scheduled.worker.ts` (Lookup superadmin dinamis & retry backup harian)
+- `apps/web/src/components/backup/BackupManualForm.tsx` (Penyempurnaan feedback UI backup manual)
 - `apps/web/src/components/ui/TablePagination.tsx` *(BARU)* (Komponen reusable pagination tabel dasbor)
 - `apps/web/src/lib/peminatan.ts` *(BARU)* (Pustaka pemetaan negara, bendera, dan styling peminatan)
 - `apps/web/src/components/ui/PeminatanBadge.tsx` *(BARU)* (Komponen visual badge bendera negara)
@@ -119,3 +192,4 @@ Fungsi operasional untuk Dosen Pembimbing Akademik (PA) telah diperbaiki dan dia
 - `apps/web/src/app/dashboard/students/archive/page.tsx` & `profile/page.tsx` (Integrasi PeminatanBadge)
 - `apps/web/src/components/panels/kehadiran/KehadiranDashboard.tsx` (Integrasi PeminatanBadge)
 - `apps/web/src/components/dashboards/pmb/TabRespons.tsx` (Integrasi PeminatanBadge)
+

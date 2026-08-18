@@ -91,6 +91,7 @@ export const users = pgTable("users", {
 	passwordHash: text("password_hash").notNull(),
 	fullName: text("full_name").notNull(),
 	role: roleEnum("role").notNull(),
+	roles: jsonb("roles").$type<string[]>().default([]),
 	email: text("email"),
 	phone: text("phone"),
 	profilePhotoUrl: text("profile_photo_url"),

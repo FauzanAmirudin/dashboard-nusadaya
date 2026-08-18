@@ -27,7 +27,7 @@ import { useEffect, useState } from "react";
 
 import { api } from "@/lib/eden";
 import { cn } from "@/lib/utils";
-import { useAuthStore } from "@/store";
+import { getUserRoles, hasRole, useAuthStore } from "@/store";
 
 interface SidebarSubItem {
 	label: string;
@@ -58,31 +58,41 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 			"dosen",
 			"pa",
 			"magang",
+			"evaluator",
 		],
 	},
 	{
 		icon: Users,
 		label: "Semua Mahasiswa",
 		href: "/dashboard/students",
-		roles: ["superadmin", "pmb", "crm", "finance", "akademik", "pa", "magang"],
+		roles: [
+			"superadmin",
+			"pmb",
+			"crm",
+			"finance",
+			"akademik",
+			"pa",
+			"magang",
+			"evaluator",
+		],
 	},
 	{
 		icon: ClipboardList,
 		label: "Panel PMB",
 		href: "/dashboard/pmb",
-		roles: ["superadmin"],
+		roles: ["superadmin", "pmb"],
 	},
 	{
 		icon: PhoneCall,
 		label: "Panel CRM",
 		href: "/dashboard/crm",
-		roles: ["superadmin"],
+		roles: ["superadmin", "crm"],
 	},
 	{
 		icon: Wallet,
 		label: "Panel Finance",
 		href: "/dashboard/finance",
-		roles: ["superadmin"],
+		roles: ["superadmin", "finance"],
 	},
 	{
 		icon: GraduationCap,
@@ -133,24 +143,23 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 			},
 		],
 	},
-
 	{
 		icon: HeartHandshake,
 		label: "Panel PA",
 		href: "/dashboard/pa",
-		roles: ["superadmin"],
+		roles: ["superadmin", "pa"],
 	},
 	{
 		icon: Plane,
 		label: "Panel Magang",
 		href: "/dashboard/magang",
-		roles: ["superadmin"],
+		roles: ["superadmin", "magang"],
 	},
 	{
 		icon: ShieldCheck,
 		label: "Panel Keputusan Final",
 		href: "/dashboard/evaluator",
-		roles: ["superadmin"],
+		roles: ["superadmin", "evaluator"],
 	},
 	{
 		icon: UserCog,
@@ -190,26 +199,33 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 		router.push("/login");
 	};
 
+	const userRoles = getUserRoles(user);
+	const isSuperadmin = hasRole(user, "superadmin");
 	const visibleItems: SidebarItem[] = [];
-	if (mounted && user?.role) {
+
+	if (mounted && user) {
 		SIDEBAR_ITEMS.forEach((item) => {
-			if (user.role === "superadmin") {
-				if (item.roles.includes(user.role)) visibleItems.push(item);
+			if (isSuperadmin) {
+				if (item.roles.includes("superadmin")) {
+					visibleItems.push(item);
+				}
 			} else {
 				if (item.subItems) {
 					const allowed = item.subItems.filter((sub) =>
-						sub.roles.includes(user.role!),
+						sub.roles.some((r) => userRoles.includes(r)),
 					);
-					allowed.forEach((sub) => {
+					if (allowed.length > 0) {
 						visibleItems.push({
-							icon: sub.icon || item.icon,
-							label: sub.label,
-							href: sub.href,
-							roles: sub.roles,
+							...item,
+							subItems: allowed,
 						});
-					});
+					}
 				} else {
-					if (item.roles.includes(user.role)) visibleItems.push(item);
+					if (item.roles.some((r) => userRoles.includes(r))) {
+						if (!visibleItems.some((v) => v.href === item.href)) {
+							visibleItems.push(item);
+						}
+					}
 				}
 			}
 		});
@@ -412,8 +428,12 @@ function NavItem({
 	const Icon = item.icon;
 
 	if (item.subItems) {
+		const userRoles = getUserRoles(user);
 		const visibleSubItems = item.subItems.filter(
-			(sub) => user?.role && sub.roles.includes(user.role),
+			(sub) =>
+				user?.role === "superadmin" ||
+				userRoles.includes("superadmin") ||
+				sub.roles.some((r) => userRoles.includes(r)),
 		);
 		if (visibleSubItems.length === 0) return null;
 

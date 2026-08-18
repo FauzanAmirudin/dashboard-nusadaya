@@ -57,7 +57,7 @@ function formatWhatsAppUrl(phone: string | null | undefined) {
 	return `https://wa.me/${formatted}`;
 }
 
-import { useAuthStore } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
 
 export function PaDashboard({ user: propUser, data: propData }: any) {
 	const router = useRouter();
@@ -122,14 +122,13 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 	}, [propData]);
 
 	// Filter data by PA assignment:
-	// - If user is a PA (role === 'pa'), strictly show only students assigned to this PA (paId === user.id)
-	// - If superadmin, allow filtering by selected PA dropdown
+	const isSuperadmin = hasRole(user, "superadmin");
+	const isAcademicOnly = hasRole(user, "akademik") && !hasRole(user, "pa");
+	const hasPaRole = hasRole(user, "pa");
+
 	const paFilteredData = useMemo(() => {
 		if (!data) return [];
-		if (user?.role === "pa") {
-			return data.filter((s: any) => s.student?.paId === user.id);
-		}
-		if (user?.role === "superadmin") {
+		if (isSuperadmin || isAcademicOnly) {
 			if (selectedPaId === "all") return data;
 			if (selectedPaId === "unassigned") {
 				return data.filter((s: any) => !s.student?.paId);
@@ -138,8 +137,20 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 				(s: any) => s.student?.paId?.toString() === selectedPaId,
 			);
 		}
+		if (hasPaRole) {
+			return data.filter((s: any) => s.student?.paId === user.id);
+		}
 		return data;
-	}, [data, user?.role, user?.id, selectedPaId]);
+	}, [
+		data,
+		user?.role,
+		user?.roles,
+		user?.id,
+		selectedPaId,
+		isSuperadmin,
+		isAcademicOnly,
+		hasPaRole,
+	]);
 
 	// Filter by cohort first for reactive KPI
 	const cohortData = useMemo(() => {
@@ -270,14 +281,14 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 								<h1 className="text-2xl font-bold text-slate-900">
 									Dashboard Pembimbing Akademik (PA)
 								</h1>
-								{user?.role === "pa" && (
+								{hasPaRole && (
 									<Badge className="bg-teal-50 text-teal-700 border-teal-200 text-xs">
 										Dosen PA
 									</Badge>
 								)}
 							</div>
 							<p className="text-slate-500 text-xs sm:text-sm mt-0.5">
-								{user?.role === "pa"
+								{hasPaRole && !isSuperadmin
 									? `Menampilkan daftar mahasiswa bimbingan dari: ${user?.fullName || "Anda"}`
 									: "Monitoring bimbingan konseling, rekap sesi wawancara 1-3, tripartite meeting, dan kelayakan mental/karakter."}
 							</p>
@@ -286,7 +297,7 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 				</div>
 
 				<div className="flex flex-wrap items-center gap-2.5">
-					{user?.role === "superadmin" && (
+					{(isSuperadmin || isAcademicOnly) && (
 						<Select
 							value={selectedPaId}
 							onValueChange={(val) => setSelectedPaId(val || "all")}

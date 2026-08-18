@@ -5,13 +5,13 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAuthStore } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
 
 export function VocationalBudgetTab() {
 	const { user, token } = useAuthStore();
 	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-	const canEdit = user?.role === "finance" || user?.role === "superadmin";
+	const canEdit = hasRole(user, "finance");
 
 	const [requests, setRequests] = useState<any[]>([]);
 	const [leftovers, setLeftovers] = useState<any[]>([]);
@@ -332,12 +332,15 @@ export function VocationalBudgetTab() {
 												<Input
 													type="number"
 													className="h-8 text-sm"
-													value={item.qty}
+													placeholder="0"
+													value={item.qty === 0 || !item.qty ? "" : item.qty}
 													onChange={(e) =>
 														handleMaterialChange(
 															idx,
 															"qty",
-															Number(e.target.value),
+															e.target.value === ""
+																? 0
+																: Number(e.target.value),
 														)
 													}
 												/>
@@ -345,6 +348,7 @@ export function VocationalBudgetTab() {
 											<td className="p-2">
 												<Input
 													className="h-8 text-sm"
+													placeholder="Satuan"
 													value={item.unit}
 													onChange={(e) =>
 														handleMaterialChange(idx, "unit", e.target.value)
@@ -355,12 +359,19 @@ export function VocationalBudgetTab() {
 												<Input
 													type="number"
 													className="h-8 text-sm"
-													value={item.estPrice}
+													placeholder="0"
+													value={
+														item.estPrice === 0 || !item.estPrice
+															? ""
+															: item.estPrice
+													}
 													onChange={(e) =>
 														handleMaterialChange(
 															idx,
 															"estPrice",
-															Number(e.target.value),
+															e.target.value === ""
+																? 0
+																: Number(e.target.value),
 														)
 													}
 												/>
@@ -618,7 +629,7 @@ export function VocationalBudgetTab() {
 									step="0.01"
 									className="bg-white h-9 text-sm"
 									placeholder="0"
-									value={loQty}
+									value={loQty === "0" || !loQty ? "" : loQty}
 									onChange={(e) => setLoQty(e.target.value)}
 								/>
 							</div>

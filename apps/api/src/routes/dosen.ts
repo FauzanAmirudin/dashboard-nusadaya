@@ -7,6 +7,7 @@ import {
 	practicesMaterialReports,
 	students,
 } from "../db/schema";
+import { hasRole } from "../lib/permissions";
 import { fileService } from "../modules/file/service/file.service";
 
 export const dosenRouter = new Elysia({ prefix: "/dosen" }).get(
@@ -15,7 +16,7 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" }).get(
 		const user = (context as any).user;
 		const set = context.set;
 
-		if (!user || (user.role !== "dosen" && user.role !== "superadmin")) {
+		if (!hasRole(user, "dosen")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -28,7 +29,7 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" }).get(
 			.from(courseGrades)
 			.innerJoin(students, eq(courseGrades.studentId, students.id));
 
-		if (user.role !== "superadmin") {
+		if (!hasRole(user, "superadmin")) {
 			query = query.where(eq(courseGrades.dosenId, user.id)) as any;
 		}
 

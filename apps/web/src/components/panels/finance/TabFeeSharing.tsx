@@ -276,7 +276,8 @@ export function TabFeeSharing({ studentId, canEdit }: TabFeeSharingProps) {
 												<Input
 													type="number"
 													min={0}
-													defaultValue={r.nominalFee || 0}
+													placeholder="0"
+													defaultValue={r.nominalFee || ""}
 													onKeyDown={(e) => {
 														if (e.key === "-" || e.key === "e" || e.key === "E")
 															e.preventDefault();

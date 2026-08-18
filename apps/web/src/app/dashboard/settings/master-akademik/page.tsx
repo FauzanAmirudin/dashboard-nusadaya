@@ -1,6 +1,7 @@
 "use client";
 
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -27,11 +28,11 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { api } from "@/lib/eden";
-import { useAuthStore } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
 
 export default function MasterAkademikSettings() {
-	const { user } = useAuthStore();
-	const isSuperadmin = user?.role === "superadmin";
+	const { user, hasHydrated } = useAuthStore();
+	const isSuperadmin = hasRole(user, "superadmin");
 
 	const [events, setEvents] = useState<any[]>([]);
 	const [businessParams, setBusinessParams] = useState<any[]>([]);
@@ -80,8 +81,30 @@ export default function MasterAkademikSettings() {
 	};
 
 	useEffect(() => {
-		fetchData();
-	}, []);
+		if (hasHydrated && hasRole(user, "superadmin", "akademik")) {
+			fetchData();
+		}
+	}, [hasHydrated, user]);
+
+	if (!hasHydrated) return null;
+
+	if (!hasRole(user, "superadmin", "akademik")) {
+		return (
+			<div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
+				<div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mb-4">
+					<ShieldAlert className="w-8 h-8" />
+				</div>
+				<h2 className="text-xl font-bold text-slate-800 mb-2">Akses Ditolak</h2>
+				<p className="text-sm text-slate-500 max-w-md mb-6">
+					Halaman Master Data Akademik hanya dapat diakses oleh Administrator
+					dan Tim Akademik.
+				</p>
+				<Link href="/dashboard">
+					<Button variant="outline">Kembali ke Dashboard</Button>
+				</Link>
+			</div>
+		);
+	}
 
 	const handleAddEvent = async () => {
 		if (!newEvent.configKey || !newEvent.eventName)

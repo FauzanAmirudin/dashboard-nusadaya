@@ -5,7 +5,7 @@ import { jwt as elysiaJwt } from "@elysiajs/jwt";
 import { swagger } from "@elysiajs/swagger";
 import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-import { db } from "./db";
+import { db, ensureDatabaseSchema } from "./db";
 import { users } from "./db/schema";
 import { backupModule } from "./modules/backup";
 import { exportModule } from "./modules/export";
@@ -66,7 +66,12 @@ const app = new Elysia()
 			const profile = await jwt.verify(token);
 			if (profile) {
 				return {
-					user: profile as { id: number; username: string; role: string },
+					user: profile as {
+						id: number;
+						username: string;
+						role: string;
+						roles?: string[];
+					},
 				};
 			}
 		}
@@ -75,7 +80,12 @@ const app = new Elysia()
 			const profile = await jwt.verify(auth.value as string);
 			if (profile) {
 				return {
-					user: profile as { id: number; username: string; role: string },
+					user: profile as {
+						id: number;
+						username: string;
+						role: string;
+						roles?: string[];
+					},
 				};
 			}
 		}
@@ -84,7 +94,12 @@ const app = new Elysia()
 			const profile = await jwt.verify(query.token as string);
 			if (profile) {
 				return {
-					user: profile as { id: number; username: string; role: string },
+					user: profile as {
+						id: number;
+						username: string;
+						role: string;
+						roles?: string[];
+					},
 				};
 			}
 		}
@@ -118,10 +133,16 @@ const app = new Elysia()
 						return { success: false, message: "Username atau password salah." };
 					}
 
+					const userRoles =
+						user.roles && Array.isArray(user.roles) && user.roles.length > 0
+							? user.roles
+							: [user.role];
+
 					const jwtPayload = {
 						id: user.id,
 						username: user.username,
 						role: user.role,
+						roles: userRoles,
 					};
 					const token = await jwt.sign(jwtPayload);
 
@@ -149,24 +170,255 @@ const app = new Elysia()
 				return { success: true };
 			})
 
-			.get("/me", (context: any) => {
+			.get("/me", async (context: any) => {
 				const { user, set } = context;
 				if (!user) {
 					set.status = 401;
 					return { error: "Unauthorized" };
 				}
+				const dbUser = await db.query.users.findFirst({
+					where: eq(users.id, user.id),
+					columns: {
+						id: true,
+						username: true,
+						fullName: true,
+						role: true,
+						roles: true,
+						email: true,
+						phone: true,
+						profilePhotoUrl: true,
+					},
+				});
+				if (dbUser) {
+					const userRoles =
+						dbUser.roles &&
+						Array.isArray(dbUser.roles) &&
+						dbUser.roles.length > 0
+							? dbUser.roles
+							: [dbUser.role];
+					return { user: { ...dbUser, roles: userRoles } };
+				}
 				return { user };
-			}),
+			})
+
+			.get("/profile", async (context: any) => {
+				const { user, set } = context;
+				if (!user) {
+					set.status = 401;
+					return { success: false, message: "Unauthorized" };
+				}
+				const dbUser = await db.query.users.findFirst({
+					where: eq(users.id, user.id),
+					columns: {
+						id: true,
+						username: true,
+						fullName: true,
+						role: true,
+						roles: true,
+						email: true,
+						phone: true,
+						profilePhotoUrl: true,
+						createdAt: true,
+						updatedAt: true,
+					},
+				});
+				if (!dbUser) {
+					set.status = 404;
+					return { success: false, message: "User not found" };
+				}
+				const userRoles =
+					dbUser.roles && Array.isArray(dbUser.roles) && dbUser.roles.length > 0
+						? dbUser.roles
+						: [dbUser.role];
+				return { success: true, data: { ...dbUser, roles: userRoles } };
+			})
+
+			.put(
+				"/profile",
+				async (context: any) => {
+					const { user, body, set } = context;
+					if (!user) {
+						set.status = 401;
+						return { success: false, message: "Unauthorized" };
+					}
+
+					const currentUser = await db.query.users.findFirst({
+						where: eq(users.id, user.id),
+					});
+					if (!currentUser) {
+						set.status = 404;
+						return { success: false, message: "User not found" };
+					}
+
+					const input = body as {
+						fullName?: string;
+						username?: string;
+						email?: string;
+						phone?: string;
+						profilePhotoUrl?: string;
+					};
+
+					// Check username uniqueness if changing
+					if (input.username && input.username !== currentUser.username) {
+						const existing = await db.query.users.findFirst({
+							where: eq(users.username, input.username),
+						});
+						if (existing) {
+							set.status = 400;
+							return {
+								success: false,
+								message: "Username sudah digunakan oleh akun lain.",
+							};
+						}
+					}
+
+					const updatePayload: Record<string, any> = {
+						updatedAt: new Date(),
+					};
+					if (input.fullName !== undefined)
+						updatePayload.fullName = input.fullName.trim();
+					if (input.username !== undefined)
+						updatePayload.username = input.username.trim();
+					if (input.email !== undefined)
+						updatePayload.email = input.email ? input.email.trim() : null;
+					if (input.phone !== undefined)
+						updatePayload.phone = input.phone ? input.phone.trim() : null;
+					if (input.profilePhotoUrl !== undefined)
+						updatePayload.profilePhotoUrl = input.profilePhotoUrl || null;
+
+					const [updated] = await db
+						.update(users)
+						.set(updatePayload)
+						.where(eq(users.id, user.id))
+						.returning({
+							id: users.id,
+							username: users.username,
+							fullName: users.fullName,
+							role: users.role,
+							roles: users.roles,
+							email: users.email,
+							phone: users.phone,
+							profilePhotoUrl: users.profilePhotoUrl,
+							updatedAt: users.updatedAt,
+						});
+
+					const userRoles =
+						updated.roles &&
+						Array.isArray(updated.roles) &&
+						updated.roles.length > 0
+							? updated.roles
+							: [updated.role];
+
+					return {
+						success: true,
+						message: "Profil berhasil diperbarui.",
+						data: { ...updated, roles: userRoles },
+					};
+				},
+				{
+					body: t.Object({
+						fullName: t.Optional(t.String()),
+						username: t.Optional(t.String()),
+						email: t.Optional(t.String()),
+						phone: t.Optional(t.String()),
+						profilePhotoUrl: t.Optional(t.String()),
+					}),
+				},
+			)
+
+			.post(
+				"/change-password",
+				async (context: any) => {
+					const { user, body, set } = context;
+					if (!user) {
+						set.status = 401;
+						return { success: false, message: "Unauthorized" };
+					}
+
+					const { currentPassword, newPassword, confirmNewPassword } = body;
+
+					if (!currentPassword || !newPassword) {
+						set.status = 400;
+						return {
+							success: false,
+							message: "Password saat ini dan password baru wajib diisi.",
+						};
+					}
+
+					if (newPassword !== confirmNewPassword) {
+						set.status = 400;
+						return {
+							success: false,
+							message: "Konfirmasi password baru tidak cocok.",
+						};
+					}
+
+					if (newPassword.length < 6) {
+						set.status = 400;
+						return {
+							success: false,
+							message: "Password baru minimal 6 karakter.",
+						};
+					}
+
+					const currentUser = await db.query.users.findFirst({
+						where: eq(users.id, user.id),
+					});
+					if (!currentUser) {
+						set.status = 404;
+						return { success: false, message: "User tidak ditemukan." };
+					}
+
+					const isPasswordValid = await Bun.password.verify(
+						currentPassword,
+						currentUser.passwordHash,
+					);
+					if (!isPasswordValid) {
+						set.status = 400;
+						return {
+							success: false,
+							message: "Password saat ini tidak sesuai.",
+						};
+					}
+
+					const newPasswordHash = await Bun.password.hash(newPassword);
+
+					await db
+						.update(users)
+						.set({
+							passwordHash: newPasswordHash,
+							updatedAt: new Date(),
+						})
+						.where(eq(users.id, user.id));
+
+					return {
+						success: true,
+						message: "Password berhasil diperbarui.",
+					};
+				},
+				{
+					body: t.Object({
+						currentPassword: t.String(),
+						newPassword: t.String(),
+						confirmNewPassword: t.String(),
+					}),
+				},
+			),
 	)
 	.get("/users", async ({ query }: any) => {
 		const { role } = query;
-		let q = db
-			.select({ id: users.id, fullName: users.fullName, role: users.role })
-			.from(users);
+		const result = await db.query.users.findMany({
+			columns: { id: true, fullName: true, role: true, roles: true },
+		});
 		if (role) {
-			q = q.where(eq(users.role, role as any)) as any;
+			const filtered = result.filter((u) => {
+				if (u.role === role) return true;
+				if (u.roles && Array.isArray(u.roles) && u.roles.includes(role))
+					return true;
+				return false;
+			});
+			return { success: true, data: filtered };
 		}
-		const result = await q;
 		return { success: true, data: result };
 	})
 
@@ -219,7 +471,10 @@ app.listen(process.env.PORT || 3001, async () => {
 		`🦊 Nusadaya API is running at http://localhost:${process.env.PORT || 3001}`,
 	);
 
-	// 1. Inisialisasi direktori storage
+	// 1. Inisialisasi skema database (auto migration column baru)
+	await ensureDatabaseSchema();
+
+	// 2. Inisialisasi direktori storage
 	await fileService.ensureDirectories();
 
 	// 2. Jalankan workers di background (non-blocking)

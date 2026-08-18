@@ -1,12 +1,36 @@
 "use client";
 
-import { History, Settings2 } from "lucide-react";
-import { useState } from "react";
+import { History, Settings2, ShieldAlert } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { BackupHistoryTable } from "@/components/backup/BackupHistoryTable";
 import { BackupManualForm } from "@/components/backup/BackupManualForm";
+import { Button } from "@/components/ui/button";
+import { hasRole, useAuthStore } from "@/store";
 
 export default function BackupSettingsPage() {
+	const { user, hasHydrated } = useAuthStore();
 	const [activeTab, setActiveTab] = useState<"history" | "manual">("history");
+
+	if (!hasHydrated) return null;
+
+	if (!hasRole(user, "superadmin")) {
+		return (
+			<div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
+				<div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mb-4">
+					<ShieldAlert className="w-8 h-8" />
+				</div>
+				<h2 className="text-xl font-bold text-slate-800 mb-2">Akses Ditolak</h2>
+				<p className="text-sm text-slate-500 max-w-md mb-6">
+					Halaman Backup & Sistem hanya dapat diakses oleh Administrator
+					(Superadmin).
+				</p>
+				<Link href="/dashboard">
+					<Button variant="outline">Kembali ke Dashboard</Button>
+				</Link>
+			</div>
+		);
+	}
 
 	return (
 		<div className="space-y-6 max-w-7xl mx-auto pb-10">

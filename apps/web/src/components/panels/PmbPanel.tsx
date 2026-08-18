@@ -6,23 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { API_URL, getToken } from "@/lib/eden";
-import { useAuthStore } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
 
 import { TabChecklist } from "./pmb/TabChecklist";
 import { TabDataTambahan } from "./pmb/TabDataTambahan";
 import { TabFeeSharing } from "./pmb/TabFeeSharing";
 import { TabSkemaKeuangan } from "./pmb/TabSkemaKeuangan";
-
-interface PmbPanelProps {
-	studentId: number;
-	pmbData: any;
-	studentData?: {
-		nim?: string | null;
-		studentStatus?: string | null;
-		paId?: number | null;
-	};
-	onUpdate: () => void;
-}
 
 interface DocFile {
 	id: number;
@@ -35,6 +24,13 @@ interface DocFile {
 	verifiedByUser?: { fullName: string } | null;
 }
 
+interface PmbPanelProps {
+	studentId: number;
+	pmbData: any;
+	studentData: any;
+	onUpdate: () => void;
+}
+
 export function PmbPanel({
 	studentId,
 	pmbData,
@@ -42,7 +38,7 @@ export function PmbPanel({
 	onUpdate,
 }: PmbPanelProps) {
 	const { user } = useAuthStore();
-	const isPmbAdmin = user?.role === "pmb" || user?.role === "superadmin";
+	const isPmbAdmin = hasRole(user, "pmb");
 	const canEdit = isPmbAdmin;
 
 	const [documents, setDocuments] = useState<Record<string, DocFile[]>>({});

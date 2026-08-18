@@ -6,6 +6,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-nusadaya}
+      TZ: ${TZ:-Asia/Jakarta}
     ports:
       - "5454:5432"
     volumes:
@@ -30,6 +31,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-nusadaya}
       - JWT_SECRET=${JWT_SECRET:-secretkey}
       - REDIS_URL=redis://redis:6379
+      - TZ=${TZ:-Asia/Jakarta}
       # Storage di luar source code — persistent via Docker volume
       # Bukan di apps/api/uploads/ (dilarang oleh plan)
       - STORAGE_PATH=/app/storage

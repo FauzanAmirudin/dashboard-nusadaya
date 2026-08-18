@@ -218,7 +218,7 @@ export default function EditStudentPage() {
 						subProgram: std.subProgram || "",
 						classType: std.classType || "",
 						academicYear: std.academicYear || "",
-						cohort: std.cohort?.toString() || "14",
+						cohort: std.cohort?.toString() || "",
 
 						// Data tambahan PMB dll
 						paId: std.paId?.toString() || "",

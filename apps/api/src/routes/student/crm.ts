@@ -34,6 +34,7 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 import { fileService } from "../../modules/file/service/file.service";
 
@@ -139,11 +140,7 @@ export const crmRoutes = new Elysia()
 				return { success: false, message: "Unauthorized" };
 			}
 
-			if (
-				user.role !== "crm" &&
-				user.role !== "superadmin" &&
-				user.role !== "superadmin"
-			) {
+			if (!hasRole(user, "crm")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -356,7 +353,7 @@ export const crmRoutes = new Elysia()
 	.delete("/:id/crm/acc", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!user || (user.role !== "crm" && user.role !== "superadmin")) {
+		if (!hasRole(user, "crm")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -519,7 +516,7 @@ export const crmRoutes = new Elysia()
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (!user || (user.role !== "crm" && user.role !== "superadmin")) {
+		if (!hasRole(user, "crm")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -535,7 +532,7 @@ export const crmRoutes = new Elysia()
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (!user || (user.role !== "crm" && user.role !== "superadmin")) {
+		if (!hasRole(user, "crm")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}

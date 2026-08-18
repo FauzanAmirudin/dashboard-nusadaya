@@ -1058,12 +1058,17 @@ export function TabAnggaranPraktik({
 												<Input
 													type="number"
 													min={1}
-													value={item.jumlah}
+													placeholder="1"
+													value={
+														item.jumlah === 0 || !item.jumlah ? "" : item.jumlah
+													}
 													onChange={(e) =>
 														handleItemChange(
 															idx,
 															"jumlah",
-															Number(e.target.value) || 1,
+															e.target.value === ""
+																? ""
+																: Number(e.target.value),
 														)
 													}
 													className="text-xs h-9 text-center bg-white"
@@ -1084,12 +1089,18 @@ export function TabAnggaranPraktik({
 													type="number"
 													min={0}
 													placeholder="Harga Satuan"
-													value={item.satuanHarga || ""}
+													value={
+														item.satuanHarga === 0 || !item.satuanHarga
+															? ""
+															: item.satuanHarga
+													}
 													onChange={(e) =>
 														handleItemChange(
 															idx,
 															"satuanHarga",
-															Number(e.target.value) || 0,
+															e.target.value === ""
+																? ""
+																: Number(e.target.value),
 														)
 													}
 													className="text-xs h-9 text-right font-medium bg-white"

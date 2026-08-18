@@ -376,7 +376,7 @@ export function TabKeuangan({
 	};
 
 	const handleNumberFieldChange = (field: string, rawVal: any) => {
-		const val = Math.max(0, Number(rawVal) || 0);
+		const val = rawVal === "" ? "" : Math.max(0, Number(rawVal) || 0);
 		setFormData((prev: any) => ({ ...prev, [field]: val }));
 	};
 
@@ -394,7 +394,7 @@ export function TabKeuangan({
 		field: string,
 		rawVal: any,
 	) => {
-		const val = Math.max(0, Number(rawVal) || 0);
+		const val = rawVal === "" ? "" : Math.max(0, Number(rawVal) || 0);
 		setCustomData((prev) =>
 			prev.map((c) => (c.id === id ? { ...c, [field]: val } : c)),
 		);
@@ -418,8 +418,14 @@ export function TabKeuangan({
 		// Sanitize data before sending
 		const sanitizedFormData = { ...formData };
 		Object.keys(sanitizedFormData).forEach((key) => {
-			if (typeof sanitizedFormData[key] === "number") {
-				sanitizedFormData[key] = Math.max(0, sanitizedFormData[key]);
+			if (
+				typeof sanitizedFormData[key] === "number" ||
+				sanitizedFormData[key] === ""
+			) {
+				sanitizedFormData[key] = Math.max(
+					0,
+					Number(sanitizedFormData[key]) || 0,
+				);
 			}
 		});
 
@@ -919,7 +925,12 @@ export function TabKeuangan({
 										type="number"
 										min={0}
 										onKeyDown={preventMinus}
-										value={formData?.registrasiNominal || 0}
+										placeholder="0"
+										value={
+											formData?.registrasiNominal === 0
+												? ""
+												: (formData?.registrasiNominal ?? "")
+										}
 										onChange={(e) =>
 											handleNumberFieldChange(
 												"registrasiNominal",
@@ -1088,8 +1099,13 @@ export function TabKeuangan({
 														type="number"
 														min={0}
 														onKeyDown={preventMinus}
+														placeholder="0"
 														className="w-32 text-right"
-														value={formData?.[item.nomField] || 0}
+														value={
+															formData?.[item.nomField] === 0
+																? ""
+																: (formData?.[item.nomField] ?? "")
+														}
 														onChange={(e) =>
 															handleNumberFieldChange(
 																item.nomField,
@@ -1188,8 +1204,13 @@ export function TabKeuangan({
 														type="number"
 														min={0}
 														onKeyDown={preventMinus}
+														placeholder="0"
 														className="w-32 text-right"
-														value={formData?.[item.nomField] || 0}
+														value={
+															formData?.[item.nomField] === 0
+																? ""
+																: (formData?.[item.nomField] ?? "")
+														}
 														onChange={(e) =>
 															handleNumberFieldChange(
 																item.nomField,
@@ -1282,7 +1303,12 @@ export function TabKeuangan({
 												type="number"
 												min={0}
 												onKeyDown={preventMinus}
-												value={formData?.adminTalaganNominal || 0}
+												placeholder="0"
+												value={
+													formData?.adminTalaganNominal === 0
+														? ""
+														: (formData?.adminTalaganNominal ?? "")
+												}
 												onChange={(e) =>
 													handleNumberFieldChange(
 														"adminTalaganNominal",
@@ -1395,8 +1421,9 @@ export function TabKeuangan({
 															type="number"
 															min={0}
 															onKeyDown={preventMinus}
+															placeholder="0"
 															className="w-32 text-right"
-															value={f.nominal || 0}
+															value={f.nominal === 0 ? "" : (f.nominal ?? "")}
 															onChange={(e) =>
 																handleCustomNumberFieldChange(
 																	f.id,
@@ -1746,8 +1773,13 @@ export function TabKeuangan({
 												type="number"
 												min={0}
 												onKeyDown={preventMinus}
+												placeholder="0"
 												className="w-32 text-right"
-												value={formData?.[item.nomField] || 0}
+												value={
+													formData?.[item.nomField] === 0
+														? ""
+														: (formData?.[item.nomField] ?? "")
+												}
 												onChange={(e) =>
 													handleNumberFieldChange(item.nomField, e.target.value)
 												}
@@ -1822,8 +1854,13 @@ export function TabKeuangan({
 										type="number"
 										min={0}
 										onKeyDown={preventMinus}
+										placeholder="0"
 										className="w-32 text-right bg-white"
-										value={formData?.rumahJuangNominal || 0}
+										value={
+											formData?.rumahJuangNominal === 0
+												? ""
+												: (formData?.rumahJuangNominal ?? "")
+										}
 										onChange={(e) =>
 											handleNumberFieldChange(
 												"rumahJuangNominal",
@@ -1917,8 +1954,9 @@ export function TabKeuangan({
 														type="number"
 														min={0}
 														onKeyDown={preventMinus}
+														placeholder="0"
 														className="w-32 text-right"
-														value={f.nominal || 0}
+														value={f.nominal === 0 ? "" : (f.nominal ?? "")}
 														onChange={(e) =>
 															handleCustomNumberFieldChange(
 																f.id,

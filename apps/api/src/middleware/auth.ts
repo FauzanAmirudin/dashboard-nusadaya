@@ -26,7 +26,12 @@ export const authSetup = new Elysia({ name: "auth-base" })
 			const profile = await jwt.verify(token);
 			if (profile) {
 				return {
-					user: profile as { id: number; username: string; role: string },
+					user: profile as {
+						id: number;
+						username: string;
+						role: string;
+						roles?: string[];
+					},
 				};
 			}
 		}
@@ -36,7 +41,12 @@ export const authSetup = new Elysia({ name: "auth-base" })
 			const profile = await jwt.verify(auth.value as string);
 			if (profile) {
 				return {
-					user: profile as { id: number; username: string; role: string },
+					user: profile as {
+						id: number;
+						username: string;
+						role: string;
+						roles?: string[];
+					},
 				};
 			}
 		}

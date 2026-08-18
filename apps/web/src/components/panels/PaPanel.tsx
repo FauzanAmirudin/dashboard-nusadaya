@@ -15,7 +15,7 @@ import { CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { API_URL, api, getToken } from "@/lib/eden";
-import { useAuthStore } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
 
 import { TabChecklistPa } from "./pa/TabChecklistPa";
 import { TabHafalan } from "./pa/TabHafalan";
@@ -41,11 +41,8 @@ interface PaPanelProps {
 
 export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 	const { user } = useAuthStore();
-	const isPa =
-		user?.role === "pa" ||
-		user?.role === "superadmin" ||
-		user?.role === "akademik";
-	const isSuperadmin = user?.role === "superadmin";
+	const isPa = hasRole(user, "pa", "akademik");
+	const isSuperadmin = hasRole(user, "superadmin");
 
 	const [paData, setPaData] = useState<PaData | null>(null);
 	const [hafalanSessions, setHafalanSessions] = useState<HafalanSession[]>([]);

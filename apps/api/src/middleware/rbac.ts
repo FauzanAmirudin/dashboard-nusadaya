@@ -1,4 +1,5 @@
 import { Elysia } from "elysia";
+import { hasRole } from "../lib/permissions";
 import { authSetup } from "./auth";
 
 export const requireRole = (allowedRoles: string[]) => {
@@ -8,7 +9,7 @@ export const requireRole = (allowedRoles: string[]) => {
 			context.set.status = 401;
 			return { error: "Unauthorized" };
 		}
-		if (!allowedRoles.includes(user.role)) {
+		if (!hasRole(user, ...allowedRoles)) {
 			context.set.status = 403;
 			return { error: "Forbidden: Insufficient privileges" };
 		}

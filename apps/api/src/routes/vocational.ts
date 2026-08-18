@@ -6,6 +6,7 @@ import {
 	vocationalLeftovers,
 	vocationalMonthlyBudgets,
 } from "../db/schema";
+import { hasRole } from "../lib/permissions";
 
 export const vocationalRouter = new Elysia({ prefix: "/vocational" })
 	// --- Budget Requests (Mingguan) ---
@@ -87,7 +88,7 @@ export const vocationalRouter = new Elysia({ prefix: "/vocational" })
 				set,
 			} = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+			if (!hasRole(user, "finance")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -137,7 +138,7 @@ export const vocationalRouter = new Elysia({ prefix: "/vocational" })
 		async (context) => {
 			const { body, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+			if (!hasRole(user, "finance")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}

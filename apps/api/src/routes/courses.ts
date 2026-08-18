@@ -12,6 +12,7 @@ import {
 	students,
 	users,
 } from "../db/schema";
+import { hasRole } from "../lib/permissions";
 
 export const coursesRoutes = new Elysia({ prefix: "/courses" })
 	.derive((context) => {
@@ -32,8 +33,8 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 
 		const conditions = [];
 
-		// If Dosen, only their own courses
-		if (user.role === "dosen") {
+		// If Dosen (and not akademik/superadmin), only their own courses
+		if (hasRole(user, "dosen") && !hasRole(user, "akademik")) {
 			conditions.push(eq(courses.dosenId, Number(user.id)));
 		}
 
@@ -62,7 +63,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 	.post(
 		"/",
 		async ({ body, user, set }) => {
-			if (!["superadmin", "akademik"].includes(user.role)) {
+			if (!hasRole(user, "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -167,7 +168,11 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			return { success: false, message: "Mata kuliah tidak ditemukan" };
 		}
 
-		if (user.role === "dosen" && course.dosenId !== user.id) {
+		if (
+			hasRole(user, "dosen") &&
+			!hasRole(user, "akademik") &&
+			course.dosenId !== user.id
+		) {
 			set.status = 403;
 			return { success: false, message: "Anda bukan pengampu mata kuliah ini" };
 		}
@@ -177,7 +182,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 	.patch(
 		"/:id",
 		async ({ params, body, user, set }) => {
-			if (!["superadmin", "akademik"].includes(user.role)) {
+			if (!hasRole(user, "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -213,7 +218,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 		},
 	)
 	.delete("/:id", async ({ params, user, set }) => {
-		if (!["superadmin", "akademik"].includes(user.role)) {
+		if (!hasRole(user, "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -259,7 +264,11 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			set.status = 404;
 			return { success: false, message: "Not found" };
 		}
-		if (user.role === "dosen" && course.dosenId !== user.id) {
+		if (
+			hasRole(user, "dosen") &&
+			!hasRole(user, "akademik") &&
+			course.dosenId !== user.id
+		) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -296,7 +305,11 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				set.status = 404;
 				return { success: false, message: "Not found" };
 			}
-			if (user.role === "dosen" && meeting.course.dosenId !== user.id) {
+			if (
+				hasRole(user, "dosen") &&
+				!hasRole(user, "akademik") &&
+				meeting.course.dosenId !== user.id
+			) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -647,7 +660,11 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				return { success: false, message: "Course not found" };
 			}
 
-			if (user.role === "dosen" && course.dosenId !== user.id) {
+			if (
+				hasRole(user, "dosen") &&
+				!hasRole(user, "akademik") &&
+				course.dosenId !== user.id
+			) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -716,11 +733,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			const reqId = parseInt(params.reqId, 10);
 			const input = body as any;
 
-			if (
-				user.role !== "dosen" &&
-				user.role !== "akademik" &&
-				user.role !== "superadmin"
-			) {
+			if (!hasRole(user, "dosen", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -754,11 +767,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 	.delete("/:id/budget-requests/:reqId", async ({ params, user, set }) => {
 		const reqId = parseInt(params.reqId, 10);
 
-		if (
-			user.role !== "dosen" &&
-			user.role !== "akademik" &&
-			user.role !== "superadmin"
-		) {
+		if (!hasRole(user, "dosen", "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}

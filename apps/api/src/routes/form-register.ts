@@ -2,6 +2,7 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
 import { pmbFormResponses, pmbFormTokens, students, users } from "../db/schema";
+import { hasRole } from "../lib/permissions";
 import { createStudentPipeline } from "./student/core";
 
 export const formRegisterRoutes = new Elysia()
@@ -158,7 +159,7 @@ export const formRegisterRoutes = new Elysia()
 	// 3. ADMIN: Generate Token
 	.post("/pmb/form-tokens", async (context) => {
 		const user = (context as any).user;
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "pmb")) {
 			context.set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -174,7 +175,7 @@ export const formRegisterRoutes = new Elysia()
 	// 4. ADMIN: Get Tokens List
 	.get("/pmb/form-tokens", async (context) => {
 		const user = (context as any).user;
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "pmb")) {
 			context.set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -191,7 +192,7 @@ export const formRegisterRoutes = new Elysia()
 	// 5. ADMIN: Get Pending Responses
 	.get("/pmb/form-responses", async (context) => {
 		const user = (context as any).user;
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "pmb")) {
 			context.set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -208,7 +209,7 @@ export const formRegisterRoutes = new Elysia()
 		async (context) => {
 			const { query, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "pmb")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -265,7 +266,7 @@ export const formRegisterRoutes = new Elysia()
 	.get("/pmb/form-responses/:id", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "pmb")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -285,7 +286,7 @@ export const formRegisterRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "pmb")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -313,7 +314,7 @@ export const formRegisterRoutes = new Elysia()
 	.patch("/pmb/form-responses/:id/approve", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "pmb")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -455,7 +456,7 @@ export const formRegisterRoutes = new Elysia()
 	// 9. ADMIN: Get Single Response
 	.get("/pmb/form-responses/:id", async (context) => {
 		const user = (context as any).user;
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "pmb")) {
 			context.set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}

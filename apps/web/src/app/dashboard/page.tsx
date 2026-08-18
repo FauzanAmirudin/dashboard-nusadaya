@@ -42,6 +42,8 @@ import {
 } from "recharts";
 import { AkademikDashboard } from "@/components/dashboards/AkademikDashboard";
 import { CrmDashboard } from "@/components/dashboards/CrmDashboard";
+import { DosenDashboard } from "@/components/dashboards/DosenDashboard";
+import { EvaluatorDashboard } from "@/components/dashboards/EvaluatorDashboard";
 import { FinanceDashboard } from "@/components/dashboards/FinanceDashboard";
 import { MagangDashboard } from "@/components/dashboards/MagangDashboard";
 import { PaDashboard } from "@/components/dashboards/PaDashboard";
@@ -74,13 +76,13 @@ import {
 } from "@/components/ui/tooltip";
 import { api } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
-import { useAuthStore } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
 
 // Data types inferred from Eden API
 type StudentData = {
 	student: {
 		id: number;
-		nim: string;
+		nim: string | null;
 		name: string;
 		cohort: number;
 		program: string;
@@ -318,7 +320,25 @@ export default function DashboardPage() {
 		);
 	}
 
-	// Role-specific Dashboards for non-superadmin users
+	// Role-specific Dashboards based on active primary role or permissions
+	if (
+		user?.role === "dosen" ||
+		(!hasRole(user, "superadmin") &&
+			hasRole(user, "dosen") &&
+			!hasRole(
+				user,
+				"pmb",
+				"crm",
+				"finance",
+				"akademik",
+				"pa",
+				"magang",
+				"evaluator",
+			))
+	) {
+		return <DosenDashboard user={user} />;
+	}
+
 	if (user?.role === "pmb")
 		return (
 			<PmbDashboard
@@ -365,6 +385,101 @@ export default function DashboardPage() {
 				user={user}
 			/>
 		);
+	if (user?.role === "evaluator")
+		return (
+			<EvaluatorDashboard
+				data={data as any}
+				searchQuery={searchQuery}
+				setSearchQuery={setSearchQuery}
+				user={user}
+				onUpdate={() => {
+					api.students.get().then((res) => {
+						if (res.data?.data)
+							setData(res.data.data as unknown as StudentData[]);
+					});
+				}}
+			/>
+		);
+
+	// Multi-role fallbacks if user.role wasn't directly matched above
+	if (hasRole(user, "pmb"))
+		return (
+			<PmbDashboard
+				data={data as any}
+				searchQuery={searchQuery}
+				setSearchQuery={setSearchQuery}
+				user={user}
+			/>
+		);
+	if (hasRole(user, "crm"))
+		return (
+			<CrmDashboard
+				data={data as any}
+				searchQuery={searchQuery}
+				setSearchQuery={setSearchQuery}
+				user={user}
+			/>
+		);
+	if (hasRole(user, "akademik"))
+		return (
+			<AkademikDashboard
+				data={data as any}
+				searchQuery={searchQuery}
+				setSearchQuery={setSearchQuery}
+				user={user}
+			/>
+		);
+	if (hasRole(user, "pa"))
+		return (
+			<PaDashboard
+				data={data as any}
+				searchQuery={searchQuery}
+				setSearchQuery={setSearchQuery}
+				user={user}
+			/>
+		);
+	if (hasRole(user, "magang")) return <MagangDashboard />;
+	if (hasRole(user, "finance"))
+		return (
+			<FinanceDashboard
+				data={data as any}
+				searchQuery={searchQuery}
+				setSearchQuery={setSearchQuery}
+				user={user}
+			/>
+		);
+	if (hasRole(user, "evaluator"))
+		return (
+			<EvaluatorDashboard
+				data={data as any}
+				searchQuery={searchQuery}
+				setSearchQuery={setSearchQuery}
+				user={user}
+				onUpdate={() => {
+					api.students.get().then((res) => {
+						if (res.data?.data)
+							setData(res.data.data as unknown as StudentData[]);
+					});
+				}}
+			/>
+		);
+	if (hasRole(user, "dosen")) {
+		return <DosenDashboard user={user} />;
+	}
+
+	// Superadmin Guard: Non-superadmin should never reach the master dashboard
+	if (!hasRole(user, "superadmin")) {
+		return (
+			<div className="p-12 text-center text-slate-500">
+				<p className="text-base font-bold text-slate-700">
+					Selamat datang di Nusadaya Academy
+				</p>
+				<p className="text-xs text-slate-400 mt-1">
+					Silakan pilih menu panel di bilah samping navigasi.
+				</p>
+			</div>
+		);
+	}
 
 	// ==========================================
 	// SUPERADMIN DASHBOARD

@@ -34,6 +34,7 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 import { fileService } from "../../modules/file/service/file.service";
 
@@ -170,7 +171,7 @@ export const finalDecisionRoutes = new Elysia()
 			const user = (context as any).user;
 			const id = Number(params.id);
 
-			if (!user || user.role !== "superadmin") {
+			if (!hasRole(user, "superadmin", "evaluator")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}

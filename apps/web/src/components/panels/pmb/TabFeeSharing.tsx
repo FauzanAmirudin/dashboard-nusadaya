@@ -653,7 +653,12 @@ export function TabFeeSharing({
 									<Input
 										type="number"
 										min={0}
-										value={recipientForm.nominalFee}
+										placeholder="0"
+										value={
+											recipientForm.nominalFee === 0
+												? ""
+												: recipientForm.nominalFee
+										}
 										onKeyDown={(e) => {
 											if (e.key === "-" || e.key === "e" || e.key === "E")
 												e.preventDefault();

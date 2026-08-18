@@ -279,11 +279,19 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 											<Input
 												type="number"
 												className="w-24 bg-white h-9"
-												value={editForm.attendancePresent}
+												placeholder="0"
+												value={
+													editForm.attendancePresent === 0
+														? ""
+														: editForm.attendancePresent
+												}
 												onChange={(e) =>
 													setEditForm({
 														...editForm,
-														attendancePresent: parseInt(e.target.value) || 0,
+														attendancePresent:
+															e.target.value === ""
+																? 0
+																: parseInt(e.target.value) || 0,
 													})
 												}
 												min={0}
@@ -296,11 +304,19 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 											<Input
 												type="number"
 												className="w-24 bg-white h-9"
-												value={editForm.totalMeetings}
+												placeholder="0"
+												value={
+													editForm.totalMeetings === 0
+														? ""
+														: editForm.totalMeetings
+												}
 												onChange={(e) =>
 													setEditForm({
 														...editForm,
-														totalMeetings: parseInt(e.target.value) || 0,
+														totalMeetings:
+															e.target.value === ""
+																? 0
+																: parseInt(e.target.value) || 0,
 													})
 												}
 												min={1}

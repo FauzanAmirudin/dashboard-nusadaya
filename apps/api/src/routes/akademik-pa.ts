@@ -2,6 +2,7 @@ import { asc, count, eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { db } from "../db";
 import { students, users } from "../db/schema";
+import { hasRole } from "../lib/permissions";
 
 export const akademikPaRouter = new Elysia({ prefix: "/akademik/pa" })
 	// GET /akademik/pa/users — list semua PA user dengan jumlah mahasiswa
@@ -9,20 +10,27 @@ export const akademikPaRouter = new Elysia({ prefix: "/akademik/pa" })
 		const { set } = context;
 		const user = (context as any).user;
 
-		if (!user || (user.role !== "akademik" && user.role !== "superadmin")) {
+		if (!hasRole(user, "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
 
-		const paUsers = await db
-			.select({
-				id: users.id,
-				fullName: users.fullName,
-				username: users.username,
-			})
-			.from(users)
-			.where(eq(users.role, "pa"))
-			.orderBy(asc(users.fullName));
+		const allUsers = await db.query.users.findMany({
+			columns: {
+				id: true,
+				fullName: true,
+				username: true,
+				role: true,
+				roles: true,
+			},
+			orderBy: [asc(users.fullName)],
+		});
+
+		const paUsers = allUsers.filter(
+			(u) =>
+				u.role === "pa" ||
+				(u.roles && Array.isArray(u.roles) && u.roles.includes("pa")),
+		);
 
 		const studentCounts = await db
 			.select({
@@ -52,7 +60,7 @@ export const akademikPaRouter = new Elysia({ prefix: "/akademik/pa" })
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (!user || (user.role !== "akademik" && user.role !== "superadmin")) {
+		if (!hasRole(user, "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}

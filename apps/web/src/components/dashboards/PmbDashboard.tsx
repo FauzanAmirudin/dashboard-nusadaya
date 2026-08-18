@@ -53,6 +53,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { exportToCSV } from "@/lib/export";
+import { hasRole } from "@/store";
 import { FormMahasiswaModule } from "./pmb/FormMahasiswaModule";
 
 function formatWhatsAppUrl(phone: string | null | undefined) {
@@ -312,7 +313,7 @@ export function PmbDashboard({
 						</SelectContent>
 					</Select>
 
-					{(user?.role === "pmb" || user?.role === "superadmin") && (
+					{hasRole(user, "pmb") && (
 						<Link href="/dashboard/students/add">
 							<Button
 								size="sm"

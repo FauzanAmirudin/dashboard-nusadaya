@@ -42,21 +42,20 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { api, getToken } from "@/lib/eden";
-import { useAuthStore } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
 import type { AssessmentRecord } from "./akademik/assessment/AssessmentFormCard";
 import { AssessmentFormCard } from "./akademik/assessment/AssessmentFormCard";
 import { TabManajemenMahasiswa } from "./akademik/TabManajemenMahasiswa";
 
 interface DocFile {
 	id: number;
-	documentKey: string;
-	fileName: string;
-	fileUrl: string;
+	name: string;
+	url: string;
+	type: string;
 	isVerified: boolean;
-	uploadedAt: string;
-	verifiedAt?: string;
-	uploadedBy?: { fullName: string };
-	verifiedBy?: { fullName: string };
+	verifiedAt?: string | null;
+	verifiedBy?: number | null;
+	verifierName?: string | null;
 }
 
 interface AkademikPanelProps {
@@ -66,9 +65,8 @@ interface AkademikPanelProps {
 
 export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 	const { user, token } = useAuthStore();
-	const isAkademikAdmin =
-		user?.role === "akademik" || user?.role === "superadmin";
-	const isSuperadmin = user?.role === "superadmin";
+	const isAkademikAdmin = hasRole(user, "akademik");
+	const isSuperadmin = hasRole(user, "superadmin");
 	const canEdit = isAkademikAdmin || isSuperadmin;
 
 	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";

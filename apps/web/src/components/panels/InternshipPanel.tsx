@@ -39,7 +39,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { api } from "@/lib/eden";
-import { useAuthStore } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
 import { TabDanaTalangan } from "./magang/TabDanaTalangan";
 import { TabDokumen } from "./magang/TabDokumen";
 import { TabPraPaspor } from "./magang/TabPraPaspor";
@@ -131,11 +131,8 @@ interface InternshipPanelProps {
 
 export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 	const { user } = useAuthStore();
-	const isMagang =
-		user?.role === "magang" ||
-		user?.role === "superadmin" ||
-		user?.role === "akademik";
-	const isSuperadmin = user?.role === "superadmin";
+	const isMagang = hasRole(user, "magang", "akademik");
+	const isSuperadmin = hasRole(user, "superadmin");
 	const [data, setData] = useState<InternshipData | null>(null);
 
 	const canEdit = isMagang || isSuperadmin;

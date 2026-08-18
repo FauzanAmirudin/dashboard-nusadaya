@@ -284,16 +284,20 @@ export function TabSkemaKeuangan({
 									type="number"
 									min={0}
 									disabled={!isEditing || !canEdit}
-									value={totalBiaya === 0 && !isEditing ? "" : totalBiaya}
+									value={totalBiaya === 0 || !totalBiaya ? "" : totalBiaya}
 									onKeyDown={(e) => {
 										if (e.key === "-" || e.key === "e" || e.key === "E")
 											e.preventDefault();
 									}}
 									onChange={(e) =>
-										setTotalBiaya(Math.max(0, Number(e.target.value) || 0))
+										setTotalBiaya(
+											e.target.value === ""
+												? 0
+												: Math.max(0, Number(e.target.value) || 0),
+										)
 									}
 									className="pl-9 font-bold text-base bg-white h-10 border-indigo-200 focus:border-indigo-500 disabled:bg-slate-100 disabled:text-slate-700"
-									placeholder="Belum diinputkan"
+									placeholder="Belum diinputkan (Contoh: 25000000)"
 								/>
 							</div>
 							<span className="text-xs font-semibold text-indigo-700 mt-1.5 block">

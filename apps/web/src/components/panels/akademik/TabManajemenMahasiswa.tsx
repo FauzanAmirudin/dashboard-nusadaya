@@ -377,14 +377,19 @@ export function TabManajemenMahasiswa({
 										<Input
 											type="number"
 											min={0}
-											value={attendanceManual.attendancePiketPresent}
+											placeholder="0"
+											value={
+												attendanceManual.attendancePiketPresent === 0
+													? ""
+													: attendanceManual.attendancePiketPresent
+											}
 											onChange={(e) =>
 												setAttendanceManual({
 													...attendanceManual,
-													attendancePiketPresent: Math.max(
-														0,
-														Number(e.target.value),
-													),
+													attendancePiketPresent:
+														e.target.value === ""
+															? 0
+															: Math.max(0, Number(e.target.value)),
 												})
 											}
 											disabled={!canEdit}
@@ -397,14 +402,19 @@ export function TabManajemenMahasiswa({
 										<Input
 											type="number"
 											min={0}
-											value={attendanceManual.attendancePiketTotal}
+											placeholder="0"
+											value={
+												attendanceManual.attendancePiketTotal === 0
+													? ""
+													: attendanceManual.attendancePiketTotal
+											}
 											onChange={(e) =>
 												setAttendanceManual({
 													...attendanceManual,
-													attendancePiketTotal: Math.max(
-														0,
-														Number(e.target.value),
-													),
+													attendancePiketTotal:
+														e.target.value === ""
+															? 0
+															: Math.max(0, Number(e.target.value)),
 												})
 											}
 											disabled={!canEdit}
@@ -441,14 +451,19 @@ export function TabManajemenMahasiswa({
 										<Input
 											type="number"
 											min={0}
-											value={attendanceManual.attendanceOdsPresent}
+											placeholder="0"
+											value={
+												attendanceManual.attendanceOdsPresent === 0
+													? ""
+													: attendanceManual.attendanceOdsPresent
+											}
 											onChange={(e) =>
 												setAttendanceManual({
 													...attendanceManual,
-													attendanceOdsPresent: Math.max(
-														0,
-														Number(e.target.value),
-													),
+													attendanceOdsPresent:
+														e.target.value === ""
+															? 0
+															: Math.max(0, Number(e.target.value)),
 												})
 											}
 											disabled={!canEdit}
@@ -461,14 +476,19 @@ export function TabManajemenMahasiswa({
 										<Input
 											type="number"
 											min={0}
-											value={attendanceManual.attendanceOdsTotal}
+											placeholder="0"
+											value={
+												attendanceManual.attendanceOdsTotal === 0
+													? ""
+													: attendanceManual.attendanceOdsTotal
+											}
 											onChange={(e) =>
 												setAttendanceManual({
 													...attendanceManual,
-													attendanceOdsTotal: Math.max(
-														0,
-														Number(e.target.value),
-													),
+													attendanceOdsTotal:
+														e.target.value === ""
+															? 0
+															: Math.max(0, Number(e.target.value)),
 												})
 											}
 											disabled={!canEdit}
@@ -505,14 +525,19 @@ export function TabManajemenMahasiswa({
 										<Input
 											type="number"
 											min={0}
-											value={attendanceManual.attendancePramagangPresent}
+											placeholder="0"
+											value={
+												attendanceManual.attendancePramagangPresent === 0
+													? ""
+													: attendanceManual.attendancePramagangPresent
+											}
 											onChange={(e) =>
 												setAttendanceManual({
 													...attendanceManual,
-													attendancePramagangPresent: Math.max(
-														0,
-														Number(e.target.value),
-													),
+													attendancePramagangPresent:
+														e.target.value === ""
+															? 0
+															: Math.max(0, Number(e.target.value)),
 												})
 											}
 											disabled={!canEdit}
@@ -525,14 +550,19 @@ export function TabManajemenMahasiswa({
 										<Input
 											type="number"
 											min={0}
-											value={attendanceManual.attendancePramagangTotal}
+											placeholder="0"
+											value={
+												attendanceManual.attendancePramagangTotal === 0
+													? ""
+													: attendanceManual.attendancePramagangTotal
+											}
 											onChange={(e) =>
 												setAttendanceManual({
 													...attendanceManual,
-													attendancePramagangTotal: Math.max(
-														0,
-														Number(e.target.value),
-													),
+													attendancePramagangTotal:
+														e.target.value === ""
+															? 0
+															: Math.max(0, Number(e.target.value)),
 												})
 											}
 											disabled={!canEdit}

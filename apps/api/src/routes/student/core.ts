@@ -36,6 +36,7 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 import { fileService } from "../../modules/file/service/file.service";
 
@@ -215,7 +216,7 @@ export const coreRoutes = new Elysia()
 	.post(
 		"/",
 		async ({ body, set, user }: any) => {
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "superadmin", "pmb", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -308,7 +309,7 @@ export const coreRoutes = new Elysia()
 	.put(
 		"/:id",
 		async ({ params, body, set, user }: any) => {
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "superadmin", "pmb", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -519,7 +520,7 @@ export const coreRoutes = new Elysia()
 	.patch(
 		"/:id",
 		async ({ params, body, set, user }: any) => {
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "superadmin", "pmb", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -565,7 +566,7 @@ export const coreRoutes = new Elysia()
 	.post(
 		"/:id/profile-photo",
 		async ({ params, body, set, user }: any) => {
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "superadmin", "pmb", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -610,7 +611,7 @@ export const coreRoutes = new Elysia()
 		},
 	)
 	.patch("/:id/archive", async ({ params, set, user }: any) => {
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "superadmin", "pmb", "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -622,7 +623,7 @@ export const coreRoutes = new Elysia()
 		return { success: true, message: "Berhasil mengarsipkan mahasiswa" };
 	})
 	.post("/:id/generate-account", async ({ params, set, user }: any) => {
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "superadmin", "pmb", "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -668,7 +669,7 @@ export const coreRoutes = new Elysia()
 		};
 	})
 	.patch("/:id/unarchive", async ({ params, set, user }: any) => {
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "superadmin", "pmb", "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -683,7 +684,7 @@ export const coreRoutes = new Elysia()
 		};
 	})
 	.delete("/:id", async ({ params, set, user }: any) => {
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "superadmin", "pmb")) {
 			set.status = 403;
 			return {
 				success: false,
@@ -830,7 +831,7 @@ export const coreRoutes = new Elysia()
 	})
 	// GET list of all PA users (for dropdown)
 	.get("/pa-list", async ({ set, user }: any) => {
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "superadmin", "pmb", "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -844,7 +845,7 @@ export const coreRoutes = new Elysia()
 	.patch(
 		"/:id/student-status",
 		async ({ params, body, set, user }: any) => {
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "superadmin", "pmb", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -865,7 +866,7 @@ export const coreRoutes = new Elysia()
 	.patch(
 		"/:id/nim",
 		async ({ params, body, set, user }: any) => {
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "superadmin", "pmb", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -899,7 +900,7 @@ export const coreRoutes = new Elysia()
 	.patch(
 		"/:id/pa",
 		async ({ params, body, set, user }: any) => {
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "superadmin", "pmb", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}

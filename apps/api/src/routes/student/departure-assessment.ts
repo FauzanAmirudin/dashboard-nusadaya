@@ -9,6 +9,7 @@ import {
 	students,
 	users,
 } from "../../db/schema";
+import { hasRole } from "../../lib/permissions";
 
 function computeStatus(
 	score: number | null | undefined,
@@ -32,7 +33,7 @@ export const departureAssessmentRoutes = new Elysia()
 			set.status = 401;
 			return { success: false, message: "Unauthorized" };
 		}
-		if (user.role !== "akademik" && user.role !== "superadmin") {
+		if (!hasRole(user, "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -162,7 +163,7 @@ export const departureAssessmentRoutes = new Elysia()
 				set.status = 401;
 				return { success: false, message: "Unauthorized" };
 			}
-			if (user.role !== "akademik" && user.role !== "superadmin") {
+			if (!hasRole(user, "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -238,7 +239,7 @@ export const departureAssessmentRoutes = new Elysia()
 				set.status = 401;
 				return { success: false, message: "Unauthorized" };
 			}
-			if (user.role !== "akademik" && user.role !== "superadmin") {
+			if (!hasRole(user, "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -379,7 +380,7 @@ export const departureAssessmentRoutes = new Elysia()
 			set.status = 401;
 			return { success: false, message: "Unauthorized" };
 		}
-		if (user.role !== "akademik" && user.role !== "superadmin") {
+		if (!hasRole(user, "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -464,7 +465,7 @@ export const departureAssessmentRoutes = new Elysia()
 				set.status = 401;
 				return { success: false, message: "Unauthorized" };
 			}
-			if (user.role !== "akademik" && user.role !== "superadmin") {
+			if (!hasRole(user, "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -531,7 +532,7 @@ export const departureAssessmentRoutes = new Elysia()
 				set.status = 401;
 				return { success: false, message: "Unauthorized" };
 			}
-			if (user.role !== "akademik" && user.role !== "superadmin") {
+			if (!hasRole(user, "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -583,7 +584,7 @@ export const departureAssessmentRoutes = new Elysia()
 			set.status = 401;
 			return { success: false, message: "Unauthorized" };
 		}
-		if (user.role !== "akademik" && user.role !== "superadmin") {
+		if (!hasRole(user, "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
