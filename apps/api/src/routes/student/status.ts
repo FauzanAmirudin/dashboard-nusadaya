@@ -168,14 +168,31 @@ export const statusRoutes = new Elysia().get(
 		totalIndicators += 5;
 
 		// 3. Finance
+		const isTalangan = finance?.metodePembayaran === "dana_talangan";
 		const financeItems = [
-			{ prop: finance?.registrasiStatus, name: "Registrasi Lunas" },
+			{ prop: Boolean(finance?.registrasiStatus), name: "Registrasi Awal" },
 			{
-				prop: finance?.mandiriSemesterStatus || finance?.t1SemesterStatus,
-				name: "Semester Lunas",
+				prop: isTalangan
+					? Boolean(finance?.t1SemesterStatus || finance?.mandiriSemesterStatus)
+					: Boolean(finance?.mandiriSemesterStatus),
+				name: isTalangan
+					? "Perkuliahan Semester (Talangan)"
+					: "Perkuliahan 6 Semester",
 			},
-			{ prop: finance?.toeicStatus, name: "Cicilan Lunas" },
-			{ prop: finance?.pasporStatus, name: "Tunggakan Lunas" },
+			{
+				prop: isTalangan
+					? Boolean(finance?.t1InterviewStatus)
+					: Boolean(finance?.mandiriInterviewStatus),
+				name: isTalangan ? "Interview Magang (Tahap 1)" : "Interview Magang",
+			},
+			{
+				prop: isTalangan
+					? Boolean(finance?.t2KeberangkatanStatus)
+					: Boolean(finance?.mandiriKeberangkatanStatus),
+				name: isTalangan ? "Keberangkatan (Tahap 2)" : "Keberangkatan",
+			},
+			{ prop: Boolean(finance?.toeicStatus), name: "Sertifikasi Bahasa" },
+			{ prop: Boolean(finance?.pasporStatus), name: "Paspor & Dokumen" },
 		];
 		const financeCompleted = financeItems.filter((i) => i.prop).length;
 		financeItems
@@ -192,17 +209,18 @@ export const statusRoutes = new Elysia().get(
 			id: "finance",
 			name: "Finance",
 			completed: financeCompleted,
-			total: 4,
+			total: financeItems.length,
 			status:
-				financeCompleted === 4
+				finance?.status ||
+				(financeCompleted === financeItems.length
 					? "AMAN"
-					: financeCompleted >= 2
+					: financeCompleted >= 3
 						? "PERLU_PERHATIAN"
-						: "TIDAK_AMAN",
+						: "TIDAK_AMAN"),
 			isAcc: finance?.isAcc,
 		});
 		totalCompleted += financeCompleted;
-		totalIndicators += 4;
+		totalIndicators += financeItems.length;
 
 		// 4. Akademik
 		const attendanceOk = academic

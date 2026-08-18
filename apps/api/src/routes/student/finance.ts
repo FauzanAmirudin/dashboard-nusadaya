@@ -19,6 +19,7 @@ import {
 	financeDocuments,
 	financeSemesterInstallments,
 	financeSemesters,
+	financeTalanganInstallments,
 	internalNotes,
 	internshipData,
 	internshipDocuments,
@@ -97,15 +98,19 @@ export const financeRoutes = new Elysia()
 				}
 			}
 
-			// Only validate if they are actively trying to set Tahap 2 values
-			const isSettingTahap2 =
+			// Total Biaya Pendidikan hanya bisa di-edit oleh PMB / Superadmin
+			if (user.role !== "superadmin" && user.role !== "pmb") {
+				delete updates.totalBiayaPendidikan;
+			}
+
+			// Only validate if they are actively trying to set Tahap 2 as disbursed / paid
+			const isDisbursingTahap2 =
 				updates.t2KeberangkatanStatus === true ||
-				(updates.t2KeberangkatanNominal &&
-					Number(updates.t2KeberangkatanNominal) > 0) ||
 				(updates.t2KeberangkatanPaidDate &&
+					typeof updates.t2KeberangkatanPaidDate === "string" &&
 					updates.t2KeberangkatanPaidDate.trim() !== "");
 
-			if (isSettingTahap2) {
+			if (isDisbursingTahap2) {
 				const internship = await db.query.internshipData.findFirst({
 					where: eq(internshipData.studentId, id),
 				});
@@ -161,12 +166,42 @@ export const financeRoutes = new Elysia()
 				where: eq(financeData.studentId, id),
 			});
 			if (updated) {
-				const checked: number = 0;
-				// TODO: Sesuaikan dengan schema financeData yang baru
-				// if (updated.registrasiStatus) checked++;
-				// if (updated.mandiriSemesterStatus) checked++;
-				// if (updated.mandiriInterviewStatus) checked++;
-				// if (updated.mandiriKeberangkatanStatus) checked++;
+				// Hitung checklist keuangan dari field aktual (mendukung kedua metode pembayaran)
+				let checked = 0;
+				const isTalangan = updated.metodePembayaran === "dana_talangan";
+
+				// 1. Registrasi Awal — lunas jika registrasiStatus true
+				if (updated.registrasiStatus) checked++;
+
+				// 2. Semester — lunas jika:
+				//    Dana Talangan: t1SemesterStatus atau mandiriSemesterStatus
+				//    Dana Mandiri: mandiriSemesterStatus
+				if (
+					isTalangan
+						? updated.t1SemesterStatus || updated.mandiriSemesterStatus
+						: updated.mandiriSemesterStatus
+				)
+					checked++;
+
+				// 3. Interview Magang — lunas jika:
+				//    Dana Talangan: t1InterviewStatus
+				//    Dana Mandiri: mandiriInterviewStatus
+				if (
+					isTalangan
+						? updated.t1InterviewStatus
+						: updated.mandiriInterviewStatus
+				)
+					checked++;
+
+				// 4. Keberangkatan — lunas jika:
+				//    Dana Talangan: t2KeberangkatanStatus
+				//    Dana Mandiri: mandiriKeberangkatanStatus
+				if (
+					isTalangan
+						? updated.t2KeberangkatanStatus
+						: updated.mandiriKeberangkatanStatus
+				)
+					checked++;
 
 				let status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
 				if (checked === 4) status = "AMAN";
@@ -174,7 +209,7 @@ export const financeRoutes = new Elysia()
 
 				const toUpdate: any = { status };
 
-				// AUTO-REVOKE isAcc if not all are true
+				// AUTO-REVOKE isAcc if not all milestones are completed
 				if (updated.isAcc && checked < 4) {
 					toUpdate.isAcc = false;
 					toUpdate.accAt = null;
@@ -734,6 +769,118 @@ export const financeRoutes = new Elysia()
 					})
 					.where(eq(financeSemesters.id, semesterId));
 			}
+
+			return { success: true };
+		},
+	)
+	.get("/:id/finance/talangan-installments", async ({ params }) => {
+		const id = Number(params.id);
+		const installments = await db.query.financeTalanganInstallments.findMany({
+			where: eq(financeTalanganInstallments.studentId, id),
+			orderBy: (financeTalanganInstallments, { asc }) => [
+				asc(financeTalanganInstallments.stage),
+				asc(financeTalanganInstallments.installmentNumber),
+			],
+		});
+		return { success: true, data: installments };
+	})
+	.post(
+		"/:id/finance/talangan-installments",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const studentId = Number(params.id);
+			const b = body as any;
+
+			const existing = await db.query.financeTalanganInstallments.findMany({
+				where: and(
+					eq(financeTalanganInstallments.studentId, studentId),
+					eq(financeTalanganInstallments.stage, b.stage),
+				),
+			});
+
+			const installmentNumber = existing.length + 1;
+
+			const [inserted] = await db
+				.insert(financeTalanganInstallments)
+				.values({
+					studentId,
+					stage: b.stage,
+					installmentNumber,
+					nominalPaid: Number(b.nominalPaid) || 0,
+					paymentDate: b.paymentDate ? new Date(b.paymentDate) : new Date(),
+					buktiBayarUrl: b.buktiBayarUrl,
+					notes: b.notes,
+				})
+				.returning();
+
+			return { success: true, data: inserted };
+		},
+		{
+			body: t.Object({
+				stage: t.String(),
+				nominalPaid: t.Number(),
+				paymentDate: t.Optional(t.String()),
+				buktiBayarUrl: t.Optional(t.String()),
+				notes: t.Optional(t.String()),
+			}),
+		},
+	)
+	.patch(
+		"/:id/finance/talangan-installments/:installmentId",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const installmentId = Number(params.installmentId);
+			const b = body as any;
+
+			const updateData: any = { updatedAt: new Date() };
+			if (b.nominalPaid !== undefined)
+				updateData.nominalPaid = Number(b.nominalPaid) || 0;
+			if (b.paymentDate !== undefined)
+				updateData.paymentDate = b.paymentDate ? new Date(b.paymentDate) : null;
+			if (b.buktiBayarUrl !== undefined)
+				updateData.buktiBayarUrl = b.buktiBayarUrl;
+			if (b.notes !== undefined) updateData.notes = b.notes;
+
+			await db
+				.update(financeTalanganInstallments)
+				.set(updateData)
+				.where(eq(financeTalanganInstallments.id, installmentId));
+
+			return { success: true };
+		},
+		{
+			body: t.Object({
+				nominalPaid: t.Optional(t.Number()),
+				paymentDate: t.Optional(t.String()),
+				buktiBayarUrl: t.Optional(t.String()),
+				notes: t.Optional(t.String()),
+			}),
+		},
+	)
+	.delete(
+		"/:id/finance/talangan-installments/:installmentId",
+		async (context) => {
+			const { params, set } = context;
+			const user = (context as any).user;
+			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const installmentId = Number(params.installmentId);
+
+			await db
+				.delete(financeTalanganInstallments)
+				.where(eq(financeTalanganInstallments.id, installmentId));
 
 			return { success: true };
 		},

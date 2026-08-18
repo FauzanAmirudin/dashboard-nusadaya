@@ -3,9 +3,13 @@
 import {
 	ArrowLeft,
 	CheckCircle,
+	ChevronDown,
+	ChevronUp,
 	Clock,
 	Download,
 	FileText,
+	GraduationCap,
+	Phone,
 	Printer,
 	XCircle,
 } from "lucide-react";
@@ -189,6 +193,7 @@ function StudentDetailContent() {
 	const [isArchiving, setIsArchiving] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+	const [showFullBiodata, setShowFullBiodata] = useState(false);
 	const [activeTab, setActiveTab] = useState("");
 	const [mounted, setMounted] = useState(false);
 	const [updateTrigger, setUpdateTrigger] = useState(0);
@@ -401,13 +406,76 @@ function StudentDetailContent() {
 		? STATUS_COLORS[s.overallStatus as keyof typeof STATUS_COLORS]
 		: STATUS_COLORS.PERLU_PERHATIAN;
 
-	const getInitials = (name: string) => {
-		return name
-			.split(" ")
-			.map((n) => n[0])
-			.join("")
-			.substring(0, 2)
-			.toUpperCase();
+	const getInitials = (name?: string) => {
+		if (!name) return "M";
+		const parts = name.trim().split(/\s+/);
+		if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+		return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+	};
+
+	const getCountryFlag = (subProgram?: string | null, dest?: string | null) => {
+		const text = `${subProgram || ""} ${dest || ""}`.toLowerCase();
+		if (text.includes("malaysia") || text.includes("my")) {
+			return "https://flagcdn.com/w20/my.png";
+		}
+		if (text.includes("taiwan") || text.includes("tw")) {
+			return "https://flagcdn.com/w20/tw.png";
+		}
+		if (
+			text.includes("timur tengah") ||
+			text.includes("saudi") ||
+			text.includes("arab") ||
+			text.includes("barista")
+		) {
+			return "https://flagcdn.com/w20/sa.png";
+		}
+		if (
+			text.includes("jepang") ||
+			text.includes("japan") ||
+			text.includes("jp")
+		) {
+			return "https://flagcdn.com/w20/jp.png";
+		}
+		if (text.includes("korea") || text.includes("kr")) {
+			return "https://flagcdn.com/w20/kr.png";
+		}
+		if (
+			text.includes("jerman") ||
+			text.includes("germany") ||
+			text.includes("de")
+		) {
+			return "https://flagcdn.com/w20/de.png";
+		}
+		if (
+			text.includes("singapura") ||
+			text.includes("singapore") ||
+			text.includes("sg")
+		) {
+			return "https://flagcdn.com/w20/sg.png";
+		}
+		if (
+			text.includes("australia") ||
+			text.includes("aussie") ||
+			text.includes("au")
+		) {
+			return "https://flagcdn.com/w20/au.png";
+		}
+		if (
+			text.includes("thailand") ||
+			text.includes("thai") ||
+			text.includes("th")
+		) {
+			return "https://flagcdn.com/w20/th.png";
+		}
+		if (
+			text.includes("indonesia") ||
+			text.includes("reguler") ||
+			text.includes("domestik") ||
+			text.includes("id")
+		) {
+			return "https://flagcdn.com/w20/id.png";
+		}
+		return null;
 	};
 
 	const formatAddress = (s: any) => {
@@ -477,8 +545,10 @@ function StudentDetailContent() {
 		</div>
 	);
 
+	const flagUrl = getCountryFlag(s.subProgram, s.destinationCountry);
+
 	return (
-		<div className="pb-20 relative">
+		<div className="pb-20 relative space-y-4">
 			<AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
 				<AlertDialogContent>
 					<AlertDialogHeader>
@@ -507,8 +577,8 @@ function StudentDetailContent() {
 				</AlertDialogContent>
 			</AlertDialog>
 
-			{/* Top Actions */}
-			<div className="flex justify-between items-center mb-6">
+			{/* ─── TOP BAR ACTIONS ─── */}
+			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
 				<button
 					type="button"
 					onClick={() => {
@@ -527,36 +597,31 @@ function StudentDetailContent() {
 							router.push("/dashboard");
 						}
 					}}
-					className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm font-medium cursor-pointer"
+					className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 transition-colors text-xs font-semibold cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-2xs"
 				>
-					<ArrowLeft className="w-4 h-4" />
-					Kembali
+					<ArrowLeft className="w-3.5 h-3.5" />
+					Kembali ke Dashboard
 				</button>
-				<div className="flex flex-wrap gap-3">
-					<Button
-						onClick={() =>
-							router.push(`/dashboard/students/${params.id}/profile`)
-						}
-						className="bg-[#0517B0] text-white hover:bg-[#04128A]"
-					>
-						Lihat Detail Profil
-					</Button>
+
+				<div className="flex flex-wrap items-center gap-2">
 					{user?.role === "superadmin" && (
 						<Button
+							size="sm"
 							variant="outline"
 							onClick={handleGenerateAccount}
 							disabled={isGenerating || !!data?.student?.studentUserId}
-							className="bg-[#0517B0]/5 text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 hover:text-[#04128A]"
+							className="bg-blue-50 text-[#0517B0] border-blue-200 hover:bg-blue-100 text-xs h-8.5 font-semibold"
 						>
 							{isGenerating
 								? "Memproses..."
 								: data?.student?.studentUserId
-									? "Akun Sudah Dibuat"
-									: "Buat Akun Mahasiswa"}
+									? "Akun Aktif"
+									: "Buat Akun"}
 						</Button>
 					)}
 					{user?.role === "superadmin" && (
 						<Button
+							size="sm"
 							variant="outline"
 							onClick={
 								exportStatus === "completed" && exportDownloadUrl
@@ -566,80 +631,80 @@ function StudentDetailContent() {
 									: handleExportFiles
 							}
 							disabled={isExporting}
-							className={
-								exportStatus === "completed"
-									? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 hover:text-green-800"
-									: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:text-blue-800"
-							}
+							className="text-xs h-8.5 font-semibold border-slate-200 text-slate-700 hover:bg-slate-50"
 						>
-							<Download className="w-4 h-4 mr-2" />
-							{isExporting
-								? "Menyiapkan ZIP..."
-								: exportStatus === "completed"
-									? "Unduh ZIP"
-									: "Unduh Semua Berkas"}
+							<Download className="w-3.5 h-3.5 mr-1 text-slate-500" />
+							{isExporting ? "Menyiapkan..." : "Unduh Berkas"}
 						</Button>
 					)}
 					{(user?.role === "superadmin" || user?.role === "pmb") && (
 						<>
 							<Button
+								size="sm"
 								variant="outline"
 								onClick={handleArchive}
 								disabled={isArchiving}
-								className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:text-amber-800"
+								className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 text-xs h-8.5 font-semibold"
 							>
-								{isArchiving ? "Memproses..." : "Arsip Data"}
+								{isArchiving ? "Memproses..." : "Arsip"}
 							</Button>
 							<Button
+								size="sm"
 								variant="outline"
 								onClick={() => setShowDeleteDialog(true)}
-								className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100 hover:text-red-700"
+								className="bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 text-xs h-8.5 font-semibold"
 							>
-								Hapus Mahasiswa
+								Hapus
 							</Button>
 						</>
 					)}
 				</div>
 			</div>
 
-			{/* HEADER DETAIL MAHASISWA */}
-			<div className="bg-white pb-4 pt-2 -mx-6 px-6 border-b border-slate-200">
-				<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-					{/* Profile Info */}
-					<div className="flex items-start gap-5">
-						<Avatar className="w-16 h-16 border-2 border-[#0517B0]/30">
+			{/* ─── HEADER DETAIL MAHASISWA (COMPACT & MODERN EXECUTIVE CARD) ─── */}
+			<div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-4 sm:p-5 space-y-3.5">
+				<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+					{/* Left: Profile Summary */}
+					<div className="flex items-start gap-3.5">
+						<Avatar className="w-13 h-13 border-2 border-blue-100 shadow-2xs shrink-0 rounded-full">
 							{s.profilePhotoUrl ? (
-								<>
-									{/* biome-ignore lint/performance/noImgElement: Dynamic avatar image */}
-									<img
-										src={
-											s.profilePhotoUrl.startsWith("http")
-												? s.profilePhotoUrl
-												: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}${s.profilePhotoUrl}`
-										}
-										alt={s.name}
-										className="w-full h-full object-cover rounded-full"
-									/>
-								</>
+								<img
+									src={
+										s.profilePhotoUrl.startsWith("http")
+											? s.profilePhotoUrl
+											: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}${s.profilePhotoUrl}`
+									}
+									alt={s.name}
+									className="w-full h-full object-cover rounded-full"
+								/>
 							) : (
-								<AvatarFallback className="bg-gradient-to-br from-[#0517B0] to-blue-600 text-white text-xl font-bold">
+								<AvatarFallback className="bg-linear-to-br from-[#0517B0] to-blue-600 text-white text-base font-black flex items-center justify-center">
 									{getInitials(s.name)}
 								</AvatarFallback>
 							)}
 						</Avatar>
-						<div>
-							<div className="flex items-center gap-3 mb-1">
-								<h1 className="text-2xl font-bold text-slate-900">{s.name}</h1>
+
+						<div className="space-y-1">
+							<div className="flex flex-wrap items-center gap-2">
+								<h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+									{s.name}
+								</h1>
 								{s.studentStatus && (
-									<Badge className="bg-slate-100 text-slate-600 border border-slate-200 uppercase px-2 py-0.5">
-										{s.studentStatus}
+									<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold px-2 py-0.5">
+										● {s.studentStatus}
 									</Badge>
 								)}
-								{user?.role === "superadmin" && (
+								<Badge
+									variant="outline"
+									className="text-xs px-2 py-0.5 font-semibold text-slate-700 border-slate-200 bg-slate-100/80 font-mono"
+								>
+									Angkatan {s.cohort || "-"}
+								</Badge>
+								{user?.role === "superadmin" && s.overallStatus && (
 									<Badge
-										className={`${sColor.bg} ${sColor.text} ${sColor.border} border uppercase px-2 py-0.5`}
+										className={`${sColor.bg} ${sColor.text} ${sColor.border} border uppercase px-2 py-0.5 text-[10px] font-bold`}
 									>
-										<span className="mr-1.5">
+										<span className="mr-1">
 											{s.overallStatus === "AMAN"
 												? "🟢"
 												: s.overallStatus === "TIDAK_AMAN"
@@ -650,124 +715,189 @@ function StudentDetailContent() {
 									</Badge>
 								)}
 							</div>
-							<div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-sm text-slate-600 mt-3 border-t border-slate-100 pt-3">
-								<div>
-									<span className="text-slate-500 block text-xs">NIM</span>{" "}
-									<span className="font-medium">{s.nim}</span>
-								</div>
-								<div>
-									<span className="text-slate-500 block text-xs">Angkatan</span>{" "}
-									<span className="font-medium">{s.cohort}</span>
-								</div>
-								<div>
-									<span className="text-slate-500 block text-xs">Program</span>{" "}
-									<span className="font-medium">
-										{s.program}
-										{s.subProgram ? ` - ${s.subProgram}` : ""}
-									</span>
-								</div>
-								<div>
-									<span className="text-slate-500 block text-xs">Tujuan</span>{" "}
-									<span className="font-medium">
-										{s.destinationCountry
-											? `${s.destinationCountry} ${s.period ? `(${s.period})` : ""}`
-											: "-"}
-									</span>
+
+							{/* Essential Metadata Strip */}
+							<div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-600 pt-0.5">
+								<span className="font-mono bg-slate-100 px-2 py-0.5 rounded-md text-slate-700 font-semibold border border-slate-200/60 text-[11px]">
+									NIM: {s.nim || "Belum ada NIM"}
+								</span>
+
+								<div className="flex items-center gap-1.5 font-semibold text-slate-800">
+									<GraduationCap className="w-3.5 h-3.5 text-[#0517B0]" />
+									<span>{s.program || "-"}</span>
+									{s.subProgram && (
+										<span className="inline-flex items-center gap-1.5 text-slate-700 font-semibold bg-slate-100/90 border border-slate-200 px-2 py-0.5 rounded-md text-[11px] shadow-2xs">
+											{flagUrl ? (
+												<img
+													src={flagUrl}
+													alt={s.subProgram}
+													className="w-4 h-3 object-cover rounded-xs shadow-2xs inline-block"
+												/>
+											) : (
+												<span className="text-xs">🌐</span>
+											)}
+											<span>{s.subProgram}</span>
+										</span>
+									)}
 								</div>
 
-								<div>
-									<span className="text-slate-500 block text-xs">
-										NIK / NISN
-									</span>{" "}
-									<span className="font-medium">
-										{s.nik || "-"} / {s.nisn || "-"}
-									</span>
-								</div>
-								<div>
-									<span className="text-slate-500 block text-xs">TTL</span>{" "}
-									<span className="font-medium">
-										{s.birthPlace || "-"},{" "}
-										{s.birthDate
-											? new Date(s.birthDate).toLocaleDateString("id-ID")
-											: "-"}
-									</span>
-								</div>
-								<div>
-									<span className="text-slate-500 block text-xs">Kelamin</span>{" "}
-									<span className="font-medium">{s.gender || "-"}</span>
-								</div>
-								<div>
-									<span className="text-slate-500 block text-xs">
-										Kontak (HP)
-									</span>{" "}
-									<span className="font-medium">{s.phone || "-"}</span>
-								</div>
+								{s.destinationCountry && (
+									<div className="flex items-center gap-1.5 font-medium text-slate-600 bg-blue-50/60 border border-blue-100 px-2 py-0.5 rounded-md">
+										{flagUrl && (
+											<img
+												src={flagUrl}
+												alt={s.destinationCountry}
+												className="w-4 h-3 object-cover rounded-xs shadow-2xs"
+											/>
+										)}
+										<span>Tujuan:</span>
+										<span className="font-semibold text-[#0517B0]">
+											{s.destinationCountry}
+										</span>
+										{s.period && (
+											<span className="text-slate-400">({s.period})</span>
+										)}
+									</div>
+								)}
 
-								<div className="col-span-2 md:col-span-4">
-									<span className="text-slate-500 block text-xs">Alamat</span>{" "}
-									<span className="font-medium">{formatAddress(s)}</span>
-								</div>
-
-								<div>
-									<span className="text-slate-500 block text-xs">
-										Asal Sekolah
-									</span>{" "}
-									<span className="font-medium">{s.schoolOrigin || "-"}</span>
-								</div>
-								<div>
-									<span className="text-slate-500 block text-xs">
-										Nama Ortu
-									</span>{" "}
-									<span className="font-medium">
-										{primaryParent?.name || "-"}
-									</span>
-								</div>
-								<div>
-									<span className="text-slate-500 block text-xs">
-										Pekerjaan / Penghasilan Ortu
-									</span>{" "}
-									<span className="font-medium">
-										{primaryParent?.job || "-"} / {primaryParent?.income || "-"}
-									</span>
-								</div>
-								<div>
-									<span className="text-slate-500 block text-xs">
-										No HP Ortu
-									</span>{" "}
-									<span className="font-medium">
-										{primaryParent?.phone || "-"}
-									</span>
-								</div>
+								{s.phone && (
+									<a
+										href={`https://wa.me/${s.phone.replace(/[^0-9]/g, "")}`}
+										target="_blank"
+										rel="noreferrer"
+										className="inline-flex items-center gap-1 text-slate-700 hover:text-emerald-600 font-medium transition-colors"
+										title="Buka WhatsApp"
+									>
+										<Phone className="w-3.5 h-3.5 text-emerald-600" />
+										<span className="font-mono text-xs">{s.phone}</span>
+									</a>
+								)}
 							</div>
 						</div>
 					</div>
 
-					{/* Progress Overview */}
-					<StudentProgress
-						studentId={s.id}
-						updateTrigger={updateTrigger}
-						userRole={user?.role}
-					/>
+					{/* Right: Progress Overview */}
+					<div className="shrink-0 w-full lg:w-auto">
+						<StudentProgress
+							studentId={s.id}
+							updateTrigger={updateTrigger}
+							userRole={user?.role}
+						/>
+					</div>
 				</div>
 
-				{/* Anchor Navigation */}
-				<div className="flex overflow-x-auto gap-1 mt-6 pb-2 hide-scrollbar">
-					{mounted &&
-						visibleLinks.map((link) => (
-							<button
-								type="button"
-								key={link.id}
-								onClick={() => scrollToAnchor(link.id)}
-								className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${
-									(activeTab || visibleLinks[0]?.id) === link.id
-										? "bg-blue-50 text-[#0517B0]"
-										: "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
-								}`}
-							>
-								{link.label}
-							</button>
-						))}
+				{/* Collapsible Biodata Toggle */}
+				<div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+					<button
+						type="button"
+						onClick={() => setShowFullBiodata(!showFullBiodata)}
+						className="text-xs font-semibold text-[#0517B0] hover:text-blue-800 flex items-center gap-1.5 transition-colors cursor-pointer"
+					>
+						<FileText className="w-3.5 h-3.5" />
+						<span>
+							{showFullBiodata
+								? "Sembunyikan Biodata Lengkap"
+								: "Lihat Biodata Lengkap (NIK, Alamat, Orang Tua)"}
+						</span>
+						{showFullBiodata ? (
+							<ChevronUp className="w-3.5 h-3.5" />
+						) : (
+							<ChevronDown className="w-3.5 h-3.5" />
+						)}
+					</button>
 				</div>
+
+				{/* Collapsible Biodata Content */}
+				{showFullBiodata && (
+					<div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200/80 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs animate-in fade-in duration-200">
+						<div>
+							<span className="text-slate-400 font-medium block text-[11px]">
+								NIK / NISN
+							</span>
+							<span className="font-semibold text-slate-800">
+								{s.nik || "-"} / {s.nisn || "-"}
+							</span>
+						</div>
+						<div>
+							<span className="text-slate-400 font-medium block text-[11px]">
+								Tempat, Tanggal Lahir
+							</span>
+							<span className="font-semibold text-slate-800">
+								{s.birthPlace || "-"},{" "}
+								{s.birthDate
+									? new Date(s.birthDate).toLocaleDateString("id-ID")
+									: "-"}
+							</span>
+						</div>
+						<div>
+							<span className="text-slate-400 font-medium block text-[11px]">
+								Jenis Kelamin
+							</span>
+							<span className="font-semibold text-slate-800">
+								{s.gender || "-"}
+							</span>
+						</div>
+						<div>
+							<span className="text-slate-400 font-medium block text-[11px]">
+								Asal Sekolah
+							</span>
+							<span className="font-semibold text-slate-800">
+								{s.schoolOrigin || "-"}
+							</span>
+						</div>
+						<div className="col-span-2 md:col-span-4">
+							<span className="text-slate-400 font-medium block text-[11px]">
+								Alamat Lengkap
+							</span>
+							<span className="font-medium text-slate-700">
+								{formatAddress(s)}
+							</span>
+						</div>
+						<div>
+							<span className="text-slate-400 font-medium block text-[11px]">
+								Nama Orang Tua / Wali
+							</span>
+							<span className="font-semibold text-slate-800">
+								{primaryParent?.name || "-"}
+							</span>
+						</div>
+						<div>
+							<span className="text-slate-400 font-medium block text-[11px]">
+								Pekerjaan / Penghasilan
+							</span>
+							<span className="font-semibold text-slate-800">
+								{primaryParent?.job || "-"} / {primaryParent?.income || "-"}
+							</span>
+						</div>
+						<div>
+							<span className="text-slate-400 font-medium block text-[11px]">
+								No. HP Orang Tua
+							</span>
+							<span className="font-semibold text-slate-800 font-mono">
+								{primaryParent?.phone || "-"}
+							</span>
+						</div>
+					</div>
+				)}
+			</div>
+
+			{/* ─── DIVISION TABS NAVIGATION (SEGMENTED PILLS) ─── */}
+			<div className="flex overflow-x-auto gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 hide-scrollbar w-fit max-w-full">
+				{mounted &&
+					visibleLinks.map((link) => (
+						<button
+							type="button"
+							key={link.id}
+							onClick={() => scrollToAnchor(link.id)}
+							className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 ${
+								(activeTab || visibleLinks[0]?.id) === link.id
+									? "bg-white text-[#0517B0] shadow-xs font-bold"
+									: "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+							}`}
+						>
+							{link.label}
+						</button>
+					))}
 			</div>
 
 			{/* PANELS CONTENT */}
