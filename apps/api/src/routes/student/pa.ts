@@ -36,6 +36,7 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 
 export const paRoutes = new Elysia()
@@ -128,12 +129,7 @@ export const paRoutes = new Elysia()
 			const user = (context as any).user;
 			const id = Number(params.id);
 
-			if (
-				!user ||
-				(user.role !== "pa" &&
-					user.role !== "superadmin" &&
-					user.role !== "akademik")
-			) {
+			if (!hasRole(user, "pa", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -143,7 +139,7 @@ export const paRoutes = new Elysia()
 			});
 			if (!pa) return { success: false, message: "PA data not found" };
 
-			if (pa.isAcc && user.role !== "superadmin") {
+			if (pa.isAcc && !hasRole(user, "superadmin")) {
 				set.status = 403;
 				return { success: false, message: "Cannot edit after ACC" };
 			}
@@ -193,12 +189,7 @@ export const paRoutes = new Elysia()
 			const user = (context as any).user;
 			const id = Number(params.id);
 
-			if (
-				!user ||
-				(user.role !== "pa" &&
-					user.role !== "superadmin" &&
-					user.role !== "akademik")
-			) {
+			if (!hasRole(user, "pa", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -225,12 +216,7 @@ export const paRoutes = new Elysia()
 		const user = (context as any).user;
 		const logId = Number(params.logId);
 
-		if (
-			!user ||
-			(user.role !== "pa" &&
-				user.role !== "superadmin" &&
-				user.role !== "akademik")
-		) {
+		if (!hasRole(user, "pa", "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -245,12 +231,7 @@ export const paRoutes = new Elysia()
 			const user = (context as any).user;
 			const id = Number(params.id);
 
-			if (
-				!user ||
-				(user.role !== "pa" &&
-					user.role !== "superadmin" &&
-					user.role !== "akademik")
-			) {
+			if (!hasRole(user, "pa", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -279,12 +260,7 @@ export const paRoutes = new Elysia()
 		const user = (context as any).user;
 		const logId = Number(params.logId);
 
-		if (
-			!user ||
-			(user.role !== "pa" &&
-				user.role !== "superadmin" &&
-				user.role !== "akademik")
-		) {
+		if (!hasRole(user, "pa", "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -298,16 +274,11 @@ export const paRoutes = new Elysia()
 			const { params, body, set } = context;
 			const user = (context as any).user;
 			const id = Number(params.id);
-			if (
-				!user ||
-				(user.role !== "pa" &&
-					user.role !== "superadmin" &&
-					user.role !== "akademik")
-			) {
+			if (!hasRole(user, "pa", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
-			const { language, languageCustom, vocabCount, sentenceCount } =
+			const { language, languageCustom, vocabCount, sentenceCount, date } =
 				body as any;
 			const inserted = await db
 				.insert(paHafalanSessions)
@@ -317,6 +288,7 @@ export const paRoutes = new Elysia()
 					languageCustom: languageCustom ?? null,
 					vocabCount: vocabCount ?? 0,
 					sentenceCount: sentenceCount ?? 0,
+					createdAt: date ? new Date(date) : new Date(),
 					createdBy: user.id,
 				})
 				.returning();
@@ -328,6 +300,7 @@ export const paRoutes = new Elysia()
 				languageCustom: t.Optional(t.Nullable(t.String())),
 				vocabCount: t.Optional(t.Number()),
 				sentenceCount: t.Optional(t.Number()),
+				date: t.Optional(t.String()),
 			}),
 		},
 	)
@@ -336,27 +309,26 @@ export const paRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (
-				!user ||
-				(user.role !== "pa" &&
-					user.role !== "superadmin" &&
-					user.role !== "akademik")
-			) {
+			if (!hasRole(user, "pa", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
 			const logId = Number(params.logId);
-			const { language, languageCustom, vocabCount, sentenceCount } =
+			const { language, languageCustom, vocabCount, sentenceCount, date } =
 				body as any;
+			const updateData: any = {
+				language,
+				languageCustom: languageCustom ?? null,
+				vocabCount,
+				sentenceCount,
+				updatedAt: new Date(),
+			};
+			if (date) {
+				updateData.createdAt = new Date(date);
+			}
 			await db
 				.update(paHafalanSessions)
-				.set({
-					language,
-					languageCustom: languageCustom ?? null,
-					vocabCount,
-					sentenceCount,
-					updatedAt: new Date(),
-				})
+				.set(updateData)
 				.where(eq(paHafalanSessions.id, logId));
 			return { success: true };
 		},
@@ -366,18 +338,14 @@ export const paRoutes = new Elysia()
 				languageCustom: t.Optional(t.Nullable(t.String())),
 				vocabCount: t.Number(),
 				sentenceCount: t.Number(),
+				date: t.Optional(t.String()),
 			}),
 		},
 	)
 	.delete("/:id/pa/hafalan/:logId", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (
-			!user ||
-			(user.role !== "pa" &&
-				user.role !== "superadmin" &&
-				user.role !== "akademik")
-		) {
+		if (!hasRole(user, "pa", "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -392,12 +360,7 @@ export const paRoutes = new Elysia()
 			const { params, body, set } = context;
 			const user = (context as any).user;
 			const id = Number(params.id);
-			if (
-				!user ||
-				(user.role !== "pa" &&
-					user.role !== "superadmin" &&
-					user.role !== "akademik")
-			) {
+			if (!hasRole(user, "pa", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -425,12 +388,7 @@ export const paRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (
-				!user ||
-				(user.role !== "pa" &&
-					user.role !== "superadmin" &&
-					user.role !== "akademik")
-			) {
+			if (!hasRole(user, "pa", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -449,12 +407,7 @@ export const paRoutes = new Elysia()
 	.delete("/:id/pa/student-notes/:noteId", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (
-			!user ||
-			(user.role !== "pa" &&
-				user.role !== "superadmin" &&
-				user.role !== "akademik")
-		) {
+		if (!hasRole(user, "pa", "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -464,7 +417,7 @@ export const paRoutes = new Elysia()
 		return { success: true };
 	})
 	.post("/:id/pa/acc", async ({ params, set, user }: any) => {
-		if (user?.role !== "pa" && user?.role !== "superadmin") {
+		if (!hasRole(user, "pa")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -481,7 +434,7 @@ export const paRoutes = new Elysia()
 		return { success: true };
 	})
 	.delete("/:id/pa/acc", async ({ params, set, user }: any) => {
-		if (user?.role !== "pa" && user?.role !== "superadmin") {
+		if (!hasRole(user, "pa")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -498,31 +451,24 @@ export const paRoutes = new Elysia()
 		return { success: true };
 	})
 	.post("/:id/pa/tripartite", async ({ params, body, set, user }: any) => {
-		if (
-			user?.role !== "pa" &&
-			user?.role !== "superadmin" &&
-			user?.role !== "akademik"
-		) {
+		if (!hasRole(user, "pa", "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
+		const b = body as any;
 		await db.insert(paTripartiteLogs).values({
 			studentId: Number(params.id),
-			contactDate: new Date((body as any).contactDate),
-			contactName: (body as any).parentName, // frontend might send parentName
-			contactType: (body as any).contactMethod || "Orang Tua", // frontend contactMethod -> contactType
-			summary: (body as any).topic, // frontend topic -> summary
-			result: (body as any).result,
+			contactDate: new Date(b.contactDate || b.date || Date.now()),
+			contactName: b.contactName || b.parentName || null,
+			contactType: b.contactType || b.contactMethod || "Orang Tua",
+			summary: b.summary || b.topic || "-",
+			result: b.result || null,
 			createdBy: user.id,
 		});
 		return { success: true };
 	})
 	.delete("/:id/pa/tripartite/:logId", async ({ params, set, user }: any) => {
-		if (
-			user?.role !== "pa" &&
-			user?.role !== "superadmin" &&
-			user?.role !== "akademik"
-		) {
+		if (!hasRole(user, "pa", "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -532,31 +478,24 @@ export const paRoutes = new Elysia()
 		return { success: true };
 	})
 	.post("/:id/pa/interview", async ({ params, body, set, user }: any) => {
-		if (
-			user?.role !== "pa" &&
-			user?.role !== "superadmin" &&
-			user?.role !== "akademik"
-		) {
+		if (!hasRole(user, "pa", "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
+		const b = body as any;
 		await db.insert(paInterviewLogs).values({
 			studentId: Number(params.id),
-			interviewDate: new Date((body as any).interviewDate),
-			companyName: "N/A", // Default if frontend doesn't send it yet
-			country: (body as any).country,
-			result: (body as any).result,
-			notes: (body as any).notes,
+			interviewDate: new Date(b.interviewDate || b.date || Date.now()),
+			companyName: b.companyName || b.company || "N/A",
+			country: b.country || null,
+			result: b.result || "Menunggu",
+			notes: b.notes || null,
 			createdBy: user.id,
 		});
 		return { success: true };
 	})
 	.delete("/:id/pa/interview/:logId", async ({ params, set, user }: any) => {
-		if (
-			user?.role !== "pa" &&
-			user?.role !== "superadmin" &&
-			user?.role !== "akademik"
-		) {
+		if (!hasRole(user, "pa", "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}

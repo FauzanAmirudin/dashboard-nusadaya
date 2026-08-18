@@ -34,6 +34,7 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 
 export const internalNotesRoutes = new Elysia()
@@ -42,8 +43,20 @@ export const internalNotesRoutes = new Elysia()
 		const user = (context as any).user;
 		const id = Number(params.id);
 
-		// Semua role kecuali "dosen" boleh mengakses
-		if (!user || user.role === "dosen") {
+		// Semua role staf kecuali "dosen" murni boleh mengakses
+		if (
+			!hasRole(
+				user,
+				"superadmin",
+				"akademik",
+				"pa",
+				"pmb",
+				"crm",
+				"finance",
+				"magang",
+				"evaluator",
+			)
+		) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -124,7 +137,7 @@ export const internalNotesRoutes = new Elysia()
 			}
 
 			const isAuthor = existingNote.authorId === user.id;
-			const isSuperadmin = user.role === "superadmin";
+			const isSuperadmin = hasRole(user, "superadmin");
 
 			if (!isAuthor && !isSuperadmin) {
 				set.status = 403;
@@ -176,7 +189,7 @@ export const internalNotesRoutes = new Elysia()
 		}
 
 		const isAuthor = existingNote.authorId === user.id;
-		const isSuperadmin = user.role === "superadmin";
+		const isSuperadmin = hasRole(user, "superadmin");
 
 		if (!isAuthor && !isSuperadmin) {
 			set.status = 403;

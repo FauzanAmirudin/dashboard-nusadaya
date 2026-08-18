@@ -10,6 +10,8 @@ import {
 	FilePlus,
 	FileText,
 	HelpCircle,
+	MessageCircle,
+	Phone,
 	Plus,
 	Search,
 	ShieldAlert,
@@ -20,11 +22,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { Progress } from "@/components/ui/progress";
 import {
 	Select,
@@ -33,6 +36,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { TablePagination } from "@/components/ui/TablePagination";
 import {
 	Table,
 	TableBody,
@@ -49,7 +53,16 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { exportToCSV } from "@/lib/export";
+import { hasRole } from "@/store";
 import { FormMahasiswaModule } from "./pmb/FormMahasiswaModule";
+
+function formatWhatsAppUrl(phone: string | null | undefined) {
+	if (!phone) return null;
+	const clean = phone.replace(/[^0-9]/g, "");
+	if (!clean) return null;
+	const formatted = clean.startsWith("0") ? `62${clean.slice(1)}` : clean;
+	return `https://wa.me/${formatted}`;
+}
 
 export function PmbDashboard({
 	data = [],
@@ -62,15 +75,26 @@ export function PmbDashboard({
 	const [selectedCohort, setSelectedCohort] = useState<string>("all");
 	const [selectedStatus, setSelectedStatus] = useState<string>("all");
 	const [localSearch, setLocalSearch] = useState(searchQuery || "");
+	const [currentPage, setCurrentPage] = useState(1);
+	const pageSize = 20;
 
-	// Cohort years starting from 2022
-	const cohortYears = useMemo(() => {
-		const currentYear = new Date().getFullYear();
-		return Array.from(
-			{ length: currentYear - 2022 + 2 },
-			(_, i) => currentYear + 1 - i,
-		);
-	}, []);
+	// Available cohorts dynamically derived from student data
+	const availableCohorts = useMemo(() => {
+		const cohorts = new Set<string>();
+		if (data && data.length > 0) {
+			data.forEach((s: any) => {
+				if (s.student?.cohort) cohorts.add(s.student.cohort.toString());
+			});
+		}
+		// Default fallback cohorts (16, 15, 14, 13, 12, etc.)
+		["16", "15", "14", "13", "12", "11", "10"].forEach((c) => cohorts.add(c));
+		return Array.from(cohorts).sort((a, b) => {
+			const numA = Number(a);
+			const numB = Number(b);
+			if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
+			return b.localeCompare(a);
+		});
+	}, [data]);
 
 	// Filter by cohort first for reactive KPI
 	const cohortData = useMemo(() => {
@@ -180,7 +204,10 @@ export function PmbDashboard({
 				!q ||
 				(s.student?.name || "").toLowerCase().includes(q) ||
 				(s.student?.nim || "").toLowerCase().includes(q) ||
-				(s.student?.program || "").toLowerCase().includes(q);
+				(s.student?.program || "").toLowerCase().includes(q) ||
+				(s.student?.subProgram || "").toLowerCase().includes(q) ||
+				(s.student?.destinationCountry || "").toLowerCase().includes(q) ||
+				(s.student?.phone || "").toLowerCase().includes(q);
 
 			const pmbStatus = s.pmb?.status || "PERLU_PERHATIAN";
 			let matchStatus = true;
@@ -195,27 +222,44 @@ export function PmbDashboard({
 		});
 	}, [cohortData, searchQuery, localSearch, selectedStatus]);
 
+	// Reset page on filter changes
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [selectedCohort, selectedStatus, localSearch]);
+
+	const paginatedData = useMemo(() => {
+		const start = (currentPage - 1) * pageSize;
+		return filteredData.slice(start, start + pageSize);
+	}, [filteredData, currentPage]);
+
 	const handleExport = () => {
-		const exportData = filteredData.map((s: any) => ({
-			NIM: s.student?.nim || "-",
-			"Nama Mahasiswa": s.student?.name || "-",
-			Angkatan: s.student?.cohort || "-",
-			Program: s.student?.program || "-",
-			"Formulir Masuk": s.pmb?.formReceived ? "Sudah" : "Belum",
-			"Berkas Lengkap": s.pmb?.documentsComplete ? "Sudah" : "Belum",
-			"Data Terinput": s.pmb?.dataInputted ? "Sudah" : "Belum",
-			"Follow Up Awal": s.pmb?.initialFollowUp ? "Sudah" : "Belum",
-			"Status Checklist PMB":
-				s.pmb?.status === "AMAN"
-					? "Aman"
-					: s.pmb?.status === "TIDAK_AMAN"
-						? "Tidak Aman"
-						: "Perlu Perhatian",
-			Rekomendasi: s.pmb?.rekomendasi || "-",
-			"Fee Mitra": s.finance?.vMitra || 0,
-			"Fee Koord": s.finance?.vKoordinator || 0,
-			"Status ACC PMB": s.pmb?.isAcc ? "Sudah ACC" : "Belum",
-		}));
+		const exportData = filteredData.map((s: any) => {
+			const checklist = getPmbChecklist(s.pmb);
+			return {
+				NIM: s.student?.nim || "-",
+				"Nama Mahasiswa": s.student?.name || "-",
+				Angkatan: s.student?.cohort ? `Angkatan ${s.student.cohort}` : "-",
+				"Tahun Ajaran": s.student?.academicYear || s.student?.period || "-",
+				Peminatan:
+					s.student?.subProgram ||
+					s.student?.destinationCountry ||
+					s.student?.program ||
+					"-",
+				"No. WhatsApp": s.student?.phone || "-",
+				"Progress Checklist": `${checklist.completed}/14 Item (${Math.round((checklist.completed / 14) * 100)}%)`,
+				"Formulir Masuk": s.pmb?.formReceived ? "Sudah" : "Belum",
+				"Berkas Lengkap": s.pmb?.documentsComplete ? "Sudah" : "Belum",
+				"Data Terinput": s.pmb?.dataInputted ? "Sudah" : "Belum",
+				"Follow Up Awal": s.pmb?.initialFollowUp ? "Sudah" : "Belum",
+				"Status Checklist PMB":
+					s.pmb?.status === "AMAN"
+						? "Aman"
+						: s.pmb?.status === "TIDAK_AMAN"
+							? "Tidak Aman"
+							: "Perlu Perhatian",
+				"Status ACC PMB": s.pmb?.isAcc ? "Sudah ACC" : "Belum",
+			};
+		});
 		exportToCSV(
 			exportData,
 			`Data_PMB_${new Date().toISOString().split("T")[0]}`,
@@ -248,20 +292,28 @@ export function PmbDashboard({
 						value={selectedCohort}
 						onValueChange={(val) => setSelectedCohort(val || "all")}
 					>
-						<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
+						<SelectTrigger className="w-[180px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
 							<SelectValue placeholder="Filter Angkatan" />
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value="all">Semua Angkatan</SelectItem>
-							{cohortYears.map((year) => (
-								<SelectItem key={year} value={year.toString()}>
-									Angkatan {year}
-								</SelectItem>
-							))}
+							{availableCohorts.map((cohort) => {
+								const cNum = Number(cohort);
+								const ayLabel =
+									!isNaN(cNum) && cNum >= 10 && cNum <= 30
+										? ` (${2010 + cNum}/${2011 + cNum})`
+										: "";
+								return (
+									<SelectItem key={cohort} value={cohort}>
+										Angkatan {cohort}
+										{ayLabel}
+									</SelectItem>
+								);
+							})}
 						</SelectContent>
 					</Select>
 
-					{(user?.role === "pmb" || user?.role === "superadmin") && (
+					{hasRole(user, "pmb") && (
 						<Link href="/dashboard/students/add">
 							<Button
 								size="sm"
@@ -419,10 +471,10 @@ export function PmbDashboard({
 
 							{/* Search & Filter Bar */}
 							<div className="flex flex-wrap items-center gap-2.5">
-								<div className="relative w-full sm:w-60">
+								<div className="relative w-full sm:w-64">
 									<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
 									<Input
-										placeholder="Cari NIM, Nama, Peminatan..."
+										placeholder="Cari Nama, NIM, Peminatan, WA..."
 										className="pl-9 h-9 text-xs bg-white border-slate-200"
 										value={
 											searchQuery !== undefined ? searchQuery : localSearch
@@ -457,62 +509,128 @@ export function PmbDashboard({
 								<Table>
 									<TableHeader className="bg-slate-50 sticky top-0 z-10">
 										<TableRow className="border-slate-200">
-											<TableHead className="py-3.5 font-bold text-slate-700 text-xs w-28">
-												NIM
+											<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[180px]">
+												Nama Mahasiswa & NIM
 											</TableHead>
-											<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
-												Nama & Program
+											<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+												Angkatan
+											</TableHead>
+											<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-32">
+												Tahun Ajaran
+											</TableHead>
+											<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[160px]">
+												Peminatan
+											</TableHead>
+											<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[140px]">
+												No. WhatsApp
 											</TableHead>
 											<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
-												Checklist Berkas (14)
-											</TableHead>
-											<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
-												Rekomendasi
+												Progress (14)
 											</TableHead>
 											<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
 												Status PMB
 											</TableHead>
-											<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+											<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-24">
 												ACC PMB
 											</TableHead>
-											<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-28">
+											<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-24">
 												Aksi
 											</TableHead>
 										</TableRow>
 									</TableHeader>
 									<TableBody>
-										{filteredData.map((s: any) => {
+										{paginatedData.map((s: any) => {
 											const { items, completed, isDone } = getPmbChecklist(
 												s.pmb,
 											);
 											const status = s.pmb?.status || "PERLU_PERHATIAN";
+											const waUrl = formatWhatsAppUrl(s.student?.phone);
 
 											return (
 												<TableRow
 													key={s.student.id}
 													className="border-slate-100 hover:bg-blue-50/40 transition-colors"
 												>
-													<TableCell className="font-mono text-xs font-bold text-slate-700">
-														{s.student.nim || "-"}
-													</TableCell>
+													{/* Nama & NIM */}
 													<TableCell>
 														<div className="font-bold text-slate-900 text-sm">
 															{s.student.name}
 														</div>
-														<div className="flex items-center gap-2 mt-0.5">
-															<Badge
-																variant="outline"
-																className="text-[10px] px-1.5 py-0 text-slate-500 border-slate-200"
-															>
-																Angkatan {s.student.cohort}
-															</Badge>
-															<span className="text-xs text-slate-500 font-medium truncate max-w-[200px]">
-																{s.student.program || "-"}
+														<div className="flex items-center gap-1.5 mt-0.5">
+															<span className="font-mono text-xs font-semibold text-slate-500">
+																{s.student.nim || "Belum ada NIM"}
 															</span>
+															{s.student.nickname && (
+																<span className="text-[11px] text-slate-400">
+																	({s.student.nickname})
+																</span>
+															)}
 														</div>
 													</TableCell>
 
-													{/* Checklist Progress with Tooltip */}
+													{/* Angkatan */}
+													<TableCell className="text-center">
+														<Badge
+															variant="outline"
+															className="text-xs font-bold text-slate-700 bg-slate-50 border-slate-200 px-2 py-0.5"
+														>
+															{s.student.cohort
+																? `Angkatan ${s.student.cohort}`
+																: "-"}
+														</Badge>
+													</TableCell>
+
+													{/* Tahun Ajaran */}
+													<TableCell className="text-center font-medium text-xs text-slate-700">
+														{s.student.academicYear ||
+															(s.student.cohort &&
+															!isNaN(Number(s.student.cohort))
+																? `${2010 + Number(s.student.cohort)}/${2011 + Number(s.student.cohort)}`
+																: s.student.period || (
+																		<span className="text-slate-400 italic">
+																			-
+																		</span>
+																	))}
+													</TableCell>
+
+													{/* Peminatan with Country Flag */}
+													<TableCell>
+														<PeminatanBadge
+															subProgram={s.student.subProgram}
+															destinationCountry={s.student.destinationCountry}
+															program={s.student.program}
+														/>
+													</TableCell>
+
+													{/* No. WhatsApp */}
+													<TableCell>
+														{s.student?.phone ? (
+															waUrl ? (
+																<a
+																	href={waUrl}
+																	target="_blank"
+																	rel="noopener noreferrer"
+																	className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 hover:text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-md transition-colors group"
+																	title="Chat WhatsApp"
+																>
+																	<MessageCircle className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
+																	<span className="font-mono">
+																		{s.student.phone}
+																	</span>
+																</a>
+															) : (
+																<span className="text-xs font-mono text-slate-700">
+																	{s.student.phone}
+																</span>
+															)
+														) : (
+															<span className="text-slate-400 text-xs italic">
+																-
+															</span>
+														)}
+													</TableCell>
+
+													{/* Progress Checklist with Tooltip */}
 													<TableCell className="text-center">
 														<TooltipProvider>
 															<Tooltip>
@@ -581,17 +699,7 @@ export function PmbDashboard({
 														</TooltipProvider>
 													</TableCell>
 
-													<TableCell className="text-xs text-slate-600">
-														{s.pmb?.rekomendasi ? (
-															<span className="truncate max-w-[150px] inline-block font-medium">
-																{s.pmb.rekomendasi}
-															</span>
-														) : (
-															<span className="text-slate-400 italic">-</span>
-														)}
-													</TableCell>
-
-													{/* Status Badge */}
+													{/* Status PMB */}
 													<TableCell className="text-center">
 														{status === "AMAN" ? (
 															<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold">
@@ -628,7 +736,7 @@ export function PmbDashboard({
 															variant="outline"
 															onClick={() =>
 																router.push(
-																	`/dashboard/students/${s.student.id}`,
+																	`/dashboard/students/${s.student.id}?context=pmb`,
 																)
 															}
 															className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5"
@@ -655,6 +763,14 @@ export function PmbDashboard({
 										</p>
 									</div>
 								)}
+
+								<TablePagination
+									currentPage={currentPage}
+									totalItems={filteredData.length}
+									pageSize={pageSize}
+									onPageChange={setCurrentPage}
+									itemName="Pendaftar PMB"
+								/>
 							</div>
 						</CardContent>
 					</Card>

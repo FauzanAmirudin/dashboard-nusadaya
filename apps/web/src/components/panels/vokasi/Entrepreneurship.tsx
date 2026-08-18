@@ -176,7 +176,11 @@ export function Entrepreneurship({
 										<Input
 											type="number"
 											placeholder="0"
-											value={form.productionQty}
+											value={
+												form.productionQty === "0" || !form.productionQty
+													? ""
+													: form.productionQty
+											}
 											onChange={(e) =>
 												setForm({ ...form, productionQty: e.target.value })
 											}
@@ -189,7 +193,11 @@ export function Entrepreneurship({
 										<Input
 											type="number"
 											placeholder="0"
-											value={form.revenueTotal}
+											value={
+												form.revenueTotal === "0" || !form.revenueTotal
+													? ""
+													: form.revenueTotal
+											}
 											onChange={(e) =>
 												setForm({ ...form, revenueTotal: e.target.value })
 											}

@@ -34,6 +34,7 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 
 export const internshipRoutes = new Elysia()
@@ -119,7 +120,7 @@ export const internshipRoutes = new Elysia()
 			const user = (context as any).user;
 			const updates = body as Record<string, any>;
 
-			if (!user || (user.role !== "magang" && user.role !== "superadmin")) {
+			if (!hasRole(user, "magang")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -291,7 +292,7 @@ export const internshipRoutes = new Elysia()
 			const user = (context as any).user;
 			const input = body as any;
 
-			if (!user || (user.role !== "magang" && user.role !== "superadmin")) {
+			if (!hasRole(user, "magang")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -320,7 +321,7 @@ export const internshipRoutes = new Elysia()
 		const user = (context as any).user;
 		const id = Number(params.id);
 
-		if (!user || (user.role !== "magang" && user.role !== "superadmin")) {
+		if (!hasRole(user, "magang")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -394,7 +395,7 @@ export const internshipRoutes = new Elysia()
 		const user = (context as any).user;
 		const id = Number(params.id);
 
-		if (!user || (user.role !== "magang" && user.role !== "superadmin")) {
+		if (!hasRole(user, "magang")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -418,7 +419,7 @@ export const internshipRoutes = new Elysia()
 			const user = (context as any).user;
 			const id = Number(params.id);
 
-			if (!user || (user.role !== "magang" && user.role !== "superadmin")) {
+			if (!hasRole(user, "magang")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}

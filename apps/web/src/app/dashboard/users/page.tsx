@@ -1,10 +1,15 @@
 "use client";
 
 import {
+	Check,
+	CheckSquare,
 	Edit,
+	Info,
 	Loader2,
 	Plus,
 	Search,
+	Shield,
+	Square,
 	Trash2,
 	Upload,
 	UserCog,
@@ -49,13 +54,15 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { API_URL, api, getToken } from "@/lib/eden";
-import { useAuthStore } from "@/store";
+import { cn } from "@/lib/utils";
+import { hasRole, useAuthStore } from "@/store";
 
 type UserData = {
 	id: number;
 	username: string;
 	fullName: string;
 	role: string;
+	roles?: string[];
 	email: string | null;
 	phone: string | null;
 	profilePhotoUrl: string | null;
@@ -64,17 +71,18 @@ type UserData = {
 
 const ROLE_LABELS: Record<string, string> = {
 	superadmin: "Super Admin",
-	pmb: "Tim PMB",
-	crm: "Tim CRM",
-	finance: "Finance",
-	akademik: "Akademik",
-	dosen: "Dosen",
-	pa: "Pembimbing Akademik",
+	pmb: "Admin PMB",
+	akademik: "Admin Akademik",
+	finance: "Admin Finance",
+	crm: "Admin CRM",
+	pa: "Pembimbing Akademik (PA)",
+	dosen: "Dosen Pengajar",
+	evaluator: "Tim Evaluasi",
 	magang: "Tim Magang",
 };
 
 export default function UsersManagementPage() {
-	const { user } = useAuthStore();
+	const { user, hasHydrated } = useAuthStore();
 	const [users, setUsers] = useState<UserData[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [searchQuery, setSearchQuery] = useState("");
@@ -96,6 +104,7 @@ export default function UsersManagementPage() {
 		email: "",
 		phone: "",
 		role: "",
+		roles: [] as string[],
 		password: "",
 		confirmPassword: "",
 		profilePhotoUrl: "",
@@ -108,35 +117,49 @@ export default function UsersManagementPage() {
 		try {
 			setLoading(true);
 			const { data, error } = await api["manage-users"].get();
-			if (error) throw error;
-			if (data.success) {
+			if (error) {
+				const errMsg =
+					(error as any)?.value?.message ||
+					(error as any)?.message ||
+					"Gagal mengambil data pengguna";
+				console.error("Gagal mengambil data pengguna:", errMsg, error);
+				toast.error(errMsg);
+				return;
+			}
+			if (data?.success) {
 				setUsers(data.data as unknown as UserData[]);
 			}
-		} catch (err) {
+		} catch (err: any) {
 			console.error("Gagal mengambil data pengguna:", err);
-			toast.error("Gagal mengambil data pengguna");
+			toast.error(err?.message || "Gagal mengambil data pengguna");
 		} finally {
 			setLoading(false);
 		}
 	};
 
 	useEffect(() => {
-		fetchUsers();
-	}, []);
+		if (hasHydrated) {
+			fetchUsers();
+		}
+	}, [hasHydrated]);
 
 	const filteredUsers = users.filter((u) => {
 		const matchesSearch =
 			u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
 			u.username.toLowerCase().includes(searchQuery.toLowerCase());
-		const matchesRole = selectedRole === "all" || u.role === selectedRole;
+		const uRoles = u.roles && u.roles.length > 0 ? u.roles : [u.role];
+		const matchesRole = selectedRole === "all" || uRoles.includes(selectedRole);
 		return matchesSearch && matchesRole;
 	});
 
+	const isSuperadmin = hasRole(user, "superadmin");
+	const isAkademik = hasRole(user, "akademik");
+
 	// Helper to determine allowed roles for current user
 	const getAllowedRoles = () => {
-		if (user?.role === "superadmin") {
+		if (isSuperadmin) {
 			return Object.keys(ROLE_LABELS);
-		} else if (user?.role === "akademik") {
+		} else if (isAkademik) {
 			return ["pa", "dosen"];
 		}
 		return [];
@@ -175,12 +198,54 @@ export default function UsersManagementPage() {
 		}
 	};
 
+	const toggleRole = (r: string) => {
+		if (r === "superadmin") {
+			// Superadmin is exclusive
+			setFormData((prev) => ({
+				...prev,
+				role: "superadmin",
+				roles: ["superadmin"],
+			}));
+			return;
+		}
+
+		setFormData((prev) => {
+			const currentRoles = prev.roles.filter((role) => role !== "superadmin");
+			const exists = currentRoles.includes(r);
+			const newRoles = exists
+				? currentRoles.filter((role) => role !== r)
+				: [...currentRoles, r];
+			const newPrimaryRole = newRoles.includes(prev.role)
+				? prev.role
+				: newRoles[0] || "";
+			return {
+				...prev,
+				role: newPrimaryRole,
+				roles: newRoles,
+			};
+		});
+	};
+
 	const handleAddSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
+		const effectiveRoles =
+			formData.roles.length > 0
+				? formData.roles
+				: formData.role
+					? [formData.role]
+					: [];
+
+		if (effectiveRoles.length === 0) {
+			toast.error("Pilih minimal satu peran / role");
+			return;
+		}
+
 		if (formData.password !== formData.confirmPassword) {
 			toast.error("Password tidak cocok");
 			return;
 		}
+
+		const primaryRole = formData.role || effectiveRoles[0];
 
 		try {
 			setIsSubmitting(true);
@@ -188,7 +253,8 @@ export default function UsersManagementPage() {
 				username: formData.username,
 				password: formData.password,
 				fullName: formData.fullName,
-				role: formData.role,
+				role: primaryRole,
+				roles: effectiveRoles,
 				email: formData.email || undefined,
 				phone: formData.phone || undefined,
 				profilePhotoUrl: formData.profilePhotoUrl || undefined,
@@ -214,10 +280,24 @@ export default function UsersManagementPage() {
 	const handleEditSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!editingUser) return;
+		const effectiveRoles =
+			formData.roles.length > 0
+				? formData.roles
+				: formData.role
+					? [formData.role]
+					: [];
+
+		if (effectiveRoles.length === 0) {
+			toast.error("Pilih minimal satu peran / role");
+			return;
+		}
+
 		if (formData.password && formData.password !== formData.confirmPassword) {
 			toast.error("Password tidak cocok");
 			return;
 		}
+
+		const primaryRole = formData.role || effectiveRoles[0];
 
 		try {
 			setIsSubmitting(true);
@@ -226,7 +306,8 @@ export default function UsersManagementPage() {
 			const payload: any = {
 				fullName: formData.fullName,
 				username: formData.username,
-				role: formData.role,
+				role: primaryRole,
+				roles: effectiveRoles,
 				email: formData.email || undefined,
 				phone: formData.phone || undefined,
 				profilePhotoUrl: formData.profilePhotoUrl || undefined,
@@ -281,12 +362,14 @@ export default function UsersManagementPage() {
 
 	const openEditDialog = (u: UserData) => {
 		setEditingUser(u);
+		const uRoles = u.roles && u.roles.length > 0 ? u.roles : [u.role];
 		setFormData({
 			fullName: u.fullName,
 			username: u.username,
 			email: u.email || "",
 			phone: u.phone || "",
-			role: u.role,
+			role: u.role || uRoles[0] || "",
+			roles: uRoles,
 			profilePhotoUrl: u.profilePhotoUrl || "",
 			password: "",
 			confirmPassword: "",
@@ -301,6 +384,7 @@ export default function UsersManagementPage() {
 			email: "",
 			phone: "",
 			role: "",
+			roles: [],
 			password: "",
 			confirmPassword: "",
 			profilePhotoUrl: "",
@@ -424,16 +508,39 @@ export default function UsersManagementPage() {
 												</span>
 											</TableCell>
 											<TableCell>
-												<div className="flex flex-col items-start gap-1">
-													<span className="text-sm font-medium text-slate-700">
-														{ROLE_LABELS[u.role] || u.role}
-													</span>
-													<Badge
-														variant="outline"
-														className="text-[10px] bg-slate-50 text-slate-500 border-slate-200 uppercase"
-													>
-														{u.role}
-													</Badge>
+												<div className="flex flex-wrap items-center gap-1.5 max-w-[280px]">
+													{(() => {
+														const uRoles =
+															u.roles && u.roles.length > 0
+																? u.roles
+																: [u.role];
+														return uRoles.map((r) => (
+															<Badge
+																key={r}
+																variant="outline"
+																className={cn(
+																	"text-[11px] font-semibold px-2.5 py-0.5 rounded-full tracking-wide shadow-2xs",
+																	r === "superadmin"
+																		? "bg-purple-50 text-purple-700 border-purple-200"
+																		: r === "pmb"
+																			? "bg-emerald-50 text-emerald-700 border-emerald-200"
+																			: r === "finance"
+																				? "bg-amber-50 text-amber-700 border-amber-200"
+																				: r === "akademik"
+																					? "bg-blue-50 text-blue-700 border-blue-200"
+																					: r === "dosen"
+																						? "bg-indigo-50 text-indigo-700 border-indigo-200"
+																						: r === "pa"
+																							? "bg-teal-50 text-teal-700 border-teal-200"
+																							: r === "magang"
+																								? "bg-cyan-50 text-cyan-700 border-cyan-200"
+																								: "bg-slate-50 text-slate-700 border-slate-200",
+																)}
+															>
+																{ROLE_LABELS[r] || r}
+															</Badge>
+														));
+													})()}
 												</div>
 											</TableCell>
 											<TableCell className="text-right">
@@ -575,26 +682,88 @@ export default function UsersManagementPage() {
 									}
 								/>
 							</div>
-							<div className="space-y-2 md:col-span-2">
-								<Label>Peran / Role *</Label>
-								<Select
-									value={formData.role || ""}
-									onValueChange={(val) =>
-										setFormData({ ...formData, role: val || "" })
-									}
-									required
-								>
-									<SelectTrigger className="border-2 border-slate-200">
-										<SelectValue placeholder="Pilih Peran" />
-									</SelectTrigger>
-									<SelectContent>
-										{allowedRoles.map((r) => (
-											<SelectItem key={r} value={r}>
-												{ROLE_LABELS[r]}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+
+							<div className="space-y-3 md:col-span-2 p-4 bg-slate-50/80 rounded-xl border border-slate-200">
+								<div className="flex items-center justify-between">
+									<Label className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+										<Shield className="w-4 h-4 text-indigo-600" />
+										Hak Akses & Peran (Multi-Role) *
+									</Label>
+									<span className="text-xs text-slate-500 font-medium">
+										{formData.roles.length} peran dipilih
+									</span>
+								</div>
+								<p className="text-xs text-slate-500">
+									Pilih satu atau beberapa peran untuk akun ini. Pengguna akan
+									dapat mengakses seluruh menu sesuai kombinasi peran yang
+									dipilih.
+								</p>
+
+								<div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+									{allowedRoles.map((r) => {
+										const isChecked =
+											formData.roles.includes(r) ||
+											(formData.roles.length === 0 && formData.role === r);
+										return (
+											<button
+												type="button"
+												key={r}
+												onClick={() => toggleRole(r)}
+												className={cn(
+													"flex items-center justify-between p-2.5 rounded-lg border text-left text-xs font-medium transition-all duration-150",
+													isChecked
+														? "bg-indigo-50/80 border-indigo-500 text-indigo-900 shadow-2xs"
+														: "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300",
+												)}
+											>
+												<div className="flex items-center gap-2 truncate">
+													<div
+														className={cn(
+															"w-4 h-4 rounded flex items-center justify-center text-white text-[10px] shrink-0 transition-colors",
+															isChecked
+																? "bg-indigo-600"
+																: "border border-slate-300 bg-white",
+														)}
+													>
+														{isChecked && (
+															<Check className="w-3 h-3 stroke-[3]" />
+														)}
+													</div>
+													<span className="truncate">
+														{ROLE_LABELS[r] || r}
+													</span>
+												</div>
+											</button>
+										);
+									})}
+								</div>
+
+								{/* Primary role selector if more than 1 role is selected */}
+								{formData.roles.length > 1 && (
+									<div className="pt-2 border-t border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+										<div className="flex items-center gap-1.5 text-xs text-slate-600">
+											<Info className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+											<span>Peran Utama (Tampilan Default):</span>
+										</div>
+										<Select
+											value={formData.role || formData.roles[0] || ""}
+											onValueChange={(val) =>
+												setFormData({ ...formData, role: val || "" })
+											}
+										>
+											<SelectTrigger className="w-full sm:w-48 h-8 text-xs bg-white border-slate-300">
+												<SelectValue placeholder="Pilih Peran Utama" />
+											</SelectTrigger>
+											<SelectContent>
+												{formData.roles.map((r) => (
+													<SelectItem key={r} value={r} className="text-xs">
+														{ROLE_LABELS[r] || r}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</div>
+								)}
 							</div>
 
 							<div className="space-y-2 md:col-span-2">

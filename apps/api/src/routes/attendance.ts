@@ -18,9 +18,6 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 	// Authentication
 	.derive((context) => {
 		const user = (context as any).user;
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
 		return { user };
 	})
 	// ==========================================

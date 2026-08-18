@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import {
 	Select,
 	SelectContent,
@@ -254,8 +255,11 @@ export function PADetailView({ paId }: Props) {
 												{s.nim ?? "-"}
 											</div>
 										</TableCell>
-										<TableCell className="text-sm text-slate-600">
-											{s.subProgram ?? s.program}
+										<TableCell className="text-sm">
+											<PeminatanBadge
+												subProgram={s.subProgram}
+												program={s.program}
+											/>
 										</TableCell>
 										<TableCell className="text-center">
 											<Badge className="bg-slate-100 text-slate-600 border-slate-200 border text-xs">

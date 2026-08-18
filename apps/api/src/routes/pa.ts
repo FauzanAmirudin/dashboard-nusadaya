@@ -2,6 +2,7 @@ import { eq, ilike, or } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { db } from "../db";
 import { paData, students, users } from "../db/schema";
+import { hasRole } from "../lib/permissions";
 import { requireRole } from "../middleware/rbac";
 
 export const paRouter = new Elysia({ prefix: "/pa" })
@@ -21,7 +22,7 @@ export const paRouter = new Elysia({ prefix: "/pa" })
 			.leftJoin(paData, eq(students.id, paData.studentId))
 			.leftJoin(users, eq(students.paId, users.id));
 
-		if (user && user.role !== "superadmin") {
+		if (user && !hasRole(user, "superadmin")) {
 			allStudentsQuery = allStudentsQuery.where(
 				eq(students.paId, user.id),
 			) as any;

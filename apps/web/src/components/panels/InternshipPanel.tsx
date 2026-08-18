@@ -1,7 +1,23 @@
 "use client";
 
-import { CalendarClock, CheckCircle, Plus } from "lucide-react";
+import {
+	AlertTriangle,
+	CalendarClock,
+	CheckCircle,
+	CheckCircle2,
+	Clock,
+	CreditCard,
+	FileCheck,
+	FolderCheck,
+	GraduationCap,
+	Loader2,
+	Plane,
+	Plus,
+	ShieldCheck,
+	Sparkles,
+} from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -13,7 +29,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
 	Tooltip,
@@ -22,7 +39,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { api } from "@/lib/eden";
-import { useAuthStore } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
 import { TabDanaTalangan } from "./magang/TabDanaTalangan";
 import { TabDokumen } from "./magang/TabDokumen";
 import { TabPraPaspor } from "./magang/TabPraPaspor";
@@ -114,14 +131,15 @@ interface InternshipPanelProps {
 
 export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 	const { user } = useAuthStore();
-	const isMagang = user?.role === "magang" || user?.role === "superadmin";
-	const isSuperadmin = user?.role === "superadmin";
+	const isMagang = hasRole(user, "magang", "akademik");
+	const isSuperadmin = hasRole(user, "superadmin");
 	const [data, setData] = useState<InternshipData | null>(null);
 
-	const canEdit = (isMagang || isSuperadmin) && !data?.isAcc;
+	const canEdit = isMagang || isSuperadmin;
 	const canEditPostInternship = isMagang || isSuperadmin;
 
 	const [isSaving, setIsSaving] = useState(false);
+	const [loadingItem, setLoadingItem] = useState<string | null>(null);
 	const [pmbPaymentData, setPmbPaymentData] = useState<any>(null);
 	const [postInternshipDocs, setPostInternshipDocs] = useState<any[]>([]);
 
@@ -193,241 +211,369 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 	const handleBlurField = async (field: any) => {
 		if (!canEdit || !data) return;
 		setIsSaving(true);
-		await api.students[studentId.toString()].internship.patch({
-			[field]: (data as any)[field],
-		});
-		onUpdate(); // Trigger parent refresh for overall status
+		const { error } = await api.students[studentId.toString()].internship.patch(
+			{
+				[field]: (data as any)[field],
+			},
+		);
+		if (error) {
+			toast.error("Gagal menyimpan perubahan");
+		} else {
+			toast.success("Perubahan data berhasil disimpan");
+			onUpdate();
+		}
 		setIsSaving(false);
 	};
 
 	const handleToggleField = async (field: any, value: any) => {
 		if (!canEdit) return;
+		setLoadingItem(field);
+		const prevVal = data ? (data as any)[field] : undefined;
+
+		// Optimistic update
 		setData((prev) =>
 			prev ? ({ ...prev, [field]: value } as InternshipData) : null,
 		);
-		setIsSaving(true);
-		await api.students[studentId.toString()].internship.patch({
-			[field]: value,
-		});
-		onUpdate();
-		setIsSaving(false);
+
+		const { error } = await api.students[studentId.toString()].internship.patch(
+			{
+				[field]: value,
+			},
+		);
+
+		if (error) {
+			setData((prev) =>
+				prev ? ({ ...prev, [field]: prevVal } as InternshipData) : null,
+			);
+			toast.error("Gagal memperbarui status checklist");
+		} else {
+			toast.success("Status checklist berhasil disimpan");
+			onUpdate();
+		}
+		setLoadingItem(null);
 	};
 
 	const handleSaveNotes = async () => {
 		if (!canEdit) return;
 		setIsSaving(true);
-		await api.students[studentId.toString()].internship.patch({ notes });
-		await fetchInternshipData();
-		onUpdate();
+		const { error } = await api.students[studentId.toString()].internship.patch(
+			{ notes },
+		);
+		if (error) {
+			toast.error("Gagal menyimpan catatan");
+		} else {
+			toast.success("Catatan internal magang berhasil disimpan");
+			await fetchInternshipData();
+			onUpdate();
+		}
 		setIsSaving(false);
 	};
 
 	const handleAcc = async () => {
 		setIsSaving(true);
-		await api.students[studentId.toString()].internship.acc.post();
-		await fetchInternshipData();
-		onUpdate();
+		const { error } =
+			await api.students[studentId.toString()].internship.acc.post();
+		if (error) {
+			toast.error("Gagal memberikan ACC Magang");
+		} else {
+			toast.success("Status ACC Magang berhasil disetujui");
+			await fetchInternshipData();
+			onUpdate();
+		}
 		setIsSaving(false);
 	};
 
 	const handleCancelAcc = async () => {
 		setIsSaving(true);
-		await api.students[studentId.toString()].internship.acc.delete();
-		await fetchInternshipData();
-		onUpdate();
+		const { error } =
+			await api.students[studentId.toString()].internship.acc.delete();
+		if (error) {
+			toast.error("Gagal membatalkan ACC Magang");
+		} else {
+			toast.success("Status ACC Magang berhasil dibatalkan");
+			await fetchInternshipData();
+			onUpdate();
+		}
 		setIsSaving(false);
 	};
 
-	const praPasporChecks = [
-		data?.praPasporPasFoto,
-		data?.praPasporKtm,
-		data?.praPasporKtp,
-		data?.praPasporKk,
-		data?.praPasporAktaKelahiran,
-		data?.praPasporSl21,
-		data?.praPasporSkma,
-		data?.praPasporRekomendasiDisdik,
-		...(passportClearance?.isGapYear ? [data?.praPasporGapYear] : []),
-		data?.praPasporPddikti,
-		data?.praPasporCv,
+	const praPasporKeys = [
+		"praPasporPasFoto",
+		"praPasporKtm",
+		"praPasporKtp",
+		"praPasporKk",
+		"praPasporAktaKelahiran",
+		"praPasporSl21",
+		"praPasporSkma",
+		"praPasporRekomendasiDisdik",
+		...(passportClearance?.isGapYear ? ["praPasporGapYear"] : []),
+		"praPasporCv",
 	];
 
-	const dokumenChecks = [
-		data?.passportReady,
-		data?.interviewReady,
-		data?.contractReady,
-		data?.loaReady,
-		data?.mcuReady,
-		data?.visaReady,
-		data?.pdtReady,
-		data?.dokumentasiReady,
-		data?.ticketReady,
-		data?.agenReady,
+	const praPasporCompleted = praPasporKeys.filter(
+		(k) => !!(data as any)?.[k],
+	).length;
+	const praPasporTotal = praPasporKeys.length;
+
+	const dokumenKeys = [
+		"passportReady",
+		"interviewReady",
+		"lolReady",
+		"loaConfirmed",
+		"moaReady",
+		"contractReady",
+		"mcuReady",
+		"visaReady",
+		"ticketReady",
+		"pdtReady",
+		"dokumentasiReady",
+		"agenReady",
 	];
 
-	const syaratAkhirChecks = [
-		data?.logbookReady,
-		data?.laporanAkhirReady,
-		data?.videoDokumentasiReady,
+	const dokumenCompleted = dokumenKeys.filter(
+		(k) => !!(data as any)?.[k],
+	).length;
+	const dokumenTotal = dokumenKeys.length;
+
+	const syaratAkhirKeys = [
+		"logbookReady",
+		"laporanAkhirReady",
+		"videoDokumentasiReady",
 	];
 
-	const checks = [...praPasporChecks, ...dokumenChecks, ...syaratAkhirChecks];
-	const validatedCount = checks.filter(Boolean).length;
-	const totalCount = checks.length;
+	const syaratAkhirCompleted = syaratAkhirKeys.filter(
+		(k) => !!(data as any)?.[k],
+	).length;
+	const syaratAkhirTotal = syaratAkhirKeys.length;
 
-	let panelStatusBadge = (
-		<Badge className="bg-emerald-50 text-emerald-600 border-emerald-200">
-			🟢 {validatedCount}/{totalCount} AMAN
-		</Badge>
-	);
-	if (data?.status === "TIDAK_AMAN") {
-		panelStatusBadge = (
-			<Badge className="bg-rose-50 text-rose-600 border-rose-200">
-				🔴 {validatedCount}/{totalCount} TIDAK AMAN
-			</Badge>
-		);
-	} else if (data?.status === "PERLU_PERHATIAN") {
-		panelStatusBadge = (
-			<Badge className="bg-amber-50 text-amber-600 border-amber-200">
-				🟡 {validatedCount}/{totalCount} PROSES
-			</Badge>
-		);
-	}
+	// Total checklist progress
+	const allChecklistKeys = [
+		...praPasporKeys,
+		...dokumenKeys,
+		...syaratAkhirKeys,
+	];
+	const validatedCount = allChecklistKeys.filter(
+		(k) => !!(data as any)?.[k],
+	).length;
+	const totalCount = allChecklistKeys.length;
+	const progressPercent =
+		totalCount > 0 ? Math.round((validatedCount / totalCount) * 100) : 0;
 
 	return (
 		<TooltipProvider>
 			<div className="space-y-6">
-				<div>
-					<div className="border-b border-slate-200 pb-4 mb-6">
-						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-							<div>
-								<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
-									<span className="text-xl">✈️</span> Tim Magang Internasional
-									<span className="ml-2 text-sm font-normal text-slate-500">
-										[{validatedCount}/{totalCount}]
-									</span>
-								</CardTitle>
-								<p className="text-sm text-slate-500 mt-1">
-									Dikelola oleh: Tim Magang | Tujuan:{" "}
-									{data?.destinationCity || "Belum ditentukan"}
-								</p>
+				{/* Top Panel Header */}
+				<div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+						<div>
+							<div className="flex items-center gap-2">
+								<div className="w-9 h-9 rounded-xl bg-blue-50 text-[#0517B0] flex items-center justify-center font-bold">
+									<Plane className="w-5 h-5" />
+								</div>
+								<div>
+									<h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+										Divisi Magang & Penempatan Luar Negeri
+										{data?.isAcc && (
+											<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-bold gap-1">
+												<CheckCircle2 className="w-3.5 h-3.5" /> ACC Disetujui
+											</Badge>
+										)}
+									</h2>
+									<p className="text-xs text-slate-500">
+										Monitoring berkas pra-paspor, legalitas visa, kontrak,
+										tiket, dan evaluasi kepulangan magang
+									</p>
+								</div>
 							</div>
-							<div className="flex items-center gap-3">
-								{isSuperadmin && !isMagang && (
-									<Badge
-										variant="outline"
-										className="text-slate-400 border-slate-300"
-									>
-										👁 Mode Lihat Saja
-									</Badge>
-								)}
-								{panelStatusBadge}
-							</div>
+						</div>
+
+						<div className="flex items-center gap-2 shrink-0">
+							<Badge
+								variant="outline"
+								className={`text-xs font-bold px-3 py-1 ${
+									progressPercent === 100
+										? "bg-emerald-50 text-emerald-700 border-emerald-200"
+										: progressPercent >= 50
+											? "bg-blue-50 text-[#0517B0] border-blue-200"
+											: "bg-slate-50 text-slate-600 border-slate-200"
+								}`}
+							>
+								{validatedCount}/{totalCount} Checklist ({progressPercent}%)
+							</Badge>
 						</div>
 					</div>
 
-					{/* TABS NAVIGATION */}
-					<Tabs defaultValue="dokumen" className="w-full">
-						<TabsList className="mb-6 grid w-full grid-cols-4 bg-slate-100 p-1 rounded-lg">
-							<TabsTrigger
-								value="pra-paspor"
-								className="data-[state=active]:bg-white data-[state=active]:text-slate-800 data-[state=active]:shadow-sm rounded-md py-2 transition-all font-bold"
-							>
-								Kelayakan Pra-Paspor
-							</TabsTrigger>
-							<TabsTrigger
-								value="dokumen"
-								className="data-[state=active]:bg-white data-[state=active]:text-slate-800 data-[state=active]:shadow-sm rounded-md py-2 transition-all font-bold"
-							>
-								Dokumen Keberangkatan
-							</TabsTrigger>
-							<TabsTrigger
-								value="dana-talangan"
-								className="data-[state=active]:bg-white data-[state=active]:text-slate-800 data-[state=active]:shadow-sm rounded-md py-2 transition-all font-bold"
-							>
-								Metode Pembayaran Lanjutan
-							</TabsTrigger>
-							<TabsTrigger
-								value="syarat-akhir"
-								className="data-[state=active]:bg-white data-[state=active]:text-slate-800 data-[state=active]:shadow-sm rounded-md py-2 transition-all font-bold"
-							>
-								Syarat Akhir
-							</TabsTrigger>
-						</TabsList>
-
-						<TabsContent value="pra-paspor">
-							<TabPraPaspor
-								studentId={studentId}
-								data={data}
-								passportClearance={passportClearance}
-								canEdit={canEdit}
-								handleToggleField={handleToggleField}
-								fetchInternshipData={fetchInternshipData}
-							/>
-						</TabsContent>
-
-						<TabsContent value="dokumen">
-							<TabDokumen
-								studentId={studentId}
-								data={data}
-								canEdit={canEdit}
-								handleToggleField={handleToggleField}
-								handleLocalChange={handleLocalChange}
-								handleBlurField={handleBlurField}
-								fetchInternshipData={fetchInternshipData}
-								notes={notes}
-								setNotes={setNotes}
-								handleSaveNotes={handleSaveNotes}
-								isSaving={isSaving}
-							/>
-						</TabsContent>
-
-						<TabsContent value="dana-talangan">
-							<TabDanaTalangan
-								studentId={studentId}
-								data={data}
-								pmbPaymentData={pmbPaymentData}
-								canEdit={canEdit}
-								handleToggleField={handleToggleField}
-								handleLocalChange={handleLocalChange}
-								handleBlurField={handleBlurField}
-							/>
-						</TabsContent>
-
-						<TabsContent value="syarat-akhir">
-							<TabSyaratAkhir
-								studentId={studentId}
-								data={data}
-								postInternshipDocs={postInternshipDocs}
-								canEditPostInternship={canEdit}
-								setPostInternshipDocs={setPostInternshipDocs}
-								handleToggleField={handleToggleField}
-								handleLocalChange={handleLocalChange}
-								handleBlurField={handleBlurField}
-							/>
-						</TabsContent>
-					</Tabs>
+					{/* Progress bar */}
+					<div className="space-y-1.5">
+						<div className="flex justify-between text-xs text-slate-500 font-medium">
+							<span>Kelengkapan Modul Magang</span>
+							<span>{progressPercent}%</span>
+						</div>
+						<Progress
+							value={progressPercent}
+							className="h-2 bg-slate-100 [&>div]:bg-[#0517B0]"
+						/>
+					</div>
 				</div>
+
+				{/* TABS NAVIGATION */}
+				<Tabs defaultValue="dokumen" className="w-full">
+					<TabsList className="mb-6 grid w-full grid-cols-2 md:grid-cols-4 bg-slate-100 p-1 rounded-xl h-auto gap-1">
+						<TabsTrigger
+							value="pra-paspor"
+							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-lg py-2.5 transition-all font-bold text-xs flex items-center justify-center gap-2"
+						>
+							<FolderCheck className="w-4 h-4" />
+							<span>Pra-Paspor</span>
+							<Badge
+								variant="outline"
+								className={`text-[10px] px-1.5 py-0 ${
+									praPasporCompleted === praPasporTotal
+										? "bg-emerald-50 text-emerald-700 border-emerald-200"
+										: "bg-slate-100 text-slate-600 border-slate-200"
+								}`}
+							>
+								{praPasporCompleted}/{praPasporTotal}
+							</Badge>
+						</TabsTrigger>
+
+						<TabsTrigger
+							value="dokumen"
+							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-lg py-2.5 transition-all font-bold text-xs flex items-center justify-center gap-2"
+						>
+							<Plane className="w-4 h-4" />
+							<span>Dokumen Terbang</span>
+							<Badge
+								variant="outline"
+								className={`text-[10px] px-1.5 py-0 ${
+									dokumenCompleted === dokumenTotal
+										? "bg-emerald-50 text-emerald-700 border-emerald-200"
+										: "bg-slate-100 text-slate-600 border-slate-200"
+								}`}
+							>
+								{dokumenCompleted}/{dokumenTotal}
+							</Badge>
+						</TabsTrigger>
+
+						<TabsTrigger
+							value="dana-talangan"
+							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-lg py-2.5 transition-all font-bold text-xs flex items-center justify-center gap-2"
+						>
+							<CreditCard className="w-4 h-4" />
+							<span>Pembayaran Lanjutan</span>
+						</TabsTrigger>
+
+						<TabsTrigger
+							value="syarat-akhir"
+							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-lg py-2.5 transition-all font-bold text-xs flex items-center justify-center gap-2"
+						>
+							<GraduationCap className="w-4 h-4" />
+							<span>Syarat Akhir</span>
+							<Badge
+								variant="outline"
+								className={`text-[10px] px-1.5 py-0 ${
+									syaratAkhirCompleted === syaratAkhirTotal
+										? "bg-emerald-50 text-emerald-700 border-emerald-200"
+										: "bg-slate-100 text-slate-600 border-slate-200"
+								}`}
+							>
+								{syaratAkhirCompleted}/{syaratAkhirTotal}
+							</Badge>
+						</TabsTrigger>
+					</TabsList>
+
+					<TabsContent value="pra-paspor">
+						<TabPraPaspor
+							studentId={studentId}
+							data={data}
+							passportClearance={passportClearance}
+							canEdit={canEdit}
+							loadingItem={loadingItem}
+							handleToggleField={handleToggleField}
+							fetchInternshipData={fetchInternshipData}
+						/>
+					</TabsContent>
+
+					<TabsContent value="dokumen">
+						<TabDokumen
+							studentId={studentId}
+							data={data}
+							canEdit={canEdit}
+							loadingItem={loadingItem}
+							handleToggleField={handleToggleField}
+							handleLocalChange={handleLocalChange}
+							handleBlurField={handleBlurField}
+							fetchInternshipData={fetchInternshipData}
+							notes={notes}
+							setNotes={setNotes}
+							handleSaveNotes={handleSaveNotes}
+							isSaving={isSaving}
+						/>
+					</TabsContent>
+
+					<TabsContent value="dana-talangan">
+						<TabDanaTalangan
+							studentId={studentId}
+							data={data}
+							pmbPaymentData={pmbPaymentData}
+							canEdit={canEdit}
+							handleToggleField={handleToggleField}
+							handleLocalChange={handleLocalChange}
+							handleBlurField={handleBlurField}
+						/>
+					</TabsContent>
+
+					<TabsContent value="syarat-akhir">
+						<TabSyaratAkhir
+							studentId={studentId}
+							data={data}
+							postInternshipDocs={postInternshipDocs}
+							canEditPostInternship={canEditPostInternship}
+							loadingItem={loadingItem}
+							setPostInternshipDocs={setPostInternshipDocs}
+							handleToggleField={handleToggleField}
+							handleLocalChange={handleLocalChange}
+							handleBlurField={handleBlurField}
+						/>
+					</TabsContent>
+				</Tabs>
 
 				{/* Status ACC Panel Card */}
 				<Card
-					className={`border shadow-sm overflow-hidden ${data?.isAcc ? "bg-slate-50 border-slate-200" : "bg-blue-50 border-blue-200"}`}
+					className={`border shadow-sm overflow-hidden ${
+						data?.isAcc
+							? "bg-emerald-50/50 border-emerald-200"
+							: "bg-slate-50 border-slate-200"
+					}`}
 				>
-					<CardContent className="p-0">
-						<div className="flex flex-col sm:flex-row items-center justify-between p-6">
-							<div className="flex items-center gap-4 mb-4 sm:mb-0">
+					<CardContent className="p-5 sm:p-6">
+						<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+							<div className="flex items-center gap-3.5">
 								{data?.isAcc ? (
-									<>
-										<div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center">
-											<CheckCircle className="w-6 h-6 text-slate-600" />
-										</div>
-										<div>
-											<h4 className="text-slate-800 font-bold text-lg">
-												✅ Disetujui (ACC) oleh{" "}
-												{data.accBy?.fullName || "Tim Magang"}
+									<div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+										<CheckCircle2 className="w-6 h-6" />
+									</div>
+								) : (
+									<div className="w-12 h-12 rounded-2xl bg-blue-100 text-[#0517B0] flex items-center justify-center shrink-0">
+										<ShieldCheck className="w-6 h-6" />
+									</div>
+								)}
+
+								<div>
+									{data?.isAcc ? (
+										<>
+											<h4 className="text-slate-900 font-bold text-base flex items-center gap-2">
+												Status ACC: Disetujui (ACC)
+												<Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px]">
+													Final
+												</Badge>
 											</h4>
-											<p className="text-sm text-slate-600">
-												Pada{" "}
+											<p className="text-xs text-slate-600 mt-0.5">
+												Disetujui oleh{" "}
+												<strong className="text-slate-800">
+													{data.accBy?.fullName || "Tim Magang"}
+												</strong>{" "}
+												pada{" "}
 												{new Date(data.accAt!).toLocaleDateString("id-ID", {
 													day: "numeric",
 													month: "long",
@@ -437,108 +583,101 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 												})}{" "}
 												WIB
 											</p>
-										</div>
-									</>
-								) : (
-									<>
-										<div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-											<CheckCircle className="w-6 h-6 text-blue-600" />
-										</div>
-										<div>
-											<h4 className="text-blue-900 font-bold text-lg">
-												ACC Tim Magang Internasional
+										</>
+									) : (
+										<>
+											<h4 className="text-slate-900 font-bold text-base">
+												Persetujuan Akhir Divisi Magang
 											</h4>
-											<p className="text-sm text-blue-700 max-w-md">
+											<p className="text-xs text-slate-600 mt-0.5 max-w-md">
 												{validatedCount < totalCount
-													? `Menunggu ${totalCount - validatedCount} progres (ceklist) diselesaikan (Saat ini: ${validatedCount}/${totalCount} selesai).`
-													: "Seluruh progres (ceklist) telah selesai. Silakan berikan ACC keberangkatan."}
+													? `Kelengkapan checklist: ${validatedCount}/${totalCount} selesai. Masih ada ${totalCount - validatedCount} item yang belum lengkap.`
+													: "Seluruh berkas magang telah lengkap. Silakan berikan persetujuan ACC."}
 											</p>
-										</div>
-									</>
-								)}
+										</>
+									)}
+								</div>
 							</div>
 
-							{isMagang && data?.isAcc && (
-								<AlertDialog>
-									<AlertDialogTrigger
-										render={
-											<Button
-												variant="outline"
-												className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 shrink-0"
-												disabled={isSaving}
-											>
-												{isSaving ? "Membatalkan..." : "Batalkan ACC"}
-											</Button>
-										}
-									/>
-									<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
-										<AlertDialogTitle>
-											Konfirmasi Pembatalan ACC Magang
-										</AlertDialogTitle>
-										<AlertDialogDescription className="text-slate-500">
-											Apakah Anda yakin ingin membatalkan status ACC untuk panel
-											Tim Magang Internasional ini? Status mahasiswa akan
-											kembali ke tahap proses.
-										</AlertDialogDescription>
-										<div className="flex justify-end gap-3 mt-4">
-											<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50">
-												Batal
-											</AlertDialogCancel>
-											<AlertDialogAction
-												onClick={handleCancelAcc}
-												className="bg-rose-600 hover:bg-rose-700 text-white"
-											>
-												Ya, Batalkan ACC
-											</AlertDialogAction>
-										</div>
-									</AlertDialogContent>
-								</AlertDialog>
-							)}
+							<div className="flex items-center gap-2 self-end sm:self-center">
+								{isMagang && data?.isAcc && (
+									<AlertDialog>
+										<AlertDialogTrigger
+											render={
+												<Button
+													variant="outline"
+													size="sm"
+													className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 text-xs font-semibold"
+													disabled={isSaving}
+												>
+													{isSaving ? "Membatalkan..." : "Batalkan ACC"}
+												</Button>
+											}
+										/>
+										<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
+											<AlertDialogTitle>
+												Konfirmasi Pembatalan ACC Magang
+											</AlertDialogTitle>
+											<AlertDialogDescription className="text-slate-500">
+												Apakah Anda yakin ingin membatalkan status ACC untuk
+												panel Tim Magang Internasional ini? Status mahasiswa
+												akan kembali ke tahap evaluasi berkas.
+											</AlertDialogDescription>
+											<div className="flex justify-end gap-3 mt-4">
+												<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50">
+													Batal
+												</AlertDialogCancel>
+												<AlertDialogAction
+													onClick={handleCancelAcc}
+													className="bg-rose-600 hover:bg-rose-700 text-white"
+												>
+													Ya, Batalkan ACC
+												</AlertDialogAction>
+											</div>
+										</AlertDialogContent>
+									</AlertDialog>
+								)}
 
-							{isMagang && !data?.isAcc && (
-								<Tooltip>
-									<TooltipTrigger render={<span className="inline-block" />}>
-										<span>
-											<AlertDialog>
-												<AlertDialogTrigger
-													render={
-														<Button
-															disabled={validatedCount < totalCount}
-															className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px] disabled:opacity-50 disabled:cursor-not-allowed"
-														>
-															Berikan ACC
-														</Button>
-													}
-												/>
-												<AlertDialogContent>
-													<AlertDialogTitle>
-														Konfirmasi ACC Magang
-													</AlertDialogTitle>
-													<AlertDialogDescription>
-														Apakah Anda yakin ingin memberikan ACC? Tindakan ini
-														menandakan bahwa seluruh progres (ceklist) magang
-														mahasiswa telah selesai.
-													</AlertDialogDescription>
-													<div className="flex justify-end gap-3 mt-4">
-														<AlertDialogCancel>Batal</AlertDialogCancel>
-														<AlertDialogAction
-															onClick={handleAcc}
-															className="bg-blue-600 hover:bg-blue-700"
-														>
-															Ya, Berikan ACC
-														</AlertDialogAction>
-													</div>
-												</AlertDialogContent>
-											</AlertDialog>
-										</span>
-									</TooltipTrigger>
-									{validatedCount < totalCount && (
-										<TooltipContent>
-											{`Selesaikan semua ${totalCount - validatedCount} progres (ceklist) yang belum dicentang terlebih dahulu`}
-										</TooltipContent>
-									)}
-								</Tooltip>
-							)}
+								{isMagang && !data?.isAcc && (
+									<AlertDialog>
+										<AlertDialogTrigger
+											render={
+												<Button
+													size="sm"
+													disabled={isSaving}
+													className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs font-semibold px-4"
+												>
+													{isSaving ? (
+														<Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+													) : (
+														<CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+													)}
+													Berikan ACC Magang
+												</Button>
+											}
+										/>
+										<AlertDialogContent className="bg-white border-slate-200">
+											<AlertDialogTitle>
+												Konfirmasi Persetujuan ACC Magang
+											</AlertDialogTitle>
+											<AlertDialogDescription className="text-slate-600">
+												Apakah Anda yakin ingin memberikan status ACC Magang
+												untuk mahasiswa ini? Tindakan ini akan tercatat dalam
+												log audit sistem.
+											</AlertDialogDescription>
+											<div className="flex justify-end gap-3 mt-4">
+												<AlertDialogCancel>Batal</AlertDialogCancel>
+												<AlertDialogAction
+													onClick={handleAcc}
+													className="bg-[#0517B0] hover:bg-blue-800 text-white"
+												>
+													Ya, Berikan ACC
+												</AlertDialogAction>
+											</div>
+										</AlertDialogContent>
+									</AlertDialog>
+								)}
+							</div>
 						</div>
 					</CardContent>
 				</Card>

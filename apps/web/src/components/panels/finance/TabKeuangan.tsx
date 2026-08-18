@@ -1062,8 +1062,14 @@ export function TabKeuangan({
 		// Sanitize data before sending
 		const sanitizedFormData = { ...formData };
 		Object.keys(sanitizedFormData).forEach((key) => {
-			if (typeof sanitizedFormData[key] === "number") {
-				sanitizedFormData[key] = Math.max(0, sanitizedFormData[key]);
+			if (
+				typeof sanitizedFormData[key] === "number" ||
+				sanitizedFormData[key] === ""
+			) {
+				sanitizedFormData[key] = Math.max(
+					0,
+					Number(sanitizedFormData[key]) || 0,
+				);
 			}
 		});
 
@@ -3274,8 +3280,8 @@ export function TabKeuangan({
 															type="number"
 															min={0}
 															onKeyDown={preventMinus}
-															className="w-32 text-right"
 															placeholder="0"
+															className="w-32 text-right"
 															value={
 																f.nominal === 0 || f.nominal === "0"
 																	? ""

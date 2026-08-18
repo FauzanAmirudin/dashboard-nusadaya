@@ -9,6 +9,7 @@ import {
 	Download,
 	Eye,
 	HelpCircle,
+	MessageCircle,
 	Phone,
 	Search,
 	ShieldCheck,
@@ -25,6 +26,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
+import { Progress } from "@/components/ui/progress";
 import {
 	Select,
 	SelectContent,
@@ -32,6 +35,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { TablePagination } from "@/components/ui/TablePagination";
 import {
 	Table,
 	TableBody,
@@ -399,6 +403,14 @@ function getStudentLatestTimestamp(s: any): number {
 	return latest;
 }
 
+function formatWhatsAppUrl(phone: string | null | undefined) {
+	if (!phone) return null;
+	const clean = phone.replace(/[^0-9]/g, "");
+	if (!clean) return null;
+	const formatted = clean.startsWith("0") ? `62${clean.slice(1)}` : clean;
+	return `https://wa.me/${formatted}`;
+}
+
 export function FinanceDashboard({ user, data: propData }: any) {
 	const router = useRouter();
 	const [data, setData] = useState<any[]>(propData || []);
@@ -411,6 +423,9 @@ export function FinanceDashboard({ user, data: propData }: any) {
 	const [sortBy, setSortBy] = useState<
 		"recent" | "oldest" | "name" | "paid_desc"
 	>("recent");
+
+	const [currentPage, setCurrentPage] = useState(1);
+	const pageSize = 20;
 
 	// State Fitur Proyeksi Pendapatan per Bulan (Komponen 2)
 	const [datePreset, setDatePreset] = useState<DatePreset>("this_month");
@@ -679,6 +694,16 @@ export function FinanceDashboard({ user, data: propData }: any) {
 			return (b.student?.id || 0) - (a.student?.id || 0);
 		});
 	}, [cohortData, searchQuery, selectedStatus, sortBy]);
+
+	// Reset page on filter changes
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [selectedCohort, selectedStatus, searchQuery]);
+
+	const paginatedData = useMemo(() => {
+		const start = (currentPage - 1) * pageSize;
+		return filteredData.slice(start, start + pageSize);
+	}, [filteredData, currentPage]);
 
 	const handleExport = () => {
 		const exportData = filteredData.map((s: any) => ({
@@ -1349,7 +1374,7 @@ export function FinanceDashboard({ user, data: propData }: any) {
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{filteredData.map((s: any, idx: number) => {
+								{paginatedData.map((s: any, idx: number) => {
 									const { items, completed, total, isDone } =
 										getFinanceChecklist(s.finance);
 									const unpaidItems = items.filter((it) => !it.done);
@@ -1358,6 +1383,7 @@ export function FinanceDashboard({ user, data: propData }: any) {
 									const financeStatus = s.finance?.status || "PERLU_PERHATIAN";
 									const isAmanOrLunas =
 										financeStatus === "AMAN" || unpaidItems.length === 0;
+									const waUrl = formatWhatsAppUrl(s.student?.phone);
 
 									return (
 										<TableRow
@@ -1535,15 +1561,6 @@ export function FinanceDashboard({ user, data: propData }: any) {
 																	<span>
 																		{completed}/{total} Item
 																	</span>
-																	<span
-																		className={
-																			isDone
-																				? "text-emerald-600"
-																				: "text-slate-500"
-																		}
-																	>
-																		{Math.round((completed / total) * 100)}%
-																	</span>
 																</div>
 																<div className="w-full h-2 bg-slate-200/70 rounded-full overflow-hidden border border-slate-200">
 																	<div
@@ -1602,7 +1619,9 @@ export function FinanceDashboard({ user, data: propData }: any) {
 													size="sm"
 													variant="outline"
 													onClick={() =>
-														router.push(`/dashboard/students/${s.student.id}`)
+														router.push(
+															`/dashboard/students/${s.student.id}?context=finance`,
+														)
 													}
 													className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5 shadow-2xs"
 												>
@@ -1623,11 +1642,18 @@ export function FinanceDashboard({ user, data: propData }: any) {
 									Tidak ada data keuangan mahasiswa ditemukan.
 								</p>
 								<p className="text-xs text-slate-400 mt-0.5">
-									Coba ubah kata kunci pencarian atau filter status yang
-									digunakan.
+									Coba ubah kata kunci pencarian atau filter yang digunakan.
 								</p>
 							</div>
 						)}
+
+						<TablePagination
+							currentPage={currentPage}
+							totalItems={filteredData.length}
+							pageSize={pageSize}
+							onPageChange={setCurrentPage}
+							itemName="Mahasiswa Keuangan"
+						/>
 					</div>
 				</CardContent>
 			</Card>

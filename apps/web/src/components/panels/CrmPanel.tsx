@@ -7,7 +7,7 @@ import { CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/eden";
-import { useAuthStore } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
 import { TabHafalan } from "./crm/TabHafalan";
 import { TabKehadiran } from "./crm/TabKehadiran";
 import { TabMonitoring } from "./crm/TabMonitoring";
@@ -22,8 +22,8 @@ interface CrmPanelProps {
 
 export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 	const { user, token } = useAuthStore();
-	const isCrmAdmin = user?.role === "crm" || user?.role === "superadmin";
-	const isSuperadmin = user?.role === "superadmin";
+	const isCrmAdmin = hasRole(user, "crm");
+	const isSuperadmin = hasRole(user, "superadmin");
 	const canEdit = isCrmAdmin;
 
 	const [crmState, setCrmState] = useState<{

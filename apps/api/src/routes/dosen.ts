@@ -7,6 +7,7 @@ import {
 	practicesMaterialReports,
 	students,
 } from "../db/schema";
+import { hasRole } from "../lib/permissions";
 import { fileService } from "../modules/file/service/file.service";
 
 export const dosenRouter = new Elysia({ prefix: "/dosen" }).get(
@@ -15,7 +16,7 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" }).get(
 		const user = (context as any).user;
 		const set = context.set;
 
-		if (!user || (user.role !== "dosen" && user.role !== "superadmin")) {
+		if (!hasRole(user, "dosen")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -28,32 +29,71 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" }).get(
 			.from(courseGrades)
 			.innerJoin(students, eq(courseGrades.studentId, students.id));
 
-		if (user.role !== "superadmin") {
+		if (!hasRole(user, "superadmin")) {
 			query = query.where(eq(courseGrades.dosenId, user.id)) as any;
 		}
 
 		const grades = await query;
 
-		const totalStudentsSet = new Set<number>();
-		let pendingAcc = 0;
-		let lowAttendance = 0;
+		const studentMap = new Map<number, any>();
+		let pendingAccCount = 0;
+		let lowAttendanceCount = 0;
 
-		const mappedGrades = grades.map((g) => {
-			totalStudentsSet.add(g.student.id);
-			if (!g.courseGrade.isAcc) pendingAcc++;
-			if ((g.courseGrade.attendanceRate || 0) < 70) lowAttendance++;
+		for (const g of grades) {
+			const sId = g.student.id;
+			if (!studentMap.has(sId)) {
+				studentMap.set(sId, {
+					studentId: sId,
+					studentName: g.student.name,
+					studentNim: g.student.nim || "-",
+					studentCohort: g.student.cohort,
+					program: g.student.program,
+					subProgram: g.student.subProgram,
+					courses: [],
+				});
+			}
 
-			return {
+			const std = studentMap.get(sId);
+			std.courses.push({
 				id: g.courseGrade.id,
-				studentId: g.student.id,
-				studentName: g.student.name,
-				studentNim: g.student.nim,
 				courseCode: g.courseGrade.courseCode,
 				courseName: g.courseGrade.courseName,
 				grade: g.courseGrade.grade,
 				attendanceRate: g.courseGrade.attendanceRate,
 				isAcc: g.courseGrade.isAcc,
 				status: g.courseGrade.status,
+			});
+		}
+
+		const studentRows = Array.from(studentMap.values()).map((std) => {
+			const totalCrs = std.courses.length;
+			const totalAtt = std.courses.reduce(
+				(acc: number, c: any) => acc + (c.attendanceRate || 0),
+				0,
+			);
+			const avgAtt = totalCrs > 0 ? Math.round(totalAtt / totalCrs) : 0;
+			const isAllAcc = totalCrs > 0 && std.courses.every((c: any) => c.isAcc);
+			const hasTidakAman = std.courses.some(
+				(c: any) => c.status === "TIDAK_AMAN",
+			);
+			const hasPerhatian = std.courses.some(
+				(c: any) => c.status === "PERLU_PERHATIAN",
+			);
+			const overallStatus = hasTidakAman
+				? "TIDAK_AMAN"
+				: hasPerhatian
+					? "PERLU_PERHATIAN"
+					: "AMAN";
+
+			if (!isAllAcc) pendingAccCount++;
+			if (avgAtt < 80) lowAttendanceCount++;
+
+			return {
+				...std,
+				totalCourses: totalCrs,
+				avgAttendance: avgAtt,
+				isAllAcc,
+				overallStatus,
 			};
 		});
 
@@ -66,11 +106,11 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" }).get(
 			data: {
 				kpi: {
 					totalCourses: uniqueCourses,
-					totalStudents: totalStudentsSet.size,
-					pendingAcc,
-					lowAttendance,
+					totalStudents: studentRows.length,
+					pendingAcc: pendingAccCount,
+					lowAttendance: lowAttendanceCount,
 				},
-				courseGrades: mappedGrades,
+				students: studentRows,
 			},
 		};
 	},

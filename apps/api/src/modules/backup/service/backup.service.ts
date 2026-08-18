@@ -189,7 +189,11 @@ export class BackupService {
 			const totalFiles = fileRecords.length;
 
 			// Update total di Redis
-			await setJobProgress("backup", jobId, { total: totalFiles });
+			await setJobProgress("backup", jobId, {
+				total: totalFiles,
+				processed: 0,
+				percentage: totalFiles === 0 ? 100 : 0,
+			});
 
 			// 3. Tentukan direktori output backup
 			// Untuk backup type "student", gunakan NIM sebagai nama folder
@@ -211,48 +215,50 @@ export class BackupService {
 			let totalSize = 0;
 			const manifestFiles: ManifestFile[] = [];
 
-			for (const fileRecord of fileRecords) {
-				// Ganti students/{id}/... menjadi students/{nim}/... di dalam backup
-				// sehingga admin mudah membaca isi folder ZIP
-				let relDestPath = fileRecord.storagePath;
-				if (fileRecord.studentId !== null) {
-					const nim = studentNimMap.get(fileRecord.studentId);
-					if (nim) {
-						relDestPath = relDestPath.replace(
-							`students/${fileRecord.studentId}/`,
-							`students/${nim}/`,
+			if (totalFiles > 0) {
+				for (const fileRecord of fileRecords) {
+					// Ganti students/{id}/... menjadi students/{nim}/... di dalam backup
+					// sehingga admin mudah membaca isi folder ZIP
+					let relDestPath = fileRecord.storagePath;
+					if (fileRecord.studentId !== null) {
+						const nim = studentNimMap.get(fileRecord.studentId);
+						if (nim) {
+							relDestPath = relDestPath.replace(
+								`students/${fileRecord.studentId}/`,
+								`students/${nim}/`,
+							);
+						}
+					}
+
+					try {
+						await fileService.copyFileToBackup(
+							fileRecord.id,
+							outputDir,
+							relDestPath,
+						);
+						totalSize += fileRecord.size;
+						manifestFiles.push({
+							path: relDestPath,
+							originalName: fileRecord.originalName,
+							size: fileRecord.size,
+							checksum: fileRecord.checksum,
+						});
+					} catch {
+						// File mungkin sudah dihapus — skip tapi catat
+						console.warn(
+							`[Backup] Skip file ${fileRecord.id}: file tidak ditemukan di storage`,
 						);
 					}
-				}
 
-				try {
-					await fileService.copyFileToBackup(
-						fileRecord.id,
-						outputDir,
-						relDestPath,
-					);
-					totalSize += fileRecord.size;
-					manifestFiles.push({
-						path: relDestPath,
-						originalName: fileRecord.originalName,
-						size: fileRecord.size,
-						checksum: fileRecord.checksum,
-					});
-				} catch {
-					// File mungkin sudah dihapus — skip tapi catat
-					console.warn(
-						`[Backup] Skip file ${fileRecord.id}: file tidak ditemukan di storage`,
-					);
-				}
+					processed++;
 
-				processed++;
-
-				// Update Redis setiap 10 file (bukan tiap file — kurangi beban Redis)
-				if (processed % 10 === 0 || processed === totalFiles) {
-					await setJobProgress("backup", jobId, {
-						processed,
-						currentFile: fileRecord.originalName,
-					});
+					// Update Redis setiap 10 file atau saat selesai (bukan tiap file — kurangi beban Redis)
+					if (processed % 10 === 0 || processed === totalFiles) {
+						await setJobProgress("backup", jobId, {
+							processed,
+							currentFile: fileRecord.originalName,
+						});
+					}
 				}
 			}
 
@@ -282,7 +288,9 @@ export class BackupService {
 
 			await setJobProgress("backup", jobId, {
 				status: "completed",
+				total: totalFiles,
 				processed,
+				percentage: 100,
 				completedAt: new Date().toISOString(),
 			});
 		} catch (err) {

@@ -91,6 +91,7 @@ export const users = pgTable("users", {
 	passwordHash: text("password_hash").notNull(),
 	fullName: text("full_name").notNull(),
 	role: roleEnum("role").notNull(),
+	roles: jsonb("roles").$type<string[]>().default([]),
 	email: text("email"),
 	phone: text("phone"),
 	profilePhotoUrl: text("profile_photo_url"),
@@ -2188,8 +2189,9 @@ export const courseMeetings = pgTable("course_meetings", {
 	courseId: integer("course_id")
 		.references(() => courses.id)
 		.notNull(),
-	meetingNumber: integer("meeting_number").notNull(), // 0=PKKMB, 1=Beginning, 2-17
-	meetingType: meetingTypeEnum("meeting_type").notNull(),
+	meetingNumber: integer("meeting_number").notNull(), // 1 to 16
+	meetingType: meetingTypeEnum("meeting_type").notNull(), // regular, uts, uas
+	sessionType: text("session_type"), // "teori" | "praktik" | "keduanya"
 	meetingLabel: text("meeting_label").notNull(),
 	description: text("description"),
 	meetingDate: date("meeting_date"),
@@ -2219,7 +2221,9 @@ export const courseMeetingAttendances = pgTable("course_meeting_attendances", {
 	studentId: integer("student_id")
 		.references(() => students.id)
 		.notNull(),
-	status: text("status").notNull(), // hadir, izin, sakit, alpha
+	status: text("status"), // hadir, izin, sakit, alpha, or null if unassigned
+	theoryScore: integer("theory_score"),
+	practicalScore: integer("practical_score"),
 	notes: text("notes"),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),

@@ -1,4 +1,5 @@
 import { Elysia, t } from "elysia";
+import { hasRole } from "../../../lib/permissions";
 import { backupRepository } from "../repository/backup.repository";
 import { backupService } from "../service/backup.service";
 
@@ -25,7 +26,7 @@ export const backupRoutes = new Elysia()
 			}
 
 			// Hanya superadmin yang bisa membuat backup
-			if (user.role !== "superadmin") {
+			if (!hasRole(user, "superadmin")) {
 				set.status = 403;
 				return {
 					success: false,
@@ -87,7 +88,7 @@ export const backupRoutes = new Elysia()
 			return { success: false, message: "Unauthorized" };
 		}
 
-		if (user.role !== "superadmin") {
+		if (!hasRole(user, "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -107,7 +108,7 @@ export const backupRoutes = new Elysia()
 			return { success: false, message: "Unauthorized" };
 		}
 
-		if (user.role !== "superadmin") {
+		if (!hasRole(user, "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -131,7 +132,7 @@ export const backupRoutes = new Elysia()
 			return { success: false, message: "Unauthorized" };
 		}
 
-		if (user.role !== "superadmin") {
+		if (!hasRole(user, "superadmin")) {
 			set.status = 403;
 			return {
 				success: false,
@@ -159,7 +160,7 @@ export const backupRoutes = new Elysia()
 			return { success: false, message: "Unauthorized" };
 		}
 
-		if (user.role !== "superadmin") {
+		if (!hasRole(user, "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -173,11 +174,19 @@ export const backupRoutes = new Elysia()
 			};
 		}
 
-		// Gunakan Node.js child_process untuk zip — tidak ada crash risk
-		const os = require("os");
-		const path = require("path");
-		const { execSync } = require("child_process");
-		const { existsSync, readFileSync, unlinkSync } = require("fs");
+		const fs = await import("node:fs");
+		if (!fs.existsSync(job.outputPath)) {
+			set.status = 404;
+			return {
+				success: false,
+				message: "Direktori backup fisik tidak ditemukan di server",
+			};
+		}
+
+		const os = await import("node:os");
+		const path = await import("node:path");
+		const archiverModule = await import("archiver");
+		const archiver = ((archiverModule as any).default || archiverModule) as any;
 
 		const tmpFile = path.join(
 			os.tmpdir(),
@@ -185,29 +194,24 @@ export const backupRoutes = new Elysia()
 		);
 
 		try {
-			// PowerShell Compress-Archive (Windows) atau zip (Linux/Mac)
-			const isWindows = process.platform === "win32";
-			if (isWindows) {
-				execSync(
-					`powershell -Command "Compress-Archive -Path '${job.outputPath}\\*' -DestinationPath '${tmpFile}' -Force"`,
-					{ timeout: 120000 },
-				);
-			} else {
-				execSync(`cd "${job.outputPath}" && zip -r "${tmpFile}" .`, {
-					timeout: 120000,
-				});
-			}
+			const output = fs.createWriteStream(tmpFile);
+			const archive = archiver("zip", { zlib: { level: 6 } });
 
-			if (!existsSync(tmpFile)) {
-				set.status = 500;
-				return { success: false, message: "Gagal membuat file ZIP" };
-			}
+			await new Promise<void>((resolve, reject) => {
+				output.on("close", () => resolve());
+				output.on("error", (err) => reject(err));
+				archive.on("error", (err: any) => reject(err));
 
-			const zipBuffer = readFileSync(tmpFile);
+				archive.pipe(output);
+				archive.directory(job.outputPath, false);
+				archive.finalize();
+			});
+
+			const zipBuffer = fs.readFileSync(tmpFile);
 
 			// Cleanup temp file
 			try {
-				unlinkSync(tmpFile);
+				fs.unlinkSync(tmpFile);
 			} catch {}
 
 			set.headers = {
@@ -220,7 +224,7 @@ export const backupRoutes = new Elysia()
 		} catch (err: any) {
 			// Cleanup on error
 			try {
-				if (existsSync(tmpFile)) unlinkSync(tmpFile);
+				if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
 			} catch {}
 			set.status = 500;
 			return {

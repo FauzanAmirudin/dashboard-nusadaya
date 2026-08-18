@@ -3,6 +3,7 @@
 import {
 	AlertCircle,
 	AlertTriangle,
+	BookOpen,
 	CheckCircle2,
 	DollarSign,
 	Download,
@@ -59,9 +60,26 @@ interface ItemSisaBahan {
 	kondisi: string;
 }
 
+interface DosenCourse {
+	id: number;
+	code: string;
+	name: string;
+	cohort: number;
+	type: string;
+	dosenId?: number;
+}
+
 interface BudgetRequest {
 	id: number;
 	dosenId: number;
+	courseId?: number;
+	course?: {
+		id: number;
+		name: string;
+		code: string;
+		cohort: number;
+		type: string;
+	};
 	daftarKebutuhan: ItemKebutuhan[];
 	totalNominal: number;
 	status: string; // "menunggu" | "disetujui" | "ditolak"
@@ -82,18 +100,33 @@ interface MaterialReport {
 interface TabAnggaranPraktikProps {
 	courseId: string;
 	canEdit: boolean;
+	currentCourse?: {
+		id: number;
+		name: string;
+		code: string;
+		cohort: number;
+		type: string;
+		dosenId?: number;
+	};
 }
 
 export function TabAnggaranPraktik({
 	courseId,
 	canEdit,
+	currentCourse,
 }: TabAnggaranPraktikProps) {
-	const { token } = useAuthStore();
+	const { user, token } = useAuthStore();
 	const authToken = token || getToken();
 	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 	const [requests, setRequests] = useState<BudgetRequest[]>([]);
 	const [reports, setReports] = useState<MaterialReport[]>([]);
+	const [dosenCourses, setDosenCourses] = useState<DosenCourse[]>(
+		currentCourse ? [currentCourse] : [],
+	);
+	const [selectedCourseId, setSelectedCourseId] = useState<string>(
+		courseId || (currentCourse?.id?.toString() ?? ""),
+	);
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSaving, setIsSaving] = useState(false);
 
@@ -135,6 +168,44 @@ export function TabAnggaranPraktik({
 		}
 	};
 
+	const fetchDosenCourses = async () => {
+		try {
+			const res = await fetch(`${API_URL}/courses`, {
+				headers: { Authorization: `Bearer ${authToken}` },
+			});
+			if (res.ok) {
+				const json = await res.json();
+				if (json.success) {
+					const allCourses = (json.data as any[]) || [];
+					let filtered = allCourses;
+					if (user?.role === "dosen") {
+						filtered = allCourses.filter(
+							(c) => c.dosenId === user.id || c.dosen?.id === user.id,
+						);
+					}
+					// Ensure current course is included
+					if (
+						currentCourse &&
+						!filtered.some((c) => c.id === currentCourse.id)
+					) {
+						filtered = [currentCourse, ...filtered];
+					} else if (
+						courseId &&
+						!filtered.some((c) => c.id.toString() === courseId.toString())
+					) {
+						const cur = allCourses.find(
+							(c) => c.id.toString() === courseId.toString(),
+						);
+						if (cur) filtered = [cur, ...filtered];
+					}
+					setDosenCourses(filtered);
+				}
+			}
+		} catch (error) {
+			console.error("Failed to fetch dosen courses", error);
+		}
+	};
+
 	const fetchReports = async () => {
 		try {
 			const res = await fetch(`${API_URL}/dosen/laporan-sisa-bahan`, {
@@ -152,8 +223,10 @@ export function TabAnggaranPraktik({
 	useEffect(() => {
 		if (!courseId) return;
 		setIsLoading(true);
-		fetchRequests().finally(() => setIsLoading(false));
-	}, [token, courseId]);
+		Promise.all([fetchRequests(), fetchDosenCourses()]).finally(() =>
+			setIsLoading(false),
+		);
+	}, [token, courseId, user]);
 
 	// Calculate Total Nominal of Budget Request
 	const totalNominalCalculated = items.reduce(
@@ -186,12 +259,19 @@ export function TabAnggaranPraktik({
 
 	const handleOpenNewModal = () => {
 		setEditingRequestId(null);
+		setSelectedCourseId(courseId || (dosenCourses[0]?.id.toString() ?? ""));
 		setItems([{ namaItem: "", jumlah: 1, satuan: "pcs", satuanHarga: 0 }]);
 		setIsModalOpen(true);
 	};
 
 	const handleOpenRevisiModal = (req: BudgetRequest) => {
 		setEditingRequestId(req.id);
+		setSelectedCourseId(
+			req.courseId?.toString() ||
+				req.course?.id?.toString() ||
+				courseId ||
+				(dosenCourses[0]?.id.toString() ?? ""),
+		);
 		setItems(
 			req.daftarKebutuhan && req.daftarKebutuhan.length > 0
 				? req.daftarKebutuhan
@@ -206,16 +286,23 @@ export function TabAnggaranPraktik({
 			return;
 		}
 
+		const targetCourseId = selectedCourseId || courseId;
+		if (!targetCourseId) {
+			toast.error("Pilih mata kuliah praktik terlebih dahulu");
+			return;
+		}
+
 		setIsSaving(true);
 		try {
 			const payload = {
+				courseId: Number(targetCourseId),
 				daftarKebutuhan: items,
 				totalNominal: totalNominalCalculated,
 			};
 
 			const endpoint = editingRequestId
-				? `${API_URL}/courses/${courseId}/budget-requests/${editingRequestId}`
-				: `${API_URL}/courses/${courseId}/budget-requests`;
+				? `${API_URL}/courses/${targetCourseId}/budget-requests/${editingRequestId}`
+				: `${API_URL}/courses/${targetCourseId}/budget-requests`;
 			const method = editingRequestId ? "PUT" : "POST";
 
 			const res = await fetch(endpoint, {
@@ -494,9 +581,27 @@ export function TabAnggaranPraktik({
 												{idx + 1}
 											</span>
 											<div>
-												<h4 className="text-sm font-bold text-slate-800">
-													Pengajuan Anggaran #{req.id}
-												</h4>
+												<div className="flex items-center gap-2 flex-wrap">
+													<h4 className="text-sm font-bold text-slate-800">
+														Pengajuan Anggaran #{req.id}
+													</h4>
+													{req.course && (
+														<Badge
+															variant="outline"
+															className="bg-indigo-50/80 text-indigo-700 border-indigo-200 text-xs font-semibold"
+														>
+															[{req.course.code}] {req.course.name}
+														</Badge>
+													)}
+												</div>
+												<span className="text-xs text-slate-500">
+													Diajukan pada:{" "}
+													{new Date(req.createdAt).toLocaleDateString("id-ID", {
+														day: "numeric",
+														month: "long",
+														year: "numeric",
+													})}
+												</span>
 											</div>
 										</div>
 										<div className="flex items-center gap-3">
@@ -852,6 +957,61 @@ export function TabAnggaranPraktik({
 					</DialogHeader>
 
 					<div className="space-y-5 py-3">
+						{/* Mata Kuliah Dropdown */}
+						<div className="space-y-1.5 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200">
+							<Label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+								<BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+								Mata Kuliah Praktik *
+							</Label>
+							<Select
+								value={selectedCourseId}
+								onValueChange={(val) => setSelectedCourseId(val || "")}
+							>
+								{(() => {
+									const selectedCourseObj =
+										dosenCourses.find(
+											(c) => c.id.toString() === selectedCourseId,
+										) ||
+										(currentCourse &&
+										currentCourse.id.toString() === selectedCourseId
+											? currentCourse
+											: undefined);
+
+									return (
+										<SelectTrigger className="w-full bg-white border-slate-200 text-xs h-10 font-semibold text-slate-800">
+											<SelectValue placeholder="Pilih Mata Kuliah Praktik...">
+												{selectedCourseObj
+													? `[${selectedCourseObj.code}] ${selectedCourseObj.name} (Angk. ${selectedCourseObj.cohort})`
+													: undefined}
+											</SelectValue>
+										</SelectTrigger>
+									);
+								})()}
+								<SelectContent className="max-h-60">
+									{dosenCourses.map((c) => (
+										<SelectItem key={c.id} value={c.id.toString()}>
+											<div className="flex items-center gap-2 py-0.5">
+												<span className="font-bold text-indigo-600 font-mono">
+													[{c.code}]
+												</span>
+												<span className="font-medium text-slate-800">
+													{c.name}
+												</span>
+												<span className="text-[11px] text-slate-400">
+													(Angk. {c.cohort} • {c.type})
+												</span>
+											</div>
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+							<p className="text-[11px] text-slate-500 mt-1">
+								{user?.role === "dosen"
+									? "Menampilkan daftar mata kuliah yang Anda ampu sebagai dosen."
+									: "Pilih mata kuliah yang dialokasikan untuk pengajuan anggaran ini."}
+							</p>
+						</div>
+
 						{/* Dynamic Items Table */}
 						<div className="space-y-3 pt-2">
 							<div className="flex items-center justify-between">
@@ -898,12 +1058,17 @@ export function TabAnggaranPraktik({
 												<Input
 													type="number"
 													min={1}
-													value={item.jumlah}
+													placeholder="1"
+													value={
+														item.jumlah === 0 || !item.jumlah ? "" : item.jumlah
+													}
 													onChange={(e) =>
 														handleItemChange(
 															idx,
 															"jumlah",
-															Number(e.target.value) || 1,
+															e.target.value === ""
+																? ""
+																: Number(e.target.value),
 														)
 													}
 													className="text-xs h-9 text-center bg-white"
@@ -924,12 +1089,18 @@ export function TabAnggaranPraktik({
 													type="number"
 													min={0}
 													placeholder="Harga Satuan"
-													value={item.satuanHarga || ""}
+													value={
+														item.satuanHarga === 0 || !item.satuanHarga
+															? ""
+															: item.satuanHarga
+													}
 													onChange={(e) =>
 														handleItemChange(
 															idx,
 															"satuanHarga",
-															Number(e.target.value) || 0,
+															e.target.value === ""
+																? ""
+																: Number(e.target.value),
 														)
 													}
 													className="text-xs h-9 text-right font-medium bg-white"
@@ -1022,7 +1193,9 @@ export function TabAnggaranPraktik({
 								<SelectContent>
 									{requests.map((r) => (
 										<SelectItem key={r.id} value={r.id.toString()}>
-											Pengajuan #{r.id} - {formatRupiah(r.totalNominal)}
+											Pengajuan #{r.id} -{" "}
+											{r.course ? `[${r.course.code}] ${r.course.name} • ` : ""}
+											{formatRupiah(r.totalNominal)}
 										</SelectItem>
 									))}
 								</SelectContent>

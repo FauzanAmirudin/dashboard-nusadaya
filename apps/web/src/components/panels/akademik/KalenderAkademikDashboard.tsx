@@ -445,7 +445,7 @@ function CreateCalendarView({
 					<Input
 						type="number"
 						placeholder="Misal: 2025"
-						value={form.cohort}
+						value={form.cohort || ""}
 						onChange={(e) => setForm({ ...form, cohort: e.target.value })}
 					/>
 				</div>

@@ -9,6 +9,7 @@ import {
 	Eye,
 	GraduationCap,
 	HelpCircle,
+	MessageCircle,
 	Search,
 	ShieldAlert,
 	ShieldCheck,
@@ -16,11 +17,12 @@ import {
 	XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { Progress } from "@/components/ui/progress";
 import {
 	Select,
@@ -29,6 +31,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { TablePagination } from "@/components/ui/TablePagination";
 import {
 	Table,
 	TableBody,
@@ -45,6 +48,14 @@ import {
 } from "@/components/ui/tooltip";
 import { exportToCSV } from "@/lib/export";
 
+function formatWhatsAppUrl(phone: string | null | undefined) {
+	if (!phone) return null;
+	const clean = phone.replace(/[^0-9]/g, "");
+	if (!clean) return null;
+	const formatted = clean.startsWith("0") ? `62${clean.slice(1)}` : clean;
+	return `https://wa.me/${formatted}`;
+}
+
 export function AkademikDashboard({
 	data = [],
 	searchQuery,
@@ -55,6 +66,8 @@ export function AkademikDashboard({
 	const [selectedCohort, setSelectedCohort] = useState<string>("all");
 	const [selectedStatus, setSelectedStatus] = useState<string>("all");
 	const [localSearch, setLocalSearch] = useState(searchQuery || "");
+	const [currentPage, setCurrentPage] = useState(1);
+	const pageSize = 20;
 
 	// Cohort years starting from 2022
 	const cohortYears = useMemo(() => {
@@ -119,7 +132,17 @@ export function AkademikDashboard({
 
 			return matchSearch && matchStatus;
 		});
-	}, [cohortData, searchQuery, localSearch, selectedStatus]);
+	}, [cohortData, localSearch, searchQuery, selectedStatus]);
+
+	// Reset page on filter changes
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [selectedCohort, selectedStatus, localSearch]);
+
+	const paginatedData = useMemo(() => {
+		const start = (currentPage - 1) * pageSize;
+		return filteredData.slice(start, start + pageSize);
+	}, [filteredData, currentPage]);
 
 	const handleExport = () => {
 		const exportData = filteredData.map((s: any) => ({
@@ -385,58 +408,105 @@ export function AkademikDashboard({
 						<Table>
 							<TableHeader className="bg-slate-50 sticky top-0 z-10">
 								<TableRow className="border-slate-200">
-									<TableHead className="py-3.5 font-bold text-slate-700 text-xs w-28">
-										NIM
-									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
-										Nama & Program
+										Nama Mahasiswa & NIM
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+										Angkatan
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-32">
+										Tahun Ajaran
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[160px]">
+										Peminatan
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[140px]">
+										No. WhatsApp
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
-										Checklist Akademik (7)
+										Progress Akademik (7)
 									</TableHead>
-									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
-										Presensi
-									</TableHead>
-									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
-										Status Akademik
-									</TableHead>
-									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
-										ACC Akademik
-									</TableHead>
-									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-28">
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-24">
 										Aksi
 									</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{filteredData.map((s: any) => {
+								{paginatedData.map((s: any) => {
 									const { items, completed, total, isDone, attendancePct } =
 										getAcademicChecklist(s);
 									const status = s.academic?.status || "PERLU_PERHATIAN";
+									const waUrl = formatWhatsAppUrl(s.student?.phone);
 
 									return (
 										<TableRow
 											key={s.student.id}
 											className="border-slate-100 hover:bg-blue-50/40 transition-colors"
 										>
-											<TableCell className="font-mono text-xs font-bold text-slate-700">
-												{s.student.nim || "-"}
-											</TableCell>
 											<TableCell>
 												<div className="font-bold text-slate-900 text-sm">
 													{s.student.name}
 												</div>
-												<div className="flex items-center gap-2 mt-0.5">
-													<Badge
-														variant="outline"
-														className="text-[10px] px-1.5 py-0 text-slate-500 border-slate-200"
-													>
-														Angkatan {s.student.cohort}
-													</Badge>
-													<span className="text-xs text-slate-500 font-medium truncate max-w-[200px]">
-														{s.student.program || "-"}
+												<div className="flex items-center gap-1.5 mt-0.5">
+													<span className="font-mono text-xs font-semibold text-slate-500">
+														{s.student.nim || "Belum ada NIM"}
 													</span>
 												</div>
+											</TableCell>
+
+											<TableCell className="text-center">
+												<Badge
+													variant="outline"
+													className="text-xs font-bold text-slate-700 bg-slate-50 border-slate-200 px-2 py-0.5"
+												>
+													{s.student.cohort
+														? `Angkatan ${s.student.cohort}`
+														: "-"}
+												</Badge>
+											</TableCell>
+
+											<TableCell className="text-center font-medium text-xs text-slate-700">
+												{s.student.academicYear ||
+													(s.student.cohort && !isNaN(Number(s.student.cohort))
+														? `${2010 + Number(s.student.cohort)}/${2011 + Number(s.student.cohort)}`
+														: s.student.period || (
+																<span className="text-slate-400 italic">-</span>
+															))}
+											</TableCell>
+
+											<TableCell>
+												<PeminatanBadge
+													subProgram={s.student.subProgram}
+													destinationCountry={s.student.destinationCountry}
+													program={s.student.program}
+												/>
+											</TableCell>
+
+											<TableCell>
+												{s.student?.phone ? (
+													waUrl ? (
+														<a
+															href={waUrl}
+															target="_blank"
+															rel="noopener noreferrer"
+															className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 hover:text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-md transition-colors group"
+															title="Chat WhatsApp"
+														>
+															<MessageCircle className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
+															<span className="font-mono">
+																{s.student.phone}
+															</span>
+														</a>
+													) : (
+														<span className="text-xs font-mono text-slate-700">
+															{s.student.phone}
+														</span>
+													)
+												) : (
+													<span className="text-slate-400 text-xs italic">
+														-
+													</span>
+												)}
 											</TableCell>
 
 											{/* Checklist Progress with Tooltip */}
@@ -510,56 +580,15 @@ export function AkademikDashboard({
 												</TooltipProvider>
 											</TableCell>
 
-											<TableCell className="text-center">
-												<Badge
-													variant="outline"
-													className={`text-xs font-semibold ${
-														attendancePct >= 80
-															? "bg-emerald-50 text-emerald-700 border-emerald-200"
-															: "bg-rose-50 text-rose-700 border-rose-200"
-													}`}
-												>
-													{attendancePct}%
-												</Badge>
-											</TableCell>
-
-											{/* Status Badge */}
-											<TableCell className="text-center">
-												{status === "AMAN" ? (
-													<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold">
-														🟢 Aman
-													</Badge>
-												) : status === "PERLU_PERHATIAN" ? (
-													<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs font-semibold">
-														🟡 Berproses
-													</Badge>
-												) : (
-													<Badge className="bg-rose-50 text-rose-700 border-rose-200 text-xs font-semibold">
-														⛔ Kendala
-													</Badge>
-												)}
-											</TableCell>
-
-											{/* ACC Akademik */}
-											<TableCell className="text-center">
-												{s.academic?.isAcc ? (
-													<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs font-bold">
-														✓ ACC
-													</Badge>
-												) : (
-													<span className="text-xs text-slate-400 italic">
-														Belum
-													</span>
-												)}
-											</TableCell>
-
 											{/* Action */}
 											<TableCell className="text-right pr-6">
 												<Button
 													size="sm"
 													variant="outline"
 													onClick={() =>
-														router.push(`/dashboard/students/${s.student.id}`)
+														router.push(
+															`/dashboard/students/${s.student.id}?context=akademik`,
+														)
 													}
 													className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5"
 												>
@@ -577,14 +606,21 @@ export function AkademikDashboard({
 							<div className="text-center py-12 text-slate-500">
 								<HelpCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
 								<p className="text-sm font-semibold">
-									Tidak ada data akademik mahasiswa ditemukan.
+									Tidak ada data mahasiswa akademik ditemukan.
 								</p>
 								<p className="text-xs text-slate-400 mt-0.5">
-									Coba ubah kata kunci pencarian atau filter status yang
-									digunakan.
+									Coba ubah kata kunci pencarian atau filter yang digunakan.
 								</p>
 							</div>
 						)}
+
+						<TablePagination
+							currentPage={currentPage}
+							totalItems={filteredData.length}
+							pageSize={pageSize}
+							onPageChange={setCurrentPage}
+							itemName="Mahasiswa Akademik"
+						/>
 					</div>
 				</CardContent>
 			</Card>

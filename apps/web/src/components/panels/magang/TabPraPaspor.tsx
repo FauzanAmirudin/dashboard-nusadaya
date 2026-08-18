@@ -1,19 +1,28 @@
-import { CheckCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { DocumentUpload } from "@/components/ui/DocumentUpload";
+"use client";
+
 import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
+	BookOpen,
+	CheckCircle,
+	CheckCircle2,
+	Clock,
+	FileCheck,
+	FolderCheck,
+	Loader2,
+	ShieldCheck,
+} from "lucide-react";
+import React from "react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DocumentUpload } from "@/components/ui/DocumentUpload";
 
 interface TabPraPasporProps {
 	studentId: number;
 	data: any;
 	passportClearance: any;
 	canEdit: boolean;
-	handleToggleField: (field: string, value: any) => void;
+	loadingItem?: string | null;
+	handleToggleField: (field: string, value: any) => Promise<void> | void;
 	fetchInternshipData: () => Promise<void>;
 }
 
@@ -22,226 +31,180 @@ export function TabPraPaspor({
 	data,
 	passportClearance,
 	canEdit,
+	loadingItem = null,
 	handleToggleField,
 	fetchInternshipData,
 }: TabPraPasporProps) {
-	// Compute isAllClear based on local data checkboxes
-	const isAllClear =
-		data?.praPasporPasFoto &&
-		data?.praPasporKtm &&
-		data?.praPasporKtp &&
-		data?.praPasporKk &&
-		data?.praPasporAktaKelahiran &&
-		data?.praPasporSl21 &&
-		data?.praPasporSkma &&
-		data?.praPasporRekomendasiDisdik &&
-		(passportClearance?.isGapYear ? data?.praPasporGapYear : true);
+	const docItems = [
+		{
+			label: "1. Pas Foto Terbaru",
+			key: "praPasporPasFoto",
+			docKey: "pas_foto",
+			desc: "Pas foto formal ukuran paspor dengan latar belakang sesuai regulasi",
+		},
+		{
+			label: "2. Kartu Tanda Mahasiswa (KTM)",
+			key: "praPasporKtm",
+			docKey: "ktm",
+			desc: "Scan Kartu Tanda Mahasiswa aktif Nusadaya Academy",
+		},
+		{
+			label: "3. Scan e-KTP",
+			key: "praPasporKtp",
+			docKey: "ktp",
+			desc: "Scan e-KTP asli yang jelas, tidak buram, dan masih berlaku",
+		},
+		{
+			label: "4. Scan Kartu Keluarga (KK)",
+			key: "praPasporKk",
+			docKey: "kk",
+			desc: "Scan Kartu Keluarga terbaru yang terdaftar resmi di Disdukcapil",
+		},
+		{
+			label: "5. Scan Akta Kelahiran",
+			key: "praPasporAktaKelahiran",
+			docKey: "akta_kelahiran",
+			desc: "Scan Akta Kelahiran asli calon mahasiswa magang",
+		},
+		{
+			label: "6. Statement Letter (SL-21)",
+			key: "praPasporSl21",
+			docKey: "sl21",
+			desc: "Surat pernyataan kesanggupan dan integritas bermaterai",
+		},
+		{
+			label: "7. Surat Keterangan Mahasiswa Aktif (SKMA)",
+			key: "praPasporSkma",
+			docKey: "skma",
+			desc: "Surat pengantar resmi mahasiswa aktif dari bagian akademik",
+		},
+		{
+			label: "8. Surat Rekomendasi Disdik",
+			key: "praPasporRekomendasiDisdik",
+			docKey: "rekomendasi_disdik",
+			desc: "Surat rekomendasi pembuatan paspor dari Dinas Pendidikan",
+		},
+		{
+			label: "9. Transkrip Nilai / Ijazah",
+			key: "praPasporCv",
+			docKey: "cv",
+			desc: "Scan ijazah atau transkrip nilai pendidikan terakhir",
+		},
+		...(passportClearance?.isGapYear
+			? [
+					{
+						label: "10. Dokumen Gap Year",
+						key: "praPasporGapYear",
+						docKey: "gap_year",
+						desc: "Surat keterangan kegiatan / riwayat selama masa gap year",
+					},
+				]
+			: []),
+	];
+
+	const completedCount = docItems.filter((item) => !!data?.[item.key]).length;
+	const isAllClear = completedCount === docItems.length;
 
 	return (
-		<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-8">
-			<div className="bg-slate-50 border-b border-slate-200 px-5 py-4">
-				<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-					STATUS KELAYAKAN PRA-PASPOR
-				</h3>
-			</div>
-			<div className="p-5">
-				<div className="mb-4">
-					<h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3 flex items-center justify-between">
-						<span>Kelengkapan Berkas Sidik Paspor</span>
-						{isAllClear ? (
-							<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none">
-								Lengkap
-							</Badge>
-						) : (
-							<Badge className="bg-rose-100 text-rose-700 hover:bg-rose-100 border-none">
-								Belum Lengkap
-							</Badge>
-						)}
-					</h4>
+		<div className="space-y-6">
+			<Card className="border border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
+				<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+					<div>
+						<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+							<FolderCheck className="w-4 h-4 text-[#0517B0]" />
+							Status Kelayakan Pra-Paspor ({docItems.length})
+						</CardTitle>
+						<p className="text-[11px] text-slate-500 mt-0.5">
+							Verifikasi berkas persyaratan permohonan dan sidik paspor di
+							Kantor Imigrasi
+						</p>
+					</div>
+					<div className="flex items-center gap-2">
+						<Badge
+							className={`text-xs font-bold px-2.5 py-0.5 ${
+								isAllClear
+									? "bg-emerald-50 text-emerald-700 border-emerald-200"
+									: "bg-blue-50 text-[#0517B0] border-blue-200"
+							}`}
+						>
+							{completedCount}/{docItems.length} Selesai
+						</Badge>
+					</div>
+				</CardHeader>
 
-					<h5 className="text-sm font-semibold text-slate-700 mb-3 border-b pb-1">
-						Dokumen Wajib
-					</h5>
-					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-						{[
-							{
-								label: "Pas Foto Terbaru",
-								key: "praPasporPasFoto",
-								panel: "pmb",
-								docKey: "pas_foto",
-							},
-							{
-								label: "KTM",
-								key: "praPasporKtm",
-								panel: "pmb",
-								docKey: "ktm",
-							},
-							{
-								label: "Scan KTP",
-								key: "praPasporKtp",
-								panel: "pmb",
-								docKey: "ktp",
-							},
-							{
-								label: "Scan KK",
-								key: "praPasporKk",
-								panel: "pmb",
-								docKey: "kk",
-							},
-							{
-								label: "Scan Akta Kelahiran",
-								key: "praPasporAktaKelahiran",
-								panel: "pmb",
-								docKey: "akta_kelahiran",
-							},
-							{
-								label: "Statement Letter",
-								key: "praPasporSl21",
-								panel: "pmb",
-								docKey: "sl21",
-							},
-							{
-								label: "Surat Keterangan Mahasiswa Aktif",
-								key: "praPasporSkma",
-								panel: "pmb",
-								docKey: "skma",
-							},
-							{
-								label: "Surat Rekomendasi dari Disdik",
-								key: "praPasporRekomendasiDisdik",
-								panel: "pmb",
-								docKey: "rekomendasi_disdik",
-							},
-							...(passportClearance?.isGapYear
-								? [
-										{
-											label: "Dokumen Gap Year",
-											key: "praPasporGapYear",
-											panel: "pmb",
-											docKey: "gap_year",
-										},
-									]
-								: []),
-						].map((item, idx) => (
-							<div
-								key={`wajib-${idx}`}
-								className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow"
-							>
-								<div className="flex items-start gap-3 mb-3">
-									<div className="mt-0.5 shrink-0 flex items-center">
-										{canEdit ? (
-											<button
-												onClick={() =>
-													handleToggleField(item.key, !data?.[item.key])
-												}
-												className="focus:outline-none hover:scale-110 transition-transform"
-											>
-												{data?.[item.key] ? (
-													<CheckCircle className="w-5 h-5 text-emerald-500" />
+				<CardContent className="p-4 sm:p-5 space-y-4">
+					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+						{docItems.map((item) => {
+							const isChecked = !!data?.[item.key];
+							const isLoading = loadingItem === item.key;
+
+							return (
+								<div
+									key={item.key}
+									className={`p-4 rounded-xl border transition-colors flex flex-col justify-between space-y-3 ${
+										isChecked
+											? "border-emerald-200 bg-emerald-50/20 shadow-xs"
+											: "border-slate-200 bg-white shadow-xs"
+									}`}
+								>
+									<div>
+										<div className="flex items-start justify-between gap-3 mb-2">
+											<div className="flex items-start gap-3">
+												<Checkbox
+													id={`chk-${item.key}`}
+													checked={isChecked}
+													disabled={!canEdit || isLoading}
+													onCheckedChange={(checked) =>
+														handleToggleField(item.key, !!checked)
+													}
+													className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+												/>
+												<div>
+													<label
+														htmlFor={`chk-${item.key}`}
+														className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
+													>
+														{item.label}
+													</label>
+													<p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+														{item.desc}
+													</p>
+												</div>
+											</div>
+											<div className="flex items-center gap-2 shrink-0">
+												{isLoading ? (
+													<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+												) : isChecked ? (
+													<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+														✓ Selesai
+													</Badge>
 												) : (
-													<div className="w-5 h-5 rounded-full border-2 border-slate-300 bg-white hover:border-[#0517B0] transition-colors" />
+													<Badge
+														variant="outline"
+														className="text-slate-400 border-slate-200 text-[10px]"
+													>
+														Belum
+													</Badge>
 												)}
-											</button>
-										) : data?.[item.key] ? (
-											<CheckCircle className="w-5 h-5 text-emerald-500" />
-										) : (
-											<div className="w-5 h-5 rounded-full border-2 border-slate-300 bg-white" />
-										)}
+											</div>
+										</div>
 									</div>
-									<span
-										className={`text-sm font-bold ${data?.[item.key] ? "text-slate-800" : "text-slate-600"}`}
-									>
-										{item.label}
-									</span>
-								</div>
-								<div className="mt-auto pt-2 border-t border-slate-200/60">
-									{item.panel ? (
+
+									<div className="pt-3 border-t border-slate-100 mt-auto">
 										<DocumentUpload
 											studentId={studentId}
-											panel={item.panel as any}
-											documentKey={item.docKey!}
+											panel="pmb"
+											documentKey={item.docKey}
 											canEdit={canEdit}
 											onUploadSuccess={fetchInternshipData}
 										/>
-									) : (
-										<div className="text-xs text-slate-500 italic py-2 flex items-center justify-center bg-white rounded border border-slate-200 border-dashed">
-											Divalidasi oleh Tim Akademik
-										</div>
-									)}
-								</div>
-							</div>
-						))}
-					</div>
-
-					<h5 className="text-sm font-semibold text-slate-700 mb-3 border-b pb-1">
-						Dokumen Opsional
-					</h5>
-					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-						{[
-							{
-								label: "NIM Tervalidasi PDDikti",
-								key: "praPasporPddikti",
-								panel: null,
-								docKey: null,
-							},
-							{
-								label: "CV Format Industri",
-								key: "praPasporCv",
-								panel: "pmb",
-								docKey: "cv",
-							},
-						].map((item, idx) => (
-							<div
-								key={`opsional-${idx}`}
-								className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow"
-							>
-								<div className="flex items-start gap-3 mb-3">
-									<div className="mt-0.5 shrink-0 flex items-center">
-										{canEdit ? (
-											<button
-												onClick={() =>
-													handleToggleField(item.key, !data?.[item.key])
-												}
-												className="focus:outline-none hover:scale-110 transition-transform"
-											>
-												{data?.[item.key] ? (
-													<CheckCircle className="w-5 h-5 text-emerald-500" />
-												) : (
-													<div className="w-5 h-5 rounded-full border-2 border-slate-300 bg-white hover:border-[#0517B0] transition-colors" />
-												)}
-											</button>
-										) : data?.[item.key] ? (
-											<CheckCircle className="w-5 h-5 text-emerald-500" />
-										) : (
-											<div className="w-5 h-5 rounded-full border-2 border-slate-300 bg-white" />
-										)}
 									</div>
-									<span
-										className={`text-sm font-bold ${data?.[item.key] ? "text-slate-800" : "text-slate-600"}`}
-									>
-										{item.label}
-									</span>
 								</div>
-								<div className="mt-auto pt-2 border-t border-slate-200/60">
-									{item.panel ? (
-										<DocumentUpload
-											studentId={studentId}
-											panel={item.panel as any}
-											documentKey={item.docKey!}
-											canEdit={canEdit}
-											onUploadSuccess={fetchInternshipData}
-										/>
-									) : (
-										<div className="text-xs text-slate-500 italic py-2 flex items-center justify-center bg-white rounded border border-slate-200 border-dashed">
-											Divalidasi oleh Tim Akademik
-										</div>
-									)}
-								</div>
-							</div>
-						))}
+							);
+						})}
 					</div>
-				</div>
-			</div>
+				</CardContent>
+			</Card>
 		</div>
 	);
 }

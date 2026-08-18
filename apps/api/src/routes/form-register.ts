@@ -2,6 +2,7 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
 import { pmbFormResponses, pmbFormTokens, students, users } from "../db/schema";
+import { hasRole } from "../lib/permissions";
 import { createStudentPipeline } from "./student/core";
 
 export const formRegisterRoutes = new Elysia()
@@ -158,7 +159,7 @@ export const formRegisterRoutes = new Elysia()
 	// 3. ADMIN: Generate Token
 	.post("/pmb/form-tokens", async (context) => {
 		const user = (context as any).user;
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "pmb")) {
 			context.set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -174,7 +175,7 @@ export const formRegisterRoutes = new Elysia()
 	// 4. ADMIN: Get Tokens List
 	.get("/pmb/form-tokens", async (context) => {
 		const user = (context as any).user;
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "pmb")) {
 			context.set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -191,7 +192,7 @@ export const formRegisterRoutes = new Elysia()
 	// 5. ADMIN: Get Pending Responses
 	.get("/pmb/form-responses", async (context) => {
 		const user = (context as any).user;
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "pmb")) {
 			context.set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -208,7 +209,7 @@ export const formRegisterRoutes = new Elysia()
 		async (context) => {
 			const { query, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "pmb")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -265,7 +266,7 @@ export const formRegisterRoutes = new Elysia()
 	.get("/pmb/form-responses/:id", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "pmb")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -285,7 +286,7 @@ export const formRegisterRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "pmb")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -313,7 +314,7 @@ export const formRegisterRoutes = new Elysia()
 	.patch("/pmb/form-responses/:id/approve", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "pmb")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -357,13 +358,27 @@ export const formRegisterRoutes = new Elysia()
 				schoolMajor: response.schoolMajor,
 				graduationYear: response.graduationYear,
 				program: response.program || "Reguler", // Fallback
-				subProgram: response.subProgram,
+				subProgram: response.subProgram || "Indonesia-Reguler",
+				destinationCountry:
+					response.subProgram === "Malaysia-Hospitality"
+						? "Malaysia"
+						: response.subProgram === "Taiwan-Hospitality"
+							? "Taiwan"
+							: response.subProgram === "Timur tengah-Barista"
+								? "Timur Tengah"
+								: "Indonesia",
 				classType: response.classType,
 				batch: response.batch,
-				academicYear: response.academicYear,
-				cohort: response.academicYear
-					? response.academicYear.split("/")[0]
-					: new Date().getFullYear().toString(),
+				academicYear: response.academicYear || undefined,
+				cohort: (() => {
+					if (response.academicYear) {
+						const startYear = parseInt(response.academicYear.split("/")[0], 10);
+						if (!isNaN(startYear)) {
+							return startYear >= 2000 ? startYear - 2010 : startYear;
+						}
+					}
+					return new Date().getFullYear() - 2010;
+				})(),
 
 				bloodType: response.bloodType,
 				diseaseHistory: response.diseaseHistory,
@@ -441,7 +456,7 @@ export const formRegisterRoutes = new Elysia()
 	// 9. ADMIN: Get Single Response
 	.get("/pmb/form-responses/:id", async (context) => {
 		const user = (context as any).user;
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "pmb")) {
 			context.set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}

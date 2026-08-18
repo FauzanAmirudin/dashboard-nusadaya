@@ -52,9 +52,16 @@ export async function setJobProgress(
 			...existing,
 			...progress,
 		};
-		// Hitung persentase otomatis jika total > 0
-		if (merged.total > 0) {
-			merged.percentage = Math.round((merged.processed / merged.total) * 100);
+		// Hitung persentase otomatis
+		if (merged.status === "completed") {
+			merged.percentage = 100;
+		} else if (merged.total > 0) {
+			merged.percentage = Math.min(
+				99,
+				Math.round((merged.processed / merged.total) * 100),
+			);
+		} else if (progress.percentage !== undefined) {
+			merged.percentage = progress.percentage;
 		}
 		await redis.set(key, JSON.stringify(merged), "EX", JOB_TTL);
 	} catch {

@@ -17,6 +17,7 @@ import { AssessmentFormCard } from "@/components/panels/akademik/assessment/Asse
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { API_URL, getToken } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 
@@ -284,17 +285,14 @@ export function AssessmentDetailView({ studentId }: AssessmentDetailViewProps) {
 									<GraduationCap className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
 									<div className="min-w-0">
 										<p className="text-[11px] text-slate-400 uppercase tracking-wide font-medium">
-											Program
+											Peminatan
 										</p>
-										<p className="text-sm text-slate-700 truncate">
-											{student.program}
-											{student.subProgram && (
-												<span className="text-slate-500">
-													{" "}
-													/ {student.subProgram}
-												</span>
-											)}
-										</p>
+										<div className="mt-0.5">
+											<PeminatanBadge
+												subProgram={student.subProgram}
+												program={student.program}
+											/>
+										</div>
 									</div>
 								</div>
 								<div className="flex items-start gap-2">

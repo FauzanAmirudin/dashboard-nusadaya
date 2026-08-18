@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
 import {
+	courseGrades,
 	courseMeetingActivities,
 	courseMeetingAttendances,
 	courseMeetings,
@@ -11,33 +12,38 @@ import {
 	students,
 	users,
 } from "../db/schema";
+import { hasRole } from "../lib/permissions";
 
 export const coursesRoutes = new Elysia({ prefix: "/courses" })
 	.derive((context) => {
 		const user = (context as any).user;
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
 		return { user };
 	})
 
 	// ==========================================
 	// 1. MATA KULIAH (COURSES) CRUD
 	// ==========================================
-	.get("/", async ({ query, user, set }) => {
-		const { cohort, type, peminatan } = query;
+	.get("/", async ({ query, user, set }: any) => {
+		if (!user) {
+			set.status = 401;
+			return { success: false, message: "Unauthorized" };
+		}
+
+		const { cohort, type, peminatan } = query || {};
 
 		const conditions = [];
 
-		// If Dosen, only their own courses
-		if (user.role === "dosen") {
-			conditions.push(eq(courses.dosenId, user.id));
+		// If Dosen (and not akademik/superadmin), only their own courses
+		if (hasRole(user, "dosen") && !hasRole(user, "akademik")) {
+			conditions.push(eq(courses.dosenId, Number(user.id)));
 		}
 
 		if (cohort)
 			conditions.push(eq(courses.cohort, parseInt(cohort as string, 10)));
-		if (type) conditions.push(eq(courses.type, type as "teori" | "praktik"));
-		if (peminatan) conditions.push(eq(courses.peminatan, peminatan as string));
+		if (type && type !== "all")
+			conditions.push(eq(courses.type, type as "teori" | "praktik"));
+		if (peminatan && peminatan !== "all")
+			conditions.push(eq(courses.peminatan, peminatan as string));
 
 		const data = await db.query.courses.findMany({
 			where: conditions.length > 0 ? and(...conditions) : undefined,
@@ -57,7 +63,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 	.post(
 		"/",
 		async ({ body, user, set }) => {
-			if (!["superadmin", "akademik"].includes(user.role)) {
+			if (!hasRole(user, "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -86,28 +92,30 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				})
 				.returning();
 
-			// Auto-generate 20 meetings
-			const meetingsToInsert = [];
+			// Auto-generate meetings: PKKMB (-1), Beginning Class (0), and Pertemuan 1..16 (8=UTS, 16=UAS)
+			const meetingsToInsert: {
+				courseId: number;
+				meetingNumber: number;
+				meetingType: "pkkmb" | "beginning" | "regular" | "uts" | "uas";
+				meetingLabel: string;
+				description?: string;
+			}[] = [
+				{
+					courseId: newCourse.id,
+					meetingNumber: -1,
+					meetingType: "pkkmb",
+					meetingLabel: "PKKMB - Pengenalan Program",
+					description: "Pengenalan Program Perkuliahan & Kebijakan Kampus",
+				},
+				{
+					courseId: newCourse.id,
+					meetingNumber: 0,
+					meetingType: "beginning",
+					meetingLabel: "Beginning Class & Kontrak Kuliah",
+					description: "Orientasi Perkuliahan, Silabus, dan Kontrak Belajar",
+				},
+			];
 
-			// 0: PKKMB
-			meetingsToInsert.push({
-				courseId: newCourse.id,
-				meetingNumber: 0,
-				meetingType: "pkkmb" as const,
-				meetingLabel: "PKKMB",
-			});
-
-			// 1: Beginning Class
-			meetingsToInsert.push({
-				courseId: newCourse.id,
-				meetingNumber: 1,
-				meetingType: "beginning" as const,
-				meetingLabel: "Beginning Class",
-			});
-
-			// 2-17: Regular (8=UTS, 16=UAS is based on meetingNumber offset, so 1+8=9 is UTS, 1+16=17 is UAS)
-			// Wait, let's map it cleanly:
-			// Regular meetings 1 to 16.
 			for (let i = 1; i <= 16; i++) {
 				let mType: "regular" | "uts" | "uas" = "regular";
 				let mLabel = `Pertemuan ${i}`;
@@ -122,9 +130,10 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 
 				meetingsToInsert.push({
 					courseId: newCourse.id,
-					meetingNumber: i + 1, // Store as 2 to 17 for internal order
+					meetingNumber: i,
 					meetingType: mType,
 					meetingLabel: mLabel,
+					description: "",
 				});
 			}
 
@@ -159,7 +168,11 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			return { success: false, message: "Mata kuliah tidak ditemukan" };
 		}
 
-		if (user.role === "dosen" && course.dosenId !== user.id) {
+		if (
+			hasRole(user, "dosen") &&
+			!hasRole(user, "akademik") &&
+			course.dosenId !== user.id
+		) {
 			set.status = 403;
 			return { success: false, message: "Anda bukan pengampu mata kuliah ini" };
 		}
@@ -169,7 +182,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 	.patch(
 		"/:id",
 		async ({ params, body, user, set }) => {
-			if (!["superadmin", "akademik"].includes(user.role)) {
+			if (!hasRole(user, "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -205,7 +218,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 		},
 	)
 	.delete("/:id", async ({ params, user, set }) => {
-		if (!["superadmin", "akademik"].includes(user.role)) {
+		if (!hasRole(user, "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -251,7 +264,11 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			set.status = 404;
 			return { success: false, message: "Not found" };
 		}
-		if (user.role === "dosen" && course.dosenId !== user.id) {
+		if (
+			hasRole(user, "dosen") &&
+			!hasRole(user, "akademik") &&
+			course.dosenId !== user.id
+		) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -288,19 +305,29 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				set.status = 404;
 				return { success: false, message: "Not found" };
 			}
-			if (user.role === "dosen" && meeting.course.dosenId !== user.id) {
+			if (
+				hasRole(user, "dosen") &&
+				!hasRole(user, "akademik") &&
+				meeting.course.dosenId !== user.id
+			) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
 
+			const updatePayload: Record<string, any> = {
+				meetingLabel: input.meetingLabel,
+				description: input.description,
+				meetingDate: input.meetingDate || null,
+				updatedAt: new Date(),
+			};
+
+			if (input.sessionType !== undefined) {
+				updatePayload.sessionType = input.sessionType;
+			}
+
 			const [updated] = await db
 				.update(courseMeetings)
-				.set({
-					meetingLabel: input.meetingLabel,
-					description: input.description,
-					meetingDate: input.meetingDate || null,
-					updatedAt: new Date(),
-				})
+				.set(updatePayload)
 				.where(eq(courseMeetings.id, meetingId))
 				.returning();
 
@@ -309,6 +336,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 		{
 			body: t.Object({
 				meetingLabel: t.String(),
+				sessionType: t.Optional(t.Union([t.String(), t.Null()])),
 				description: t.Optional(t.Union([t.String(), t.Null()])),
 				meetingDate: t.Optional(t.Union([t.String(), t.Null()])),
 			}),
@@ -403,15 +431,24 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 	)
 
 	// ==========================================
-	// 4. ATTENDANCES BULK UPSERT
+	// 4. ATTENDANCES BULK UPSERT & AUTO-SYNC AGGREGATES
 	// ==========================================
 	.post(
 		"/:id/meetings/:meetingId/attendances",
 		async ({ params, body, user, set }) => {
+			const courseId = parseInt(params.id, 10);
 			const meetingId = parseInt(params.meetingId, 10);
-			const input = body as any; // { attendances: [{ studentId: 1, status: "hadir", notes: "" }] }
+			const input = body as any;
 
-			// Delete existing
+			const course = await db.query.courses.findFirst({
+				where: eq(courses.id, courseId),
+			});
+			if (!course) {
+				set.status = 404;
+				return { success: false, message: "Course not found" };
+			}
+
+			// Delete existing attendances for this meeting
 			await db
 				.delete(courseMeetingAttendances)
 				.where(eq(courseMeetingAttendances.meetingId, meetingId));
@@ -420,21 +457,163 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				const toInsert = input.attendances.map((a: any) => ({
 					meetingId: meetingId,
 					studentId: a.studentId,
-					status: a.status,
+					status: a.status || null,
+					theoryScore:
+						a.theoryScore !== undefined &&
+						a.theoryScore !== null &&
+						a.theoryScore !== ""
+							? Math.max(0, Math.min(100, parseInt(a.theoryScore, 10) || 0))
+							: null,
+					practicalScore:
+						a.practicalScore !== undefined &&
+						a.practicalScore !== null &&
+						a.practicalScore !== ""
+							? Math.max(0, Math.min(100, parseInt(a.practicalScore, 10) || 0))
+							: null,
 					notes: a.notes || null,
 				}));
 
 				await db.insert(courseMeetingAttendances).values(toInsert);
+
+				// Auto-synchronize aggregate scores and attendance rate for each affected student
+				const studentIds = Array.from(
+					new Set(input.attendances.map((a: any) => a.studentId)),
+				) as number[];
+
+				// Get all meetings for this course
+				const allCourseMeetings = await db.query.courseMeetings.findMany({
+					where: eq(courseMeetings.courseId, courseId),
+					columns: { id: true },
+				});
+				const allMeetingIds = allCourseMeetings.map((m) => m.id);
+
+				if (allMeetingIds.length > 0) {
+					for (const studentId of studentIds) {
+						// Fetch all attendances for this student across this course's meetings
+						const studentAttendances =
+							await db.query.courseMeetingAttendances.findMany({
+								where: and(
+									eq(courseMeetingAttendances.studentId, studentId),
+									inArray(courseMeetingAttendances.meetingId, allMeetingIds),
+								),
+							});
+
+						const presentCount = studentAttendances.filter(
+							(a) => a.status === "hadir",
+						).length;
+						const totalMeetings = allMeetingIds.length || 18;
+						const attendanceRate = Math.min(
+							100,
+							Math.round((presentCount / totalMeetings) * 100),
+						);
+
+						// Average theory score
+						const validTheoryScores = studentAttendances
+							.filter(
+								(a) => a.theoryScore !== null && a.theoryScore !== undefined,
+							)
+							.map((a) => a.theoryScore as number);
+						const avgTheory =
+							validTheoryScores.length > 0
+								? Math.round(
+										validTheoryScores.reduce((acc, curr) => acc + curr, 0) /
+											validTheoryScores.length,
+									)
+								: 0;
+
+						// Average practical score
+						const validPracticalScores = studentAttendances
+							.filter(
+								(a) =>
+									a.practicalScore !== null && a.practicalScore !== undefined,
+							)
+							.map((a) => a.practicalScore as number);
+						const avgPractical =
+							validPracticalScores.length > 0
+								? Math.round(
+										validPracticalScores.reduce((acc, curr) => acc + curr, 0) /
+											validPracticalScores.length,
+									)
+								: 0;
+
+						// Calculate final score
+						const isPracticalCourse = course.type === "praktik";
+						const finalScore = isPracticalCourse
+							? avgPractical * 0.8 + avgTheory * 0.2
+							: avgTheory;
+
+						let displayGrade = "E";
+						if (finalScore >= 85) displayGrade = "A";
+						else if (finalScore >= 75) displayGrade = "B";
+						else if (finalScore >= 65) displayGrade = "C";
+						else if (finalScore >= 50) displayGrade = "D";
+
+						// Overall status based on attendance
+						const status =
+							attendanceRate >= 90
+								? "AMAN"
+								: attendanceRate >= 75
+									? "PERLU_PERHATIAN"
+									: "TIDAK_AMAN";
+
+						// Upsert into courseGrades table
+						const existingGrade = await db.query.courseGrades.findFirst({
+							where: and(
+								eq(courseGrades.studentId, studentId),
+								eq(courseGrades.courseId, courseId),
+							),
+						});
+
+						if (existingGrade) {
+							await db
+								.update(courseGrades)
+								.set({
+									courseCode: course.code,
+									courseName: course.name,
+									dosenId: course.dosenId,
+									attendancePresent: presentCount,
+									totalMeetings: totalMeetings,
+									attendanceRate: attendanceRate,
+									theoryScore: avgTheory,
+									practicalScore: avgPractical,
+									grade: displayGrade,
+									status: status,
+									updatedAt: new Date(),
+								})
+								.where(eq(courseGrades.id, existingGrade.id));
+						} else {
+							await db.insert(courseGrades).values({
+								studentId: studentId,
+								courseId: courseId,
+								courseCode: course.code,
+								courseName: course.name,
+								dosenId: course.dosenId,
+								attendancePresent: presentCount,
+								totalMeetings: totalMeetings,
+								attendanceRate: attendanceRate,
+								theoryScore: avgTheory,
+								practicalScore: avgPractical,
+								grade: displayGrade,
+								status: status,
+							});
+						}
+					}
+				}
 			}
 
-			return { success: true, message: "Presensi berhasil disimpan" };
+			return {
+				success: true,
+				message: "Presensi dan nilai harian berhasil disimpan",
+			};
 		},
 		{
 			body: t.Object({
 				attendances: t.Array(
 					t.Object({
 						studentId: t.Number(),
-						status: t.String(),
+						status: t.Optional(t.Union([t.String(), t.Null()])),
+						theoryScore: t.Optional(t.Union([t.Number(), t.Null()])),
+						practicalScore: t.Optional(t.Union([t.Number(), t.Null()])),
 						notes: t.Optional(t.Union([t.String(), t.Null()])),
 					}),
 				),
@@ -451,6 +630,10 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 		const data = await db.query.practicesBudgetRequests.findMany({
 			where: eq(practicesBudgetRequests.courseId, courseId),
 			with: {
+				course: true,
+				dosen: {
+					columns: { id: true, fullName: true },
+				},
 				materialReports: true,
 			},
 			orderBy: [desc(practicesBudgetRequests.createdAt)],
@@ -464,8 +647,12 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			const courseId = parseInt(params.id, 10);
 			const input = body as any;
 
+			const targetCourseId = input.courseId
+				? parseInt(input.courseId, 10)
+				: courseId;
+
 			const course = await db.query.courses.findFirst({
-				where: eq(courses.id, courseId),
+				where: eq(courses.id, targetCourseId),
 			});
 
 			if (!course) {
@@ -473,7 +660,11 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				return { success: false, message: "Course not found" };
 			}
 
-			if (user.role === "dosen" && course.dosenId !== user.id) {
+			if (
+				hasRole(user, "dosen") &&
+				!hasRole(user, "akademik") &&
+				course.dosenId !== user.id
+			) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -481,7 +672,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			const [newRequest] = await db
 				.insert(practicesBudgetRequests)
 				.values({
-					courseId,
+					courseId: targetCourseId,
 					dosenId: user.id,
 					daftarKebutuhan: input.daftarKebutuhan,
 					totalNominal: input.totalNominal,
@@ -492,6 +683,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 		},
 		{
 			body: t.Object({
+				courseId: t.Optional(t.Number()),
 				daftarKebutuhan: t.Array(
 					t.Object({
 						namaItem: t.String(),
@@ -541,29 +733,32 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			const reqId = parseInt(params.reqId, 10);
 			const input = body as any;
 
-			if (
-				user.role !== "dosen" &&
-				user.role !== "akademik" &&
-				user.role !== "superadmin"
-			) {
+			if (!hasRole(user, "dosen", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
 
+			const updateData: any = {
+				daftarKebutuhan: input.daftarKebutuhan,
+				totalNominal: input.totalNominal,
+				status: "menunggu",
+				updatedAt: new Date(),
+			};
+
+			if (input.courseId) {
+				updateData.courseId = parseInt(input.courseId, 10);
+			}
+
 			await db
 				.update(practicesBudgetRequests)
-				.set({
-					daftarKebutuhan: input.daftarKebutuhan,
-					totalNominal: input.totalNominal,
-					status: "menunggu",
-					updatedAt: new Date(),
-				})
+				.set(updateData)
 				.where(eq(practicesBudgetRequests.id, reqId));
 
 			return { success: true };
 		},
 		{
 			body: t.Object({
+				courseId: t.Optional(t.Number()),
 				daftarKebutuhan: t.Array(t.Any()),
 				totalNominal: t.Number(),
 			}),
@@ -572,11 +767,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 	.delete("/:id/budget-requests/:reqId", async ({ params, user, set }) => {
 		const reqId = parseInt(params.reqId, 10);
 
-		if (
-			user.role !== "dosen" &&
-			user.role !== "akademik" &&
-			user.role !== "superadmin"
-		) {
+		if (!hasRole(user, "dosen", "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}

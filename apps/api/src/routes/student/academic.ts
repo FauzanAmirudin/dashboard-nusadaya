@@ -24,7 +24,9 @@ import {
 	overseasProgramChecklists,
 	paData,
 	paDocuments,
+	paHafalanSessions,
 	paInterviewLogs,
+	paStudentNotes,
 	paTripartiteLogs,
 	pmbData,
 	pmbDocuments,
@@ -36,6 +38,7 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 import { fileService } from "../../modules/file/service/file.service";
 
@@ -61,11 +64,7 @@ export const academicRoutes = new Elysia()
 				return { success: false, message: "Unauthorized" };
 			}
 
-			if (
-				user.role !== "akademik" &&
-				user.role !== "superadmin" &&
-				user.role !== "superadmin"
-			) {
+			if (!hasRole(user, "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -175,7 +174,7 @@ export const academicRoutes = new Elysia()
 	.delete("/:id/academic/acc", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!user || (user.role !== "akademik" && user.role !== "superadmin")) {
+		if (!hasRole(user, "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -233,7 +232,7 @@ export const academicRoutes = new Elysia()
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (!user || (user.role !== "akademik" && user.role !== "superadmin")) {
+		if (!hasRole(user, "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -249,7 +248,7 @@ export const academicRoutes = new Elysia()
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (!user || (user.role !== "akademik" && user.role !== "superadmin")) {
+		if (!hasRole(user, "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -300,11 +299,7 @@ export const academicRoutes = new Elysia()
 				return { success: false, message: "Unauthorized" };
 			}
 
-			if (
-				user.role !== "superadmin" &&
-				user.role !== "dosen" &&
-				user.role !== "akademik"
-			) {
+			if (!hasRole(user, "dosen", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -383,11 +378,7 @@ export const academicRoutes = new Elysia()
 			}
 
 			// Only superadmin, akademik, or the assigned dosen can edit
-			if (
-				user.role !== "superadmin" &&
-				user.role !== "akademik" &&
-				current.dosenId !== user.id
-			) {
+			if (!hasRole(user, "akademik") && current.dosenId !== user.id) {
 				set.status = 403;
 				return {
 					success: false,
@@ -531,11 +522,7 @@ export const academicRoutes = new Elysia()
 			return { success: false, message: "Course not found" };
 		}
 
-		if (
-			user.role !== "superadmin" &&
-			user.role !== "akademik" &&
-			current.dosenId !== user.id
-		) {
+		if (!hasRole(user, "akademik") && current.dosenId !== user.id) {
 			set.status = 403;
 			return {
 				success: false,
@@ -564,7 +551,7 @@ export const academicRoutes = new Elysia()
 			return { success: false, message: "Unauthorized" };
 		}
 
-		if (user.role !== "superadmin" && user.role !== "akademik") {
+		if (!hasRole(user, "akademik")) {
 			set.status = 403;
 			return {
 				success: false,
@@ -736,7 +723,7 @@ export const academicRoutes = new Elysia()
 			const { params, set } = context;
 			const user = (context as any).user;
 
-			if (!user || (user.role !== "dosen" && user.role !== "superadmin")) {
+			if (!hasRole(user, "dosen", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -753,7 +740,7 @@ export const academicRoutes = new Elysia()
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (!user || (user.role !== "dosen" && user.role !== "superadmin")) {
+		if (!hasRole(user, "dosen", "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -787,7 +774,7 @@ export const academicRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "dosen" && user.role !== "superadmin")) {
+			if (!hasRole(user, "dosen", "akademik")) {
 				set.status = 403;
 				return {
 					success: false,

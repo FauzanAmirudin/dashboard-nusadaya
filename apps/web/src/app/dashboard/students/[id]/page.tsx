@@ -20,7 +20,6 @@ import { toast } from "sonner";
 import { AkademikPanel } from "@/components/panels/AkademikPanel";
 import { CatatanPanel } from "@/components/panels/CatatanPanel";
 import { CrmPanel } from "@/components/panels/CrmPanel";
-import { DosenPanel } from "@/components/panels/DosenPanel";
 import { FinalDecisionPanel } from "@/components/panels/FinalDecisionPanel";
 import { FinancePanel } from "@/components/panels/FinancePanel";
 import { InternshipPanel } from "@/components/panels/InternshipPanel";
@@ -46,11 +45,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/eden";
-import { useAuthStore } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
 
 type StudentDetail = {
 	student: {
@@ -153,20 +153,32 @@ const NAV_LINKS = [
 	{ id: "crm", label: "CRM", roles: ["superadmin", "crm"] },
 	{ id: "finance", label: "Finance", roles: ["superadmin", "finance"] },
 	{ id: "akademik", label: "Akademik", roles: ["superadmin", "akademik"] },
-	{ id: "kehadiran", label: "Kehadiran", roles: ["superadmin", "akademik"] },
-	{ id: "dosen", label: "Dosen per MK", roles: ["dosen"] },
+	{
+		id: "kehadiran",
+		label: "Kehadiran",
+		roles: ["superadmin", "akademik", "dosen"],
+	},
 	{ id: "pa", label: "PA", roles: ["superadmin", "pa"] },
 	{ id: "magang", label: "Tim Magang", roles: ["superadmin", "magang"] },
-	{ id: "status", label: "Status Akhir", roles: ["superadmin"] },
+	{ id: "status", label: "Status Akhir", roles: ["superadmin", "evaluator"] },
 	{
 		id: "final-decision",
 		label: "Keputusan Final",
-		roles: ["superadmin"],
+		roles: ["superadmin", "evaluator"],
 	},
 	{
 		id: "catatan",
 		label: "Catatan Internal",
-		roles: ["superadmin", "akademik", "pa", "pmb", "crm", "finance", "magang"],
+		roles: [
+			"superadmin",
+			"akademik",
+			"pa",
+			"pmb",
+			"crm",
+			"finance",
+			"magang",
+			"dosen",
+		],
 	},
 ];
 
@@ -194,10 +206,16 @@ function StudentDetailContent() {
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 	const [showFullBiodata, setShowFullBiodata] = useState(false);
-	const [activeTab, setActiveTab] = useState("");
+	const [activeTab, setActiveTab] = useState(context || "");
 	const [mounted, setMounted] = useState(false);
 	const [updateTrigger, setUpdateTrigger] = useState(0);
 	const [isGenerating, setIsGenerating] = useState(false);
+
+	useEffect(() => {
+		if (context && context !== "all") {
+			setActiveTab(context);
+		}
+	}, [context]);
 
 	const [isExporting, setIsExporting] = useState(false);
 	const [exportJobId, setExportJobId] = useState<string | null>(null);
@@ -353,6 +371,20 @@ function StudentDetailContent() {
 	const [departureDate, setDepartureDate] = useState<string>("");
 	const [directorNotes, setDirectorNotes] = useState<string>("");
 
+	const visibleLinks = NAV_LINKS.filter((link) => {
+		if (!mounted || !user) return false;
+		return hasRole(user, ...link.roles);
+	});
+
+	useEffect(() => {
+		if (mounted && visibleLinks.length > 0) {
+			const isCurrentActiveValid = visibleLinks.some((l) => l.id === activeTab);
+			if (!isCurrentActiveValid) {
+				setActiveTab(visibleLinks[0]?.id || "");
+			}
+		}
+	}, [mounted, visibleLinks, activeTab]);
+
 	const handleDirectorApproval = async () => {
 		if (!data) return;
 		setIsApprovingDirector(true);
@@ -497,15 +529,6 @@ function StudentDetailContent() {
 		data.parents?.find((p: any) => p.type === "ibu") ||
 		data.parents?.find((p: any) => p.type === "wali");
 
-	const visibleLinks = NAV_LINKS.filter((link) => {
-		if (!mounted || !user?.role || !link.roles.includes(user.role))
-			return false;
-		if (context && context !== "all") {
-			return link.id === context;
-		}
-		return true;
-	});
-
 	const scrollToAnchor = (id: string) => {
 		setActiveTab(id);
 	};
@@ -588,7 +611,9 @@ function StudentDetailContent() {
 							return;
 						}
 						if (context && context !== "all") {
-							router.push(`/dashboard/${context}`);
+							const target =
+								context === "final-decision" ? "evaluator" : context;
+							router.push(`/dashboard/${target}`);
 							return;
 						}
 						if (typeof window !== "undefined" && window.history.length > 1) {
@@ -604,7 +629,7 @@ function StudentDetailContent() {
 				</button>
 
 				<div className="flex flex-wrap items-center gap-2">
-					{user?.role === "superadmin" && (
+					{hasRole(user, "superadmin") && (
 						<Button
 							size="sm"
 							variant="outline"
@@ -619,7 +644,7 @@ function StudentDetailContent() {
 									: "Buat Akun"}
 						</Button>
 					)}
-					{user?.role === "superadmin" && (
+					{hasRole(user, "superadmin") && (
 						<Button
 							size="sm"
 							variant="outline"
@@ -637,7 +662,7 @@ function StudentDetailContent() {
 							{isExporting ? "Menyiapkan..." : "Unduh Berkas"}
 						</Button>
 					)}
-					{(user?.role === "superadmin" || user?.role === "pmb") && (
+					{hasRole(user, "superadmin", "pmb") && (
 						<>
 							<Button
 								size="sm"
@@ -715,7 +740,6 @@ function StudentDetailContent() {
 									</Badge>
 								)}
 							</div>
-
 							{/* Essential Metadata Strip */}
 							<div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-600 pt-0.5">
 								<span className="font-mono bg-slate-100 px-2 py-0.5 rounded-md text-slate-700 font-semibold border border-slate-200/60 text-[11px]">
@@ -934,8 +958,6 @@ function StudentDetailContent() {
 									<AkademikPanel studentId={s.id} onUpdate={refetchStudent} />
 								) : currentLink.id === "kehadiran" ? (
 									<KehadiranPanel studentId={s.id} />
-								) : currentLink.id === "dosen" ? (
-									<DosenPanel studentId={s.id} onUpdate={refetchStudent} />
 								) : currentLink.id === "pa" ? (
 									<PaPanel studentId={s.id} onUpdate={refetchStudent} />
 								) : currentLink.id === "magang" ? (

@@ -163,12 +163,36 @@ export function BackupManualForm() {
 						/>
 					</div>
 
-					<div className="mt-3 flex justify-between text-xs text-slate-500">
-						<span>
-							File diproses: {progress.processed || 0} / {progress.total || 0}
-						</span>
+					<div className="mt-3 flex flex-col gap-1 text-xs text-slate-600">
+						<div className="flex justify-between items-center">
+							<span>
+								{progress.status === "completed" &&
+								(progress.total ?? 0) === 0 ? (
+									<span className="text-emerald-700 font-medium">
+										Semua metadata sistem & struktur direktori berhasil
+										dicadangkan (0 berkas fisik).
+									</span>
+								) : (
+									<>
+										File diproses:{" "}
+										<strong className="font-semibold text-slate-800">
+											{progress.processed || 0}
+										</strong>{" "}
+										/ {progress.total || 0}
+									</>
+								)}
+							</span>
+							{progress.currentFile && progress.status === "processing" && (
+								<span className="truncate max-w-[200px] text-slate-400 font-mono">
+									{progress.currentFile}
+								</span>
+							)}
+						</div>
 						{progress.status === "failed" && (
-							<span className="text-red-600">{progress.errorMessage}</span>
+							<span className="text-red-600 font-medium">
+								{progress.errorMessage ||
+									"Terjadi kegagalan saat mengeksekusi backup."}
+							</span>
 						)}
 					</div>
 				</div>

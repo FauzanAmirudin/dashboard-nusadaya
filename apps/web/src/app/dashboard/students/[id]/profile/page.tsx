@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 
@@ -203,7 +204,18 @@ export default function StudentProfilePage() {
 								value={student.graduationYear?.toString()}
 							/>
 							<DataRow label="Program Pilihan" value={student.program} />
-							<DataRow label="Sub Program" value={student.subProgram} />
+							<div className="grid grid-cols-3 py-2 border-b last:border-0 text-sm">
+								<div className="text-slate-500 font-medium">
+									Sub Program / Peminatan
+								</div>
+								<div className="col-span-2">
+									<PeminatanBadge
+										subProgram={student.subProgram}
+										destinationCountry={student.destinationCountry}
+										program={student.program}
+									/>
+								</div>
+							</div>
 							<DataRow label="Tipe Kelas" value={student.classType} />
 						</CardContent>
 					</Card>
@@ -218,10 +230,16 @@ export default function StudentProfilePage() {
 						</CardHeader>
 						<CardContent className="pt-4">
 							<DataRow label="Status Mahasiswa" value={student.studentStatus} />
-							<DataRow
-								label="Negara Tujuan"
-								value={student.destinationCountry}
-							/>
+							<div className="grid grid-cols-3 py-2 border-b last:border-0 text-sm">
+								<div className="text-slate-500 font-medium">Negara Tujuan</div>
+								<div className="col-span-2">
+									<PeminatanBadge
+										subProgram={student.subProgram}
+										destinationCountry={student.destinationCountry}
+										showCountryOnly={true}
+									/>
+								</div>
+							</div>
 							<DataRow label="Periode Keberangkatan" value={student.period} />
 							<DataRow label="Rekomendasi" value={pmb?.rekomendasi} />
 							<DataRow label="Tim Visit" value={pmb?.timVisit} />

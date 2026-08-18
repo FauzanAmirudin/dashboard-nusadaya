@@ -37,6 +37,7 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 
 export const financeRoutes = new Elysia()
@@ -62,8 +63,8 @@ export const financeRoutes = new Elysia()
 				return { success: false, message: "Unauthorized" };
 			}
 
-			const isFinance = user.role === "finance" || user.role === "superadmin";
-			const isMagang = user.role === "magang";
+			const isFinance = hasRole(user, "finance");
+			const isMagang = hasRole(user, "magang");
 
 			if (!isFinance && !isMagang) {
 				set.status = 403;
@@ -268,7 +269,7 @@ export const financeRoutes = new Elysia()
 	.delete("/:id/finance/acc", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+		if (!hasRole(user, "finance")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -337,7 +338,7 @@ export const financeRoutes = new Elysia()
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+		if (!hasRole(user, "finance")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -353,7 +354,7 @@ export const financeRoutes = new Elysia()
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+		if (!hasRole(user, "finance")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -419,7 +420,7 @@ export const financeRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+			if (!hasRole(user, "finance")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -483,7 +484,7 @@ export const financeRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+			if (!hasRole(user, "finance")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -566,7 +567,7 @@ export const financeRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+			if (!hasRole(user, "finance")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -631,7 +632,7 @@ export const financeRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+			if (!hasRole(user, "finance")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -721,7 +722,7 @@ export const financeRoutes = new Elysia()
 		async (context) => {
 			const { params, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+			if (!hasRole(user, "finance")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}

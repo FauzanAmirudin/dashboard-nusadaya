@@ -33,6 +33,8 @@ const TABS = [
 	"Keterangan Wali",
 ];
 
+import { getPeminatanOption, PEMINATAN_OPTIONS } from "@/lib/peminatan";
+
 export default function FormMahasiswaPublic() {
 	const params = useParams();
 	const token = (params?.token as string) || "";
@@ -75,9 +77,8 @@ export default function FormMahasiswaPublic() {
 		program: "",
 		subProgram: "",
 		classType: "",
-		batch: "",
 		academicYear: "",
-		cohort: new Date().getFullYear().toString(),
+		cohort: "14",
 
 		// Tab 3: Kesehatan
 		bloodType: "",
@@ -219,7 +220,6 @@ export default function FormMahasiswaPublic() {
 				"schoolAddress",
 				"program",
 				"cohort",
-				"batch",
 				"academicYear",
 			];
 			if (!checkEmpty(reqKeys)) {
@@ -880,52 +880,57 @@ export default function FormMahasiswaPublic() {
 								</Label>
 								<Select
 									value={formData.subProgram}
-									onValueChange={(v) => updateData("subProgram", v)}
+									onValueChange={(v) => {
+										const val = v || "";
+										const dest =
+											val === "Malaysia-Hospitality"
+												? "Malaysia"
+												: val === "Taiwan-Hospitality"
+													? "Taiwan"
+													: val === "Timur tengah-Barista"
+														? "Timur Tengah"
+														: "Indonesia";
+										setFormData((prev) => ({
+											...prev,
+											subProgram: val,
+											destinationCountry: dest,
+										}));
+									}}
 								>
 									<SelectTrigger>
-										<SelectValue placeholder="Pilih Peminatan" />
+										{formData.subProgram ? (
+											(() => {
+												const opt = getPeminatanOption(formData.subProgram);
+												return (
+													<div className="flex items-center gap-2">
+														<img
+															src={opt?.flag}
+															alt={opt?.alt || "Flag"}
+															className="w-4 h-3 object-cover rounded-[1px] shrink-0"
+														/>
+														<span>{opt?.label}</span>
+													</div>
+												);
+											})()
+										) : (
+											<span className="text-muted-foreground">
+												Pilih Peminatan
+											</span>
+										)}
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value="Malaysia-Hospitality">
-											<div className="flex items-center gap-2">
-												<img
-													src="https://flagcdn.com/w20/my.png"
-													alt="MY"
-													className="w-4 h-3 object-cover"
-												/>{" "}
-												Malaysia-Hospitality
-											</div>
-										</SelectItem>
-										<SelectItem value="Taiwan-Hospitality">
-											<div className="flex items-center gap-2">
-												<img
-													src="https://flagcdn.com/w20/tw.png"
-													alt="TW"
-													className="w-4 h-3 object-cover"
-												/>{" "}
-												Taiwan-Hospitality
-											</div>
-										</SelectItem>
-										<SelectItem value="Timur tengah-Barista">
-											<div className="flex items-center gap-2">
-												<img
-													src="https://flagcdn.com/w20/sa.png"
-													alt="SA"
-													className="w-4 h-3 object-cover"
-												/>{" "}
-												Timur tengah-Barista
-											</div>
-										</SelectItem>
-										<SelectItem value="Indonesia-Reguler">
-											<div className="flex items-center gap-2">
-												<img
-													src="https://flagcdn.com/w20/id.png"
-													alt="ID"
-													className="w-4 h-3 object-cover"
-												/>{" "}
-												Indonesia-Reguler
-											</div>
-										</SelectItem>
+										{PEMINATAN_OPTIONS.map((item) => (
+											<SelectItem key={item.value} value={item.value}>
+												<div className="flex items-center gap-2">
+													<img
+														src={item.flag}
+														alt={item.alt}
+														className="w-4 h-3 object-cover rounded-[1px] shrink-0"
+													/>
+													<span>{item.label}</span>
+												</div>
+											</SelectItem>
+										))}
 									</SelectContent>
 								</Select>
 							</div>
@@ -949,25 +954,27 @@ export default function FormMahasiswaPublic() {
 							</div>
 							<div className="space-y-2">
 								<Label>
-									Angkatan (Tahun) <span className="text-red-500">*</span>
+									Angkatan <span className="text-red-500">*</span>
 								</Label>
 								<Input
 									required
 									type="number"
-									placeholder="2024"
+									placeholder="Contoh: 15 atau 16"
 									value={formData.cohort}
-									onChange={(e) => updateData("cohort", e.target.value)}
-								/>
-							</div>
-							<div className="space-y-2">
-								<Label>
-									Batch <span className="text-red-500">*</span>
-								</Label>
-								<Input
-									type="number"
-									placeholder="2025"
-									value={formData.batch}
-									onChange={(e) => updateData("batch", e.target.value)}
+									onChange={(e) => {
+										const val = e.target.value;
+										const cNum = parseInt(val, 10);
+										if (!isNaN(cNum) && cNum >= 1 && cNum <= 99) {
+											const startYear = 2010 + cNum;
+											setFormData((prev) => ({
+												...prev,
+												cohort: val,
+												academicYear: `${startYear}/${startYear + 1}`,
+											}));
+										} else {
+											updateData("cohort", val);
+										}
+									}}
 								/>
 							</div>
 							<div className="space-y-2">
@@ -975,9 +982,23 @@ export default function FormMahasiswaPublic() {
 									Tahun Ajaran <span className="text-red-500">*</span>
 								</Label>
 								<Input
-									placeholder="2024/2025"
+									placeholder="Contoh: 2025/2026 atau 2026/2027"
 									value={formData.academicYear}
-									onChange={(e) => updateData("academicYear", e.target.value)}
+									onChange={(e) => {
+										const val = e.target.value;
+										const match = val.match(/20(\d{2})/);
+										if (match) {
+											const startYear = parseInt(match[0], 10);
+											const calculatedCohort = (startYear - 2010).toString();
+											setFormData((prev) => ({
+												...prev,
+												academicYear: val,
+												cohort: calculatedCohort,
+											}));
+										} else {
+											updateData("academicYear", val);
+										}
+									}}
 								/>
 							</div>
 

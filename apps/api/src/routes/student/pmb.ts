@@ -11,6 +11,7 @@ import {
 	students,
 	users,
 } from "../../db/schema";
+import { hasRole } from "../../lib/permissions";
 import { fileService } from "../../modules/file/service/file.service";
 
 export const pmbRoutes = new Elysia()
@@ -19,7 +20,7 @@ export const pmbRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "pmb")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -117,7 +118,7 @@ export const pmbRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "pmb")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -137,7 +138,7 @@ export const pmbRoutes = new Elysia()
 	.post("/:id/pmb/acc", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!user || (user.role !== "pmb" && user.role !== "superadmin")) {
+		if (!hasRole(user, "pmb")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -184,10 +185,10 @@ export const pmbRoutes = new Elysia()
 
 		return { success: true };
 	})
-	.delete("/:id/pmb/acc", async (context) => {
+	.post("/:id/pmb/cancel-acc", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!user || (user.role !== "pmb" && user.role !== "superadmin")) {
+		if (!hasRole(user, "pmb")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -378,11 +379,10 @@ export const pmbRoutes = new Elysia()
 			},
 		});
 	})
-	.patch("/:id/pmb/documents/:docId/verify", async (context) => {
+	.post("/:id/pmb/documents/:docId/verify", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-
-		if (!user || (user.role !== "pmb" && user.role !== "superadmin")) {
+		if (!hasRole(user, "pmb")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -398,7 +398,7 @@ export const pmbRoutes = new Elysia()
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (!user || (user.role !== "pmb" && user.role !== "superadmin")) {
+		if (!hasRole(user, "pmb")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -430,7 +430,7 @@ export const pmbRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "pmb")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -530,7 +530,7 @@ export const pmbRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "pmb")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -570,12 +570,7 @@ export const pmbRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (
-				!user ||
-				(user.role !== "superadmin" &&
-					user.role !== "pmb" &&
-					user.role !== "finance")
-			) {
+			if (!hasRole(user, "pmb", "finance")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -627,7 +622,7 @@ export const pmbRoutes = new Elysia()
 	.delete("/:id/pmb/fee-share-recipients/:recipientId", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+		if (!hasRole(user, "pmb")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -662,7 +657,7 @@ export const pmbRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!user || (user.role !== "superadmin" && user.role !== "pmb")) {
+			if (!hasRole(user, "pmb")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}

@@ -24,6 +24,8 @@ interface BackupJobPayload {
 export async function startBackupWorker(): Promise<void> {
 	console.log("🔄 Backup Worker started — listening on queue:backup");
 
+	let errorBackoffMs = 1000;
+
 	// eslint-disable-next-line no-constant-condition
 	while (true) {
 		try {
@@ -31,10 +33,13 @@ export async function startBackupWorker(): Promise<void> {
 			// Return null jika timeout (tidak ada job), lanjut loop
 			const job = await dequeue<BackupJobPayload>("backup", 5);
 
+			// Reset backoff on successful communication with Redis
+			errorBackoffMs = 1000;
+
 			if (!job) continue;
 
 			console.log(
-				`[BackupWorker] Processing job ${job.payload.jobId} (type: ${job.payload.backupType})`,
+				`[BackupWorker] [${new Date().toISOString()}] Processing job ${job.payload.jobId} (type: ${job.payload.backupType})`,
 			);
 
 			await backupService.executeBackup(
@@ -45,12 +50,18 @@ export async function startBackupWorker(): Promise<void> {
 				>[2],
 			);
 
-			console.log(`[BackupWorker] Job ${job.payload.jobId} completed ✅`);
+			console.log(
+				`[BackupWorker] [${new Date().toISOString()}] Job ${job.payload.jobId} completed ✅`,
+			);
 		} catch (err) {
 			const error = err as Error;
-			console.error("[BackupWorker] Error processing job:", error.message);
-			// Jangan crash worker — lanjut ke job berikutnya
-			await new Promise((r) => setTimeout(r, 1000));
+			console.error(
+				`[BackupWorker] [${new Date().toISOString()}] Error processing job:`,
+				error.message,
+			);
+			// Exponential backoff up to 30 seconds
+			await new Promise((r) => setTimeout(r, errorBackoffMs));
+			errorBackoffMs = Math.min(errorBackoffMs * 2, 30000);
 		}
 	}
 }

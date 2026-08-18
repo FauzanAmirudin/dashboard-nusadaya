@@ -4,6 +4,7 @@ import { Eye } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import {
 	Table,
 	TableBody,
@@ -93,7 +94,10 @@ export function TabRespons() {
 									<TableCell>{r.phone || "-"}</TableCell>
 									<TableCell>{r.schoolOrigin || "-"}</TableCell>
 									<TableCell>
-										{r.program || "-"} {r.subProgram ? `(${r.subProgram})` : ""}
+										<PeminatanBadge
+											subProgram={r.subProgram}
+											program={r.program}
+										/>
 									</TableCell>
 									<TableCell>
 										{new Date(r.submittedAt).toLocaleDateString("id-ID", {

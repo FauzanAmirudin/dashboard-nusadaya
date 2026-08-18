@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 
@@ -131,21 +132,27 @@ export default function MahasiswaDashboard() {
 						</p>
 						<div className="flex flex-wrap gap-3">
 							<div className="bg-black/20 rounded-lg px-4 py-2 border border-white/10">
-								<p className="text-xs text-blue-200">Program</p>
-								<p className="font-semibold">
-									{student?.program}{" "}
-									{student?.subProgram ? `- ${student.subProgram}` : ""}
+								<p className="text-xs text-blue-200 mb-1">
+									Peminatan / Program
 								</p>
+								<PeminatanBadge
+									subProgram={student?.subProgram}
+									destinationCountry={student?.destinationCountry}
+									program={student?.program}
+									className="bg-white/95 text-slate-900 border-white/20"
+								/>
 							</div>
 							<div className="bg-black/20 rounded-lg px-4 py-2 border border-white/10">
 								<p className="text-xs text-blue-200">Angkatan</p>
 								<p className="font-semibold">{student?.cohort}</p>
 							</div>
 							<div className="bg-black/20 rounded-lg px-4 py-2 border border-white/10">
-								<p className="text-xs text-blue-200">Negara Tujuan</p>
-								<p className="font-semibold">
-									{student?.destinationCountry || "-"}
-								</p>
+								<p className="text-xs text-blue-200 mb-1">Negara Tujuan</p>
+								<PeminatanBadge
+									destinationCountry={student?.destinationCountry}
+									showCountryOnly={true}
+									className="bg-white/95 text-slate-900 border-white/20"
+								/>
 							</div>
 						</div>
 					</div>

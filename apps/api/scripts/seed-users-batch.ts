@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import postgres from "postgres";
 import { db } from "../src/db";
 import {
@@ -58,6 +58,13 @@ async function seedBatch() {
 	// 2. Buat 10 User Dosen
 	// -------------------------------------------------------------
 	const dosenList = [
+		{
+			username: "dosen",
+			fullName: "Dosen Pengajar",
+			role: "dosen" as const,
+			email: "dosen@nusadaya.ac.id",
+			phone: "081234567000",
+		},
 		{
 			username: "dosen1",
 			fullName: "Dr. Hendra Gunawan, M.Pd.",
@@ -274,9 +281,10 @@ async function seedBatch() {
 			name: "Aditya Pratama",
 			nickname: "Adit",
 			gender: "Laki-laki",
-			cohort: 2025,
+			cohort: 15,
+			academicYear: "2025/2026",
 			program: "Hospitality",
-			subProgram: "F&B Service",
+			subProgram: "Malaysia-Hospitality",
 			destinationCountry: "Malaysia",
 			email: "mhs1@student.nusadaya.ac.id",
 			phone: "085712345001",
@@ -288,9 +296,10 @@ async function seedBatch() {
 			name: "Bella Safitri",
 			nickname: "Bella",
 			gender: "Perempuan",
-			cohort: 2025,
+			cohort: 15,
+			academicYear: "2025/2026",
 			program: "Culinary",
-			subProgram: "Pastry & Bakery",
+			subProgram: "Taiwan-Hospitality",
 			destinationCountry: "Taiwan",
 			email: "mhs2@student.nusadaya.ac.id",
 			phone: "085712345002",
@@ -302,9 +311,10 @@ async function seedBatch() {
 			name: "Dimas Anggara",
 			nickname: "Dimas",
 			gender: "Laki-laki",
-			cohort: 2025,
+			cohort: 15,
+			academicYear: "2025/2026",
 			program: "Barista",
-			subProgram: "Coffee Brewing",
+			subProgram: "Timur tengah-Barista",
 			destinationCountry: "Timur Tengah",
 			email: "mhs3@student.nusadaya.ac.id",
 			phone: "085712345003",
@@ -316,9 +326,10 @@ async function seedBatch() {
 			name: "Eka Putri Rahayu",
 			nickname: "Eka",
 			gender: "Perempuan",
-			cohort: 2025,
+			cohort: 15,
+			academicYear: "2025/2026",
 			program: "Front Office",
-			subProgram: "Reception & Concierge",
+			subProgram: "Malaysia-Hospitality",
 			destinationCountry: "Malaysia",
 			email: "mhs4@student.nusadaya.ac.id",
 			phone: "085712345004",
@@ -330,9 +341,10 @@ async function seedBatch() {
 			name: "Faris Maulana",
 			nickname: "Faris",
 			gender: "Laki-laki",
-			cohort: 2025,
+			cohort: 15,
+			academicYear: "2025/2026",
 			program: "Housekeeping",
-			subProgram: "Room Attendant",
+			subProgram: "Taiwan-Hospitality",
 			destinationCountry: "Taiwan",
 			email: "mhs5@student.nusadaya.ac.id",
 			phone: "085712345005",
@@ -344,10 +356,11 @@ async function seedBatch() {
 			name: "Gita Gutawa",
 			nickname: "Gita",
 			gender: "Perempuan",
-			cohort: 2025,
+			cohort: 15,
+			academicYear: "2025/2026",
 			program: "Hospitality",
-			subProgram: "F&B Service",
-			destinationCountry: "Jepang",
+			subProgram: "Indonesia-Reguler",
+			destinationCountry: "Indonesia",
 			email: "mhs6@student.nusadaya.ac.id",
 			phone: "085712345006",
 			overallStatus: "PERLU_PERHATIAN" as const,
@@ -358,9 +371,10 @@ async function seedBatch() {
 			name: "Hilman Syahputra",
 			nickname: "Hilman",
 			gender: "Laki-laki",
-			cohort: 2025,
+			cohort: 15,
+			academicYear: "2025/2026",
 			program: "Culinary",
-			subProgram: "Western Cuisine",
+			subProgram: "Malaysia-Hospitality",
 			destinationCountry: "Malaysia",
 			email: "mhs7@student.nusadaya.ac.id",
 			phone: "085712345007",
@@ -372,9 +386,10 @@ async function seedBatch() {
 			name: "Intan Permata",
 			nickname: "Intan",
 			gender: "Perempuan",
-			cohort: 2025,
+			cohort: 15,
+			academicYear: "2025/2026",
 			program: "Barista",
-			subProgram: "Latte Art & Roasting",
+			subProgram: "Timur tengah-Barista",
 			destinationCountry: "Timur Tengah",
 			email: "mhs8@student.nusadaya.ac.id",
 			phone: "085712345008",
@@ -386,9 +401,10 @@ async function seedBatch() {
 			name: "Julian Alamsyah",
 			nickname: "Julian",
 			gender: "Laki-laki",
-			cohort: 2025,
+			cohort: 15,
+			academicYear: "2025/2026",
 			program: "Front Office",
-			subProgram: "Guest Service",
+			subProgram: "Taiwan-Hospitality",
 			destinationCountry: "Taiwan",
 			email: "mhs9@student.nusadaya.ac.id",
 			phone: "085712345009",
@@ -400,9 +416,10 @@ async function seedBatch() {
 			name: "Karin Novilda",
 			nickname: "Karin",
 			gender: "Perempuan",
-			cohort: 2025,
+			cohort: 15,
+			academicYear: "2025/2026",
 			program: "Hospitality",
-			subProgram: "F&B Service",
+			subProgram: "Malaysia-Hospitality",
 			destinationCountry: "Malaysia",
 			email: "mhs10@student.nusadaya.ac.id",
 			phone: "085712345010",
@@ -458,6 +475,7 @@ async function seedBatch() {
 					name: m.name,
 					nickname: m.nickname,
 					cohort: m.cohort,
+					academicYear: m.academicYear,
 					program: m.program,
 					subProgram: m.subProgram,
 					gender: m.gender,
@@ -480,6 +498,7 @@ async function seedBatch() {
 					name: m.name,
 					nickname: m.nickname,
 					cohort: m.cohort,
+					academicYear: m.academicYear,
 					program: m.program,
 					subProgram: m.subProgram,
 					gender: m.gender,
@@ -632,90 +651,141 @@ async function seedBatch() {
 		"\nMenyimpan Mata Kuliah untuk 10 Dosen & Membuat 18 Pertemuan...",
 	);
 	const courseDefinitions = [
+		// 6 Mata Kuliah untuk Akun Demo Dosen (username: "dosen")
+		{
+			code: "FO101",
+			name: "Front Office",
+			dosenUsername: "dosen",
+			peminatan: "Taiwan-Hospitality",
+			cohort: 14,
+			type: "praktik" as const,
+		},
+		{
+			code: "HK101",
+			name: "Housekeeping",
+			dosenUsername: "dosen",
+			peminatan: "Malaysia-Hospitality",
+			cohort: 14,
+			type: "praktik" as const,
+		},
+		{
+			code: "FB101",
+			name: "Food & Beverage",
+			dosenUsername: "dosen",
+			peminatan: "Malaysia-Hospitality",
+			cohort: 14,
+			type: "praktik" as const,
+		},
+		{
+			code: "ENG101",
+			name: "Bahasa Inggris",
+			dosenUsername: "dosen",
+			peminatan: "Indonesia-Reguler",
+			cohort: 14,
+			type: "teori" as const,
+		},
+		{
+			code: "ETH101",
+			name: "Etika Profesi",
+			dosenUsername: "dosen",
+			peminatan: "Indonesia-Reguler",
+			cohort: 14,
+			type: "teori" as const,
+		},
+		{
+			code: "GRO101",
+			name: "Grooming",
+			dosenUsername: "dosen",
+			peminatan: "Malaysia-Hospitality",
+			cohort: 14,
+			type: "praktik" as const,
+		},
+
+		// 10 Mata Kuliah untuk Dosen 1 s.d 10 (username: "dosen1" .. "dosen10")
 		{
 			code: "MK-HOSP-101",
 			name: "Food & Beverage Service Operation",
-			dosenIndex: 0,
+			dosenUsername: "dosen1",
 			peminatan: "Malaysia-Hospitality",
-			cohort: 2025,
+			cohort: 15,
 			type: "praktik" as const,
 		},
 		{
 			code: "MK-MGMT-102",
 			name: "Manajemen & Tata Kelola Perhotelan",
-			dosenIndex: 1,
+			dosenUsername: "dosen2",
 			peminatan: "Indonesia-Reguler",
-			cohort: 2025,
+			cohort: 15,
 			type: "teori" as const,
 		},
 		{
 			code: "MK-BAR-103",
 			name: "Coffee Brewing & Espresso Specialist",
-			dosenIndex: 2,
+			dosenUsername: "dosen3",
 			peminatan: "Timur tengah-Barista",
-			cohort: 2025,
+			cohort: 15,
 			type: "praktik" as const,
 		},
 		{
 			code: "MK-FO-104",
 			name: "Front Office Operation & System",
-			dosenIndex: 3,
+			dosenUsername: "dosen4",
 			peminatan: "Taiwan-Hospitality",
-			cohort: 2025,
+			cohort: 15,
 			type: "praktik" as const,
 		},
 		{
 			code: "MK-HK-105",
 			name: "Housekeeping & Room Management",
-			dosenIndex: 4,
+			dosenUsername: "dosen5",
 			peminatan: "Malaysia-Hospitality",
-			cohort: 2025,
+			cohort: 15,
 			type: "praktik" as const,
 		},
 		{
 			code: "MK-HYG-106",
 			name: "Hygiene, Sanitasi & K3 Perhotelan",
-			dosenIndex: 5,
+			dosenUsername: "dosen6",
 			peminatan: "Indonesia-Reguler",
-			cohort: 2025,
+			cohort: 15,
 			type: "teori" as const,
 		},
 		{
 			code: "MK-ENG-107",
 			name: "Bahasa Inggris Komunikasi Vokasi",
-			dosenIndex: 6,
+			dosenUsername: "dosen7",
 			peminatan: "Malaysia-Hospitality",
-			cohort: 2025,
+			cohort: 15,
 			type: "teori" as const,
 		},
 		{
 			code: "MK-CUL-108",
 			name: "Seni Kuliner Nusantara & Oriental",
-			dosenIndex: 7,
+			dosenUsername: "dosen8",
 			peminatan: "Taiwan-Hospitality",
-			cohort: 2025,
+			cohort: 15,
 			type: "praktik" as const,
 		},
 		{
 			code: "MK-KWU-109",
 			name: "Digital Marketing & Kewirausahaan",
-			dosenIndex: 8,
+			dosenUsername: "dosen9",
 			peminatan: "Indonesia-Reguler",
-			cohort: 2025,
+			cohort: 15,
 			type: "teori" as const,
 		},
 		{
-			code: "MK-CUL-110",
-			name: "Pastry, Bakery & Dessert Art",
-			dosenIndex: 9,
-			peminatan: "Malaysia-Hospitality",
-			cohort: 2025,
+			code: "MK-BAR-110",
+			name: "Beverage Mixology & Latte Art",
+			dosenUsername: "dosen10",
+			peminatan: "Timur tengah-Barista",
+			cohort: 15,
 			type: "praktik" as const,
 		},
 	];
 
 	for (const def of courseDefinitions) {
-		const dosen = createdDosen[def.dosenIndex];
+		const dosen = createdDosen.find((d) => d.username === def.dosenUsername);
 		if (!dosen) continue;
 
 		let course;
@@ -877,6 +947,63 @@ async function seedBatch() {
 		);
 	}
 
+	// -------------------------------------------------------------
+	// 6. Daftarkan Mahasiswa ke Mata Kuliah Dosen (course_grades)
+	// -------------------------------------------------------------
+	console.log(
+		"\nMendaftarkan Mahasiswa ke Mata Kuliah Dosen (course_grades)...",
+	);
+	const allCreatedCourses = await db.select().from(courses);
+	const allStudents = await db.select().from(students);
+
+	for (const std of allStudents) {
+		// Hubungkan mahasiswa ke mata kuliah yang relevan
+		const relevantCourses = allCreatedCourses.filter(
+			(c) =>
+				c.peminatan === std.subProgram ||
+				c.cohort === std.cohort ||
+				c.peminatan === "Indonesia-Reguler" ||
+				c.peminatan === "Malaysia-Hospitality",
+		);
+
+		for (const crs of relevantCourses) {
+			const [existingGrade] = await db
+				.select()
+				.from(courseGrades)
+				.where(
+					and(
+						eq(courseGrades.studentId, std.id),
+						eq(courseGrades.courseCode, crs.code),
+					),
+				);
+
+			if (!existingGrade) {
+				await db.insert(courseGrades).values({
+					studentId: std.id,
+					courseId: crs.id,
+					courseCode: crs.code,
+					courseName: crs.name,
+					dosenId: crs.dosenId,
+					grade: "A",
+					attendanceRate: 90,
+					practicalScore: 88,
+					theoryScore: 85,
+					entrepreneurScore: 80,
+					totalMeetings: 16,
+					attendancePresent: 14,
+					attitudeNote:
+						"Sikap perkuliahan sangat baik dan aktif dalam praktikum.",
+					status: "AMAN",
+					isAcc: true,
+					accAt: new Date(),
+				});
+			}
+		}
+	}
+	console.log(
+		"✓ Seluruh Mahasiswa berhasil terdaftar ke kelas dosen pengampu!",
+	);
+
 	console.log("\n=======================================================");
 	console.log("🎉 BATCH SEEDING SELESAI DENGAN SUKSES!");
 	console.log("=======================================================");
@@ -890,6 +1017,9 @@ async function seedBatch() {
 	);
 	console.log(
 		"• Setiap Mahasiswa telah otomatis terdaftar ke masing-masing PA (1 mahasiswa per PA).",
+	);
+	console.log(
+		"• Seluruh Mahasiswa telah otomatis terdaftar ke kelas mata kuliah Dosen.",
 	);
 	console.log("=======================================================\n");
 

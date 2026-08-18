@@ -2,23 +2,26 @@ import { and, eq, inArray, not } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
 import { users } from "../db/schema";
+import { hasRole } from "../lib/permissions";
 
 export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 	.derive((context) => {
 		const user = (context as any).user;
-		if (!user) {
-			throw new Error("Unauthorized");
-		}
 		return { user };
 	})
 	.get("/", async ({ user, set }: any) => {
-		if (user.role !== "superadmin" && user.role !== "akademik") {
+		if (!user) {
+			set.status = 401;
+			return { success: false, message: "Unauthorized" };
+		}
+		if (!hasRole(user, "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
 
 		let whereClause;
-		if (user.role === "akademik") {
+		const isSuperadmin = hasRole(user, "superadmin");
+		if (!isSuperadmin && hasRole(user, "akademik")) {
 			// Akademik can only see PA and Dosen
 			whereClause = inArray(users.role, ["pa", "dosen"]);
 		} else {
@@ -33,6 +36,7 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 				username: true,
 				fullName: true,
 				role: true,
+				roles: true,
 				email: true,
 				phone: true,
 				profilePhotoUrl: true,
@@ -46,14 +50,19 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 	.post(
 		"/",
 		async ({ body, set, user }: any) => {
-			if (user.role !== "superadmin" && user.role !== "akademik") {
+			if (!hasRole(user, "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
 
 			const input = body as any;
+			const isSuperadmin = hasRole(user, "superadmin");
 
-			if (user.role === "akademik" && !["pa", "dosen"].includes(input.role)) {
+			if (
+				!isSuperadmin &&
+				hasRole(user, "akademik") &&
+				!["pa", "dosen"].includes(input.role)
+			) {
 				set.status = 403;
 				return {
 					success: false,
@@ -71,13 +80,20 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 
 			const passwordHash = await Bun.password.hash(input.password);
 
+			const userRoles =
+				input.roles && Array.isArray(input.roles) && input.roles.length > 0
+					? input.roles
+					: [input.role];
+			const primaryRole = input.role || userRoles[0];
+
 			const [newUser] = await db
 				.insert(users)
 				.values({
 					username: input.username,
 					passwordHash,
 					fullName: input.fullName,
-					role: input.role,
+					role: primaryRole,
+					roles: userRoles,
 					email: input.email || null,
 					phone: input.phone || null,
 					profilePhotoUrl: input.profilePhotoUrl || null,
@@ -87,6 +103,7 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 					username: users.username,
 					fullName: users.fullName,
 					role: users.role,
+					roles: users.roles,
 				});
 
 			return { success: true, data: newUser };
@@ -97,6 +114,7 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 				password: t.String(),
 				fullName: t.String(),
 				role: t.String(),
+				roles: t.Optional(t.Array(t.String())),
 				email: t.Optional(t.String()),
 				phone: t.Optional(t.String()),
 				profilePhotoUrl: t.Optional(t.String()),
@@ -106,11 +124,12 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 	.patch(
 		"/:id",
 		async ({ params, body, set, user }: any) => {
-			if (user.role !== "superadmin" && user.role !== "akademik") {
+			if (!hasRole(user, "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
 
+			const isSuperadmin = hasRole(user, "superadmin");
 			const id = Number(params.id);
 			const targetUser = await db.query.users.findFirst({
 				where: eq(users.id, id),
@@ -122,7 +141,8 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 			}
 
 			if (
-				user.role === "akademik" &&
+				!isSuperadmin &&
+				hasRole(user, "akademik") &&
 				!["pa", "dosen"].includes(targetUser.role)
 			) {
 				set.status = 403;
@@ -135,7 +155,8 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 			const input = body as any;
 
 			if (
-				user.role === "akademik" &&
+				!isSuperadmin &&
+				hasRole(user, "akademik") &&
 				input.role &&
 				!["pa", "dosen"].includes(input.role)
 			) {
@@ -156,12 +177,26 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 				}
 			}
 
+			let userRoles = targetUser.roles;
+			if (input.roles !== undefined) {
+				userRoles = Array.isArray(input.roles)
+					? input.roles
+					: [input.role || targetUser.role];
+			}
+			const primaryRole =
+				input.role !== undefined
+					? input.role
+					: userRoles && userRoles.length > 0
+						? userRoles[0]
+						: targetUser.role;
+
 			const updateData: any = {
 				fullName:
 					input.fullName !== undefined ? input.fullName : targetUser.fullName,
 				username:
 					input.username !== undefined ? input.username : targetUser.username,
-				role: input.role !== undefined ? input.role : targetUser.role,
+				role: primaryRole,
+				roles: userRoles,
 				email: input.email !== undefined ? input.email : targetUser.email,
 				phone: input.phone !== undefined ? input.phone : targetUser.phone,
 				profilePhotoUrl:
@@ -184,6 +219,7 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 					username: users.username,
 					fullName: users.fullName,
 					role: users.role,
+					roles: users.roles,
 				});
 
 			return { success: true, data: updatedUser };
@@ -194,6 +230,7 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 				password: t.Optional(t.String()),
 				fullName: t.Optional(t.String()),
 				role: t.Optional(t.String()),
+				roles: t.Optional(t.Array(t.String())),
 				email: t.Optional(t.String()),
 				phone: t.Optional(t.String()),
 				profilePhotoUrl: t.Optional(t.String()),
@@ -201,11 +238,12 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 		},
 	)
 	.delete("/:id", async ({ params, set, user }: any) => {
-		if (user.role !== "superadmin" && user.role !== "akademik") {
+		if (!hasRole(user, "akademik")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
 
+		const isSuperadmin = hasRole(user, "superadmin");
 		const id = Number(params.id);
 		const targetUser = await db.query.users.findFirst({
 			where: eq(users.id, id),
@@ -217,7 +255,8 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 		}
 
 		if (
-			user.role === "akademik" &&
+			!isSuperadmin &&
+			hasRole(user, "akademik") &&
 			!["pa", "dosen"].includes(targetUser.role)
 		) {
 			set.status = 403;

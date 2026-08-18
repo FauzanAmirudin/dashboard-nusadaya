@@ -1,4 +1,7 @@
 import { join } from "node:path";
+import { eq } from "drizzle-orm";
+import { db } from "../db";
+import { users } from "../db/schema";
 import { backupService } from "../modules/backup/service/backup.service";
 import { retentionService } from "../modules/backup/service/retention.service";
 import { runFileCleanup } from "./file.worker";
@@ -10,13 +13,6 @@ import { runFileCleanup } from "./file.worker";
  * - Daily (00:00)   → full backup trigger (database + storage)
  * - Every 1 hour    → cleanup file temporary
  * - Every 7 days    → cleanup expired exports
- *
- * Catatan: Untuk production, pertimbangkan library cron seperti "node-cron"
- * agar pengelolaan schedule lebih robust. Implementasi ini menggunakan
- * setInterval yang cukup untuk kebutuhan saat ini.
- *
- * Database backup (pg_dump) harus dikonfigurasi di level OS/Docker
- * menggunakan cron job eksternal, bukan dari dalam aplikasi Node/Bun.
  */
 
 function getMillisUntilMidnight(): number {
@@ -28,22 +24,59 @@ function getMillisUntilMidnight(): number {
 		0,
 		0,
 		0,
+		0,
 	);
 	return midnight.getTime() - now.getTime();
 }
 
-async function runDailyBackup(): Promise<void> {
-	console.log("[ScheduledWorker] Running daily full backup...");
+async function getSuperadminUserId(): Promise<number> {
 	try {
+		const admin = await db.query.users.findFirst({
+			where: eq(users.role, "superadmin"),
+			columns: { id: true },
+		});
+		if (admin?.id) return admin.id;
+	} catch {
+		console.warn(
+			"[ScheduledWorker] Could not query superadmin user, fallback to userId: 1",
+		);
+	}
+	return 1;
+}
+
+async function runDailyBackup(attempt = 1): Promise<void> {
+	const timestamp = new Date().toISOString();
+	console.log(
+		`[ScheduledWorker] [${timestamp}] Running daily full backup (Attempt ${attempt}/3)...`,
+	);
+	try {
+		const userId = await getSuperadminUserId();
 		const result = await backupService.createBackupJob({
 			type: "full",
 			filters: {},
-			userId: 1, // System user — superadmin pertama
+			userId,
 		});
-		console.log(`[ScheduledWorker] Daily backup enqueued: ${result.jobId}`);
+
+		if (result.status === "rejected") {
+			console.warn(
+				`[ScheduledWorker] [${timestamp}] Daily backup skipped/rejected: ${result.message}`,
+			);
+			return;
+		}
+
+		console.log(
+			`[ScheduledWorker] [${timestamp}] Daily backup enqueued: ${result.jobId}`,
+		);
 	} catch (err) {
 		const error = err as Error;
-		console.error("[ScheduledWorker] Daily backup failed:", error.message);
+		console.error(
+			`[ScheduledWorker] [${timestamp}] Daily backup attempt ${attempt} failed:`,
+			error.message,
+		);
+		if (attempt < 3) {
+			console.log(`[ScheduledWorker] Retrying daily backup in 5 seconds...`);
+			setTimeout(() => runDailyBackup(attempt + 1), 5000);
+		}
 	}
 }
 

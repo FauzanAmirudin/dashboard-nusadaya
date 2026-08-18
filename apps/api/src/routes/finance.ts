@@ -10,13 +10,14 @@ import {
 	practicesMaterialReports,
 	students,
 } from "../db/schema";
+import { hasRole } from "../lib/permissions";
 import { requireRole } from "../middleware/rbac";
 
 export const financeRouter = new Elysia({ prefix: "/finance" })
 	// Dashboard: Requires finance or superadmin
 	.get("/dashboard", async (context) => {
 		const user = (context as any).user;
-		if (!user || (user.role !== "finance" && user.role !== "superadmin")) {
+		if (!hasRole(user, "finance")) {
 			context.set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -60,15 +61,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	.get(
 		"/student/:studentId",
 		async ({ params: { studentId }, set, user }: any) => {
-			if (
-				!user ||
-				(user.role !== "finance" &&
-					user.role !== "superadmin" &&
-					user.role !== "pa" &&
-					user.role !== "magang" &&
-					user.role !== "crm" &&
-					user.role !== "pmb")
-			) {
+			if (!hasRole(user, "finance", "pa", "magang", "crm", "pmb")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -111,7 +104,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	.patch(
 		"/student/:studentId/registrasi",
 		async ({ params: { studentId }, body, set, user }: any) => {
-			if (!user || (user.role !== "finance" && user.role !== "superadmin"))
+			if (!hasRole(user, "finance"))
 				return { success: false, message: "Forbidden" };
 
 			await db
@@ -213,7 +206,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	.patch(
 		"/student/:studentId/biaya-tambahan",
 		async ({ params: { studentId }, body, user }: any) => {
-			if (!user || (user.role !== "finance" && user.role !== "superadmin"))
+			if (!hasRole(user, "finance"))
 				return { success: false, message: "Forbidden" };
 			await db
 				.insert(financeData)
@@ -233,7 +226,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	.post(
 		"/student/:studentId/custom-field",
 		async ({ params: { studentId }, body, user }: any) => {
-			if (!user || (user.role !== "finance" && user.role !== "superadmin"))
+			if (!hasRole(user, "finance"))
 				return { success: false, message: "Forbidden" };
 			await db.insert(financeCustomFields).values({
 				studentId: parseInt(studentId),
@@ -245,7 +238,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	.patch(
 		"/student/:studentId/custom-field/:fieldId",
 		async ({ params: { fieldId }, body, user }: any) => {
-			if (!user || (user.role !== "finance" && user.role !== "superadmin"))
+			if (!hasRole(user, "finance"))
 				return { success: false, message: "Forbidden" };
 			await db
 				.update(financeCustomFields)
@@ -257,7 +250,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	.delete(
 		"/student/:studentId/custom-field/:fieldId",
 		async ({ params: { fieldId }, user }: any) => {
-			if (!user || (user.role !== "finance" && user.role !== "superadmin"))
+			if (!hasRole(user, "finance"))
 				return { success: false, message: "Forbidden" };
 			await db
 				.delete(financeCustomFields)
@@ -270,12 +263,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	.post(
 		"/fee-sharing/:studentId",
 		async ({ params: { studentId }, body, user }: any) => {
-			if (
-				!user ||
-				(user.role !== "pmb" &&
-					user.role !== "superadmin" &&
-					user.role !== "finance")
-			)
+			if (!hasRole(user, "pmb", "finance"))
 				return { success: false, message: "Forbidden" };
 			await db.insert(feeShareRecipients).values({
 				studentId: parseInt(studentId),
@@ -304,12 +292,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	.get(
 		"/fee-sharing/:studentId",
 		async ({ params: { studentId }, user }: any) => {
-			if (
-				!user ||
-				(user.role !== "finance" &&
-					user.role !== "superadmin" &&
-					user.role !== "pmb")
-			)
+			if (!hasRole(user, "finance", "pmb"))
 				return { success: false, message: "Forbidden" };
 			const sId = parseInt(studentId, 10);
 			const recipients = await db.query.feeShareRecipients.findMany({
@@ -375,12 +358,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	.patch(
 		"/fee-sharing/recipients/:recipientId",
 		async ({ params: { recipientId }, body, set, user }: any) => {
-			if (
-				!user ||
-				(user.role !== "finance" &&
-					user.role !== "superadmin" &&
-					user.role !== "pmb")
-			) {
+			if (!hasRole(user, "finance", "pmb")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -420,7 +398,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	// Tab 3: Anggaran Praktik
 
 	.get("/anggaran-praktik", async ({ user }: any) => {
-		if (!user || (user.role !== "finance" && user.role !== "superadmin"))
+		if (!hasRole(user, "finance"))
 			return { success: false, message: "Forbidden" };
 
 		const requests = await db.query.practicesBudgetRequests.findMany({
@@ -439,7 +417,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	.patch(
 		"/anggaran-praktik/:requestId/approve",
 		async ({ params: { requestId }, user }: any) => {
-			if (!user || (user.role !== "finance" && user.role !== "superadmin"))
+			if (!hasRole(user, "finance"))
 				return { success: false, message: "Forbidden" };
 			await db
 				.update(practicesBudgetRequests)
@@ -456,7 +434,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	.patch(
 		"/anggaran-praktik/:requestId/reject",
 		async ({ params: { requestId }, body, user }: any) => {
-			if (!user || (user.role !== "finance" && user.role !== "superadmin"))
+			if (!hasRole(user, "finance"))
 				return { success: false, message: "Forbidden" };
 			await db
 				.update(practicesBudgetRequests)
@@ -473,7 +451,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	.patch(
 		"/anggaran-praktik/:requestId/reset",
 		async ({ params: { requestId }, user }: any) => {
-			if (!user || (user.role !== "finance" && user.role !== "superadmin"))
+			if (!hasRole(user, "finance"))
 				return { success: false, message: "Forbidden" };
 			await db
 				.update(practicesBudgetRequests)
@@ -492,12 +470,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	.post(
 		"/laporan-sisa-bahan",
 		async ({ body, user }: any) => {
-			if (
-				!user ||
-				(user.role !== "dosen" &&
-					user.role !== "akademik" &&
-					user.role !== "superadmin")
-			)
+			if (!hasRole(user, "dosen", "akademik"))
 				return { success: false, message: "Forbidden" };
 			await db.insert(practicesMaterialReports).values({
 				budgetRequestId: parseInt(body.budgetRequestId),
@@ -521,7 +494,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	)
 
 	.get("/laporan-sisa-bahan", async ({ user }: any) => {
-		if (!user || (user.role !== "finance" && user.role !== "superadmin"))
+		if (!hasRole(user, "finance"))
 			return { success: false, message: "Forbidden" };
 		const reports = await db.query.practicesMaterialReports.findMany();
 		return { success: true, data: reports };

@@ -92,6 +92,7 @@ const INITIAL_FORM = {
 	languageCustom: "",
 	vocabCount: 0,
 	sentenceCount: 0,
+	date: new Date().toISOString().split("T")[0],
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -161,6 +162,9 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 							: null,
 					vocabCount: addForm.vocabCount,
 					sentenceCount: addForm.sentenceCount,
+					date: addForm.date
+						? new Date(addForm.date).toISOString()
+						: new Date().toISOString(),
 				}),
 			});
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -184,6 +188,7 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 			languageCustom: session.languageCustom ?? "",
 			vocabCount: session.vocabCount,
 			sentenceCount: session.sentenceCount,
+			date: new Date(session.createdAt).toISOString().split("T")[0],
 		});
 	};
 
@@ -211,6 +216,9 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 								: null,
 						vocabCount: editForm.vocabCount,
 						sentenceCount: editForm.sentenceCount,
+						date: editForm.date
+							? new Date(editForm.date).toISOString()
+							: undefined,
 					}),
 				},
 			);
@@ -325,6 +333,24 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 									Tambah Setoran Hafalan
 								</p>
 								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+									<div className="space-y-1.5">
+										<Label className="text-xs font-medium text-slate-600">
+											Tanggal Setoran *
+										</Label>
+										<Input
+											type="date"
+											value={
+												addForm.date || new Date().toISOString().split("T")[0]
+											}
+											onChange={(e) =>
+												setAddForm((p) => ({
+													...p,
+													date: e.target.value,
+												}))
+											}
+											className="h-9 text-sm"
+										/>
+									</div>
 									<div className="space-y-1.5">
 										<Label className="text-xs font-medium text-slate-600">
 											Bahasa
@@ -550,6 +576,24 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 							<AlertDialogTitle>Edit Setoran Hafalan</AlertDialogTitle>
 						</AlertDialogHeader>
 						<div className="space-y-3 py-2">
+							<div className="space-y-1.5">
+								<Label className="text-xs font-medium text-slate-600">
+									Tanggal Setoran *
+								</Label>
+								<Input
+									type="date"
+									value={
+										editForm.date || new Date().toISOString().split("T")[0]
+									}
+									onChange={(e) =>
+										setEditForm((p) => ({
+											...p,
+											date: e.target.value,
+										}))
+									}
+									className="h-9 text-sm"
+								/>
+							</div>
 							<div className="space-y-1.5">
 								<Label className="text-xs font-medium text-slate-600">
 									Bahasa

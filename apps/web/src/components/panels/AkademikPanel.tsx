@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { DosenPanel } from "@/components/panels/DosenPanel";
+import { TabMataKuliah } from "@/components/panels/kehadiran/detail/TabMataKuliah";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -42,21 +42,20 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { api, getToken } from "@/lib/eden";
-import { useAuthStore } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
 import type { AssessmentRecord } from "./akademik/assessment/AssessmentFormCard";
 import { AssessmentFormCard } from "./akademik/assessment/AssessmentFormCard";
 import { TabManajemenMahasiswa } from "./akademik/TabManajemenMahasiswa";
 
 interface DocFile {
 	id: number;
-	documentKey: string;
-	fileName: string;
-	fileUrl: string;
+	name: string;
+	url: string;
+	type: string;
 	isVerified: boolean;
-	uploadedAt: string;
-	verifiedAt?: string;
-	uploadedBy?: { fullName: string };
-	verifiedBy?: { fullName: string };
+	verifiedAt?: string | null;
+	verifiedBy?: number | null;
+	verifierName?: string | null;
 }
 
 interface AkademikPanelProps {
@@ -66,9 +65,8 @@ interface AkademikPanelProps {
 
 export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 	const { user, token } = useAuthStore();
-	const isAkademikAdmin =
-		user?.role === "akademik" || user?.role === "superadmin";
-	const isSuperadmin = user?.role === "superadmin";
+	const isAkademikAdmin = hasRole(user, "akademik");
+	const isSuperadmin = hasRole(user, "superadmin");
 	const canEdit = isAkademikAdmin || isSuperadmin;
 
 	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -603,9 +601,9 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 				{activeTab === "penilaian" && (
 					<div className="mt-2">
 						<h3 className="text-xl font-bold text-slate-800 mb-4 px-1 border-l-4 border-[#0517B0] pl-3">
-							Modul Vokasi & Penilaian Dosen
+							Rekap Nilai & Kehadiran Mata Kuliah
 						</h3>
-						<DosenPanel studentId={studentId} onUpdate={onUpdate} />
+						<TabMataKuliah studentId={studentId} />
 					</div>
 				)}
 

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/eden";
-import { useAuthStore } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
 import { TabAnggaran } from "./finance/TabAnggaran";
 import { TabFeeSharing } from "./finance/TabFeeSharing";
 import { TabKeuangan } from "./finance/TabKeuangan";
@@ -18,8 +18,7 @@ interface FinancePanelProps {
 
 export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 	const { user } = useAuthStore();
-	const isFinanceAdmin =
-		user?.role === "finance" || user?.role === "superadmin";
+	const isFinanceAdmin = hasRole(user, "finance");
 	const canEdit = isFinanceAdmin;
 
 	const [finState, setFinState] = useState<any>(null);
