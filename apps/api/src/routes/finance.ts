@@ -294,10 +294,65 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 		async ({ params: { studentId }, user }: any) => {
 			if (!hasRole(user, "finance", "pmb"))
 				return { success: false, message: "Forbidden" };
+			const sId = parseInt(studentId, 10);
 			const recipients = await db.query.feeShareRecipients.findMany({
-				where: eq(feeShareRecipients.studentId, parseInt(studentId)),
+				where: eq(feeShareRecipients.studentId, sId),
+				orderBy: [desc(feeShareRecipients.createdAt)],
 			});
-			return { success: true, data: { recipients } };
+			const fin = await db.query.financeData.findFirst({
+				where: eq(financeData.studentId, sId),
+			});
+			return {
+				success: true,
+				data: {
+					recipients,
+					totalBiayaPromosi: fin?.totalBiayaPromosi ?? 0,
+				},
+			};
+		},
+	)
+	.patch(
+		"/fee-sharing/:studentId/total-promosi",
+		async ({ params: { studentId }, body, set, user }: any) => {
+			if (
+				!user ||
+				(user.role !== "finance" &&
+					user.role !== "superadmin" &&
+					user.role !== "pmb")
+			) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const sId = parseInt(studentId, 10);
+			const totalBiayaPromosi = Math.max(
+				0,
+				Number(body.totalBiayaPromosi) || 0,
+			);
+
+			const current = await db.query.financeData.findFirst({
+				where: eq(financeData.studentId, sId),
+			});
+			if (!current) {
+				await db.insert(financeData).values({
+					studentId: sId,
+					totalBiayaPromosi,
+				});
+			} else {
+				await db
+					.update(financeData)
+					.set({
+						totalBiayaPromosi,
+						updatedAt: new Date(),
+					})
+					.where(eq(financeData.studentId, sId));
+			}
+
+			return { success: true, data: { totalBiayaPromosi } };
+		},
+		{
+			body: t.Object({
+				totalBiayaPromosi: t.Number(),
+			}),
 		},
 	)
 	.patch(

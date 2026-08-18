@@ -15,8 +15,12 @@ import {
 	entrepreneurshipRecords,
 	feeShareRecipients,
 	finalDecision,
+	financeCustomFields,
 	financeData,
 	financeDocuments,
+	financeSemesterInstallments,
+	financeSemesters,
+	financeTalanganInstallments,
 	internalNotes,
 	internshipData,
 	internshipDocuments,
@@ -201,17 +205,51 @@ export const coreRoutes = new Elysia()
 			.leftJoin(paData, eq(students.id, paData.studentId))
 			.leftJoin(internshipData, eq(students.id, internshipData.studentId))
 			.leftJoin(finalDecision, eq(students.id, finalDecision.studentId))
-			.where(eq(students.isArchived, isArchived));
-		const allCourseGrades = await db.select().from(courseGrades);
+			.where(eq(students.isArchived, isArchived))
+			.orderBy(desc(students.updatedAt), desc(students.id));
+		const [
+			allCourseGrades,
+			allFinanceSemesters,
+			allFinanceInstallments,
+			allFinanceCustomFields,
+			allFinanceTalanganInstallments,
+		] = await Promise.all([
+			db.select().from(courseGrades),
+			db.select().from(financeSemesters),
+			db.select().from(financeSemesterInstallments),
+			db.select().from(financeCustomFields),
+			db.select().from(financeTalanganInstallments),
+		]);
 
-		const dataWithCourses = results.map((r) => {
+		const dataWithDetails = results.map((r) => {
 			const courses = allCourseGrades.filter(
 				(c) => c.studentId === r.student.id,
 			);
-			return { ...r, courseGrades: courses };
+			const semesters = allFinanceSemesters.filter(
+				(s) => s.studentId === r.student.id,
+			);
+			const semesterIds = new Set(semesters.map((s) => s.id));
+			const installments = allFinanceInstallments.filter((i) =>
+				semesterIds.has(i.semesterId),
+			);
+			const customFields = allFinanceCustomFields.filter(
+				(cf) => cf.studentId === r.student.id,
+			);
+			const talanganInstallments = allFinanceTalanganInstallments.filter(
+				(ti) => ti.studentId === r.student.id,
+			);
+
+			return {
+				...r,
+				courseGrades: courses,
+				financeSemesters: semesters,
+				financeInstallments: installments,
+				financeCustomFields: customFields,
+				financeTalanganInstallments: talanganInstallments,
+			};
 		});
 
-		return { success: true, data: dataWithCourses };
+		return { success: true, data: dataWithDetails };
 	})
 	.post(
 		"/",

@@ -162,21 +162,25 @@ export function TabFeeSharing({
 				: `${API_URL}/students/${studentId}/pmb/fee-share-recipients`;
 
 			const method = isEdit ? "PATCH" : "POST";
+			const bodyPayload: any = {
+				kategori: recipientForm.kategori,
+				namaReferral: recipientForm.namaReferral,
+				noHp: recipientForm.noHp,
+				noRekening: recipientForm.noRekening || undefined,
+				namaBank: recipientForm.namaBank || undefined,
+			};
+			if (!isEdit) {
+				bodyPayload.nominalFee = 0;
+				bodyPayload.statusPencairan = "belum_dibayarkan";
+			}
+
 			const res = await fetch(url, {
 				method,
 				headers: {
 					Authorization: `Bearer ${getToken()}`,
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({
-					kategori: recipientForm.kategori,
-					namaReferral: recipientForm.namaReferral,
-					noHp: recipientForm.noHp,
-					noRekening: recipientForm.noRekening || undefined,
-					namaBank: recipientForm.namaBank || undefined,
-					nominalFee: Math.max(0, Number(recipientForm.nominalFee) || 0),
-					statusPencairan: recipientForm.statusPencairan,
-				}),
+				body: JSON.stringify(bodyPayload),
 			});
 
 			if (res.ok) {
@@ -607,100 +611,6 @@ export function TabFeeSharing({
 								/>
 							</div>
 						</div>
-
-						<div className="grid grid-cols-2 gap-3">
-							<div>
-								<Label className="text-xs font-semibold text-slate-700">
-									Rekening (Opsional)
-								</Label>
-								<Input
-									value={recipientForm.noRekening}
-									onChange={(e) =>
-										setRecipientForm({
-											...recipientForm,
-											noRekening: e.target.value,
-										})
-									}
-									placeholder="No. Rekening"
-									className="mt-1 h-9 text-xs"
-								/>
-							</div>
-							<div>
-								<Label className="text-xs font-semibold text-slate-700">
-									Bank (Opsional)
-								</Label>
-								<Input
-									value={recipientForm.namaBank}
-									onChange={(e) =>
-										setRecipientForm({
-											...recipientForm,
-											namaBank: e.target.value,
-										})
-									}
-									placeholder="BCA, Mandiri, dll."
-									className="mt-1 h-9 text-xs"
-								/>
-							</div>
-						</div>
-
-						{/* Hanya tampilkan saat Edit */}
-						{editingRecipient && (
-							<div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
-								<div>
-									<Label className="text-xs font-semibold text-slate-700">
-										Nominal Fee (Rp)
-									</Label>
-									<Input
-										type="number"
-										min={0}
-										placeholder="0"
-										value={
-											recipientForm.nominalFee === 0
-												? ""
-												: recipientForm.nominalFee
-										}
-										onKeyDown={(e) => {
-											if (e.key === "-" || e.key === "e" || e.key === "E")
-												e.preventDefault();
-										}}
-										onChange={(e) =>
-											setRecipientForm({
-												...recipientForm,
-												nominalFee: Math.max(0, Number(e.target.value) || 0),
-											})
-										}
-										className="mt-1 h-9 text-xs"
-									/>
-								</div>
-								<div>
-									<Label className="text-xs font-semibold text-slate-700">
-										Status Pencairan
-									</Label>
-									<Select
-										value={recipientForm.statusPencairan}
-										onValueChange={(val) => {
-											if (val)
-												setRecipientForm({
-													...recipientForm,
-													statusPencairan: val,
-												});
-										}}
-									>
-										<SelectTrigger className="mt-1 h-9 text-xs">
-											<SelectValue placeholder="Pilih Status" />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="belum_dibayarkan">
-												Belum Dibayarkan
-											</SelectItem>
-											<SelectItem value="sudah_dibayarkan">
-												Sudah Dibayarkan
-											</SelectItem>
-										</SelectContent>
-									</Select>
-								</div>
-							</div>
-						)}
 					</div>
 
 					<DialogFooter className="gap-2 pt-2">

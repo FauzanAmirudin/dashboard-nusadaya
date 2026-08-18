@@ -396,8 +396,9 @@ export const financeData = pgTable("finance_data", {
 		.notNull()
 		.unique(),
 
-	// Data Induk dari PMB
+	// Data Induk dari PMB / Finance
 	totalBiayaPendidikan: integer("total_biaya_pendidikan").default(0),
+	totalBiayaPromosi: integer("total_biaya_promosi").default(0),
 
 	// Registrasi Awal
 	registrasiNominal: integer("registrasi_nominal").default(0),
@@ -534,6 +535,34 @@ export const financeSemesterInstallmentsRelations = relations(
 		semester: one(financeSemesters, {
 			fields: [financeSemesterInstallments.semesterId],
 			references: [financeSemesters.id],
+		}),
+	}),
+);
+
+export const financeTalanganInstallments = pgTable(
+	"finance_talangan_installments",
+	{
+		id: serial("id").primaryKey(),
+		studentId: integer("student_id")
+			.references(() => students.id)
+			.notNull(),
+		stage: text("stage").notNull(), // "tahap_1" | "tahap_2"
+		installmentNumber: integer("installment_number").notNull(),
+		nominalPaid: integer("nominal_paid").notNull(),
+		paymentDate: timestamp("payment_date"),
+		buktiBayarUrl: text("bukti_bayar_url"),
+		notes: text("notes"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+);
+
+export const financeTalanganInstallmentsRelations = relations(
+	financeTalanganInstallments,
+	({ one }) => ({
+		student: one(students, {
+			fields: [financeTalanganInstallments.studentId],
+			references: [students.id],
 		}),
 	}),
 );

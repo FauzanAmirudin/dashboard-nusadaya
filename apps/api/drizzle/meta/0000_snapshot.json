@@ -1,9 +1,187 @@
 {
-	"id": "8207a4fd-0b9e-4383-be0a-45df3b6bc211",
+	"id": "85a9855f-3bd9-464c-be55-67ad12c9b104",
 	"prevId": "00000000-0000-0000-0000-000000000000",
 	"version": "7",
 	"dialect": "postgresql",
 	"tables": {
+		"public.academic_attitude_logs": {
+			"name": "academic_attitude_logs",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"course_grade_id": {
+					"name": "course_grade_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"dosen_id": {
+					"name": "dosen_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"discipline_score": {
+					"name": "discipline_score",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"activeness_score": {
+					"name": "activeness_score",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"date": {
+					"name": "date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"academic_attitude_logs_student_id_students_id_fk": {
+					"name": "academic_attitude_logs_student_id_students_id_fk",
+					"tableFrom": "academic_attitude_logs",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"academic_attitude_logs_course_grade_id_course_grades_id_fk": {
+					"name": "academic_attitude_logs_course_grade_id_course_grades_id_fk",
+					"tableFrom": "academic_attitude_logs",
+					"tableTo": "course_grades",
+					"columnsFrom": ["course_grade_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"academic_attitude_logs_dosen_id_users_id_fk": {
+					"name": "academic_attitude_logs_dosen_id_users_id_fk",
+					"tableFrom": "academic_attitude_logs",
+					"tableTo": "users",
+					"columnsFrom": ["dosen_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.academic_calendars": {
+			"name": "academic_calendars",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"academic_year": {
+					"name": "academic_year",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"cohort": {
+					"name": "cohort",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"start_date": {
+					"name": "start_date",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"end_date": {
+					"name": "end_date",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "'active'"
+				},
+				"created_by": {
+					"name": "created_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"academic_calendars_created_by_users_id_fk": {
+					"name": "academic_calendars_created_by_users_id_fk",
+					"tableFrom": "academic_calendars",
+					"tableTo": "users",
+					"columnsFrom": ["created_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
 		"public.academic_data": {
 			"name": "academic_data",
 			"schema": "",
@@ -101,6 +279,55 @@
 					"type": "text",
 					"primaryKey": false,
 					"notNull": false
+				},
+				"assessment_completed": {
+					"name": "assessment_completed",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"attendance_piket_total": {
+					"name": "attendance_piket_total",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"attendance_piket_present": {
+					"name": "attendance_piket_present",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"attendance_ods_total": {
+					"name": "attendance_ods_total",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"attendance_ods_present": {
+					"name": "attendance_ods_present",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"attendance_pramagang_total": {
+					"name": "attendance_pramagang_total",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"attendance_pramagang_present": {
+					"name": "attendance_pramagang_present",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
 				},
 				"is_acc": {
 					"name": "is_acc",
@@ -285,6 +512,465 @@
 			"checkConstraints": {},
 			"isRLSEnabled": false
 		},
+		"public.academic_events": {
+			"name": "academic_events",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"calendar_id": {
+					"name": "calendar_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"title": {
+					"name": "title",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"description": {
+					"name": "description",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"start_date": {
+					"name": "start_date",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"end_date": {
+					"name": "end_date",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"academic_events_calendar_id_academic_calendars_id_fk": {
+					"name": "academic_events_calendar_id_academic_calendars_id_fk",
+					"tableFrom": "academic_events",
+					"tableTo": "academic_calendars",
+					"columnsFrom": ["calendar_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.academic_periods": {
+			"name": "academic_periods",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"calendar_id": {
+					"name": "calendar_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"title": {
+					"name": "title",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"description": {
+					"name": "description",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"period_type": {
+					"name": "period_type",
+					"type": "academic_period_type",
+					"typeSchema": "public",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"start_date": {
+					"name": "start_date",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"end_date": {
+					"name": "end_date",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"order_index": {
+					"name": "order_index",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"default": 0
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"academic_periods_calendar_id_academic_calendars_id_fk": {
+					"name": "academic_periods_calendar_id_academic_calendars_id_fk",
+					"tableFrom": "academic_periods",
+					"tableTo": "academic_calendars",
+					"columnsFrom": ["calendar_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.announcements": {
+			"name": "announcements",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"title": {
+					"name": "title",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"description": {
+					"name": "description",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"target_cohort": {
+					"name": "target_cohort",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"published_at": {
+					"name": "published_at",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"created_by": {
+					"name": "created_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"announcements_created_by_users_id_fk": {
+					"name": "announcements_created_by_users_id_fk",
+					"tableFrom": "announcements",
+					"tableTo": "users",
+					"columnsFrom": ["created_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.attendance_records": {
+			"name": "attendance_records",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"session_id": {
+					"name": "session_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"recorded_by": {
+					"name": "recorded_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"recorded_at": {
+					"name": "recorded_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"attendance_records_session_id_attendance_sessions_id_fk": {
+					"name": "attendance_records_session_id_attendance_sessions_id_fk",
+					"tableFrom": "attendance_records",
+					"tableTo": "attendance_sessions",
+					"columnsFrom": ["session_id"],
+					"columnsTo": ["id"],
+					"onDelete": "cascade",
+					"onUpdate": "no action"
+				},
+				"attendance_records_student_id_students_id_fk": {
+					"name": "attendance_records_student_id_students_id_fk",
+					"tableFrom": "attendance_records",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"attendance_records_recorded_by_users_id_fk": {
+					"name": "attendance_records_recorded_by_users_id_fk",
+					"tableFrom": "attendance_records",
+					"tableTo": "users",
+					"columnsFrom": ["recorded_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.attendance_sessions": {
+			"name": "attendance_sessions",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"session_type": {
+					"name": "session_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"class_schedule_id": {
+					"name": "class_schedule_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"practicum_schedule_id": {
+					"name": "practicum_schedule_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"duty_schedule_id": {
+					"name": "duty_schedule_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"cohort": {
+					"name": "cohort",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"subject": {
+					"name": "subject",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"session_date": {
+					"name": "session_date",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"start_time": {
+					"name": "start_time",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"end_time": {
+					"name": "end_time",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"room": {
+					"name": "room",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_by": {
+					"name": "created_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"attendance_sessions_class_schedule_id_class_schedules_id_fk": {
+					"name": "attendance_sessions_class_schedule_id_class_schedules_id_fk",
+					"tableFrom": "attendance_sessions",
+					"tableTo": "class_schedules",
+					"columnsFrom": ["class_schedule_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"attendance_sessions_practicum_schedule_id_practicum_schedules_id_fk": {
+					"name": "attendance_sessions_practicum_schedule_id_practicum_schedules_id_fk",
+					"tableFrom": "attendance_sessions",
+					"tableTo": "practicum_schedules",
+					"columnsFrom": ["practicum_schedule_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"attendance_sessions_duty_schedule_id_duty_schedules_id_fk": {
+					"name": "attendance_sessions_duty_schedule_id_duty_schedules_id_fk",
+					"tableFrom": "attendance_sessions",
+					"tableTo": "duty_schedules",
+					"columnsFrom": ["duty_schedule_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"attendance_sessions_created_by_users_id_fk": {
+					"name": "attendance_sessions_created_by_users_id_fk",
+					"tableFrom": "attendance_sessions",
+					"tableTo": "users",
+					"columnsFrom": ["created_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
 		"public.audit_logs": {
 			"name": "audit_logs",
 			"schema": "",
@@ -351,6 +1037,224 @@
 			"checkConstraints": {},
 			"isRLSEnabled": false
 		},
+		"public.backup_jobs": {
+			"name": "backup_jobs",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"type": {
+					"name": "type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "'queued'"
+				},
+				"filters": {
+					"name": "filters",
+					"type": "jsonb",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"total_files": {
+					"name": "total_files",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"processed_files": {
+					"name": "processed_files",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"total_size": {
+					"name": "total_size",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"output_path": {
+					"name": "output_path",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_by": {
+					"name": "created_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"started_at": {
+					"name": "started_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"completed_at": {
+					"name": "completed_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"error_message": {
+					"name": "error_message",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"backup_jobs_created_by_users_id_fk": {
+					"name": "backup_jobs_created_by_users_id_fk",
+					"tableFrom": "backup_jobs",
+					"tableTo": "users",
+					"columnsFrom": ["created_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.class_schedules": {
+			"name": "class_schedules",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"subject": {
+					"name": "subject",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"dosen_id": {
+					"name": "dosen_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"cohort": {
+					"name": "cohort",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"room": {
+					"name": "room",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"day_of_week": {
+					"name": "day_of_week",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"session_date": {
+					"name": "session_date",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"start_time": {
+					"name": "start_time",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"end_time": {
+					"name": "end_time",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"calendar_id": {
+					"name": "calendar_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"class_schedules_dosen_id_users_id_fk": {
+					"name": "class_schedules_dosen_id_users_id_fk",
+					"tableFrom": "class_schedules",
+					"tableTo": "users",
+					"columnsFrom": ["dosen_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"class_schedules_calendar_id_academic_calendars_id_fk": {
+					"name": "class_schedules_calendar_id_academic_calendars_id_fk",
+					"tableFrom": "class_schedules",
+					"tableTo": "academic_calendars",
+					"columnsFrom": ["calendar_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
 		"public.counseling_logs": {
 			"name": "counseling_logs",
 			"schema": "",
@@ -366,6 +1270,13 @@
 					"type": "integer",
 					"primaryKey": false,
 					"notNull": true
+				},
+				"type": {
+					"name": "type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "'konseling'"
 				},
 				"date": {
 					"name": "date",
@@ -557,6 +1468,12 @@
 					"primaryKey": false,
 					"notNull": true
 				},
+				"course_id": {
+					"name": "course_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
 				"course_code": {
 					"name": "course_code",
 					"type": "text",
@@ -594,6 +1511,54 @@
 					"primaryKey": false,
 					"notNull": false
 				},
+				"practical_score": {
+					"name": "practical_score",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"theory_score": {
+					"name": "theory_score",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"entrepreneur_score": {
+					"name": "entrepreneur_score",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"kwu_score": {
+					"name": "kwu_score",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"product_photo_url": {
+					"name": "product_photo_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"total_meetings": {
+					"name": "total_meetings",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 16
+				},
+				"attendance_present": {
+					"name": "attendance_present",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
 				"is_acc": {
 					"name": "is_acc",
 					"type": "boolean",
@@ -612,6 +1577,13 @@
 					"type": "integer",
 					"primaryKey": false,
 					"notNull": false
+				},
+				"has_kwu": {
+					"name": "has_kwu",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
 				},
 				"status": {
 					"name": "status",
@@ -640,6 +1612,15 @@
 					"onDelete": "no action",
 					"onUpdate": "no action"
 				},
+				"course_grades_course_id_courses_id_fk": {
+					"name": "course_grades_course_id_courses_id_fk",
+					"tableFrom": "course_grades",
+					"tableTo": "courses",
+					"columnsFrom": ["course_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
 				"course_grades_dosen_id_users_id_fk": {
 					"name": "course_grades_dosen_id_users_id_fk",
 					"tableFrom": "course_grades",
@@ -661,6 +1642,344 @@
 			},
 			"compositePrimaryKeys": {},
 			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.course_meeting_activities": {
+			"name": "course_meeting_activities",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"meeting_id": {
+					"name": "meeting_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"activity_type": {
+					"name": "activity_type",
+					"type": "activity_type",
+					"typeSchema": "public",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"score": {
+					"name": "score",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"document_url": {
+					"name": "document_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"document_name": {
+					"name": "document_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"course_meeting_activities_meeting_id_course_meetings_id_fk": {
+					"name": "course_meeting_activities_meeting_id_course_meetings_id_fk",
+					"tableFrom": "course_meeting_activities",
+					"tableTo": "course_meetings",
+					"columnsFrom": ["meeting_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.course_meeting_attendances": {
+			"name": "course_meeting_attendances",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"meeting_id": {
+					"name": "meeting_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"course_meeting_attendances_meeting_id_course_meetings_id_fk": {
+					"name": "course_meeting_attendances_meeting_id_course_meetings_id_fk",
+					"tableFrom": "course_meeting_attendances",
+					"tableTo": "course_meetings",
+					"columnsFrom": ["meeting_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"course_meeting_attendances_student_id_students_id_fk": {
+					"name": "course_meeting_attendances_student_id_students_id_fk",
+					"tableFrom": "course_meeting_attendances",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.course_meetings": {
+			"name": "course_meetings",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"course_id": {
+					"name": "course_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"meeting_number": {
+					"name": "meeting_number",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"meeting_type": {
+					"name": "meeting_type",
+					"type": "meeting_type",
+					"typeSchema": "public",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"meeting_label": {
+					"name": "meeting_label",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"description": {
+					"name": "description",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"meeting_date": {
+					"name": "meeting_date",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"course_meetings_course_id_courses_id_fk": {
+					"name": "course_meetings_course_id_courses_id_fk",
+					"tableFrom": "course_meetings",
+					"tableTo": "courses",
+					"columnsFrom": ["course_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.courses": {
+			"name": "courses",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"code": {
+					"name": "code",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"dosen_id": {
+					"name": "dosen_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"peminatan": {
+					"name": "peminatan",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"cohort": {
+					"name": "cohort",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"type": {
+					"name": "type",
+					"type": "course_type",
+					"typeSchema": "public",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "'teori'"
+				},
+				"created_by": {
+					"name": "created_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"courses_dosen_id_users_id_fk": {
+					"name": "courses_dosen_id_users_id_fk",
+					"tableFrom": "courses",
+					"tableTo": "users",
+					"columnsFrom": ["dosen_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"courses_created_by_users_id_fk": {
+					"name": "courses_created_by_users_id_fk",
+					"tableFrom": "courses",
+					"tableTo": "users",
+					"columnsFrom": ["created_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {
+				"courses_code_unique": {
+					"name": "courses_code_unique",
+					"nullsNotDistinct": false,
+					"columns": ["code"]
+				}
+			},
 			"policies": {},
 			"checkConstraints": {},
 			"isRLSEnabled": false
@@ -729,6 +2048,99 @@
 					"primaryKey": false,
 					"notNull": false,
 					"default": 0
+				},
+				"is_monitoring_parent": {
+					"name": "is_monitoring_parent",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"is_monitoring_industry": {
+					"name": "is_monitoring_industry",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"is_vocab_complete": {
+					"name": "is_vocab_complete",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"has_study_permit": {
+					"name": "has_study_permit",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"is_ods_report": {
+					"name": "is_ods_report",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"is_pramagang_report": {
+					"name": "is_pramagang_report",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"is_pramagang_documentation": {
+					"name": "is_pramagang_documentation",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"has_active_case": {
+					"name": "has_active_case",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"ods_details": {
+					"name": "ods_details",
+					"type": "jsonb",
+					"primaryKey": false,
+					"notNull": false,
+					"default": "'[]'"
+				},
+				"pramagang_start_date": {
+					"name": "pramagang_start_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"pramagang_end_date": {
+					"name": "pramagang_end_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"pramagang_industry": {
+					"name": "pramagang_industry",
+					"type": "varchar(255)",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"pramagang_video_link": {
+					"name": "pramagang_video_link",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"case_notes": {
+					"name": "case_notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
 				},
 				"is_acc": {
 					"name": "is_acc",
@@ -941,6 +2353,64 @@
 					"primaryKey": false,
 					"notNull": true
 				},
+				"log_type": {
+					"name": "log_type",
+					"type": "varchar(50)",
+					"primaryKey": false,
+					"notNull": false,
+					"default": "'modul_crm'"
+				},
+				"attachments": {
+					"name": "attachments",
+					"type": "jsonb",
+					"primaryKey": false,
+					"notNull": false,
+					"default": "'[]'"
+				},
+				"start_time": {
+					"name": "start_time",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"end_time": {
+					"name": "end_time",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"media": {
+					"name": "media",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"location": {
+					"name": "location",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"topic": {
+					"name": "topic",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"agreements": {
+					"name": "agreements",
+					"type": "jsonb",
+					"primaryKey": false,
+					"notNull": false,
+					"default": "'[]'"
+				},
+				"follow_ups": {
+					"name": "follow_ups",
+					"type": "jsonb",
+					"primaryKey": false,
+					"notNull": false,
+					"default": "'[]'"
+				},
 				"created_at": {
 					"name": "created_at",
 					"type": "timestamp",
@@ -965,6 +2435,694 @@
 					"tableFrom": "crm_logs",
 					"tableTo": "users",
 					"columnsFrom": ["author_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.departure_assessment_notes": {
+			"name": "departure_assessment_notes",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"assessment_id": {
+					"name": "assessment_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"content": {
+					"name": "content",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"created_by": {
+					"name": "created_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"departure_assessment_notes_assessment_id_departure_assessments_id_fk": {
+					"name": "departure_assessment_notes_assessment_id_departure_assessments_id_fk",
+					"tableFrom": "departure_assessment_notes",
+					"tableTo": "departure_assessments",
+					"columnsFrom": ["assessment_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"departure_assessment_notes_created_by_users_id_fk": {
+					"name": "departure_assessment_notes_created_by_users_id_fk",
+					"tableFrom": "departure_assessment_notes",
+					"tableTo": "users",
+					"columnsFrom": ["created_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.departure_assessments": {
+			"name": "departure_assessments",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"score": {
+					"name": "score",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"result_file_url": {
+					"name": "result_file_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"result_file_name": {
+					"name": "result_file_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"result_file_size": {
+					"name": "result_file_size",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "'belum_dimulai'"
+				},
+				"assessed_by": {
+					"name": "assessed_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"assessed_at": {
+					"name": "assessed_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"departure_assessments_student_id_students_id_fk": {
+					"name": "departure_assessments_student_id_students_id_fk",
+					"tableFrom": "departure_assessments",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"departure_assessments_assessed_by_users_id_fk": {
+					"name": "departure_assessments_assessed_by_users_id_fk",
+					"tableFrom": "departure_assessments",
+					"tableTo": "users",
+					"columnsFrom": ["assessed_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {
+				"departure_assessments_student_id_unique": {
+					"name": "departure_assessments_student_id_unique",
+					"nullsNotDistinct": false,
+					"columns": ["student_id"]
+				}
+			},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.duty_schedules": {
+			"name": "duty_schedules",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"cohort": {
+					"name": "cohort",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"group_name": {
+					"name": "group_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"members": {
+					"name": "members",
+					"type": "jsonb",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"room": {
+					"name": "room",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"day_of_week": {
+					"name": "day_of_week",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"session_date": {
+					"name": "session_date",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"start_time": {
+					"name": "start_time",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"end_time": {
+					"name": "end_time",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"calendar_id": {
+					"name": "calendar_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"duty_schedules_calendar_id_academic_calendars_id_fk": {
+					"name": "duty_schedules_calendar_id_academic_calendars_id_fk",
+					"tableFrom": "duty_schedules",
+					"tableTo": "academic_calendars",
+					"columnsFrom": ["calendar_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.entrepreneurship_records": {
+			"name": "entrepreneurship_records",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"course_grade_id": {
+					"name": "course_grade_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"business_type": {
+					"name": "business_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"production_qty": {
+					"name": "production_qty",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"revenue_total": {
+					"name": "revenue_total",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"profit_sharing_student": {
+					"name": "profit_sharing_student",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"profit_sharing_dosen": {
+					"name": "profit_sharing_dosen",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"profit_sharing_lembaga": {
+					"name": "profit_sharing_lembaga",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"week_date": {
+					"name": "week_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"entrepreneurship_records_student_id_students_id_fk": {
+					"name": "entrepreneurship_records_student_id_students_id_fk",
+					"tableFrom": "entrepreneurship_records",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"entrepreneurship_records_course_grade_id_course_grades_id_fk": {
+					"name": "entrepreneurship_records_course_grade_id_course_grades_id_fk",
+					"tableFrom": "entrepreneurship_records",
+					"tableTo": "course_grades",
+					"columnsFrom": ["course_grade_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.fee_share_recipients": {
+			"name": "fee_share_recipients",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"nama_referral": {
+					"name": "nama_referral",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"kategori": {
+					"name": "kategori",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"no_rekening": {
+					"name": "no_rekening",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"nama_bank": {
+					"name": "nama_bank",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"no_hp": {
+					"name": "no_hp",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"nominal_fee": {
+					"name": "nominal_fee",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"invoice_file_url": {
+					"name": "invoice_file_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"status_pencairan": {
+					"name": "status_pencairan",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"default": "'belum_dibayarkan'"
+				},
+				"tanggal_cair": {
+					"name": "tanggal_cair",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_by": {
+					"name": "created_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"fee_share_recipients_student_id_students_id_fk": {
+					"name": "fee_share_recipients_student_id_students_id_fk",
+					"tableFrom": "fee_share_recipients",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"fee_share_recipients_created_by_users_id_fk": {
+					"name": "fee_share_recipients_created_by_users_id_fk",
+					"tableFrom": "fee_share_recipients",
+					"tableTo": "users",
+					"columnsFrom": ["created_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.files": {
+			"name": "files",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"category": {
+					"name": "category",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"storage_disk": {
+					"name": "storage_disk",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "'local'"
+				},
+				"storage_path": {
+					"name": "storage_path",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"filename": {
+					"name": "filename",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"original_name": {
+					"name": "original_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"extension": {
+					"name": "extension",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"mime_type": {
+					"name": "mime_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"size": {
+					"name": "size",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"checksum": {
+					"name": "checksum",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"visibility": {
+					"name": "visibility",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "'private'"
+				},
+				"uploaded_by": {
+					"name": "uploaded_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"panel": {
+					"name": "panel",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"document_key": {
+					"name": "document_key",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"is_verified": {
+					"name": "is_verified",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"verified_at": {
+					"name": "verified_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"verified_by": {
+					"name": "verified_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"deleted_at": {
+					"name": "deleted_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"files_student_id_students_id_fk": {
+					"name": "files_student_id_students_id_fk",
+					"tableFrom": "files",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"files_uploaded_by_users_id_fk": {
+					"name": "files_uploaded_by_users_id_fk",
+					"tableFrom": "files",
+					"tableTo": "users",
+					"columnsFrom": ["uploaded_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"files_verified_by_users_id_fk": {
+					"name": "files_verified_by_users_id_fk",
+					"tableFrom": "files",
+					"tableTo": "users",
+					"columnsFrom": ["verified_by"],
 					"columnsTo": ["id"],
 					"onDelete": "no action",
 					"onUpdate": "no action"
@@ -1037,6 +3195,18 @@
 					"primaryKey": false,
 					"notNull": false
 				},
+				"confidential_notes": {
+					"name": "confidential_notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"sk_document_url": {
+					"name": "sk_document_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
 				"updated_at": {
 					"name": "updated_at",
 					"type": "timestamp",
@@ -1078,6 +3248,93 @@
 			"checkConstraints": {},
 			"isRLSEnabled": false
 		},
+		"public.finance_custom_fields": {
+			"name": "finance_custom_fields",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"field_type": {
+					"name": "field_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"label": {
+					"name": "label",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"nominal": {
+					"name": "nominal",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"status": {
+					"name": "status",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"bukti_bayar_url": {
+					"name": "bukti_bayar_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"finance_custom_fields_student_id_students_id_fk": {
+					"name": "finance_custom_fields_student_id_students_id_fk",
+					"tableFrom": "finance_custom_fields",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
 		"public.finance_data": {
 			"name": "finance_data",
 			"schema": "",
@@ -1094,79 +3351,285 @@
 					"primaryKey": false,
 					"notNull": true
 				},
-				"registration_paid": {
-					"name": "registration_paid",
-					"type": "boolean",
-					"primaryKey": false,
-					"notNull": false,
-					"default": false
-				},
-				"registration_amount": {
-					"name": "registration_amount",
+				"total_biaya_pendidikan": {
+					"name": "total_biaya_pendidikan",
 					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"default": 0
 				},
-				"registration_date": {
-					"name": "registration_date",
+				"registrasi_nominal": {
+					"name": "registrasi_nominal",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"registrasi_paid_date": {
+					"name": "registrasi_paid_date",
 					"type": "timestamp",
 					"primaryKey": false,
 					"notNull": false
 				},
-				"semester_paid": {
-					"name": "semester_paid",
-					"type": "boolean",
-					"primaryKey": false,
-					"notNull": false,
-					"default": false
-				},
-				"semester_amount": {
-					"name": "semester_amount",
-					"type": "integer",
-					"primaryKey": false,
-					"notNull": false,
-					"default": 0
-				},
-				"semester_date": {
-					"name": "semester_date",
-					"type": "timestamp",
+				"registrasi_bukti_bayar_url": {
+					"name": "registrasi_bukti_bayar_url",
+					"type": "text",
 					"primaryKey": false,
 					"notNull": false
 				},
-				"installment_cleared": {
-					"name": "installment_cleared",
+				"registrasi_status": {
+					"name": "registrasi_status",
 					"type": "boolean",
 					"primaryKey": false,
 					"notNull": false,
 					"default": false
 				},
-				"installment_amount": {
-					"name": "installment_amount",
-					"type": "integer",
-					"primaryKey": false,
-					"notNull": false,
-					"default": 0
-				},
-				"installment_date": {
-					"name": "installment_date",
-					"type": "timestamp",
+				"metode_pembayaran": {
+					"name": "metode_pembayaran",
+					"type": "text",
 					"primaryKey": false,
 					"notNull": false
 				},
-				"arrears_cleared": {
-					"name": "arrears_cleared",
+				"mandiri_semester_nominal": {
+					"name": "mandiri_semester_nominal",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"mandiri_semester_status": {
+					"name": "mandiri_semester_status",
 					"type": "boolean",
 					"primaryKey": false,
 					"notNull": false,
 					"default": false
 				},
-				"arrears_amount": {
-					"name": "arrears_amount",
+				"mandiri_semester_bukti_bayar_url": {
+					"name": "mandiri_semester_bukti_bayar_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"mandiri_interview_nominal": {
+					"name": "mandiri_interview_nominal",
 					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"default": 0
+				},
+				"mandiri_interview_status": {
+					"name": "mandiri_interview_status",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"mandiri_interview_bukti_bayar_url": {
+					"name": "mandiri_interview_bukti_bayar_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"mandiri_keberangkatan_nominal": {
+					"name": "mandiri_keberangkatan_nominal",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"mandiri_keberangkatan_status": {
+					"name": "mandiri_keberangkatan_status",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"mandiri_keberangkatan_bukti_bayar_url": {
+					"name": "mandiri_keberangkatan_bukti_bayar_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"t1_semester_nominal_total": {
+					"name": "t1_semester_nominal_total",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"t1_semester_nominal_dibayar": {
+					"name": "t1_semester_nominal_dibayar",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"t1_semester_nominal_talangan": {
+					"name": "t1_semester_nominal_talangan",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"t1_semester_jumlah_cicilan": {
+					"name": "t1_semester_jumlah_cicilan",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"t1_semester_cicilan_ke": {
+					"name": "t1_semester_cicilan_ke",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"t1_semester_status": {
+					"name": "t1_semester_status",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"t1_interview_nominal": {
+					"name": "t1_interview_nominal",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"t1_interview_status": {
+					"name": "t1_interview_status",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"t1_interview_bukti_bayar_url": {
+					"name": "t1_interview_bukti_bayar_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"t2_keberangkatan_nominal": {
+					"name": "t2_keberangkatan_nominal",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"t2_keberangkatan_status": {
+					"name": "t2_keberangkatan_status",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"t2_keberangkatan_bukti_bayar_url": {
+					"name": "t2_keberangkatan_bukti_bayar_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"admin_talagan_nominal": {
+					"name": "admin_talagan_nominal",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"admin_talagan_metode": {
+					"name": "admin_talagan_metode",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"admin_talagan_bank_tujuan": {
+					"name": "admin_talagan_bank_tujuan",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"admin_talagan_bukti_bayar_url": {
+					"name": "admin_talagan_bukti_bayar_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"admin_talagan_status": {
+					"name": "admin_talagan_status",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"toeic_nominal": {
+					"name": "toeic_nominal",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"toeic_status": {
+					"name": "toeic_status",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"toeic_bukti_bayar_url": {
+					"name": "toeic_bukti_bayar_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"paspor_nominal": {
+					"name": "paspor_nominal",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"paspor_status": {
+					"name": "paspor_status",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"paspor_bukti_bayar_url": {
+					"name": "paspor_bukti_bayar_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"rumah_juang_aktif": {
+					"name": "rumah_juang_aktif",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"rumah_juang_nominal": {
+					"name": "rumah_juang_nominal",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"rumah_juang_status": {
+					"name": "rumah_juang_status",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"rumah_juang_bukti_bayar_url": {
+					"name": "rumah_juang_bukti_bayar_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
 				},
 				"notes": {
 					"name": "notes",
@@ -1357,6 +3820,167 @@
 			"checkConstraints": {},
 			"isRLSEnabled": false
 		},
+		"public.finance_semester_installments": {
+			"name": "finance_semester_installments",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"semester_id": {
+					"name": "semester_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"installment_number": {
+					"name": "installment_number",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"nominal_paid": {
+					"name": "nominal_paid",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"payment_date": {
+					"name": "payment_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"bukti_bayar_url": {
+					"name": "bukti_bayar_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"is_talangan": {
+					"name": "is_talangan",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"finance_semester_installments_semester_id_finance_semesters_id_fk": {
+					"name": "finance_semester_installments_semester_id_finance_semesters_id_fk",
+					"tableFrom": "finance_semester_installments",
+					"tableTo": "finance_semesters",
+					"columnsFrom": ["semester_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.finance_semesters": {
+			"name": "finance_semesters",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"semester_number": {
+					"name": "semester_number",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"total_billed": {
+					"name": "total_billed",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"is_talangan": {
+					"name": "is_talangan",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"default": "'BELUM_BAYAR'"
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"finance_semesters_student_id_students_id_fk": {
+					"name": "finance_semesters_student_id_students_id_fk",
+					"tableFrom": "finance_semesters",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
 		"public.internal_notes": {
 			"name": "internal_notes",
 			"schema": "",
@@ -1462,6 +4086,83 @@
 					"type": "integer",
 					"primaryKey": false,
 					"notNull": true
+				},
+				"pra_paspor_pas_foto": {
+					"name": "pra_paspor_pas_foto",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"pra_paspor_ktm": {
+					"name": "pra_paspor_ktm",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"pra_paspor_ktp": {
+					"name": "pra_paspor_ktp",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"pra_paspor_kk": {
+					"name": "pra_paspor_kk",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"pra_paspor_akta_kelahiran": {
+					"name": "pra_paspor_akta_kelahiran",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"pra_paspor_sl21": {
+					"name": "pra_paspor_sl21",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"pra_paspor_skma": {
+					"name": "pra_paspor_skma",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"pra_paspor_rekomendasi_disdik": {
+					"name": "pra_paspor_rekomendasi_disdik",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"pra_paspor_gap_year": {
+					"name": "pra_paspor_gap_year",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"pra_paspor_pddikti": {
+					"name": "pra_paspor_pddikti",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"pra_paspor_cv": {
+					"name": "pra_paspor_cv",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
 				},
 				"passport_ready": {
 					"name": "passport_ready",
@@ -1621,8 +4322,65 @@
 					"primaryKey": false,
 					"notNull": false
 				},
+				"pdt_end_date": {
+					"name": "pdt_end_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
 				"pdt_place": {
 					"name": "pdt_place",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"lol_ready": {
+					"name": "lol_ready",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"lol_date": {
+					"name": "lol_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"lol_notes": {
+					"name": "lol_notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"loa_confirmed": {
+					"name": "loa_confirmed",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"loa_date": {
+					"name": "loa_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"moa_ready": {
+					"name": "moa_ready",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"moa_date": {
+					"name": "moa_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"moa_notes": {
+					"name": "moa_notes",
 					"type": "text",
 					"primaryKey": false,
 					"notNull": false
@@ -1647,6 +4405,117 @@
 				},
 				"internship_company": {
 					"name": "internship_company",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"dokumentasi_ready": {
+					"name": "dokumentasi_ready",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"dokumentasi_keberangkatan_link": {
+					"name": "dokumentasi_keberangkatan_link",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"agen_ready": {
+					"name": "agen_ready",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"agen_negara_tujuan": {
+					"name": "agen_negara_tujuan",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"agen_peminatan": {
+					"name": "agen_peminatan",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"dana_tahap1_amount": {
+					"name": "dana_tahap1_amount",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"dana_tahap1_date": {
+					"name": "dana_tahap1_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"dana_tahap1_notes": {
+					"name": "dana_tahap1_notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"is_dana_tahap1_disbursed": {
+					"name": "is_dana_tahap1_disbursed",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"dana_tahap2_amount": {
+					"name": "dana_tahap2_amount",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"dana_tahap2_date": {
+					"name": "dana_tahap2_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"dana_tahap2_notes": {
+					"name": "dana_tahap2_notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"is_dana_tahap2_disbursed": {
+					"name": "is_dana_tahap2_disbursed",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"logbook_ready": {
+					"name": "logbook_ready",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"laporan_akhir_ready": {
+					"name": "laporan_akhir_ready",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"video_dokumentasi_ready": {
+					"name": "video_dokumentasi_ready",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"video_dokumentasi_link": {
+					"name": "video_dokumentasi_link",
 					"type": "text",
 					"primaryKey": false,
 					"notNull": false
@@ -1721,6 +4590,554 @@
 					"columns": ["student_id"]
 				}
 			},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.internship_documents": {
+			"name": "internship_documents",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"document_key": {
+					"name": "document_key",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"file_name": {
+					"name": "file_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"file_url": {
+					"name": "file_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"file_size": {
+					"name": "file_size",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"mime_type": {
+					"name": "mime_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"uploaded_at": {
+					"name": "uploaded_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"uploaded_by": {
+					"name": "uploaded_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"is_verified": {
+					"name": "is_verified",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"verified_at": {
+					"name": "verified_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"verified_by": {
+					"name": "verified_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"internship_documents_student_id_students_id_fk": {
+					"name": "internship_documents_student_id_students_id_fk",
+					"tableFrom": "internship_documents",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"internship_documents_uploaded_by_users_id_fk": {
+					"name": "internship_documents_uploaded_by_users_id_fk",
+					"tableFrom": "internship_documents",
+					"tableTo": "users",
+					"columnsFrom": ["uploaded_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"internship_documents_verified_by_users_id_fk": {
+					"name": "internship_documents_verified_by_users_id_fk",
+					"tableFrom": "internship_documents",
+					"tableTo": "users",
+					"columnsFrom": ["verified_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.internship_monitoring_schedule": {
+			"name": "internship_monitoring_schedule",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"scheduled_date": {
+					"name": "scheduled_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"completed_at": {
+					"name": "completed_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"monitoring_notes": {
+					"name": "monitoring_notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"condition": {
+					"name": "condition",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"conducted_by": {
+					"name": "conducted_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"internship_monitoring_schedule_student_id_students_id_fk": {
+					"name": "internship_monitoring_schedule_student_id_students_id_fk",
+					"tableFrom": "internship_monitoring_schedule",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"internship_monitoring_schedule_conducted_by_users_id_fk": {
+					"name": "internship_monitoring_schedule_conducted_by_users_id_fk",
+					"tableFrom": "internship_monitoring_schedule",
+					"tableTo": "users",
+					"columnsFrom": ["conducted_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.master_business_parameters": {
+			"name": "master_business_parameters",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"business_unit_id": {
+					"name": "business_unit_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"parameter_name": {
+					"name": "parameter_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"formula_value": {
+					"name": "formula_value",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"description": {
+					"name": "description",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.master_event_types": {
+			"name": "master_event_types",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"config_key": {
+					"name": "config_key",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"event_name": {
+					"name": "event_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"is_active": {
+					"name": "is_active",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": true
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {
+				"master_event_types_config_key_unique": {
+					"name": "master_event_types_config_key_unique",
+					"nullsNotDistinct": false,
+					"columns": ["config_key"]
+				}
+			},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.master_service_tags": {
+			"name": "master_service_tags",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"service_id": {
+					"name": "service_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"category_name": {
+					"name": "category_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"is_enabled": {
+					"name": "is_enabled",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": true
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {
+				"master_service_tags_service_id_unique": {
+					"name": "master_service_tags_service_id_unique",
+					"nullsNotDistinct": false,
+					"columns": ["service_id"]
+				}
+			},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.ods_attendance_records": {
+			"name": "ods_attendance_records",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"date": {
+					"name": "date",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"recorded_by": {
+					"name": "recorded_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"recorded_at": {
+					"name": "recorded_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"ods_attendance_records_student_id_students_id_fk": {
+					"name": "ods_attendance_records_student_id_students_id_fk",
+					"tableFrom": "ods_attendance_records",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"ods_attendance_records_recorded_by_users_id_fk": {
+					"name": "ods_attendance_records_recorded_by_users_id_fk",
+					"tableFrom": "ods_attendance_records",
+					"tableTo": "users",
+					"columnsFrom": ["recorded_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.overseas_program_checklists": {
+			"name": "overseas_program_checklists",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"program_type": {
+					"name": "program_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "'taiwan'"
+				},
+				"cohort": {
+					"name": "cohort",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"pas_foto_checked": {
+					"name": "pas_foto_checked",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"cv_checked": {
+					"name": "cv_checked",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"ktm_checked": {
+					"name": "ktm_checked",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"khs_checked": {
+					"name": "khs_checked",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"sl21_checked": {
+					"name": "sl21_checked",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"aktif_checked": {
+					"name": "aktif_checked",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"gap_year_checked": {
+					"name": "gap_year_checked",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"pddikti_checked": {
+					"name": "pddikti_checked",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"pribadi_checked": {
+					"name": "pribadi_checked",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"lol_checked": {
+					"name": "lol_checked",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"loa_checked": {
+					"name": "loa_checked",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"suhhan_checked": {
+					"name": "suhhan_checked",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"overseas_program_checklists_student_id_students_id_fk": {
+					"name": "overseas_program_checklists_student_id_students_id_fk",
+					"tableFrom": "overseas_program_checklists",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
 			"policies": {},
 			"checkConstraints": {},
 			"isRLSEnabled": false
@@ -1843,6 +5260,461 @@
 			"checkConstraints": {},
 			"isRLSEnabled": false
 		},
+		"public.pa_documents": {
+			"name": "pa_documents",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"document_key": {
+					"name": "document_key",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"file_name": {
+					"name": "file_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"file_url": {
+					"name": "file_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"file_size": {
+					"name": "file_size",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"mime_type": {
+					"name": "mime_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"uploaded_at": {
+					"name": "uploaded_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"uploaded_by": {
+					"name": "uploaded_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"is_verified": {
+					"name": "is_verified",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"verified_at": {
+					"name": "verified_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"verified_by": {
+					"name": "verified_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"pa_documents_student_id_students_id_fk": {
+					"name": "pa_documents_student_id_students_id_fk",
+					"tableFrom": "pa_documents",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"pa_documents_uploaded_by_users_id_fk": {
+					"name": "pa_documents_uploaded_by_users_id_fk",
+					"tableFrom": "pa_documents",
+					"tableTo": "users",
+					"columnsFrom": ["uploaded_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"pa_documents_verified_by_users_id_fk": {
+					"name": "pa_documents_verified_by_users_id_fk",
+					"tableFrom": "pa_documents",
+					"tableTo": "users",
+					"columnsFrom": ["verified_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.pa_hafalan_sessions": {
+			"name": "pa_hafalan_sessions",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"language": {
+					"name": "language",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"language_custom": {
+					"name": "language_custom",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"vocab_count": {
+					"name": "vocab_count",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"default": 0
+				},
+				"sentence_count": {
+					"name": "sentence_count",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"default": 0
+				},
+				"created_by": {
+					"name": "created_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"pa_hafalan_sessions_student_id_students_id_fk": {
+					"name": "pa_hafalan_sessions_student_id_students_id_fk",
+					"tableFrom": "pa_hafalan_sessions",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"pa_hafalan_sessions_created_by_users_id_fk": {
+					"name": "pa_hafalan_sessions_created_by_users_id_fk",
+					"tableFrom": "pa_hafalan_sessions",
+					"tableTo": "users",
+					"columnsFrom": ["created_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.pa_interview_logs": {
+			"name": "pa_interview_logs",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"interview_date": {
+					"name": "interview_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"company_name": {
+					"name": "company_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"country": {
+					"name": "country",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"result": {
+					"name": "result",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_by": {
+					"name": "created_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"pa_interview_logs_student_id_students_id_fk": {
+					"name": "pa_interview_logs_student_id_students_id_fk",
+					"tableFrom": "pa_interview_logs",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"pa_interview_logs_created_by_users_id_fk": {
+					"name": "pa_interview_logs_created_by_users_id_fk",
+					"tableFrom": "pa_interview_logs",
+					"tableTo": "users",
+					"columnsFrom": ["created_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.pa_student_notes": {
+			"name": "pa_student_notes",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"type": {
+					"name": "type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"content": {
+					"name": "content",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"created_by": {
+					"name": "created_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"pa_student_notes_student_id_students_id_fk": {
+					"name": "pa_student_notes_student_id_students_id_fk",
+					"tableFrom": "pa_student_notes",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"pa_student_notes_created_by_users_id_fk": {
+					"name": "pa_student_notes_created_by_users_id_fk",
+					"tableFrom": "pa_student_notes",
+					"tableTo": "users",
+					"columnsFrom": ["created_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.pa_tripartite_logs": {
+			"name": "pa_tripartite_logs",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"contact_type": {
+					"name": "contact_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"contact_name": {
+					"name": "contact_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"contact_date": {
+					"name": "contact_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"summary": {
+					"name": "summary",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"result": {
+					"name": "result",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_by": {
+					"name": "created_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"pa_tripartite_logs_student_id_students_id_fk": {
+					"name": "pa_tripartite_logs_student_id_students_id_fk",
+					"tableFrom": "pa_tripartite_logs",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"pa_tripartite_logs_created_by_users_id_fk": {
+					"name": "pa_tripartite_logs_created_by_users_id_fk",
+					"tableFrom": "pa_tripartite_logs",
+					"tableTo": "users",
+					"columnsFrom": ["created_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
 		"public.pmb_data": {
 			"name": "pmb_data",
 			"schema": "",
@@ -1887,6 +5759,13 @@
 					"notNull": false,
 					"default": false
 				},
+				"is_gap_year": {
+					"name": "is_gap_year",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
 				"notes": {
 					"name": "notes",
 					"type": "text",
@@ -1919,6 +5798,119 @@
 					"primaryKey": false,
 					"notNull": false,
 					"default": "'PERLU_PERHATIAN'"
+				},
+				"rekomendasi": {
+					"name": "rekomendasi",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"tim_visit": {
+					"name": "tim_visit",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"tim_sosialisasi": {
+					"name": "tim_sosialisasi",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ro_referral": {
+					"name": "ro_referral",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"mitra_sponsor": {
+					"name": "mitra_sponsor",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"koordinator": {
+					"name": "koordinator",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"doc_ktp": {
+					"name": "doc_ktp",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"doc_kk": {
+					"name": "doc_kk",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"doc_cv": {
+					"name": "doc_cv",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"doc_ijazah": {
+					"name": "doc_ijazah",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"doc_transkrip": {
+					"name": "doc_transkrip",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"doc_passport_depan": {
+					"name": "doc_passport_depan",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"doc_passport_visa": {
+					"name": "doc_passport_visa",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"doc_skbm": {
+					"name": "doc_skbm",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"doc_mcu": {
+					"name": "doc_mcu",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"doc_sertifikasi_bahasa": {
+					"name": "doc_sertifikasi_bahasa",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"rumah_juang": {
+					"name": "rumah_juang",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
 				},
 				"updated_at": {
 					"name": "updated_at",
@@ -2076,6 +6068,1486 @@
 			"checkConstraints": {},
 			"isRLSEnabled": false
 		},
+		"public.pmb_fee_disbursements": {
+			"name": "pmb_fee_disbursements",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"channel": {
+					"name": "channel",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"nama_referral": {
+					"name": "nama_referral",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"nominal_fee": {
+					"name": "nominal_fee",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"status_pencairan": {
+					"name": "status_pencairan",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"default": "'belum'"
+				},
+				"tanggal_cair": {
+					"name": "tanggal_cair",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"pmb_fee_disbursements_student_id_students_id_fk": {
+					"name": "pmb_fee_disbursements_student_id_students_id_fk",
+					"tableFrom": "pmb_fee_disbursements",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.pmb_form_responses": {
+			"name": "pmb_form_responses",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"token_id": {
+					"name": "token_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"status": {
+					"name": "status",
+					"type": "form_response_status",
+					"typeSchema": "public",
+					"primaryKey": false,
+					"notNull": false,
+					"default": "'PENDING'"
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"nickname": {
+					"name": "nickname",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"gender": {
+					"name": "gender",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"birth_place": {
+					"name": "birth_place",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"birth_date": {
+					"name": "birth_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"religion": {
+					"name": "religion",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"nationality": {
+					"name": "nationality",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_street": {
+					"name": "address_street",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_rt": {
+					"name": "address_rt",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_rw": {
+					"name": "address_rw",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_no": {
+					"name": "address_no",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_village": {
+					"name": "address_village",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_district": {
+					"name": "address_district",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_city": {
+					"name": "address_city",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_province": {
+					"name": "address_province",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"living_with": {
+					"name": "living_with",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"phone": {
+					"name": "phone",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"email": {
+					"name": "email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"profile_photo_url": {
+					"name": "profile_photo_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"school_origin": {
+					"name": "school_origin",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"school_address": {
+					"name": "school_address",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"school_major": {
+					"name": "school_major",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"graduation_year": {
+					"name": "graduation_year",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"program": {
+					"name": "program",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"sub_program": {
+					"name": "sub_program",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"class_type": {
+					"name": "class_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"batch": {
+					"name": "batch",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"academic_year": {
+					"name": "academic_year",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"blood_type": {
+					"name": "blood_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"disease_history": {
+					"name": "disease_history",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"congenital_disease": {
+					"name": "congenital_disease",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"height": {
+					"name": "height",
+					"type": "numeric(5, 2)",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"weight": {
+					"name": "weight",
+					"type": "numeric(5, 2)",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"clothing_size": {
+					"name": "clothing_size",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ayah_name": {
+					"name": "ayah_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ayah_birth_place": {
+					"name": "ayah_birth_place",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ayah_birth_date": {
+					"name": "ayah_birth_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ayah_religion": {
+					"name": "ayah_religion",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ayah_nationality": {
+					"name": "ayah_nationality",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ayah_education": {
+					"name": "ayah_education",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ayah_job": {
+					"name": "ayah_job",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ayah_address": {
+					"name": "ayah_address",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ayah_phone": {
+					"name": "ayah_phone",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ayah_email": {
+					"name": "ayah_email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ayah_status": {
+					"name": "ayah_status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ibu_name": {
+					"name": "ibu_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ibu_birth_place": {
+					"name": "ibu_birth_place",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ibu_birth_date": {
+					"name": "ibu_birth_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ibu_religion": {
+					"name": "ibu_religion",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ibu_nationality": {
+					"name": "ibu_nationality",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ibu_education": {
+					"name": "ibu_education",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ibu_job": {
+					"name": "ibu_job",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ibu_address": {
+					"name": "ibu_address",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ibu_phone": {
+					"name": "ibu_phone",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ibu_email": {
+					"name": "ibu_email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"ibu_status": {
+					"name": "ibu_status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"wali_name": {
+					"name": "wali_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"wali_birth_place": {
+					"name": "wali_birth_place",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"wali_birth_date": {
+					"name": "wali_birth_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"wali_religion": {
+					"name": "wali_religion",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"wali_nationality": {
+					"name": "wali_nationality",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"wali_education": {
+					"name": "wali_education",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"wali_job": {
+					"name": "wali_job",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"wali_address": {
+					"name": "wali_address",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"wali_phone": {
+					"name": "wali_phone",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"wali_email": {
+					"name": "wali_email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"wali_guardian_relation": {
+					"name": "wali_guardian_relation",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"submitted_at": {
+					"name": "submitted_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"processed_at": {
+					"name": "processed_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"processed_by": {
+					"name": "processed_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"rejection_notes": {
+					"name": "rejection_notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"pmb_form_responses_token_id_pmb_form_tokens_id_fk": {
+					"name": "pmb_form_responses_token_id_pmb_form_tokens_id_fk",
+					"tableFrom": "pmb_form_responses",
+					"tableTo": "pmb_form_tokens",
+					"columnsFrom": ["token_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"pmb_form_responses_processed_by_users_id_fk": {
+					"name": "pmb_form_responses_processed_by_users_id_fk",
+					"tableFrom": "pmb_form_responses",
+					"tableTo": "users",
+					"columnsFrom": ["processed_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"pmb_form_responses_student_id_students_id_fk": {
+					"name": "pmb_form_responses_student_id_students_id_fk",
+					"tableFrom": "pmb_form_responses",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {
+				"pmb_form_responses_token_id_unique": {
+					"name": "pmb_form_responses_token_id_unique",
+					"nullsNotDistinct": false,
+					"columns": ["token_id"]
+				}
+			},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.pmb_form_tokens": {
+			"name": "pmb_form_tokens",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"token": {
+					"name": "token",
+					"type": "varchar(255)",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"created_by": {
+					"name": "created_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"is_used": {
+					"name": "is_used",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"used_at": {
+					"name": "used_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"pmb_form_tokens_created_by_users_id_fk": {
+					"name": "pmb_form_tokens_created_by_users_id_fk",
+					"tableFrom": "pmb_form_tokens",
+					"tableTo": "users",
+					"columnsFrom": ["created_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {
+				"pmb_form_tokens_token_unique": {
+					"name": "pmb_form_tokens_token_unique",
+					"nullsNotDistinct": false,
+					"columns": ["token"]
+				}
+			},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.pmb_payment_plan": {
+			"name": "pmb_payment_plan",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"total_biaya": {
+					"name": "total_biaya",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"pendaftaran_dp": {
+					"name": "pendaftaran_dp",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"total_dp": {
+					"name": "total_dp",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"pembayaran_awal_dp": {
+					"name": "pembayaran_awal_dp",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"status_dp": {
+					"name": "status_dp",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"janji_tahap2": {
+					"name": "janji_tahap2",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"janji_tahap2_nominal": {
+					"name": "janji_tahap2_nominal",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"janji_tahap2_notes": {
+					"name": "janji_tahap2_notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"janji_tahap3": {
+					"name": "janji_tahap3",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"janji_tahap3_nominal": {
+					"name": "janji_tahap3_nominal",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"janji_tahap3_notes": {
+					"name": "janji_tahap3_notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"pengajuan_dana_talangan": {
+					"name": "pengajuan_dana_talangan",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"pmb_payment_plan_student_id_students_id_fk": {
+					"name": "pmb_payment_plan_student_id_students_id_fk",
+					"tableFrom": "pmb_payment_plan",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {
+				"pmb_payment_plan_student_id_unique": {
+					"name": "pmb_payment_plan_student_id_unique",
+					"nullsNotDistinct": false,
+					"columns": ["student_id"]
+				}
+			},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.post_internship_docs": {
+			"name": "post_internship_docs",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"document_key": {
+					"name": "document_key",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"file_name": {
+					"name": "file_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"file_url": {
+					"name": "file_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"file_size": {
+					"name": "file_size",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"mime_type": {
+					"name": "mime_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"uploaded_at": {
+					"name": "uploaded_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"uploaded_by": {
+					"name": "uploaded_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"is_verified": {
+					"name": "is_verified",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"verified_at": {
+					"name": "verified_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"verified_by": {
+					"name": "verified_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"post_internship_docs_student_id_students_id_fk": {
+					"name": "post_internship_docs_student_id_students_id_fk",
+					"tableFrom": "post_internship_docs",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"post_internship_docs_uploaded_by_users_id_fk": {
+					"name": "post_internship_docs_uploaded_by_users_id_fk",
+					"tableFrom": "post_internship_docs",
+					"tableTo": "users",
+					"columnsFrom": ["uploaded_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"post_internship_docs_verified_by_users_id_fk": {
+					"name": "post_internship_docs_verified_by_users_id_fk",
+					"tableFrom": "post_internship_docs",
+					"tableTo": "users",
+					"columnsFrom": ["verified_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.practices_budget_requests": {
+			"name": "practices_budget_requests",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"dosen_id": {
+					"name": "dosen_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"course_id": {
+					"name": "course_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"daftar_kebutuhan": {
+					"name": "daftar_kebutuhan",
+					"type": "jsonb",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"total_nominal": {
+					"name": "total_nominal",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"default": 0
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"default": "'menunggu'"
+				},
+				"catatan_finance": {
+					"name": "catatan_finance",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"approved_by": {
+					"name": "approved_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"approved_at": {
+					"name": "approved_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"practices_budget_requests_dosen_id_users_id_fk": {
+					"name": "practices_budget_requests_dosen_id_users_id_fk",
+					"tableFrom": "practices_budget_requests",
+					"tableTo": "users",
+					"columnsFrom": ["dosen_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"practices_budget_requests_course_id_courses_id_fk": {
+					"name": "practices_budget_requests_course_id_courses_id_fk",
+					"tableFrom": "practices_budget_requests",
+					"tableTo": "courses",
+					"columnsFrom": ["course_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"practices_budget_requests_approved_by_users_id_fk": {
+					"name": "practices_budget_requests_approved_by_users_id_fk",
+					"tableFrom": "practices_budget_requests",
+					"tableTo": "users",
+					"columnsFrom": ["approved_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.practices_material_reports": {
+			"name": "practices_material_reports",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"budget_request_id": {
+					"name": "budget_request_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"dosen_id": {
+					"name": "dosen_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"daftar_sisa_bahan": {
+					"name": "daftar_sisa_bahan",
+					"type": "jsonb",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"catatan_dosen": {
+					"name": "catatan_dosen",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"file_url": {
+					"name": "file_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"file_name": {
+					"name": "file_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"practices_material_reports_budget_request_id_practices_budget_requests_id_fk": {
+					"name": "practices_material_reports_budget_request_id_practices_budget_requests_id_fk",
+					"tableFrom": "practices_material_reports",
+					"tableTo": "practices_budget_requests",
+					"columnsFrom": ["budget_request_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"practices_material_reports_dosen_id_users_id_fk": {
+					"name": "practices_material_reports_dosen_id_users_id_fk",
+					"tableFrom": "practices_material_reports",
+					"tableTo": "users",
+					"columnsFrom": ["dosen_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.practicum_schedules": {
+			"name": "practicum_schedules",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"subject": {
+					"name": "subject",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"dosen_id": {
+					"name": "dosen_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"cohort": {
+					"name": "cohort",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"room": {
+					"name": "room",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"day_of_week": {
+					"name": "day_of_week",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"session_date": {
+					"name": "session_date",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"start_time": {
+					"name": "start_time",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"end_time": {
+					"name": "end_time",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"calendar_id": {
+					"name": "calendar_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"practicum_schedules_dosen_id_users_id_fk": {
+					"name": "practicum_schedules_dosen_id_users_id_fk",
+					"tableFrom": "practicum_schedules",
+					"tableTo": "users",
+					"columnsFrom": ["dosen_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"practicum_schedules_calendar_id_academic_calendars_id_fk": {
+					"name": "practicum_schedules_calendar_id_academic_calendars_id_fk",
+					"tableFrom": "practicum_schedules",
+					"tableTo": "academic_calendars",
+					"columnsFrom": ["calendar_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.pramagang_attendance_records": {
+			"name": "pramagang_attendance_records",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"date": {
+					"name": "date",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"recorded_by": {
+					"name": "recorded_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"recorded_at": {
+					"name": "recorded_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"pramagang_attendance_records_student_id_students_id_fk": {
+					"name": "pramagang_attendance_records_student_id_students_id_fk",
+					"tableFrom": "pramagang_attendance_records",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"pramagang_attendance_records_recorded_by_users_id_fk": {
+					"name": "pramagang_attendance_records_recorded_by_users_id_fk",
+					"tableFrom": "pramagang_attendance_records",
+					"tableTo": "users",
+					"columnsFrom": ["recorded_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.student_health": {
+			"name": "student_health",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"blood_type": {
+					"name": "blood_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"disease_history": {
+					"name": "disease_history",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"congenital_disease": {
+					"name": "congenital_disease",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"height": {
+					"name": "height",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"weight": {
+					"name": "weight",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"clothing_size": {
+					"name": "clothing_size",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"student_health_student_id_students_id_fk": {
+					"name": "student_health_student_id_students_id_fk",
+					"tableFrom": "student_health",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {
+				"student_health_student_id_unique": {
+					"name": "student_health_student_id_unique",
+					"nullsNotDistinct": false,
+					"columns": ["student_id"]
+				}
+			},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.student_parents": {
+			"name": "student_parents",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"type": {
+					"name": "type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"birth_place": {
+					"name": "birth_place",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"birth_date": {
+					"name": "birth_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"religion": {
+					"name": "religion",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"nationality": {
+					"name": "nationality",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"education": {
+					"name": "education",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"job": {
+					"name": "job",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address": {
+					"name": "address",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"phone": {
+					"name": "phone",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"email": {
+					"name": "email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"guardian_relation": {
+					"name": "guardian_relation",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"student_parents_student_id_students_id_fk": {
+					"name": "student_parents_student_id_students_id_fk",
+					"tableFrom": "student_parents",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
 		"public.students": {
 			"name": "students",
 			"schema": "",
@@ -2090,13 +7562,19 @@
 					"name": "nim",
 					"type": "text",
 					"primaryKey": false,
-					"notNull": true
+					"notNull": false
 				},
 				"name": {
 					"name": "name",
 					"type": "text",
 					"primaryKey": false,
 					"notNull": true
+				},
+				"nickname": {
+					"name": "nickname",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
 				},
 				"cohort": {
 					"name": "cohort",
@@ -2110,14 +7588,170 @@
 					"primaryKey": false,
 					"notNull": true
 				},
+				"sub_program": {
+					"name": "sub_program",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"birth_place": {
+					"name": "birth_place",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"birth_date": {
+					"name": "birth_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"gender": {
+					"name": "gender",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"religion": {
+					"name": "religion",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"nationality": {
+					"name": "nationality",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_street": {
+					"name": "address_street",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_rt": {
+					"name": "address_rt",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_rw": {
+					"name": "address_rw",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_no": {
+					"name": "address_no",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_village": {
+					"name": "address_village",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_district": {
+					"name": "address_district",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_city": {
+					"name": "address_city",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"address_province": {
+					"name": "address_province",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"living_with": {
+					"name": "living_with",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"school_origin": {
+					"name": "school_origin",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"school_address": {
+					"name": "school_address",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"school_major": {
+					"name": "school_major",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"graduation_year": {
+					"name": "graduation_year",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"class_type": {
+					"name": "class_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"academic_year": {
+					"name": "academic_year",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"batch": {
+					"name": "batch",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
 				"phone": {
 					"name": "phone",
 					"type": "text",
 					"primaryKey": false,
 					"notNull": false
 				},
+				"email": {
+					"name": "email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
 				"parent_name": {
 					"name": "parent_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"parent_job": {
+					"name": "parent_job",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"parent_income": {
+					"name": "parent_income",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"parent_phone": {
+					"name": "parent_phone",
 					"type": "text",
 					"primaryKey": false,
 					"notNull": false
@@ -2162,6 +7796,19 @@
 					"notNull": false,
 					"default": "'AMAN'"
 				},
+				"is_archived": {
+					"name": "is_archived",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": false,
+					"default": false
+				},
+				"student_user_id": {
+					"name": "student_user_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
 				"created_at": {
 					"name": "created_at",
 					"type": "timestamp",
@@ -2184,6 +7831,15 @@
 					"tableFrom": "students",
 					"tableTo": "users",
 					"columnsFrom": ["pa_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				},
+				"students_student_user_id_users_id_fk": {
+					"name": "students_student_user_id_users_id_fk",
+					"tableFrom": "students",
+					"tableTo": "users",
+					"columnsFrom": ["student_user_id"],
 					"columnsTo": ["id"],
 					"onDelete": "no action",
 					"onUpdate": "no action"
@@ -2235,6 +7891,24 @@
 					"typeSchema": "public",
 					"primaryKey": false,
 					"notNull": true
+				},
+				"email": {
+					"name": "email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"phone": {
+					"name": "phone",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"profile_photo_url": {
+					"name": "profile_photo_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
 				},
 				"created_at": {
 					"name": "created_at",
@@ -2324,9 +7998,357 @@
 			"policies": {},
 			"checkConstraints": {},
 			"isRLSEnabled": false
+		},
+		"public.vocational_budget_requests": {
+			"name": "vocational_budget_requests",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"class_name": {
+					"name": "class_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"subject": {
+					"name": "subject",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"week_number": {
+					"name": "week_number",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"request_date": {
+					"name": "request_date",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"materials": {
+					"name": "materials",
+					"type": "jsonb",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"total_estimate": {
+					"name": "total_estimate",
+					"type": "numeric(12, 2)",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"default": "'pending'"
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"submitted_by": {
+					"name": "submitted_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"vocational_budget_requests_submitted_by_users_id_fk": {
+					"name": "vocational_budget_requests_submitted_by_users_id_fk",
+					"tableFrom": "vocational_budget_requests",
+					"tableTo": "users",
+					"columnsFrom": ["submitted_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.vocational_leftovers": {
+			"name": "vocational_leftovers",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"class_name": {
+					"name": "class_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"subject": {
+					"name": "subject",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"report_date": {
+					"name": "report_date",
+					"type": "date",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"material_name": {
+					"name": "material_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"qty": {
+					"name": "qty",
+					"type": "numeric(10, 2)",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"unit": {
+					"name": "unit",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"condition": {
+					"name": "condition",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"reported_by": {
+					"name": "reported_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"vocational_leftovers_reported_by_users_id_fk": {
+					"name": "vocational_leftovers_reported_by_users_id_fk",
+					"tableFrom": "vocational_leftovers",
+					"tableTo": "users",
+					"columnsFrom": ["reported_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.vocational_monthly_budgets": {
+			"name": "vocational_monthly_budgets",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"class_name": {
+					"name": "class_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"month": {
+					"name": "month",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"year": {
+					"name": "year",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"max_budget": {
+					"name": "max_budget",
+					"type": "numeric(12, 2)",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"approved_total": {
+					"name": "approved_total",
+					"type": "numeric(12, 2)",
+					"primaryKey": false,
+					"notNull": false,
+					"default": "'0'"
+				},
+				"notes": {
+					"name": "notes",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_by": {
+					"name": "created_by",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"vocational_monthly_budgets_created_by_users_id_fk": {
+					"name": "vocational_monthly_budgets_created_by_users_id_fk",
+					"tableFrom": "vocational_monthly_budgets",
+					"tableTo": "users",
+					"columnsFrom": ["created_by"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.weekly_events": {
+			"name": "weekly_events",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"student_id": {
+					"name": "student_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"event_type": {
+					"name": "event_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"event_date": {
+					"name": "event_date",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"description": {
+					"name": "description",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"document_url": {
+					"name": "document_url",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "now()"
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"weekly_events_student_id_students_id_fk": {
+					"name": "weekly_events_student_id_students_id_fk",
+					"tableFrom": "weekly_events",
+					"tableTo": "students",
+					"columnsFrom": ["student_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
 		}
 	},
 	"enums": {
+		"public.academic_period_type": {
+			"name": "academic_period_type",
+			"schema": "public",
+			"values": [
+				"beginning_class",
+				"pertemuan",
+				"uts",
+				"uas",
+				"pkkmb",
+				"custom"
+			]
+		},
+		"public.activity_type": {
+			"name": "activity_type",
+			"schema": "public",
+			"values": ["teori", "tugas", "praktik", "ujian"]
+		},
+		"public.course_type": {
+			"name": "course_type",
+			"schema": "public",
+			"values": ["teori", "praktik"]
+		},
 		"public.evaluator_decision": {
 			"name": "evaluator_decision",
 			"schema": "public",
@@ -2337,6 +8359,16 @@
 				"layak_berangkat",
 				"remedial"
 			]
+		},
+		"public.form_response_status": {
+			"name": "form_response_status",
+			"schema": "public",
+			"values": ["PENDING", "APPROVED", "REJECTED"]
+		},
+		"public.meeting_type": {
+			"name": "meeting_type",
+			"schema": "public",
+			"values": ["pkkmb", "beginning", "regular", "uts", "uas"]
 		},
 		"public.note_type": {
 			"name": "note_type",
@@ -2362,7 +8394,8 @@
 				"dosen",
 				"pa",
 				"magang",
-				"evaluator"
+				"evaluator",
+				"mahasiswa"
 			]
 		},
 		"public.status": {
@@ -2373,7 +8406,15 @@
 		"public.student_status": {
 			"name": "student_status",
 			"schema": "public",
-			"values": ["aktif", "cuti", "alumni", "keluar"]
+			"values": [
+				"aktif",
+				"cuti",
+				"alumni",
+				"keluar",
+				"dropout",
+				"mengundurkan_diri",
+				"lulus"
+			]
 		}
 	},
 	"schemas": {},
