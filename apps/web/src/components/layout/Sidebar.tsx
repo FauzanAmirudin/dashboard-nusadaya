@@ -147,7 +147,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 		icon: HeartHandshake,
 		label: "Panel PA",
 		href: "/dashboard/pa",
-		roles: ["superadmin", "pa"],
+		roles: ["pa"],
 	},
 	{
 		icon: Plane,

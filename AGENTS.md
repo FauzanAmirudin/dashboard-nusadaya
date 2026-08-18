@@ -128,5 +128,8 @@ Semua akun demo di-seed dengan password: `password`
     - **Modal Dialog "Tambah / Edit Pembayaran":** Input nominal terformat bersih tanpa leading zero, date picker, catatan metode bayar, dan staged file upload preview.
   - **Staged Draft State & Batch Save Terpusat:** Seluruh penambahan, pengeditan, penghapusan cicilan, dan berkas bukti bayar beroperasi secara aman pada draft lokal dan disimpan permanen serempak saat tombol "Simpan" diklik (serta dibatalkan utuh jika menekan "Batal").
   - **Sinkronisasi Otomatis ke Dashboard Finance:** Kalkulasi realisasi uang masuk dan total pembayaran mahasiswa pada Dashboard Finance langsung mengakumulasikan transaksi cicilan Dana Talangan secara akurat.
-
-
+- ✅ Penyelesaian Merge Conflicts PR & Harmonisasi Penuh Fitur Finance (`feat/finance-module-enhancements` -> `main`):
+  - Menggabungkan seluruh inovasi modul Finance (Proyeksi Pendapatan OneData, Multi-Cicilan Talangan, Partisi Biaya Pendidikan, dan Biaya Promosi) dengan fitur terbaru di branch `main` (`hasRole` RBAC helper, `TablePagination`, `PeminatanBadge`, and dynamic context tabs) tanpa menghilangkan logika atau menyebabkan error.
+  - Memperbaiki sinkronisasi skema database PostgreSQL lokal (kolom `total_biaya_promosi` & tabel `finance_talangan_installments`) sehingga seluruh 13 data mahasiswa tampil normal dengan status HTTP 200.
+- ✅ Penyesuaian Navigasi Sidebar Superadmin (`Sidebar.tsx`):
+  - Menghapus item navigasi "Panel PA" (`/dashboard/pa`) dari menu Superadmin sehingga hanya tampil khusus untuk role Pembimbing Akademik (`roles: ["pa"]`). Superadmin tetap dapat mengelola PA melalui menu "Manajemen PA" di bawah menu Akademik.
