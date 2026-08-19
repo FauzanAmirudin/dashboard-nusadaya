@@ -585,14 +585,9 @@ export function AnggaranPraktikDashboard() {
 							<UtensilsCrossed className="w-6 h-6" />
 						</div>
 						<div>
-							<div className="flex items-center gap-2.5">
-								<h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-									Anggaran Praktik
-								</h1>
-								<Badge className="bg-[#0517B0]/10 text-[#0517B0] border-[#0517B0]/20 text-[11px] font-bold px-2.5 py-0.5">
-									Divisi Finance
-								</Badge>
-							</div>
+							<h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+								Anggaran Praktik
+							</h1>
 							<p className="text-xs sm:text-sm text-slate-500 mt-1">
 								Pusat peninjauan, persetujuan anggaran bahan praktik dosen per
 								mata kuliah, dan rekapitulasi laporan sisa bahan.

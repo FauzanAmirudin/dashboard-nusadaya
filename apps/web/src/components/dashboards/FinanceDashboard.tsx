@@ -869,14 +869,9 @@ export function FinanceDashboard({ user, data: propData }: any) {
 							<Wallet className="w-5 h-5" />
 						</div>
 						<div>
-							<div className="flex items-center gap-2">
-								<h1 className="text-xl font-bold text-slate-900 tracking-tight">
-									Dashboard Finance
-								</h1>
-								<Badge className="bg-[#0517B0]/10 text-[#0517B0] border-[#0517B0]/20 text-[10px] font-bold px-2 py-0.5">
-									OneData Control Center
-								</Badge>
-							</div>
+							<h1 className="text-xl font-bold text-slate-900 tracking-tight">
+								Dashboard Finance
+							</h1>
 							<p className="text-slate-500 text-xs mt-0.5">
 								Pusat kendali transaksi uang masuk dan monitoring kepatuhan
 								pembayaran mahasiswa.
