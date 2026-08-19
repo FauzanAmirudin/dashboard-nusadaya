@@ -133,3 +133,24 @@ Semua akun demo di-seed dengan password: `password`
   - Memperbaiki sinkronisasi skema database PostgreSQL lokal (kolom `total_biaya_promosi` & tabel `finance_talangan_installments`) sehingga seluruh 13 data mahasiswa tampil normal dengan status HTTP 200.
 - ✅ Penyesuaian Navigasi Sidebar Superadmin (`Sidebar.tsx`):
   - Menghapus item navigasi "Panel PA" (`/dashboard/pa`) dari menu Superadmin sehingga hanya tampil khusus untuk role Pembimbing Akademik (`roles: ["pa"]`). Superadmin tetap dapat mengelola PA melalui menu "Manajemen PA" di bawah menu Akademik.
+<<<<<<< Updated upstream
+=======
+- ✅ Pemisahan Tab Anggaran Praktik ke Sub-Navigasi Panel Finance (`/dashboard/finance/anggaran-praktik`):
+  - Mengeluarkan tab "Anggaran Praktik" dari view detail per mahasiswa (`FinancePanel.tsx`) sehingga halaman detail mahasiswa terfokus pada urusan personal (Pembayaran & Tagihan dan Biaya Promosi / Fee Sharing).
+  - Menjadikan menu "Panel Finance" pada `Sidebar.tsx` sebagai grup menu dengan 2 sub-navigasi: **Monitoring Mahasiswa** (`/dashboard/finance`) dan **Anggaran Praktik** (`/dashboard/finance/anggaran-praktik`).
+  - Membangun antarmuka index baru `AnggaranPraktikDashboard.tsx` dengan 4 kartu metrik KPI (Total Pengajuan, Menunggu Approval, Disetujui, Laporan Sisa Bahan), Segmented Tab Controller, Filter Status Cepat, Pencarian Instan Dosen/Mata Kuliah, dan format tabel modern.
+  - Membangun Modal Peninjauan Detail Pengajuan Anggaran (`ReviewBudgetModal`) yang menyajikan rincian kebutuhan per item (Nama bahan, Qty, Satuan, Estimasi Harga, Subtotal), total keseluruhan, serta panel aksi persetujuan (*Approve*), penolakan (*Reject* dengan catatan revisi wajib), dan perbaikan status (*Reset ke Menunggu*).
+  - Membangun Modal Detail Laporan Sisa Bahan (`ViewMaterialReportModal`) yang menampilkan rekap inventaris material sisa pasca-praktik dosen, kondisi bahan, catatan, dan akses tautan berkas lampiran.
+  - Memperkaya endpoint API `GET /finance/anggaran-praktik` dan `GET /finance/laporan-sisa-bahan` untuk memuat relasi relasional Drizzle lengkap (`course`, `dosen`, `approvedBy`, `materialReports`).
+  - Merancang ulang Modal Peninjauan Detail Anggaran (`ReviewBudgetModal`) dan Modal Sisa Bahan (`ViewMaterialReportModal`) menjadi lapang (`lg:max-w-4xl`), tidak terpotong (bebas clipping), banner info 3 kolom rapi, tabel kebutuhan bahan dengan kolom terstruktur proporsional, serta footer bar aksi yang bersih dan responsif.
+  - Menambahkan Fitur Upload & Manajemen Bukti Pencairan / Penyerahan Anggaran ke Dosen:
+    - Menambahkan kolom `bukti_pencairan_url`, `bukti_pencairan_file_name`, dan `tanggal_pencairan` pada tabel `practices_budget_requests` di database PostgreSQL dan skema Drizzle ORM.
+    - Menambahkan endpoints `POST /finance/anggaran-praktik/:requestId/upload-bukti` dan `DELETE /finance/anggaran-praktik/:requestId/bukti` yang terintegrasi dengan `FileService`.
+    - Menambahkan card manajemen Bukti Pencairan di `ReviewBudgetModal` (upload berkas slip transfer, preview/lihat berkas, ganti berkas, hapus) serta indikator badge `✓ Bukti Ada` / `Belum Ada Bukti` pada tabel pengajuan.
+    - Menambahkan tampilan Bukti Pencairan pada antarmuka Dosen (`TabAnggaranPraktik.tsx`) sehingga Dosen dapat langsung mengunduh/melihat slip transfer jika anggaran telah dicairkan oleh Finance.
+  - Memperbaiki Foreign Key Constraint Error pada Approval & Upload Bukti Anggaran Praktik:
+    - Menambahkan helper `getValidUserId(user)` pada `permissions.ts` untuk memverifikasi dan mencocokkan ID user secara dinamis terhadap tabel `users` database PostgreSQL.
+    - Menangani fallback user ID dan non-student file metadata pada `FileService.uploadFile` dan endpoint `approve` sehingga proses approval dan upload berkas berjalan lancar tanpa error query.
+
+
+>>>>>>> Stashed changes

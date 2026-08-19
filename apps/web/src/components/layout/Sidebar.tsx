@@ -91,8 +91,21 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 	{
 		icon: Wallet,
 		label: "Panel Finance",
-		href: "/dashboard/finance",
 		roles: ["superadmin", "finance"],
+		subItems: [
+			{
+				label: "Monitoring Mahasiswa",
+				href: "/dashboard/finance",
+				roles: ["superadmin", "finance"],
+				icon: Wallet,
+			},
+			{
+				label: "Anggaran Praktik",
+				href: "/dashboard/finance/anggaran-praktik",
+				roles: ["superadmin", "finance"],
+				icon: Wallet,
+			},
+		],
 	},
 	{
 		icon: GraduationCap,
@@ -380,6 +393,21 @@ function checkItemActive(
 
 	if (href === "/dashboard") {
 		return pathname === "/dashboard";
+	}
+
+	if (href === "/dashboard/finance") {
+		return (
+			pathname === "/dashboard/finance" ||
+			(pathname.startsWith("/dashboard/finance/") &&
+				!pathname.startsWith("/dashboard/finance/anggaran-praktik"))
+		);
+	}
+
+	if (href === "/dashboard/finance/anggaran-praktik") {
+		return (
+			pathname === "/dashboard/finance/anggaran-praktik" ||
+			pathname.startsWith("/dashboard/finance/anggaran-praktik/")
+		);
 	}
 
 	if (href === "/dashboard/mata-kuliah") {

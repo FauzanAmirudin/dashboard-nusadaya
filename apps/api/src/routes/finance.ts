@@ -10,8 +10,9 @@ import {
 	practicesMaterialReports,
 	students,
 } from "../db/schema";
-import { hasRole } from "../lib/permissions";
+import { getValidUserId, hasRole } from "../lib/permissions";
 import { requireRole } from "../middleware/rbac";
+import { fileService } from "../modules/file/service/file.service";
 
 export const financeRouter = new Elysia({ prefix: "/finance" })
 	// Dashboard: Requires finance or superadmin
@@ -395,8 +396,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 		},
 	)
 
-	// Tab 3: Anggaran Praktik
-
+	// Tab 3: Anggaran Praktik & Laporan Sisa Bahan Vokasi
 	.get("/anggaran-praktik", async ({ user }: any) => {
 		if (!hasRole(user, "finance"))
 			return { success: false, message: "Forbidden" };
@@ -405,8 +405,18 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 			with: {
 				course: true,
 				dosen: {
-					columns: { id: true, fullName: true },
+					columns: {
+						id: true,
+						fullName: true,
+						username: true,
+						email: true,
+						phone: true,
+					},
 				},
+				approvedBy: {
+					columns: { id: true, fullName: true, username: true },
+				},
+				materialReports: true,
 			},
 			orderBy: (practicesBudgetRequests, { desc }) => [
 				desc(practicesBudgetRequests.createdAt),
@@ -416,19 +426,154 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	})
 	.patch(
 		"/anggaran-praktik/:requestId/approve",
-		async ({ params: { requestId }, user }: any) => {
+		async ({ params: { requestId }, body, user }: any) => {
+			if (!hasRole(user, "finance"))
+				return { success: false, message: "Forbidden" };
+
+			const validApproverId = await getValidUserId(user);
+
+			const updateData: any = {
+				status: "disetujui",
+				approvedBy: validApproverId,
+				approvedAt: new Date(),
+				updatedAt: new Date(),
+			};
+			if (body?.buktiPencairanUrl) {
+				updateData.buktiPencairanUrl = body.buktiPencairanUrl;
+				updateData.buktiPencairanFileName =
+					body.buktiPencairanFileName || "Bukti Pencairan Anggaran";
+				updateData.tanggalPencairan = body.tanggalPencairan
+					? new Date(body.tanggalPencairan)
+					: new Date();
+			}
+			await db
+				.update(practicesBudgetRequests)
+				.set(updateData)
+				.where(eq(practicesBudgetRequests.id, parseInt(requestId)));
+			return { success: true };
+		},
+		{
+			body: t.Optional(
+				t.Object({
+					buktiPencairanUrl: t.Optional(t.String()),
+					buktiPencairanFileName: t.Optional(t.String()),
+					tanggalPencairan: t.Optional(t.String()),
+				}),
+			),
+		},
+	)
+	.patch(
+		"/anggaran-praktik/:requestId/bukti",
+		async ({ params: { requestId }, body, user }: any) => {
 			if (!hasRole(user, "finance"))
 				return { success: false, message: "Forbidden" };
 			await db
 				.update(practicesBudgetRequests)
 				.set({
-					status: "disetujui",
-					approvedBy: user.id,
-					approvedAt: new Date(),
+					buktiPencairanUrl: body.buktiPencairanUrl || null,
+					buktiPencairanFileName: body.buktiPencairanFileName || null,
+					tanggalPencairan: body.tanggalPencairan
+						? new Date(body.tanggalPencairan)
+						: body.buktiPencairanUrl
+							? new Date()
+							: null,
 					updatedAt: new Date(),
 				})
 				.where(eq(practicesBudgetRequests.id, parseInt(requestId)));
 			return { success: true };
+		},
+		{
+			body: t.Object({
+				buktiPencairanUrl: t.Optional(t.Union([t.String(), t.Null()])),
+				buktiPencairanFileName: t.Optional(t.Union([t.String(), t.Null()])),
+				tanggalPencairan: t.Optional(t.Union([t.String(), t.Null()])),
+			}),
+		},
+	)
+	.post(
+		"/anggaran-praktik/:requestId/upload-bukti",
+		async ({ params: { requestId }, body, set, user }: any) => {
+			if (!hasRole(user, "finance")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const reqId = parseInt(requestId, 10);
+			const file = body.file as File;
+			if (!file || !file.name) {
+				set.status = 400;
+				return {
+					success: false,
+					message: "File bukti pencairan tidak ditemukan dalam request",
+				};
+			}
+
+			const validUploaderId = await getValidUserId(user);
+
+			let uploadResult;
+			try {
+				uploadResult = await fileService.uploadFile({
+					file,
+					category: "finance",
+					panel: "finance",
+					documentKey: `bukti_anggaran_praktik_${reqId}`,
+					uploadedBy: validUploaderId ?? undefined,
+				});
+			} catch (err) {
+				const error = err as Error;
+				set.status = 400;
+				return { success: false, message: error.message };
+			}
+
+			const filePath = `/files/${uploadResult.id}/download`;
+
+			await db
+				.update(practicesBudgetRequests)
+				.set({
+					buktiPencairanUrl: filePath,
+					buktiPencairanFileName: uploadResult.originalName,
+					tanggalPencairan: new Date(),
+					updatedAt: new Date(),
+				})
+				.where(eq(practicesBudgetRequests.id, reqId));
+
+			return {
+				success: true,
+				message: "Bukti pencairan anggaran berhasil diunggah",
+				data: {
+					buktiPencairanUrl: filePath,
+					buktiPencairanFileName: uploadResult.originalName,
+					tanggalPencairan: new Date().toISOString(),
+				},
+			};
+		},
+		{
+			body: t.Object({
+				file: t.File(),
+			}),
+		},
+	)
+	.delete(
+		"/anggaran-praktik/:requestId/bukti",
+		async ({ params: { requestId }, set, user }: any) => {
+			if (!hasRole(user, "finance")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const reqId = parseInt(requestId, 10);
+			await db
+				.update(practicesBudgetRequests)
+				.set({
+					buktiPencairanUrl: null,
+					buktiPencairanFileName: null,
+					tanggalPencairan: null,
+					updatedAt: new Date(),
+				})
+				.where(eq(practicesBudgetRequests.id, reqId));
+
+			return {
+				success: true,
+				message: "Bukti pencairan anggaran berhasil dihapus",
+			};
 		},
 	)
 	.patch(
@@ -460,6 +605,9 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 					catatanFinance: null,
 					approvedBy: null,
 					approvedAt: null,
+					buktiPencairanUrl: null,
+					buktiPencairanFileName: null,
+					tanggalPencairan: null,
 					updatedAt: new Date(),
 				})
 				.where(eq(practicesBudgetRequests.id, parseInt(requestId)));
@@ -496,6 +644,26 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	.get("/laporan-sisa-bahan", async ({ user }: any) => {
 		if (!hasRole(user, "finance"))
 			return { success: false, message: "Forbidden" };
-		const reports = await db.query.practicesMaterialReports.findMany();
+		const reports = await db.query.practicesMaterialReports.findMany({
+			with: {
+				dosen: {
+					columns: {
+						id: true,
+						fullName: true,
+						username: true,
+						email: true,
+						phone: true,
+					},
+				},
+				budgetRequest: {
+					with: {
+						course: true,
+					},
+				},
+			},
+			orderBy: (practicesMaterialReports, { desc }) => [
+				desc(practicesMaterialReports.createdAt),
+			],
+		});
 		return { success: true, data: reports };
 	});

@@ -17,9 +17,11 @@ import {
 	Target,
 	TrendingUp,
 	Users,
+	UtensilsCrossed,
 	Wallet,
 	XCircle,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -903,6 +905,17 @@ export function FinanceDashboard({ user, data: propData }: any) {
 								))}
 							</SelectContent>
 						</Select>
+
+						<Link href="/dashboard/finance/anggaran-praktik">
+							<Button
+								variant="outline"
+								size="sm"
+								className="border-slate-200 text-slate-700 hover:bg-blue-50 hover:text-[#0517B0] hover:border-blue-200 text-xs gap-1.5 h-8.5 font-semibold shadow-2xs rounded-lg transition-all"
+							>
+								<UtensilsCrossed className="w-3.5 h-3.5 text-slate-500" />
+								Anggaran Praktik
+							</Button>
+						</Link>
 
 						<Button
 							variant="outline"

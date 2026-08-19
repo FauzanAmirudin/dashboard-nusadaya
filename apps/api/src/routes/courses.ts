@@ -12,7 +12,7 @@ import {
 	students,
 	users,
 } from "../db/schema";
-import { hasRole } from "../lib/permissions";
+import { getValidUserId, hasRole } from "../lib/permissions";
 
 export const coursesRoutes = new Elysia({ prefix: "/courses" })
 	.derive((context) => {
@@ -669,11 +669,14 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				return { success: false, message: "Forbidden" };
 			}
 
+			const validDosenId =
+				(await getValidUserId(user)) || course.dosenId || user?.id;
+
 			const [newRequest] = await db
 				.insert(practicesBudgetRequests)
 				.values({
 					courseId: targetCourseId,
-					dosenId: user.id,
+					dosenId: validDosenId,
 					daftarKebutuhan: input.daftarKebutuhan,
 					totalNominal: input.totalNominal,
 				})
@@ -712,11 +715,14 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				return { success: false, message: "Request not found" };
 			}
 
+			const validDosenId =
+				(await getValidUserId(user)) || request.dosenId || user?.id;
+
 			const [newReport] = await db
 				.insert(practicesMaterialReports)
 				.values({
 					budgetRequestId: reqId,
-					dosenId: user.id,
+					dosenId: validDosenId,
 					daftarSisaBahan: input.daftarSisaBahan,
 					catatanDosen: input.catatanDosen,
 					fileUrl: input.fileUrl,

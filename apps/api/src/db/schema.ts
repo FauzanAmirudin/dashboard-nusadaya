@@ -600,6 +600,9 @@ export const practicesBudgetRequests = pgTable("practices_budget_requests", {
 	catatanFinance: text("catatan_finance"),
 	approvedBy: integer("approved_by").references(() => users.id),
 	approvedAt: timestamp("approved_at"),
+	buktiPencairanUrl: text("bukti_pencairan_url"),
+	buktiPencairanFileName: text("bukti_pencairan_file_name"),
+	tanggalPencairan: timestamp("tanggal_pencairan"),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -5,26 +5,37 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 
 interface TablePaginationProps {
-	currentPage: number;
-	totalItems: number;
+	currentPage?: number;
+	page?: number;
+	totalItems?: number;
+	totalCount?: number;
 	pageSize?: number;
 	onPageChange: (page: number) => void;
+	onPageSizeChange?: (size: number) => void;
+	pageSizeOptions?: number[];
 	itemName?: string;
 }
 
 export function TablePagination({
 	currentPage,
+	page,
 	totalItems,
+	totalCount,
 	pageSize = 20,
 	onPageChange,
-	itemName = "Mahasiswa",
+	onPageSizeChange,
+	pageSizeOptions,
+	itemName = "Data",
 }: TablePaginationProps) {
-	const totalPages = Math.ceil(totalItems / pageSize) || 1;
+	const activePage = Math.max(1, currentPage ?? page ?? 1);
+	const count = Math.max(0, totalItems ?? totalCount ?? 0);
+	const size = Math.max(1, pageSize);
+	const totalPages = Math.max(1, Math.ceil(count / size));
 
-	if (totalItems <= 0) return null;
+	if (count <= 0) return null;
 
-	const startItem = (currentPage - 1) * pageSize + 1;
-	const endItem = Math.min(currentPage * pageSize, totalItems);
+	const startItem = Math.max(1, (activePage - 1) * size + 1);
+	const endItem = Math.min(activePage * size, count);
 
 	// Generate visible page numbers
 	const getPageNumbers = () => {
@@ -32,9 +43,9 @@ export function TablePagination({
 		if (totalPages <= 5) {
 			for (let i = 1; i <= totalPages; i++) pages.push(i);
 		} else {
-			if (currentPage <= 3) {
+			if (activePage <= 3) {
 				pages.push(1, 2, 3, 4, "...", totalPages);
-			} else if (currentPage >= totalPages - 2) {
+			} else if (activePage >= totalPages - 2) {
 				pages.push(
 					1,
 					"...",
@@ -47,9 +58,9 @@ export function TablePagination({
 				pages.push(
 					1,
 					"...",
-					currentPage - 1,
-					currentPage,
-					currentPage + 1,
+					activePage - 1,
+					activePage,
+					activePage + 1,
 					"...",
 					totalPages,
 				);
@@ -64,16 +75,15 @@ export function TablePagination({
 				Menampilkan{" "}
 				<span className="font-bold text-slate-700">{startItem}</span> -{" "}
 				<span className="font-bold text-slate-700">{endItem}</span> dari{" "}
-				<span className="font-bold text-slate-900">{totalItems}</span>{" "}
-				{itemName}
+				<span className="font-bold text-slate-900">{count}</span> {itemName}
 			</div>
 
 			<div className="flex items-center gap-1.5">
 				<Button
 					variant="outline"
 					size="sm"
-					onClick={() => onPageChange(currentPage - 1)}
-					disabled={currentPage <= 1}
+					onClick={() => onPageChange(activePage - 1)}
+					disabled={activePage <= 1}
 					className="h-8 px-2.5 text-xs text-slate-600 border-slate-200 hover:bg-slate-50 disabled:opacity-40"
 				>
 					<ChevronLeft className="w-3.5 h-3.5 mr-1" />
@@ -92,11 +102,11 @@ export function TablePagination({
 						) : (
 							<Button
 								key={`page-${p}`}
-								variant={currentPage === p ? "default" : "outline"}
+								variant={activePage === p ? "default" : "outline"}
 								size="sm"
 								onClick={() => onPageChange(Number(p))}
 								className={`h-8 w-8 p-0 text-xs font-semibold ${
-									currentPage === p
+									activePage === p
 										? "bg-[#0517B0] hover:bg-blue-800 text-white"
 										: "text-slate-600 border-slate-200 hover:bg-slate-50"
 								}`}
@@ -110,8 +120,8 @@ export function TablePagination({
 				<Button
 					variant="outline"
 					size="sm"
-					onClick={() => onPageChange(currentPage + 1)}
-					disabled={currentPage >= totalPages}
+					onClick={() => onPageChange(activePage + 1)}
+					disabled={activePage >= totalPages}
 					className="h-8 px-2.5 text-xs text-slate-600 border-slate-200 hover:bg-slate-50 disabled:opacity-40"
 				>
 					Selanjutnya
