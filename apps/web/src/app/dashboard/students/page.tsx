@@ -56,6 +56,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useStudentsList } from "@/hooks/useStudentsList";
 import { api } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 import { useAuthStore } from "@/store";
@@ -110,7 +111,7 @@ function formatWhatsAppUrl(phone: string | null | undefined) {
 // Academic Year Helper
 function getAcademicYear(student: any) {
 	if (student?.academicYear) return student.academicYear;
-	if (student?.cohort && !isNaN(Number(student.cohort))) {
+	if (student?.cohort && !Number.isNaN(Number(student.cohort))) {
 		const startYear = 2010 + Number(student.cohort);
 		return `${startYear}/${startYear + 1}`;
 	}
@@ -385,39 +386,53 @@ export default function StudentsPage() {
 	const router = useRouter();
 	const { isAuthenticated, hasHydrated, user } = useAuthStore();
 
-	const [data, setData] = useState<StudentData[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
+	const {
+		data: studentsResult,
+		isLoading,
+		isError,
+		refetch,
+	} = useStudentsList({
+		all: true,
+	});
 
-	const fetchStudents = async () => {
-		try {
-			const { data: resData, error } = await api.students.get();
-			if (!error && resData?.data) {
-				setData(resData.data as unknown as StudentData[]);
-			}
-		} catch (err) {
-			console.error("Failed to load students", err);
-		} finally {
-			setIsLoading(false);
-		}
-	};
+	const data = (studentsResult?.data || []) as unknown as StudentData[];
 
 	useEffect(() => {
 		if (!hasHydrated) return;
 		if (!isAuthenticated) {
 			router.push("/login");
-			return;
 		}
-
-		fetchStudents();
-		const interval = setInterval(fetchStudents, 15000);
-		return () => clearInterval(interval);
 	}, [isAuthenticated, hasHydrated, router]);
 
-	if (isLoading) {
+	// Wait for auth hydration AND data loading before rendering
+	if (!hasHydrated || isLoading) {
 		return (
 			<div className="flex flex-col justify-center items-center h-80 gap-3 text-slate-500">
 				<RefreshCw className="w-8 h-8 animate-spin text-[#0517B0]" />
 				<p className="text-sm font-semibold">Memuat data semua mahasiswa...</p>
+			</div>
+		);
+	}
+
+	if (isError) {
+		return (
+			<div className="flex flex-col items-center justify-center min-h-[350px] text-center p-6 bg-white rounded-2xl border border-slate-200 shadow-xs max-w-md mx-auto my-12">
+				<div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3">
+					<ShieldAlert className="w-6 h-6" />
+				</div>
+				<h3 className="text-base font-bold text-slate-800 mb-1">
+					Gagal Memuat Data Mahasiswa
+				</h3>
+				<p className="text-xs text-slate-500 mb-4">
+					Tidak dapat terhubung ke server backend atau sesi login kedaluwarsa.
+				</p>
+				<Button
+					onClick={() => refetch()}
+					className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold text-xs h-9 px-4 gap-1.5"
+				>
+					<RefreshCw className="w-3.5 h-3.5" />
+					Coba Lagi
+				</Button>
 			</div>
 		);
 	}
@@ -451,14 +466,31 @@ function DivisionStudentsView({
 	const [currentPage, setCurrentPage] = useState(1);
 	const pageSize = 20;
 
-	// Cohort years
-	const cohortYears = useMemo(() => {
-		const currentYear = new Date().getFullYear();
-		return Array.from(
-			{ length: currentYear - 2022 + 2 },
-			(_, i) => currentYear + 1 - i,
-		);
-	}, []);
+	// Filter data by PA assignment if user is role 'pa'
+	const baseData = useMemo(() => {
+		if (!data) return [];
+		if (role === "pa" && user?.id) {
+			return data.filter((s: any) => s.student?.paId === user.id);
+		}
+		return data;
+	}, [data, role, user?.id]);
+
+	// Cohorts derived from data + fallbacks
+	const availableCohorts = useMemo(() => {
+		const cohorts = new Set<string>();
+		if (baseData && baseData.length > 0) {
+			baseData.forEach((s: any) => {
+				if (s.student?.cohort) cohorts.add(s.student.cohort.toString());
+			});
+		}
+		["16", "15", "14", "13", "12", "11", "10"].forEach((c) => cohorts.add(c));
+		return Array.from(cohorts).sort((a, b) => {
+			const numA = Number(a);
+			const numB = Number(b);
+			if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numB - numA;
+			return b.localeCompare(a);
+		});
+	}, [baseData]);
 
 	// Role configuration: title, context tab, checklist resolver
 	const config = useMemo(() => {
@@ -519,8 +551,6 @@ function DivisionStudentsView({
 					getStatus: (s: StudentData) => s.pa?.status || "PERLU_PERHATIAN",
 					getIsAcc: (s: StudentData) => Boolean(s.pa?.isAcc),
 				};
-			case "akademik":
-			case "dosen":
 			default:
 				return {
 					title: "Daftar Mahasiswa - Divisi Akademik",
@@ -536,15 +566,6 @@ function DivisionStudentsView({
 		}
 	}, [role, user?.fullName]);
 
-	// Filter data by PA assignment if user is role 'pa'
-	const baseData = useMemo(() => {
-		if (!data) return [];
-		if (role === "pa" && user?.id) {
-			return data.filter((s: any) => s.student?.paId === user.id);
-		}
-		return data;
-	}, [data, role, user?.id]);
-
 	// Filter data by Cohort, Status, and Search
 	const filteredData = useMemo(() => {
 		return baseData.filter((s) => {
@@ -558,7 +579,9 @@ function DivisionStudentsView({
 
 			const matchCohort =
 				selectedCohort === "all" ||
-				s.student?.cohort?.toString() === selectedCohort;
+				s.student?.cohort?.toString() === selectedCohort ||
+				(Number(selectedCohort) >= 2000 &&
+					s.student?.cohort === Number(selectedCohort) - 2010);
 
 			const status = config.getStatus(s);
 			const isAcc = config.getIsAcc(s);
@@ -654,13 +677,17 @@ function DivisionStudentsView({
 						onValueChange={(val) => setSelectedCohort(val || "all")}
 					>
 						<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
-							<SelectValue placeholder="Filter Angkatan" />
+							<SelectValue placeholder="Filter Angkatan">
+								{selectedCohort === "all"
+									? "Semua Angkatan"
+									: `Angkatan ${selectedCohort}`}
+							</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value="all">Semua Angkatan</SelectItem>
-							{cohortYears.map((year) => (
-								<SelectItem key={year} value={year.toString()}>
-									Angkatan {year}
+							{availableCohorts.map((cohort) => (
+								<SelectItem key={cohort} value={cohort}>
+									Angkatan {cohort}
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -786,14 +813,18 @@ function DivisionStudentsView({
 							value={selectedCohort}
 							onValueChange={(val) => setSelectedCohort(val || "all")}
 						>
-							<SelectTrigger className="w-[125px] h-9 text-xs bg-white border-slate-200">
-								<SelectValue placeholder="Angkatan" />
+							<SelectTrigger className="w-[130px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Angkatan">
+									{selectedCohort === "all"
+										? "Semua Angkatan"
+										: `Angkatan ${selectedCohort}`}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Angkatan</SelectItem>
-								{cohortYears.map((year) => (
-									<SelectItem key={year} value={year.toString()}>
-										Angkatan {year}
+								{availableCohorts.map((cohort) => (
+									<SelectItem key={cohort} value={cohort}>
+										Angkatan {cohort}
 									</SelectItem>
 								))}
 							</SelectContent>
@@ -803,8 +834,18 @@ function DivisionStudentsView({
 							value={selectedStatus}
 							onValueChange={(val) => setSelectedStatus(val || "all")}
 						>
-							<SelectTrigger className="w-[135px] h-9 text-xs bg-white border-slate-200">
-								<SelectValue placeholder="Status Filter" />
+							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Status Filter">
+									{selectedStatus === "all"
+										? "Semua Status"
+										: selectedStatus === "aman"
+											? "🟢 Aman"
+											: selectedStatus === "perhatian"
+												? "🟡 Berproses"
+												: selectedStatus === "tidak_aman"
+													? "🔴 Kendala"
+													: "🛡️ Sudah ACC"}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Status</SelectItem>
@@ -1058,14 +1099,22 @@ function SuperadminStudentsView({
 	const [currentPage, setCurrentPage] = useState(1);
 	const pageSize = 20;
 
-	// Cohort years starting from 2022 downwards
-	const cohortYears = useMemo(() => {
-		const currentYear = new Date().getFullYear();
-		return Array.from(
-			{ length: currentYear - 2022 + 2 },
-			(_, i) => currentYear + 1 - i,
-		);
-	}, []);
+	// Cohorts derived dynamically from data + standard cohorts
+	const availableCohorts = useMemo(() => {
+		const cohorts = new Set<string>();
+		if (data && data.length > 0) {
+			data.forEach((s: any) => {
+				if (s.student?.cohort) cohorts.add(s.student.cohort.toString());
+			});
+		}
+		["16", "15", "14", "13", "12", "11", "10"].forEach((c) => cohorts.add(c));
+		return Array.from(cohorts).sort((a, b) => {
+			const numA = Number(a);
+			const numB = Number(b);
+			if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numB - numA;
+			return b.localeCompare(a);
+		});
+	}, [data]);
 
 	// Filtered students by Cohort, Status, and Search
 	const filteredData = useMemo(() => {
@@ -1080,7 +1129,9 @@ function SuperadminStudentsView({
 
 			const matchCohort =
 				selectedCohort === "all" ||
-				s.student?.cohort?.toString() === selectedCohort;
+				s.student?.cohort?.toString() === selectedCohort ||
+				(Number(selectedCohort) >= 2000 &&
+					s.student?.cohort === Number(selectedCohort) - 2010);
 
 			const rtStatus = getRealtimeOverallStatus(s);
 			const { isAllAcc } = getStudentAccDetails(s);
@@ -1112,7 +1163,12 @@ function SuperadminStudentsView({
 
 	const cohortData = useMemo(() => {
 		if (selectedCohort === "all") return data;
-		return data.filter((s) => s.student?.cohort?.toString() === selectedCohort);
+		return data.filter(
+			(s) =>
+				s.student?.cohort?.toString() === selectedCohort ||
+				(Number(selectedCohort) >= 2000 &&
+					s.student?.cohort === Number(selectedCohort) - 2010),
+		);
 	}, [data, selectedCohort]);
 
 	// KPI Stats based on selected cohort
@@ -1197,13 +1253,17 @@ function SuperadminStudentsView({
 						onValueChange={(val) => setSelectedCohort(val || "all")}
 					>
 						<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
-							<SelectValue placeholder="Filter Angkatan" />
+							<SelectValue placeholder="Filter Angkatan">
+								{selectedCohort === "all"
+									? "Semua Angkatan"
+									: `Angkatan ${selectedCohort}`}
+							</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value="all">Semua Angkatan</SelectItem>
-							{cohortYears.map((year) => (
-								<SelectItem key={year} value={year.toString()}>
-									Angkatan {year}
+							{availableCohorts.map((cohort) => (
+								<SelectItem key={cohort} value={cohort}>
+									Angkatan {cohort}
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -1371,14 +1431,18 @@ function SuperadminStudentsView({
 							value={selectedCohort}
 							onValueChange={(val) => setSelectedCohort(val || "all")}
 						>
-							<SelectTrigger className="w-[125px] h-9 text-xs bg-white border-slate-200">
-								<SelectValue placeholder="Angkatan" />
+							<SelectTrigger className="w-[130px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Angkatan">
+									{selectedCohort === "all"
+										? "Semua Angkatan"
+										: `Angkatan ${selectedCohort}`}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Angkatan</SelectItem>
-								{cohortYears.map((year) => (
-									<SelectItem key={year} value={year.toString()}>
-										Angkatan {year}
+								{availableCohorts.map((cohort) => (
+									<SelectItem key={cohort} value={cohort}>
+										Angkatan {cohort}
 									</SelectItem>
 								))}
 							</SelectContent>
@@ -1388,8 +1452,20 @@ function SuperadminStudentsView({
 							value={selectedStatus}
 							onValueChange={(val) => setSelectedStatus(val || "all")}
 						>
-							<SelectTrigger className="w-[135px] h-9 text-xs bg-white border-slate-200">
-								<SelectValue placeholder="Status Filter" />
+							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Status Filter">
+									{selectedStatus === "all"
+										? "Semua Status"
+										: selectedStatus === "aman"
+											? "🟢 Aman"
+											: selectedStatus === "perhatian"
+												? "🟡 Perlu Perhatian"
+												: selectedStatus === "tidak_aman"
+													? "🔴 Tidak Aman"
+													: selectedStatus === "acc_lengkap"
+														? "🛡️ ACC Lengkap"
+														: "✈️ Layak Berangkat"}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Status</SelectItem>

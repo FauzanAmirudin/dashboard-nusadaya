@@ -123,14 +123,22 @@ export function EvaluasiFinalisasiDashboard({
 	const [confidentialNotes, setConfidentialNotes] = useState<string>("");
 	const [isSavingDeparture, setIsSavingDeparture] = useState(false);
 
-	// Cohort generation starting from 2022 downwards
-	const cohortYears = useMemo(() => {
-		const currentYear = new Date().getFullYear();
-		return Array.from(
-			{ length: currentYear - 2022 + 2 },
-			(_, i) => currentYear + 1 - i,
-		);
-	}, []);
+	// Available cohorts dynamically derived from student data + fallbacks
+	const availableCohorts = useMemo(() => {
+		const cohorts = new Set<string>();
+		if (data && data.length > 0) {
+			data.forEach((s: any) => {
+				if (s.student?.cohort) cohorts.add(s.student.cohort.toString());
+			});
+		}
+		["16", "15", "14", "13", "12", "11", "10"].forEach((c) => cohorts.add(c));
+		return Array.from(cohorts).sort((a, b) => {
+			const numA = Number(a);
+			const numB = Number(b);
+			if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numB - numA;
+			return b.localeCompare(a);
+		});
+	}, [data]);
 
 	// Helper for calculating 7-module progress
 	const getModuleBreakdown = (s: any) => {
@@ -163,7 +171,7 @@ export function EvaluasiFinalisasiDashboard({
 			{
 				name: "Dosen MK",
 				isAcc: Boolean(isDosenAcc),
-				status: isDosenAcc ? "AMAN" : "BELUM_LENGKAP",
+				status: isDosenAcc ? "AMAN" : "MENUNGGU",
 			},
 			{
 				name: "PA",
@@ -181,11 +189,11 @@ export function EvaluasiFinalisasiDashboard({
 		return { modules, accCount, isAllAcc: accCount === 7 };
 	};
 
-	// Filtered Data
+	// Filtered for Main Table (Evaluasi Tab)
 	const filteredData = useMemo(() => {
 		if (!data) return [];
 		return data.filter((s: any) => {
-			// Search query
+			// Search filter
 			const matchSearch =
 				!searchQuery ||
 				s.student?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -194,7 +202,9 @@ export function EvaluasiFinalisasiDashboard({
 			// Cohort filter
 			const matchCohort =
 				selectedCohort === "all" ||
-				s.student?.cohort?.toString() === selectedCohort;
+				s.student?.cohort?.toString() === selectedCohort ||
+				(Number(selectedCohort) >= 2000 &&
+					s.student?.cohort === Number(selectedCohort) - 2010);
 
 			// Decision filter
 			const studentDecision = s.decision?.evaluatorDecision || "menunggu";
@@ -640,14 +650,18 @@ export function EvaluasiFinalisasiDashboard({
 								value={selectedCohort}
 								onValueChange={(val) => setSelectedCohort(val || "all")}
 							>
-								<SelectTrigger className="w-[120px] h-9 text-xs bg-white border-slate-200">
-									<SelectValue placeholder="Angkatan" />
+								<SelectTrigger className="w-[130px] h-9 text-xs bg-white border-slate-200">
+									<SelectValue placeholder="Angkatan">
+										{selectedCohort === "all"
+											? "Semua Angkatan"
+											: `Angkatan ${selectedCohort}`}
+									</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
 									<SelectItem value="all">Semua Angkatan</SelectItem>
-									{cohortYears.map((year) => (
-										<SelectItem key={year} value={year.toString()}>
-											Angkatan {year}
+									{availableCohorts.map((cohort) => (
+										<SelectItem key={cohort} value={cohort}>
+											Angkatan {cohort}
 										</SelectItem>
 									))}
 								</SelectContent>

@@ -61,50 +61,6 @@ type DatePreset =
 	| "all"
 	| "custom";
 
-function getCountryFlag(subProgram?: string | null) {
-	if (!subProgram) return null;
-	const lower = subProgram.toLowerCase();
-	if (lower.includes("malaysia") || lower.includes("my")) {
-		return "https://flagcdn.com/w20/my.png";
-	}
-	if (lower.includes("taiwan") || lower.includes("tw")) {
-		return "https://flagcdn.com/w20/tw.png";
-	}
-	if (
-		lower.includes("timur tengah") ||
-		lower.includes("saudi") ||
-		lower.includes("arab") ||
-		lower.includes("barista")
-	) {
-		return "https://flagcdn.com/w20/sa.png";
-	}
-	if (
-		lower.includes("jepang") ||
-		lower.includes("japan") ||
-		lower.includes("jp")
-	) {
-		return "https://flagcdn.com/w20/jp.png";
-	}
-	if (lower.includes("korea") || lower.includes("kr")) {
-		return "https://flagcdn.com/w20/kr.png";
-	}
-	if (
-		lower.includes("jerman") ||
-		lower.includes("germany") ||
-		lower.includes("de")
-	) {
-		return "https://flagcdn.com/w20/de.png";
-	}
-	if (
-		lower.includes("indonesia") ||
-		lower.includes("reguler") ||
-		lower.includes("id")
-	) {
-		return "https://flagcdn.com/w20/id.png";
-	}
-	return null;
-}
-
 function formatRupiah(num: number): string {
 	return new Intl.NumberFormat("id-ID", {
 		style: "currency",
@@ -227,7 +183,7 @@ function calculateTransactionsInDateRange(
 	const isWithin = (d?: string | Date | null) => {
 		if (!d) return false;
 		const dateObj = new Date(d);
-		if (isNaN(dateObj.getTime())) return false;
+		if (Number.isNaN(dateObj.getTime())) return false;
 		return dateObj >= startDate && dateObj <= endDate;
 	};
 
@@ -337,7 +293,7 @@ function getStudentLatestTimestamp(s: any): number {
 	const parseTime = (val: any): number => {
 		if (!val) return 0;
 		const t = new Date(val).getTime();
-		return isNaN(t) ? 0 : t;
+		return Number.isNaN(t) ? 0 : t;
 	};
 
 	// 1. Finance updated_at
@@ -411,12 +367,8 @@ function formatWhatsAppUrl(phone: string | null | undefined) {
 	return `https://wa.me/${formatted}`;
 }
 
-export function FinanceDashboard({ user, data: propData }: any) {
+export function FinanceDashboard({ user, data = [] }: any) {
 	const router = useRouter();
-	const [data, setData] = useState<any[]>(propData || []);
-	const [isLoading, setIsLoading] = useState(
-		!propData || propData.length === 0,
-	);
 	const [selectedCohort, setSelectedCohort] = useState<string>("all");
 	const [selectedStatus, setSelectedStatus] = useState<string>("all");
 	const [searchQuery, setSearchQuery] = useState("");
@@ -452,7 +404,7 @@ export function FinanceDashboard({ user, data: propData }: any) {
 	useEffect(() => {
 		if (typeof window !== "undefined") {
 			const saved = localStorage.getItem(targetStorageKey);
-			if (saved && !isNaN(Number(saved)) && Number(saved) > 0) {
+			if (saved && !Number.isNaN(Number(saved)) && Number(saved) > 0) {
 				setTargetNominal(Number(saved));
 				setTempTargetInput(saved);
 			} else {
@@ -471,42 +423,32 @@ export function FinanceDashboard({ user, data: propData }: any) {
 		setIsEditingTarget(false);
 	};
 
-	// Cohort years starting from 2022
-	const cohortYears = useMemo(() => {
-		const currentYear = new Date().getFullYear();
-		return Array.from(
-			{ length: currentYear - 2022 + 2 },
-			(_, i) => currentYear + 1 - i,
-		);
-	}, []);
-
-	useEffect(() => {
-		const fetchData = async () => {
-			try {
-				const { data: resData, error } = await api.students.get();
-				if (!error && resData?.data) {
-					setData(resData.data);
-				}
-			} catch (err) {
-				console.error("Failed fetching finance dashboard data", err);
-			} finally {
-				setIsLoading(false);
-			}
-		};
-		if (!propData || propData.length === 0) {
-			fetchData();
-		} else {
-			setData(propData);
-			setIsLoading(false);
+	// Available cohorts dynamically derived from student data + fallbacks
+	const availableCohorts = useMemo(() => {
+		const cohorts = new Set<string>();
+		if (data && data.length > 0) {
+			data.forEach((s: any) => {
+				if (s.student?.cohort) cohorts.add(s.student.cohort.toString());
+			});
 		}
-	}, [propData]);
+		["16", "15", "14", "13", "12", "11", "10"].forEach((c) => cohorts.add(c));
+		return Array.from(cohorts).sort((a, b) => {
+			const numA = Number(a);
+			const numB = Number(b);
+			if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numB - numA;
+			return b.localeCompare(a);
+		});
+	}, [data]);
 
 	// Filter by cohort first for reactive KPI
 	const cohortData = useMemo(() => {
 		if (!data) return [];
 		if (selectedCohort === "all") return data;
 		return data.filter(
-			(s: any) => s.student?.cohort?.toString() === selectedCohort,
+			(s: any) =>
+				s.student?.cohort?.toString() === selectedCohort ||
+				(Number(selectedCohort) >= 2000 &&
+					s.student?.cohort === Number(selectedCohort) - 2010),
 		);
 	}, [data, selectedCohort]);
 
@@ -780,24 +722,6 @@ export function FinanceDashboard({ user, data: propData }: any) {
 		};
 	};
 
-	if (isLoading) {
-		return (
-			<div className="flex flex-col justify-center items-center h-80 gap-4">
-				<div className="relative">
-					<div className="w-12 h-12 rounded-full border-4 border-slate-200 border-t-[#0517B0] animate-spin" />
-				</div>
-				<div className="text-center">
-					<p className="text-sm font-bold text-slate-700">
-						Memuat Dashboard Finance
-					</p>
-					<p className="text-xs text-slate-400 mt-0.5">
-						Mengambil data keuangan mahasiswa...
-					</p>
-				</div>
-			</div>
-		);
-	}
-
 	// KPI card data for compact summary in Light Theme
 	const kpiCards = [
 		{
@@ -896,9 +820,9 @@ export function FinanceDashboard({ user, data: propData }: any) {
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Angkatan</SelectItem>
-								{cohortYears.map((year) => (
-									<SelectItem key={year} value={year.toString()}>
-										Angkatan {year}
+								{availableCohorts.map((cohort) => (
+									<SelectItem key={cohort} value={cohort}>
+										Angkatan {cohort}
 									</SelectItem>
 								))}
 							</SelectContent>
@@ -1378,7 +1302,6 @@ export function FinanceDashboard({ user, data: propData }: any) {
 									const { items, completed, total, isDone } =
 										getFinanceChecklist(s.finance);
 									const unpaidItems = items.filter((it) => !it.done);
-									const flagUrl = getCountryFlag(s.student?.subProgram);
 									const totalPaid = calculateTotalPaidStudent(s);
 									const financeStatus = s.finance?.status || "PERLU_PERHATIAN";
 									const isAmanOrLunas =
@@ -1425,27 +1348,15 @@ export function FinanceDashboard({ user, data: propData }: any) {
 
 											{/* 4. Program Studi & Peminatan (dengan Bendera) */}
 											<TableCell className="px-3 py-3">
-												<div className="font-semibold text-slate-800 text-xs">
+												<div className="font-semibold text-slate-800 text-xs mb-1">
 													{s.student.program || "-"}
 												</div>
-												{s.student.subProgram ? (
-													<div className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-600 font-medium">
-														{flagUrl ? (
-															<img
-																src={flagUrl}
-																alt={s.student.subProgram}
-																className="w-4 h-3 object-cover rounded-xs shadow-2xs inline-block"
-															/>
-														) : (
-															<span className="text-xs">🌐</span>
-														)}
-														<span>{s.student.subProgram}</span>
-													</div>
-												) : (
-													<div className="text-[11px] text-slate-400 italic mt-0.5">
-														-
-													</div>
-												)}
+												<PeminatanBadge
+													subProgram={s.student.subProgram}
+													program={s.student.program}
+													destinationCountry={s.student.destinationCountry}
+													size="xs"
+												/>
 											</TableCell>
 
 											{/* 5. No. HP/WhatsApp */}

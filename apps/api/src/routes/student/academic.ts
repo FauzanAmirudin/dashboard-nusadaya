@@ -38,6 +38,7 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
 import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 import { fileService } from "../../modules/file/service/file.service";
@@ -72,77 +73,78 @@ export const academicRoutes = new Elysia()
 			const id = Number(params.id);
 			const updates = body as Record<string, any>;
 
-			const current = await db.query.academicData.findFirst({
-				where: eq(academicData.studentId, id),
-			});
+			const [current, overseasChecklist] = await Promise.all([
+				db.query.academicData.findFirst({
+					where: eq(academicData.studentId, id),
+				}),
+				db.query.overseasProgramChecklists.findFirst({
+					where: eq(overseasProgramChecklists.studentId, id),
+				}),
+			]);
+
+			const merged = { ...(current || {}), ...updates };
+
+			let checked = 0;
+			let totalRequired = 7;
+
+			if (merged.pddiktiInput) checked++;
+			if (merged.utsPassed) checked++;
+			if (merged.uasPassed) checked++;
+			if (merged.attitudeIndicator) checked++;
+			if (merged.assignmentsCompleted) checked++;
+			if (merged.academicCommunication) checked++;
+			if (merged.assessmentCompleted) checked++;
+
+			if (overseasChecklist && overseasChecklist.programType === "taiwan") {
+				totalRequired += 12;
+				if (overseasChecklist.pasFotoChecked) checked++;
+				if (overseasChecklist.cvChecked) checked++;
+				if (overseasChecklist.ktmChecked) checked++;
+				if (overseasChecklist.khsChecked) checked++;
+				if (overseasChecklist.sl21Checked) checked++;
+				if (overseasChecklist.aktifChecked) checked++;
+				if (overseasChecklist.gapYearChecked) checked++;
+				if (overseasChecklist.pddiktiChecked) checked++;
+				if (overseasChecklist.pribadiChecked) checked++;
+				if (overseasChecklist.lolChecked) checked++;
+				if (overseasChecklist.loaChecked) checked++;
+				if (overseasChecklist.suhhanChecked) checked++;
+			}
+
+			let status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
+			if (checked === totalRequired) status = "AMAN";
+			else if (checked >= Math.floor(totalRequired / 2))
+				status = "PERLU_PERHATIAN";
+
+			const cleanUpdates: Record<string, any> = {
+				...updates,
+				status,
+				updatedAt: new Date(),
+			};
+
+			if (merged.isAcc && checked < totalRequired) {
+				cleanUpdates.isAcc = false;
+				cleanUpdates.accAt = null;
+				cleanUpdates.accBy = null;
+			}
+
 			if (!current) {
-				await db.insert(academicData).values({ studentId: id, ...updates });
+				await db.insert(academicData).values({
+					studentId: id,
+					...cleanUpdates,
+				});
 			} else {
-				const cleanUpdates: Record<string, any> = {
-					...updates,
-					updatedAt: new Date(),
-				};
 				await db
 					.update(academicData)
 					.set(cleanUpdates)
 					.where(eq(academicData.studentId, id));
 			}
 
-			// Recalculate status
-			const updated = await db.query.academicData.findFirst({
-				where: eq(academicData.studentId, id),
-			});
-			if (updated) {
-				let checked = 0;
-				let totalRequired = 7; // Changed from 6 to 7 (added assessmentCompleted)
-
-				if (updated.pddiktiInput) checked++;
-				if (updated.utsPassed) checked++;
-				if (updated.uasPassed) checked++;
-				if (updated.attitudeIndicator) checked++;
-				if (updated.assignmentsCompleted) checked++;
-				if (updated.academicCommunication) checked++;
-				if (updated.assessmentCompleted) checked++;
-
-				const overseasChecklist =
-					await db.query.overseasProgramChecklists.findFirst({
-						where: eq(overseasProgramChecklists.studentId, id),
-					});
-
-				if (overseasChecklist && overseasChecklist.programType === "taiwan") {
-					totalRequired += 12;
-					if (overseasChecklist.pasFotoChecked) checked++;
-					if (overseasChecklist.cvChecked) checked++;
-					if (overseasChecklist.ktmChecked) checked++;
-					if (overseasChecklist.khsChecked) checked++;
-					if (overseasChecklist.sl21Checked) checked++;
-					if (overseasChecklist.aktifChecked) checked++;
-					if (overseasChecklist.gapYearChecked) checked++;
-					if (overseasChecklist.pddiktiChecked) checked++;
-					if (overseasChecklist.pribadiChecked) checked++;
-					if (overseasChecklist.lolChecked) checked++;
-					if (overseasChecklist.loaChecked) checked++;
-					if (overseasChecklist.suhhanChecked) checked++;
-				}
-
-				let status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
-				if (checked === totalRequired) status = "AMAN";
-				else if (checked >= Math.floor(totalRequired / 2))
-					status = "PERLU_PERHATIAN";
-
-				const toUpdate: any = { status };
-
-				if (updated.isAcc && checked < totalRequired) {
-					toUpdate.isAcc = false;
-					toUpdate.accAt = null;
-					toUpdate.accBy = null;
-				}
-
-				await db
-					.update(academicData)
-					.set(toUpdate)
-					.where(eq(academicData.studentId, id));
-			}
+			await Promise.all([
+				cacheDel(`cache:student:${id}`),
+				cacheInvalidatePattern("cache:students:list:*"),
+				cacheInvalidatePattern(`cache:mahasiswa:*`),
+			]);
 
 			return { success: true };
 		},

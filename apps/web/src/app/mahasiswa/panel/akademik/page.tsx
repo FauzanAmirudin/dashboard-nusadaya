@@ -3,14 +3,18 @@
 import {
 	AlertCircle,
 	ArrowLeft,
+	Award,
 	BookOpen,
 	CheckCircle,
 	CheckCircle2,
 	Clock,
 	FileText,
 	GraduationCap,
-	Map,
+	Percent,
+	RefreshCw,
 	ShieldCheck,
+	Sparkles,
+	UserCheck,
 	XCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -24,6 +28,14 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 
@@ -48,7 +60,7 @@ export default function AcademicPanelMahasiswa() {
 				setData(res.data.data);
 			}
 		} catch (err) {
-			console.error(err);
+			console.error("Gagal memuat data Akademik:", err);
 		} finally {
 			setLoading(false);
 		}
@@ -59,24 +71,27 @@ export default function AcademicPanelMahasiswa() {
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center h-[50vh]">
-				<RefreshCwIcon className="w-8 h-8 text-[#0517B0] animate-spin" />
+				<RefreshCw className="w-8 h-8 text-[#0517B0] animate-spin" />
 			</div>
 		);
 	}
 
 	const renderChecklistItem = (label: string, isChecked: boolean) => (
-		<div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-lg">
-			<span className="font-medium text-slate-700 flex items-center gap-2 text-sm">
-				<ShieldCheck className="w-4 h-4 text-slate-400" />
+		<div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl transition-colors hover:bg-slate-100/60">
+			<span className="font-medium text-slate-700 flex items-center gap-2.5 text-sm">
+				<ShieldCheck className="w-4 h-4 text-slate-400 shrink-0" />
 				{label}
 			</span>
 			{isChecked ? (
-				<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0">
-					<CheckCircle2 className="w-3 h-3 mr-1" /> Ya / Selesai
+				<Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-0 text-xs">
+					<CheckCircle2 className="w-3 h-3 mr-1" /> Selesai
 				</Badge>
 			) : (
-				<Badge variant="outline" className="text-slate-500 bg-white">
-					<XCircle className="w-3 h-3 mr-1" /> Belum / Tidak
+				<Badge
+					variant="outline"
+					className="text-slate-400 bg-white border-slate-200 text-xs"
+				>
+					<Clock className="w-3 h-3 mr-1" /> Belum
 				</Badge>
 			)}
 		</div>
@@ -97,7 +112,7 @@ export default function AcademicPanelMahasiswa() {
 	const attendancePercent = total > 0 ? (present / total) * 100 : 0;
 
 	return (
-		<div className="max-w-3xl mx-auto space-y-6">
+		<div className="max-w-4xl mx-auto space-y-6 pb-12">
 			<Link
 				href="/mahasiswa/dashboard"
 				className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
@@ -105,140 +120,254 @@ export default function AcademicPanelMahasiswa() {
 				<ArrowLeft className="w-4 h-4 mr-1" /> Kembali ke Dashboard
 			</Link>
 
-			<Card className="border-slate-200 shadow-sm overflow-hidden">
+			<Card className="border-slate-200/90 shadow-sm overflow-hidden rounded-2xl">
 				<div className="h-2 w-full bg-[#0517B0]"></div>
 				<CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-6">
-					<div className="flex justify-between items-start">
+					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
 						<div>
-							<CardTitle className="text-2xl text-slate-800 flex items-center gap-2">
+							<CardTitle className="text-2xl text-slate-900 flex items-center gap-2 font-bold tracking-tight">
 								Panel Akademik
 							</CardTitle>
-							<CardDescription className="mt-2 text-sm">
-								Evaluasi, Nilai & Syarat Akademik
+							<CardDescription className="mt-1 text-sm text-slate-500">
+								Indeks Prestasi, Nilai Mata Kuliah Vokasi, Syarat Kelulusan &
+								Assessment
 							</CardDescription>
 						</div>
 						{data?.isAcc ? (
-							<Badge className="bg-emerald-500 text-white px-3 py-1 text-sm rounded-full shadow-sm">
-								<CheckCircle className="w-4 h-4 mr-1.5" /> Telah di-ACC
+							<Badge className="bg-emerald-500 text-white px-3.5 py-1.5 text-sm rounded-full shadow-sm font-semibold">
+								<CheckCircle className="w-4 h-4 mr-1.5" /> Telah di-ACC Akademik
 							</Badge>
 						) : (
 							<Badge
 								variant="outline"
-								className="text-slate-500 px-3 py-1 text-sm rounded-full bg-white"
+								className="text-slate-500 px-3.5 py-1.5 text-sm rounded-full bg-white border-slate-200 font-medium"
 							>
-								<Clock className="w-4 h-4 mr-1.5" /> Dalam Proses
+								<Clock className="w-4 h-4 mr-1.5 text-amber-500" /> Dalam Proses
 							</Badge>
 						)}
 					</div>
 				</CardHeader>
-				<CardContent className="p-6 space-y-8">
-					{/* Section 1: Checklist Akademik Dasar */}
+				<CardContent className="p-6 sm:p-8 space-y-8">
+					{/* Section 1: Ringkasan Metrik Akademik */}
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+						<div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100 flex flex-col justify-between items-center text-center">
+							<p className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2">
+								Indeks Prestasi Kumulatif (IPK)
+							</p>
+							<div className="text-3xl sm:text-4xl font-extrabold text-indigo-950 font-mono mb-2">
+								{(data?.gpa / 100 || 0).toFixed(2)}
+							</div>
+							<Progress
+								value={(data?.gpa / 400) * 100}
+								className="h-2 w-full bg-indigo-200/50 rounded-full"
+							/>
+							<p className="text-[11px] text-indigo-600 mt-2 font-medium">
+								Skala 4.00
+							</p>
+						</div>
+
+						<div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100 flex flex-col justify-between items-center text-center">
+							<p className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-2">
+								Total SKS Diselesaikan
+							</p>
+							<div className="text-3xl sm:text-4xl font-extrabold text-blue-950 font-mono mb-2">
+								{data?.creditsCompleted || 0}
+							</div>
+							<p className="text-xs text-blue-700 font-medium mt-auto">
+								SKS Telah Diakui
+							</p>
+						</div>
+
+						<div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 flex flex-col justify-between items-center text-center">
+							<p className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2">
+								Kehadiran Kelas & Praktik
+							</p>
+							<div className="text-3xl sm:text-4xl font-extrabold text-emerald-950 font-mono mb-2">
+								{Math.round(attendancePercent)}%
+							</div>
+							<p className="text-xs text-emerald-700 font-medium mt-auto">
+								{present} dari {total} total pertemuan
+							</p>
+						</div>
+					</div>
+
+					{data?.attendanceAlphaNote && (
+						<div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-600">
+							<span className="font-semibold text-slate-800">
+								Catatan Ketidakhadiran dari BAAK:
+							</span>{" "}
+							{data.attendanceAlphaNote}
+						</div>
+					)}
+
+					{/* Section 2: Checklist Akademik Dasar */}
 					<div>
-						<div className="flex justify-between items-end mb-2">
+						<div className="flex justify-between items-end mb-3">
 							<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-								<BookOpen className="w-5 h-5 text-blue-600" />
-								Checklist Akademik Dasar
+								<BookOpen className="w-4 h-4 text-[#0517B0]" />
+								Checklist Evaluasi Akademik Dasar
 							</h3>
-							<span className="text-sm font-semibold text-[#0517B0]">
+							<span className="text-base font-extrabold text-[#0517B0]">
 								{Math.round(checklistPercentage)}%
 							</span>
 						</div>
 						<Progress
 							value={checklistPercentage}
-							className="h-3 bg-slate-100 mb-4"
+							className="h-3 bg-slate-100 mb-4 rounded-full"
 						/>
 
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 							{renderChecklistItem("Terdaftar PDDIKTI", data?.pddiktiInput)}
-							{renderChecklistItem("Lulus UTS", data?.utsPassed)}
-							{renderChecklistItem("Lulus UAS", data?.uasPassed)}
+							{renderChecklistItem("Lulus Evaluasi UTS", data?.utsPassed)}
+							{renderChecklistItem("Lulus Evaluasi UAS", data?.uasPassed)}
 							{renderChecklistItem(
-								"Tugas Selesai Semua",
+								"Tugas Perkuliahan Selesai Semua",
 								data?.assignmentsCompleted,
 							)}
 							{renderChecklistItem(
-								"Indikator Sikap Baik",
+								"Indikator Sikap & Etika Baik",
 								data?.attitudeIndicator,
 							)}
 							{renderChecklistItem(
-								"Komunikasi Akademik Baik",
+								"Komunikasi Akademik Lancar",
 								data?.academicCommunication,
 							)}
 						</div>
 					</div>
 
-					{/* Section 2: Statistik Akademik */}
-					<div className="pt-6 border-t border-slate-100">
-						<div className="flex items-center gap-2 mb-4">
+					{/* Section 3: Tabel Nilai Mata Kuliah */}
+					<div className="pt-6 border-t border-slate-100 space-y-4">
+						<div className="flex items-center gap-2">
 							<GraduationCap className="w-5 h-5 text-indigo-600" />
 							<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-								Statistik Akademik
+								Transkrip Nilai Mata Kuliah & Praktik
 							</h3>
 						</div>
 
-						<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-							<div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 flex flex-col justify-center items-center text-center">
-								<p className="text-xs font-semibold text-indigo-500 uppercase tracking-wider mb-2">
-									Indeks Prestasi (IPK)
-								</p>
-								<div className="text-3xl font-bold text-indigo-900 mb-2">
-									{(data?.gpa / 100 || 0).toFixed(2)}
-								</div>
-								<Progress
-									value={(data?.gpa / 400) * 100}
-									className="h-1.5 w-full bg-indigo-100"
-								/>
+						{data?.grades && data.grades.length > 0 ? (
+							<div className="border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
+								<Table>
+									<TableHeader className="bg-slate-50/80">
+										<TableRow>
+											<TableHead className="w-20 text-xs font-bold uppercase">
+												Kode
+											</TableHead>
+											<TableHead className="text-xs font-bold uppercase">
+												Mata Kuliah
+											</TableHead>
+											<TableHead className="text-center text-xs font-bold uppercase w-20">
+												Grade
+											</TableHead>
+											<TableHead className="text-center text-xs font-bold uppercase w-24">
+												Praktik
+											</TableHead>
+											<TableHead className="text-center text-xs font-bold uppercase w-24">
+												Teori
+											</TableHead>
+											<TableHead className="text-center text-xs font-bold uppercase w-24">
+												Status
+											</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{data.grades.map((g: any) => (
+											<TableRow key={g.id} className="hover:bg-slate-50/60">
+												<TableCell className="font-mono text-xs text-slate-500 font-semibold">
+													{g.courseCode}
+												</TableCell>
+												<TableCell className="font-semibold text-slate-800 text-xs">
+													{g.courseName}
+												</TableCell>
+												<TableCell className="text-center font-bold text-xs">
+													<span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
+														{g.grade || "-"}
+													</span>
+												</TableCell>
+												<TableCell className="text-center font-mono text-xs text-slate-700">
+													{g.practicalScore ?? "-"}
+												</TableCell>
+												<TableCell className="text-center font-mono text-xs text-slate-700">
+													{g.theoryScore ?? "-"}
+												</TableCell>
+												<TableCell className="text-center">
+													{g.isAcc ? (
+														<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px]">
+															Lulus
+														</Badge>
+													) : (
+														<Badge
+															variant="outline"
+															className="text-slate-500 text-[10px]"
+														>
+															Proses
+														</Badge>
+													)}
+												</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
 							</div>
-
-							<div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 flex flex-col justify-center items-center text-center">
-								<p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-2">
-									Total SKS
-								</p>
-								<div className="text-3xl font-bold text-blue-900 mb-2">
-									{data?.creditsCompleted || 0}
-								</div>
-								<p className="text-xs text-blue-600">SKS diselesaikan</p>
-							</div>
-
-							<div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 flex flex-col justify-center items-center text-center">
-								<p className="text-xs font-semibold text-emerald-500 uppercase tracking-wider mb-2">
-									Kehadiran Kelas
-								</p>
-								<div className="text-3xl font-bold text-emerald-900 mb-2">
-									{Math.round(attendancePercent)}%
-								</div>
-								<p className="text-xs text-emerald-600 font-medium">
-									{present} dari {total} pertemuan
-								</p>
-							</div>
-						</div>
-
-						{data?.attendanceAlphaNote && (
-							<div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600">
-								<span className="font-semibold text-slate-700">
-									Catatan Ketidakhadiran:
-								</span>{" "}
-								{data.attendanceAlphaNote}
+						) : (
+							<div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-center text-xs text-slate-500">
+								Belum ada rincian nilai mata kuliah yang diinput.
 							</div>
 						)}
 					</div>
 
-					{/* Section 3: Berkas Taiwan (Only if Cohort Taiwan) */}
-					{data?.taiwanCohort && (
-						<div className="pt-6 border-t border-slate-100">
-							<div className="flex items-center gap-2 mb-4">
-								<Map className="w-5 h-5 text-rose-600" />
+					{/* Section 4: Assessment Pra-Keberangkatan */}
+					{data?.assessment && (
+						<div className="pt-6 border-t border-slate-100 space-y-3">
+							<div className="flex items-center gap-2">
+								<Award className="w-5 h-5 text-amber-600" />
 								<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-									Persyaratan Keberangkatan Taiwan
+									Hasil Assessment Pra-Keberangkatan
 								</h3>
 							</div>
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+							<div className="p-5 bg-amber-50/50 rounded-2xl border border-amber-200/70 space-y-3">
+								<div className="flex justify-between items-center">
+									<div>
+										<span className="text-xs text-amber-800 font-semibold uppercase tracking-wider block">
+											Skor Evaluasi Terpadu
+										</span>
+										<p className="text-2xl font-extrabold text-amber-950 font-mono mt-0.5">
+											{data.assessment.score ?? "Dalam Penilaian"}
+											{data.assessment.score ? " / 100" : ""}
+										</p>
+									</div>
+									<Badge className="bg-amber-100 text-amber-900 border-0 text-xs uppercase font-bold">
+										Status: {data.assessment.status || "Belum Dimulai"}
+									</Badge>
+								</div>
+								{data.assessment.notes && (
+									<p className="text-xs text-amber-900 leading-relaxed pt-2 border-t border-amber-200/50">
+										<span className="font-semibold">
+											Catatan Tim Evaluator:
+										</span>{" "}
+										{data.assessment.notes}
+									</p>
+								)}
+							</div>
+						</div>
+					)}
+
+					{/* Section 5: Berkas Khusus Taiwan (Jika Taiwan) */}
+					{data?.taiwanCohort && (
+						<div className="pt-6 border-t border-slate-100 space-y-4">
+							<div className="flex items-center gap-2">
+								<Map className="w-5 h-5 text-rose-600" />
+								<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+									Kelengkapan Persyaratan Keberangkatan Taiwan
+								</h3>
+							</div>
+							<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 								{renderChecklistItem(
-									"Pas Foto 4x6 (2 lbr)",
+									"Pas Foto 4x6 (2 Lembar)",
 									data?.taiwanPasFotoChecked,
 								)}
 								{renderChecklistItem(
-									"Formulir Daftar & CV",
+									"Formulir Pendaftaran & CV",
 									data?.taiwanCvChecked,
 								)}
 								{renderChecklistItem("Fotokopi KTM", data?.taiwanKtmChecked)}
@@ -252,11 +381,11 @@ export default function AcademicPanelMahasiswa() {
 									data?.taiwanAktifChecked,
 								)}
 								{renderChecklistItem(
-									"Screenshot PDDIKTI",
+									"Screenshot PDDIKTI Aktif",
 									data?.taiwanPddiktiChecked,
 								)}
 								{renderChecklistItem("Surat LoL", data?.taiwanLolChecked)}
-								{renderChecklistItem("Surat LoA", data?.taiwanLoaChecked)}
+								{renderChecklistItem("Surat LoA Resmi", data?.taiwanLoaChecked)}
 								{renderChecklistItem(
 									"Surat Kuasa Suhhan",
 									data?.taiwanSuhhanChecked,
@@ -265,7 +394,7 @@ export default function AcademicPanelMahasiswa() {
 						</div>
 					)}
 
-					{/* Section 4: Dokumen & Berkas Akademik */}
+					{/* Section 6: Dokumen Akademik */}
 					<div className="pt-6 border-t border-slate-100">
 						<div className="flex items-center gap-2 mb-4">
 							<ShieldCheck className="w-5 h-5 text-emerald-600" />
@@ -278,7 +407,7 @@ export default function AcademicPanelMahasiswa() {
 								{data.documents.map((doc: any, i: number) => (
 									<div
 										key={i}
-										className="flex items-center justify-between p-3 border border-slate-200 rounded-lg bg-white"
+										className="flex items-center justify-between p-3.5 border border-slate-200/80 rounded-xl bg-white shadow-xs"
 									>
 										<div className="flex items-center gap-3 overflow-hidden">
 											<FileText className="w-5 h-5 text-slate-400 shrink-0" />
@@ -286,20 +415,14 @@ export default function AcademicPanelMahasiswa() {
 												<p className="text-sm font-semibold text-slate-700 truncate">
 													{doc.documentKey.replace(/_/g, " ").toUpperCase()}
 												</p>
-												{doc.fileName.toLowerCase().includes("dummy") ? (
-													<p className="text-xs text-amber-500 italic">
-														Belum ada file valid
-													</p>
-												) : (
-													<p className="text-xs text-slate-500 truncate">
-														{doc.fileName}
-													</p>
-												)}
+												<p className="text-xs text-slate-500 truncate">
+													{doc.fileName}
+												</p>
 											</div>
 										</div>
 										<div className="shrink-0 ml-2">
 											{doc.isVerified ? (
-												<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 px-2 py-0.5 text-[10px] border-0">
+												<Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 px-2 py-0.5 text-[10px] border-0">
 													Terverifikasi
 												</Badge>
 											) : (
@@ -315,52 +438,15 @@ export default function AcademicPanelMahasiswa() {
 								))}
 							</div>
 						) : (
-							<div className="p-4 bg-slate-50 rounded-lg border border-slate-100 text-center">
+							<div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-center">
 								<p className="text-sm text-slate-500">
-									Belum ada dokumen yang diunggah.
+									Belum ada dokumen akademik yang diunggah.
 								</p>
 							</div>
 						)}
 					</div>
-
-					{/* Warning Keseluruhan */}
-					{data?.status === "TIDAK_AMAN" && (
-						<div className="mt-8 p-4 bg-rose-50 border border-rose-100 rounded-lg flex items-start gap-3">
-							<AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
-							<div>
-								<h4 className="font-semibold text-rose-800 text-sm">
-									Perhatian Diperlukan
-								</h4>
-								<p className="text-sm text-rose-600 mt-1">
-									Status Akademik Anda ditandai sebagai Tidak Aman. Pastikan
-									Anda menyelesaikan tugas yang tertinggal atau menghubungi
-									BAAK.
-								</p>
-							</div>
-						</div>
-					)}
 				</CardContent>
 			</Card>
 		</div>
-	);
-}
-
-function RefreshCwIcon(props: any) {
-	return (
-		<svg
-			{...props}
-			xmlns="http://www.w3.org/2000/svg"
-			width="24"
-			height="24"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="2"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-		>
-			<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-			<path d="M3 3v5h5" />
-		</svg>
 	);
 }

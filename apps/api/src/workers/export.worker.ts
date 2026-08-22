@@ -27,7 +27,10 @@ export async function startExportWorker(): Promise<void> {
 	while (true) {
 		try {
 			const job = await dequeue<ExportJobPayload>("export", 5);
-			if (!job) continue;
+			if (!job) {
+				await new Promise((r) => setTimeout(r, 1000));
+				continue;
+			}
 
 			const { jobId, exportType, filters } = job.payload;
 			console.log(`[ExportWorker] Processing export job ${jobId}`);
@@ -38,7 +41,7 @@ export async function startExportWorker(): Promise<void> {
 		} catch (err) {
 			const error = err as Error;
 			console.error("[ExportWorker] Error:", error.message);
-			await new Promise((r) => setTimeout(r, 1000));
+			await new Promise((r) => setTimeout(r, 5000));
 		}
 	}
 }
@@ -52,102 +55,93 @@ async function processStudentZip(jobId: string, studentId: number) {
 			throw new Error("Tidak ada file untuk mahasiswa ini.");
 		}
 
-		// 2. Get student info for filename
-		// Catatan: Karena kita tidak punya tabel khusus 'students', kita anggap role='student' dan id=studentId
-		// atau fallback ke NPM default
 		let studentName = "Mahasiswa";
 		let nim = `ID${studentId}`;
 
 		try {
-			const student = await db.query.users.findFirst({
+			const userRecord = await db.query.users.findFirst({
 				where: eq(users.id, studentId),
 			});
-			if (student) {
-				studentName = student.fullName.replace(/[^a-zA-Z0-9]/g, "_");
-				nim = student.username; // usually username is NPM
+			if (userRecord) {
+				studentName = userRecord.fullName || "Mahasiswa";
+				nim = userRecord.username || `ID${studentId}`;
 			}
 		} catch {
-			// abaikan jika tidak ketemu
+			// Fallback
 		}
 
-		const zipFilename = `Berkas_${studentName}_${nim}.zip`;
+		// 3. Setup output file path
 		const storagePath =
 			process.env.STORAGE_PATH ?? join(process.cwd(), "../../storage");
-		const exportDir = join(storagePath, "exports");
-		await mkdir(exportDir, { recursive: true });
+		const exportsDir = join(storagePath, "exports");
+		await mkdir(exportsDir, { recursive: true });
 
-		const zipFilePath = join(exportDir, zipFilename);
+		const sanitizedName = studentName.replace(/[^a-zA-Z0-9_-]/g, "_");
+		const zipFilename = `Berkas_${nim}_${sanitizedName}_${Date.now()}.zip`;
+		const zipFilePath = join(exportsDir, zipFilename);
 
-		// 3. Create archiver
+		await setJobProgress("export", jobId, {
+			status: "processing",
+			percentage: 10,
+			currentFile: "Menginisialisasi kompresi berkas...",
+		});
+
 		const output = createWriteStream(zipFilePath);
-		const archive = archiver("zip", { zlib: { level: 9 } });
+		const archive = archiver("zip", { zlib: { level: 6 } });
 
-		// Track progress
-		let processed = 0;
-		const total = files.length;
-
-		archive.on("warning", (err: any) => {
-			if (err.code === "ENOENT") {
-				console.warn("[ExportWorker] Archiver warning:", err);
-			} else {
-				throw err;
-			}
-		});
-
-		archive.on("error", (err: any) => {
-			throw err;
-		});
-
-		archive.pipe(output);
-
-		for (const file of files) {
-			try {
-				const { stream } = await fileService.streamFile(file.id);
-
-				// Convert Web Stream to Node Stream for archiver
-				const nodeStream = Readable.fromWeb(stream as any);
-
-				const filePathInZip = `${file.category}/${file.originalName}`;
-				archive.append(nodeStream, { name: filePathInZip });
-
-				processed++;
-				await setJobProgress("export", jobId, { processed, total });
-			} catch (err) {
-				console.error(
-					`[ExportWorker] Gagal memasukkan file ${file.id} ke ZIP:`,
-					err,
-				);
-				// Tetap lanjutkan file berikutnya
-			}
-		}
-
-		// Finalize archive
-		await archive.finalize();
-
-		// Tunggu sampai stream output selesai
 		await new Promise<void>((resolve, reject) => {
-			output.on("close", () => resolve());
-			output.on("error", (err) => reject(err));
+			output.on("close", resolve);
+			archive.on("error", reject);
+			archive.pipe(output);
+
+			let processed = 0;
+			const total = files.length;
+
+			(async () => {
+				for (const file of files) {
+					try {
+						const { stream } = await fileService.streamFile(file.id);
+						const nodeStream = Readable.fromWeb(stream as any);
+
+						const ext = file.extension || "pdf";
+						const folder = file.panel || "umum";
+						const docName = file.documentKey || file.originalName;
+						const zipEntryPath = `${folder}/${docName}.${ext}`;
+
+						archive.append(nodeStream, { name: zipEntryPath });
+
+						processed++;
+						const progressPct = 10 + Math.round((processed / total) * 80);
+						await setJobProgress("export", jobId, {
+							status: "processing",
+							percentage: progressPct,
+							currentFile: `Mengompresi berkas (${processed}/${total}): ${file.originalName}`,
+							processed,
+							total,
+						});
+					} catch (streamErr) {
+						console.warn(
+							`[ExportWorker] Gagal menyertakan file ${file.id}:`,
+							streamErr,
+						);
+					}
+				}
+				archive.finalize();
+			})().catch(reject);
 		});
 
-		console.log(
-			`[ExportWorker] Job ${jobId} completed ✅. Size: ${archive.pointer()} bytes`,
-		);
-
-		// 4. Update status dengan downloadUrl
 		await setJobProgress("export", jobId, {
 			status: "completed",
-			processed: total,
-			total,
-			downloadUrl: zipFilePath, // Absolute path for the API to read and stream
-			completedAt: new Date().toISOString(),
+			percentage: 100,
+			currentFile: "Selesai mengompresi berkas.",
+			downloadUrl: `/files/exports/${zipFilename}`,
 		});
-	} catch (err) {
-		const error = err as Error;
-		console.error(`[ExportWorker] Failed job ${jobId}:`, error);
+	} catch (err: any) {
+		console.error(`[ExportWorker] Export ${jobId} failed:`, err);
 		await setJobProgress("export", jobId, {
 			status: "failed",
-			errorMessage: error.message,
+			errorMessage: err?.message || "Export gagal",
 		});
+		throw err;
 	}
 }

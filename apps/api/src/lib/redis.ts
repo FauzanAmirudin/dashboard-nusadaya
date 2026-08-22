@@ -1,43 +1,55 @@
 import IORedis from "ioredis";
 
 /**
- * Koneksi Redis tunggal (singleton) menggunakan ioredis.
+ * Flag penanda apakah koneksi Redis siap digunakan.
+ * Diperbarui secara otomatis melalui event listener.
+ */
+let isRedisAvailable = false;
+
+/**
+ * Koneksi Redis singleton menggunakan ioredis.
  *
- * Digunakan oleh:
- * - cache.ts    → cache data yang sering dibaca
- * - queue.ts    → queue job backup/export/pdf
- * - lock.ts     → distributed locking (cegah duplikasi job)
- * - job.ts      → progress tracking real-time per job
- *
- * Prinsip: Redis adalah TEMPORARY layer.
- * Jika Redis mati, aplikasi tetap berjalan (PostgreSQL sebagai source of truth).
+ * Dioptimalkan dengan:
+ * - enableOfflineQueue: false -> jangan memblokir / menggantung command saat Redis offline.
+ * - connectTimeout: 500ms -> deteksi cepat saat Redis tidak tersedia.
+ * - maxRetriesPerRequest: 1 -> cegah blocking berulang pada request API.
  */
 const redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
-	maxRetriesPerRequest: 3,
-	lazyConnect: true,
-	// Jika Redis tidak bisa terkoneksi, jangan crash aplikasi
-	reconnectOnError(err) {
-		console.warn("[Redis] Reconnect triggered by error:", err.message);
-		return true;
+	maxRetriesPerRequest: 1,
+	enableOfflineQueue: false,
+	connectTimeout: 500,
+	lazyConnect: false,
+	reconnectOnError() {
+		return false;
 	},
 	retryStrategy(times) {
-		// Jika Redis belum siap, tunggu 5 detik sebelum mencoba lagi
-		// Jangan kembalikan null agar ioredis tidak berhenti mencoba (bisa auto-recover)
-		if (times === 3) {
-			console.warn(
-				"⚠️  [Redis] Server Redis belum terdeteksi. Sistem akan terus mencoba reconnect di background tanpa mengganggu aplikasi...",
-			);
+		if (times > 10) {
+			// Setelah 10 percobaan, coba setiap 30 detik agar tidak membebani log/CPU
+			return 30000;
 		}
 		return 5000;
 	},
 });
 
+redis.on("ready", () => {
+	isRedisAvailable = true;
+	console.log("✅ [Redis] Connected & ready");
+});
+
 redis.on("connect", () => {
-	console.log("✅ Redis connected");
+	isRedisAvailable = true;
 });
 
-redis.on("error", (err) => {
-	console.error("[Redis] Connection error:", err.message);
+redis.on("error", () => {
+	isRedisAvailable = false;
 });
 
-export { redis };
+redis.on("close", () => {
+	isRedisAvailable = false;
+});
+
+redis.on("end", () => {
+	isRedisAvailable = false;
+});
+
+export { isRedisAvailable, redis };

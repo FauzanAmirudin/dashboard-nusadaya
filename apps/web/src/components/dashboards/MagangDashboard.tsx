@@ -61,50 +61,45 @@ function formatWhatsAppUrl(phone: string | null | undefined) {
 
 export function MagangDashboard({
 	hideHeader = false,
+	data = [],
 }: {
 	hideHeader?: boolean;
+	data?: any[];
 } = {}) {
 	const router = useRouter();
 	const { user } = useAuthStore();
-	const [data, setData] = useState<any[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCohort, setSelectedCohort] = useState<string>("all");
 	const [selectedStatus, setSelectedStatus] = useState<string>("all");
 	const [currentPage, setCurrentPage] = useState(1);
 	const pageSize = 20;
 
-	// Cohort years starting from 2022
-	const cohortYears = useMemo(() => {
-		const currentYear = new Date().getFullYear();
-		return Array.from(
-			{ length: currentYear - 2022 + 2 },
-			(_, i) => currentYear + 1 - i,
-		);
-	}, []);
-
-	useEffect(() => {
-		const fetchStudents = async () => {
-			try {
-				const { data: resData, error } = await api.students.get();
-				if (!error && resData?.data) {
-					setData(resData.data);
-				}
-			} catch (err) {
-				console.error("Failed loading magang dashboard data", err);
-			} finally {
-				setIsLoading(false);
-			}
-		};
-		fetchStudents();
-	}, []);
+	// Available cohorts dynamically derived from student data + fallbacks
+	const availableCohorts = useMemo(() => {
+		const cohorts = new Set<string>();
+		if (data && data.length > 0) {
+			data.forEach((s: any) => {
+				if (s.student?.cohort) cohorts.add(s.student.cohort.toString());
+			});
+		}
+		["16", "15", "14", "13", "12", "11", "10"].forEach((c) => cohorts.add(c));
+		return Array.from(cohorts).sort((a, b) => {
+			const numA = Number(a);
+			const numB = Number(b);
+			if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numB - numA;
+			return b.localeCompare(a);
+		});
+	}, [data]);
 
 	// Filter by cohort first for reactive KPI
 	const cohortData = useMemo(() => {
 		if (!data) return [];
 		if (selectedCohort === "all") return data;
 		return data.filter(
-			(s: any) => s.student?.cohort?.toString() === selectedCohort,
+			(s: any) =>
+				s.student?.cohort?.toString() === selectedCohort ||
+				(Number(selectedCohort) >= 2000 &&
+					s.student?.cohort === Number(selectedCohort) - 2010),
 		);
 	}, [data, selectedCohort]);
 
@@ -196,7 +191,7 @@ export function MagangDashboard({
 		const items = [
 			{
 				name: "Pembekalan & CV",
-				done: Boolean(internship?.pembekalanStatus || internship?.cvStatus),
+				done: Boolean(internship?.praPasporCv),
 			},
 			{ name: "Paspor Siap", done: Boolean(internship?.passportReady) },
 			{ name: "Medical Checkup (MCU)", done: Boolean(internship?.mcuReady) },
@@ -215,16 +210,6 @@ export function MagangDashboard({
 			isDone: completed === items.length,
 		};
 	};
-
-	if (isLoading) {
-		return (
-			<div className="flex flex-col justify-center items-center h-80 gap-3 text-slate-500">
-				<p className="text-sm font-semibold">
-					Memuat data magang & penempatan...
-				</p>
-			</div>
-		);
-	}
 
 	return (
 		<div className="space-y-6 pb-12">
@@ -254,13 +239,17 @@ export function MagangDashboard({
 							onValueChange={(val) => setSelectedCohort(val || "all")}
 						>
 							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
-								<SelectValue placeholder="Filter Angkatan" />
+								<SelectValue placeholder="Filter Angkatan">
+									{selectedCohort === "all"
+										? "Semua Angkatan"
+										: `Angkatan ${selectedCohort}`}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Angkatan</SelectItem>
-								{cohortYears.map((year) => (
-									<SelectItem key={year} value={year.toString()}>
-										Angkatan {year}
+								{availableCohorts.map((cohort) => (
+									<SelectItem key={cohort} value={cohort}>
+										Angkatan {cohort}
 									</SelectItem>
 								))}
 							</SelectContent>
@@ -407,7 +396,17 @@ export function MagangDashboard({
 							onValueChange={(val) => setSelectedStatus(val || "all")}
 						>
 							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
-								<SelectValue placeholder="Status Magang" />
+								<SelectValue placeholder="Status Magang">
+									{selectedStatus === "all"
+										? "Semua Status"
+										: selectedStatus === "aman"
+											? "🟢 Aman"
+											: selectedStatus === "perhatian"
+												? "🟡 Berproses"
+												: selectedStatus === "tidak_aman"
+													? "🔴 Kendala"
+													: "🛡️ Sudah ACC Magang"}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Status</SelectItem>
@@ -483,7 +482,8 @@ export function MagangDashboard({
 
 											<TableCell className="text-center font-medium text-xs text-slate-700">
 												{s.student.academicYear ||
-													(s.student.cohort && !isNaN(Number(s.student.cohort))
+													(s.student.cohort &&
+													!Number.isNaN(Number(s.student.cohort))
 														? `${2010 + Number(s.student.cohort)}/${2011 + Number(s.student.cohort)}`
 														: s.student.period || (
 																<span className="text-slate-400 italic">-</span>

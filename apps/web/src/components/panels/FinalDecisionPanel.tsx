@@ -263,7 +263,7 @@ export function FinalDecisionPanel({
 					uploadedUrl = data.fileUrl;
 				} else {
 					toast.error(
-						"Gagal mengunggah SK: " + (data.message || "Unknown error"),
+						`Gagal mengunggah SK: ${data.message || "Unknown error"}`,
 					);
 					setIsUploadingSK(false);
 					setIsSubmitting(false);

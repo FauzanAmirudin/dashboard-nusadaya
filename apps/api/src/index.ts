@@ -16,6 +16,7 @@ import { academicCalendarRoutes } from "./routes/academic-calendar";
 import { akademikPaRouter } from "./routes/akademik-pa";
 import { attendanceRoutes } from "./routes/attendance";
 import { coursesRoutes } from "./routes/courses";
+import { dashboardRoutes } from "./routes/dashboard";
 import { dosenRouter } from "./routes/dosen";
 import { financeRouter } from "./routes/finance";
 import { formRegisterRoutes } from "./routes/form-register";
@@ -423,6 +424,7 @@ const app = new Elysia()
 	})
 
 	// Module Routers (existing)
+	.use(dashboardRoutes)
 	.use(studentsRouter)
 	.use(formRegisterRoutes)
 	.use(dosenRouter)
@@ -477,34 +479,14 @@ app.listen(process.env.PORT || 3001, async () => {
 	// 2. Inisialisasi direktori storage
 	await fileService.ensureDirectories();
 
-	// 2. Jalankan workers di background (non-blocking)
-	// Konfigurasi concurrency: Backup=1, Export=1, File=1, PDF=2
-	// Sesuai rekomendasi plan: mulai konservatif, monitor disk I/O
+	// 3. Jalankan background maintenance non-blocking
 	setTimeout(() => {
-		// Backup Worker (1 instance — concurrency 1)
-		startBackupWorker().catch((err) =>
-			console.error("[BackupWorker] Fatal error:", err),
-		);
-
-		// Export Worker (1 instance)
-		startExportWorker().catch((err) =>
-			console.error("[ExportWorker] Fatal error:", err),
-		);
-
-		// File Worker (cleanup — tidak perlu banyak)
+		// File Worker (cleanup lokal setiap 1 jam)
 		startFileWorker();
-
-		// PDF Workers (2 instance)
-		startPdfWorker(1).catch((err) =>
-			console.error("[PdfWorker#1] Fatal error:", err),
-		);
-		startPdfWorker(2).catch((err) =>
-			console.error("[PdfWorker#2] Fatal error:", err),
-		);
 
 		// Scheduled Worker (cron jobs)
 		startScheduledWorker();
-	}, 1000); // Delay 1 detik agar server sudah siap dulu
+	}, 2000);
 });
 
 export type App = typeof app;

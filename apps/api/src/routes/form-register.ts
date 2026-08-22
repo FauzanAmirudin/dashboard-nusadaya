@@ -373,7 +373,7 @@ export const formRegisterRoutes = new Elysia()
 				cohort: (() => {
 					if (response.academicYear) {
 						const startYear = parseInt(response.academicYear.split("/")[0], 10);
-						if (!isNaN(startYear)) {
+						if (!Number.isNaN(startYear)) {
 							return startYear >= 2000 ? startYear - 2010 : startYear;
 						}
 					}

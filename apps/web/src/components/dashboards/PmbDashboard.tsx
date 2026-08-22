@@ -91,7 +91,7 @@ export function PmbDashboard({
 		return Array.from(cohorts).sort((a, b) => {
 			const numA = Number(a);
 			const numB = Number(b);
-			if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
+			if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numB - numA;
 			return b.localeCompare(a);
 		});
 	}, [data]);
@@ -101,7 +101,10 @@ export function PmbDashboard({
 		if (!data) return [];
 		if (selectedCohort === "all") return data;
 		return data.filter(
-			(s: any) => s.student?.cohort?.toString() === selectedCohort,
+			(s: any) =>
+				s.student?.cohort?.toString() === selectedCohort ||
+				(Number(selectedCohort) >= 2000 &&
+					s.student?.cohort === Number(selectedCohort) - 2010),
 		);
 	}, [data, selectedCohort]);
 
@@ -293,14 +296,18 @@ export function PmbDashboard({
 						onValueChange={(val) => setSelectedCohort(val || "all")}
 					>
 						<SelectTrigger className="w-[180px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
-							<SelectValue placeholder="Filter Angkatan" />
+							<SelectValue placeholder="Filter Angkatan">
+								{selectedCohort === "all"
+									? "Semua Angkatan"
+									: `Angkatan ${selectedCohort}`}
+							</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value="all">Semua Angkatan</SelectItem>
 							{availableCohorts.map((cohort) => {
 								const cNum = Number(cohort);
 								const ayLabel =
-									!isNaN(cNum) && cNum >= 10 && cNum <= 30
+									!Number.isNaN(cNum) && cNum >= 10 && cNum <= 30
 										? ` (${2010 + cNum}/${2011 + cNum})`
 										: "";
 								return (
@@ -491,7 +498,17 @@ export function PmbDashboard({
 									onValueChange={(val) => setSelectedStatus(val || "all")}
 								>
 									<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
-										<SelectValue placeholder="Status PMB" />
+										<SelectValue placeholder="Status PMB">
+											{selectedStatus === "all"
+												? "Semua Status"
+												: selectedStatus === "aman"
+													? "🟢 Aman"
+													: selectedStatus === "perhatian"
+														? "🟡 Berproses"
+														: selectedStatus === "tidak_aman"
+															? "🔴 Kendala"
+															: "🛡️ Sudah ACC PMB"}
+										</SelectValue>
 									</SelectTrigger>
 									<SelectContent>
 										<SelectItem value="all">Semua Status</SelectItem>
@@ -584,7 +601,7 @@ export function PmbDashboard({
 													<TableCell className="text-center font-medium text-xs text-slate-700">
 														{s.student.academicYear ||
 															(s.student.cohort &&
-															!isNaN(Number(s.student.cohort))
+															!Number.isNaN(Number(s.student.cohort))
 																? `${2010 + Number(s.student.cohort)}/${2011 + Number(s.student.cohort)}`
 																: s.student.period || (
 																		<span className="text-slate-400 italic">

@@ -6,7 +6,7 @@
 		"apps/*"
 	],
 	"scripts": {
-		"dev": "bun --filter '*' dev",
+		"dev": "bun --filter '*' --parallel dev",
 		"build": "bun --filter web build",
 		"prepare": "husky"
 	},

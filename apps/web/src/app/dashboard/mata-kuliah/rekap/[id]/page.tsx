@@ -135,7 +135,7 @@ export default function RekapMataKuliahDetailPage() {
 				const { data: sData, error: sErr } = await api.students.get({
 					$query: {
 						cohort: courseInfo.cohort.toString(),
-						isArchived: "false",
+						all: "true",
 					},
 				});
 				if (!sErr && sData?.data) {
@@ -339,7 +339,7 @@ export default function RekapMataKuliahDetailPage() {
 			row["Rata-rata Teori"] = item.avgTheory;
 			row["Rata-rata Praktik"] = item.avgPractical;
 			row["Nilai Akhir"] = item.finalScore;
-			row["Grade"] = item.grade;
+			row.Grade = item.grade;
 			row["Status Evaluasi"] = item.status;
 			row["Status Kelulusan"] = item.statusKelulusan;
 

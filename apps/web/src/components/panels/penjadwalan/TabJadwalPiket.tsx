@@ -40,6 +40,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { useStudentsList } from "@/hooks/useStudentsList";
 import { api } from "@/lib/eden";
 
 const DAYS_OF_WEEK = [
@@ -54,7 +55,12 @@ const DAYS_OF_WEEK = [
 
 export function TabJadwalPiket({ canEdit }: { canEdit: boolean }) {
 	const [schedules, setSchedules] = useState<any[]>([]);
-	const [students, setStudents] = useState<any[]>([]);
+	const { data: studentsResult } = useStudentsList({
+		all: true,
+	});
+	const students = (studentsResult?.data || []).map(
+		(item: any) => item.student,
+	);
 	const [isLoading, setIsLoading] = useState(true);
 
 	// Filters
@@ -87,21 +93,6 @@ export function TabJadwalPiket({ canEdit }: { canEdit: boolean }) {
 			setIsLoading(false);
 		}
 	};
-
-	const fetchStudents = async () => {
-		try {
-			const { data, error } = await api.students.get();
-			if (!error && data?.data) {
-				setStudents(data.data.map((item: any) => item.student));
-			}
-		} catch (error) {
-			console.error("Error fetching students:", error);
-		}
-	};
-
-	useEffect(() => {
-		fetchStudents();
-	}, []);
 
 	useEffect(() => {
 		fetchSchedules();

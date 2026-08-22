@@ -4,13 +4,26 @@ import {
 	AlertCircle,
 	ArrowLeft,
 	Banknote,
+	Calendar,
 	CheckCircle,
 	CheckCircle2,
-	CircleDollarSign,
+	ChevronDown,
+	ChevronUp,
 	Clock,
+	Coins,
+	CreditCard,
+	DollarSign,
+	Download,
+	Eye,
 	FileText,
+	GraduationCap,
+	HelpCircle,
 	Landmark,
+	Plane,
+	RefreshCw,
 	ShieldCheck,
+	Sparkles,
+	Wallet,
 	XCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -26,12 +39,14 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
+import { formatRupiah } from "@/utils/format";
 
 export default function FinancePanelMahasiswa() {
 	const { user, isAuthenticated, hasHydrated } = useAuthStore();
 	const [mounted, setMounted] = useState(false);
 	const [data, setData] = useState<any>(null);
 	const [loading, setLoading] = useState(true);
+	const [expandedSemesters, setExpandedSemesters] = useState<number[]>([]);
 
 	useEffect(() => {
 		setMounted(true);
@@ -48,7 +63,7 @@ export default function FinancePanelMahasiswa() {
 				setData(res.data.data);
 			}
 		} catch (err) {
-			console.error(err);
+			console.error("Gagal memuat data Finance:", err);
 		} finally {
 			setLoading(false);
 		}
@@ -59,44 +74,53 @@ export default function FinancePanelMahasiswa() {
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center h-[50vh]">
-				<RefreshCwIcon className="w-8 h-8 text-[#0517B0] animate-spin" />
+				<RefreshCw className="w-8 h-8 text-[#0517B0] animate-spin" />
 			</div>
 		);
 	}
 
-	const renderChecklistItem = (label: string, isChecked: boolean) => (
-		<div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-lg">
-			<span className="font-medium text-slate-700 flex items-center gap-2 text-sm">
-				<ShieldCheck className="w-4 h-4 text-slate-400" />
-				{label}
-			</span>
-			{isChecked ? (
-				<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0">
-					<CheckCircle2 className="w-3 h-3 mr-1" /> Lunas / Selesai
-				</Badge>
-			) : (
-				<Badge variant="outline" className="text-slate-500 bg-white">
-					<XCircle className="w-3 h-3 mr-1" /> Belum Lunas
-				</Badge>
-			)}
-		</div>
-	);
+	const toggleSemester = (semNum: number) => {
+		setExpandedSemesters((prev) =>
+			prev.includes(semNum)
+				? prev.filter((s) => s !== semNum)
+				: [...prev, semNum],
+		);
+	};
 
-	const completedCount = [
-		data?.registrationPaid,
-		data?.semesterPaid,
-		data?.installmentCleared,
-		data?.arrearsCleared,
-	].filter(Boolean).length;
-	const checklistPercentage = (completedCount / 4) * 100;
+	const isTalangan = data?.metodePembayaran === "dana_talangan";
 
-	const formatCurrency = (amount: number | null | undefined) => {
-		if (amount == null) return "Rp 0";
-		return new Intl.NumberFormat("id-ID", {
-			style: "currency",
-			currency: "IDR",
-			maximumFractionDigits: 0,
-		}).format(amount);
+	// Kalkulasi Partisi
+	const totalBiayaPendidikan = data?.totalBiayaPendidikan || 0;
+	const regNominal = data?.registrasiNominal || 0;
+	const semNominal = isTalangan
+		? data?.t1SemesterNominalTotal || 0
+		: data?.mandiriSemesterNominal || 0;
+	const intNominal = isTalangan
+		? data?.t1InterviewNominal || 0
+		: data?.mandiriInterviewNominal || 0;
+	const kebNominal = isTalangan
+		? data?.t2KeberangkatanNominal || 0
+		: data?.mandiriKeberangkatanNominal || 0;
+
+	const totalAlokasi = regNominal + semNominal + intNominal + kebNominal;
+
+	// Helper milestone status badge
+	const renderMilestoneStatus = (isLunas: boolean, label = "Lunas") => {
+		if (isLunas) {
+			return (
+				<Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-0 text-xs font-semibold">
+					<CheckCircle2 className="w-3 h-3 mr-1" /> {label}
+				</Badge>
+			);
+		}
+		return (
+			<Badge
+				variant="outline"
+				className="text-amber-700 bg-amber-50/50 border-amber-200 text-xs font-medium"
+			>
+				<Clock className="w-3 h-3 mr-1" /> Belum Lunas
+			</Badge>
+		);
 	};
 
 	const formatDate = (dateString: string | null | undefined) => {
@@ -108,8 +132,29 @@ export default function FinancePanelMahasiswa() {
 		});
 	};
 
+	// Hitung cicilan talangan
+	const t1Installments = (data?.talanganInstallments || []).filter(
+		(ti: any) => ti.stage === "tahap_1",
+	);
+	const t2Installments = (data?.talanganInstallments || []).filter(
+		(ti: any) => ti.stage === "tahap_2",
+	);
+
+	const t1Paid = t1Installments.reduce(
+		(acc: number, cur: any) => acc + (cur.nominalPaid || 0),
+		0,
+	);
+	const t2Paid = t2Installments.reduce(
+		(acc: number, cur: any) => acc + (cur.nominalPaid || 0),
+		0,
+	);
+
+	const t1TotalBill =
+		(data?.t1SemesterNominalTotal || 0) + (data?.t1InterviewNominal || 0);
+	const t2TotalBill = data?.t2KeberangkatanNominal || 0;
+
 	return (
-		<div className="max-w-3xl mx-auto space-y-6">
+		<div className="max-w-4xl mx-auto space-y-6 pb-12">
 			<Link
 				href="/mahasiswa/dashboard"
 				className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
@@ -117,199 +162,501 @@ export default function FinancePanelMahasiswa() {
 				<ArrowLeft className="w-4 h-4 mr-1" /> Kembali ke Dashboard
 			</Link>
 
-			<Card className="border-slate-200 shadow-sm overflow-hidden">
+			<Card className="border-slate-200/90 shadow-sm overflow-hidden rounded-2xl">
 				<div className="h-2 w-full bg-[#0517B0]"></div>
 				<CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-6">
-					<div className="flex justify-between items-start">
+					<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
 						<div>
-							<CardTitle className="text-2xl text-slate-800 flex items-center gap-2">
-								Panel Finance
+							<CardTitle className="text-2xl text-slate-900 flex items-center gap-2 font-bold tracking-tight">
+								Panel Finance (Keuangan Mahasiswa)
 							</CardTitle>
-							<CardDescription className="mt-2 text-sm">
-								Administrasi Keuangan, Tagihan & Dana Talangan
+							<CardDescription className="mt-1 text-sm text-slate-500">
+								Transparansi Tagihan, Partisi Biaya Pendidikan, Pembayaran
+								Perkuliahan & Dana Talangan
 							</CardDescription>
 						</div>
 						{data?.isAcc ? (
-							<Badge className="bg-emerald-500 text-white px-3 py-1 text-sm rounded-full shadow-sm">
-								<CheckCircle className="w-4 h-4 mr-1.5" /> Telah di-ACC
+							<Badge className="bg-emerald-500 text-white px-3.5 py-1.5 text-sm rounded-full shadow-sm font-semibold">
+								<CheckCircle className="w-4 h-4 mr-1.5" /> Telah di-ACC Finance
 							</Badge>
 						) : (
 							<Badge
 								variant="outline"
-								className="text-slate-500 px-3 py-1 text-sm rounded-full bg-white"
+								className="text-slate-500 px-3.5 py-1.5 text-sm rounded-full bg-white border-slate-200 font-medium"
 							>
-								<Clock className="w-4 h-4 mr-1.5" /> Dalam Proses
+								<Clock className="w-4 h-4 mr-1.5 text-amber-500" /> Dalam Proses
 							</Badge>
 						)}
 					</div>
 				</CardHeader>
-				<CardContent className="p-6 space-y-8">
-					{/* Section 1: Checklist Status Tagihan */}
-					<div>
-						<div className="flex justify-between items-end mb-2">
-							<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-								<Landmark className="w-5 h-5 text-blue-600" />
-								Status Kewajiban Tagihan
-							</h3>
-							<span className="text-sm font-semibold text-[#0517B0]">
-								{Math.round(checklistPercentage)}%
-							</span>
-						</div>
-						<Progress
-							value={checklistPercentage}
-							className="h-3 bg-slate-100 mb-4"
-						/>
-
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-							{renderChecklistItem(
-								"Biaya Registrasi Awal",
-								data?.registrationPaid,
-							)}
-							{renderChecklistItem("Biaya Semester", data?.semesterPaid)}
-							{renderChecklistItem("Cicilan Bulanan", data?.installmentCleared)}
-							{renderChecklistItem("Tunggakan / Lainnya", data?.arrearsCleared)}
-						</div>
-					</div>
-
-					{/* Section 2: Rincian Tagihan */}
-					<div className="pt-6 border-t border-slate-100">
-						<div className="flex items-center gap-2 mb-4">
-							<Banknote className="w-5 h-5 text-emerald-600" />
-							<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-								Rincian Pembayaran
-							</h3>
-						</div>
-
-						<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-							<div className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
-								<p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-									Registrasi
-								</p>
-								<p className="text-lg font-bold text-slate-800 mt-1">
-									{formatCurrency(data?.registrationAmount)}
-								</p>
-								<p className="text-xs text-slate-500 mt-1">
-									Dibayar: {formatDate(data?.registrationDate)}
+				<CardContent className="p-6 sm:p-8 space-y-8">
+					{/* Section 1: Top Partisi Biaya Pendidikan */}
+					<div className="bg-gradient-to-br from-slate-900 via-[#07135e] to-[#0517B0] text-white p-6 rounded-2xl shadow-md space-y-5">
+						<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-white/15 pb-4">
+							<div>
+								<span className="text-xs text-blue-200 font-semibold uppercase tracking-wider block">
+									Plafon Biaya Pendidikan
+								</span>
+								<p className="text-2xl sm:text-3xl font-extrabold font-mono mt-1">
+									{formatRupiah(totalBiayaPendidikan)}
 								</p>
 							</div>
-							<div className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
-								<p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-									Semester
-								</p>
-								<p className="text-lg font-bold text-slate-800 mt-1">
-									{formatCurrency(data?.semesterAmount)}
-								</p>
-								<p className="text-xs text-slate-500 mt-1">
-									Dibayar: {formatDate(data?.semesterDate)}
-								</p>
-							</div>
-							<div className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
-								<p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-									Cicilan
-								</p>
-								<p className="text-lg font-bold text-slate-800 mt-1">
-									{formatCurrency(data?.installmentAmount)}
-								</p>
-								<p className="text-xs text-slate-500 mt-1">
-									Dibayar: {formatDate(data?.installmentDate)}
-								</p>
-							</div>
-							<div className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
-								<p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-									Tunggakan (Sisa)
-								</p>
-								<p className="text-lg font-bold text-rose-600 mt-1">
-									{formatCurrency(data?.arrearsAmount)}
-								</p>
-								<p className="text-xs text-slate-500 mt-1">
-									Estimasi Belum Terbayar
-								</p>
-							</div>
-						</div>
-					</div>
-
-					{/* Section 3: Dana Talangan */}
-					<div className="pt-6 border-t border-slate-100">
-						<div className="flex items-center gap-2 mb-4">
-							<CircleDollarSign className="w-5 h-5 text-indigo-600" />
-							<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-								Pengajuan Dana Talangan
-							</h3>
-						</div>
-
-						<div className="bg-indigo-50/50 p-5 rounded-xl border border-indigo-100 space-y-4">
-							<div className="flex justify-between items-center border-b border-indigo-100 pb-3">
-								<div>
-									<p className="text-xs text-indigo-500 font-semibold uppercase tracking-wider">
-										Penyedia Talangan
-									</p>
-									<p className="text-sm font-bold text-indigo-900 mt-0.5">
-										{data?.danaTalaganProvider || "Belum ada pengajuan"}
-									</p>
-								</div>
-								<Badge
-									variant="outline"
-									className="bg-white text-indigo-700 border-indigo-200"
-								>
-									{data?.danaTalaganProviderType || "-"}
+							<div className="flex items-center gap-2">
+								<Badge className="bg-white/20 text-white border-white/30 backdrop-blur-sm text-xs font-semibold px-3 py-1">
+									Metode: {isTalangan ? "Dana Talangan" : "Dana Mandiri"}
 								</Badge>
 							</div>
+						</div>
 
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-								<div>
-									<p className="text-xs text-slate-500 font-semibold mb-1">
-										Tahap 1
-									</p>
-									<p className="font-bold text-slate-800">
-										{formatCurrency(data?.danaT1Amount)}
-									</p>
-									<div className="flex items-center justify-between mt-1">
-										<span className="text-xs text-slate-500">
-											{formatDate(data?.danaT1Date)}
+						{/* 4 Mini Cards Partisi */}
+						<div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+							<div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm border border-white/10">
+								<span className="text-[11px] text-blue-200 block">
+									Registrasi Awal
+								</span>
+								<p className="text-sm font-bold font-mono mt-0.5">
+									{formatRupiah(regNominal)}
+								</p>
+								<div className="mt-2">
+									{data?.registrasiStatus ? (
+										<span className="text-[10px] bg-emerald-400/30 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+											Lunas
 										</span>
-										{data?.isDanaT1Disbursed ? (
-											<span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
-												CAIR
-											</span>
-										) : (
-											<span className="text-[10px] font-bold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
-												PENDING
-											</span>
-										)}
-									</div>
+									) : (
+										<span className="text-[10px] bg-amber-400/30 text-amber-300 px-2 py-0.5 rounded-full font-bold">
+											Pending
+										</span>
+									)}
 								</div>
-								<div>
-									<p className="text-xs text-slate-500 font-semibold mb-1">
-										Tahap 2
-									</p>
-									<p className="font-bold text-slate-800">
-										{formatCurrency(data?.danaT2Amount)}
-									</p>
-									<div className="flex items-center justify-between mt-1">
-										<span className="text-xs text-slate-500">
-											{formatDate(data?.danaT2Date)}
+							</div>
+
+							<div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm border border-white/10">
+								<span className="text-[11px] text-blue-200 block">
+									6 Semester Kuliah
+								</span>
+								<p className="text-sm font-bold font-mono mt-0.5">
+									{formatRupiah(semNominal)}
+								</p>
+								<div className="mt-2">
+									{isTalangan ? (
+										<span className="text-[10px] bg-indigo-400/30 text-indigo-200 px-2 py-0.5 rounded-full font-bold">
+											Ditalangi
 										</span>
-										{data?.isDanaT2Disbursed ? (
-											<span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
-												CAIR
-											</span>
-										) : (
-											<span className="text-[10px] font-bold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
-												PENDING
-											</span>
-										)}
-									</div>
+									) : data?.mandiriSemesterStatus ? (
+										<span className="text-[10px] bg-emerald-400/30 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+											Lunas
+										</span>
+									) : (
+										<span className="text-[10px] bg-amber-400/30 text-amber-300 px-2 py-0.5 rounded-full font-bold">
+											Proses
+										</span>
+									)}
+								</div>
+							</div>
+
+							<div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm border border-white/10">
+								<span className="text-[11px] text-blue-200 block">
+									Interview Magang
+								</span>
+								<p className="text-sm font-bold font-mono mt-0.5">
+									{formatRupiah(intNominal)}
+								</p>
+								<div className="mt-2">
+									{(
+										isTalangan
+											? data?.t1InterviewStatus
+											: data?.mandiriInterviewStatus
+									) ? (
+										<span className="text-[10px] bg-emerald-400/30 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+											Lunas
+										</span>
+									) : (
+										<span className="text-[10px] bg-amber-400/30 text-amber-300 px-2 py-0.5 rounded-full font-bold">
+											Pending
+										</span>
+									)}
+								</div>
+							</div>
+
+							<div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm border border-white/10">
+								<span className="text-[11px] text-blue-200 block">
+									Keberangkatan
+								</span>
+								<p className="text-sm font-bold font-mono mt-0.5">
+									{formatRupiah(kebNominal)}
+								</p>
+								<div className="mt-2">
+									{(
+										isTalangan
+											? data?.t2KeberangkatanStatus
+											: data?.mandiriKeberangkatanStatus
+									) ? (
+										<span className="text-[10px] bg-emerald-400/30 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+											Lunas
+										</span>
+									) : (
+										<span className="text-[10px] bg-amber-400/30 text-amber-300 px-2 py-0.5 rounded-full font-bold">
+											Pending
+										</span>
+									)}
 								</div>
 							</div>
 						</div>
 					</div>
 
-					{/* Section 4: Dokumen & Berkas Finance */}
+					{/* Section 2: Rincian Pembayaran 6 Semester */}
+					<div className="space-y-4">
+						<div className="flex items-center justify-between">
+							<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+								<GraduationCap className="w-4 h-4 text-[#0517B0]" />
+								Rincian Biaya Perkuliahan (6 Semester)
+							</h3>
+						</div>
+
+						{data?.semesters && data.semesters.length > 0 ? (
+							<div className="space-y-3">
+								{data.semesters.map((sem: any) => {
+									const isExpanded = expandedSemesters.includes(
+										sem.semesterNumber,
+									);
+									const totalTerbayar = (sem.installments || []).reduce(
+										(acc: number, cur: any) => acc + (cur.nominalPaid || 0),
+										0,
+									);
+									const semPercentage =
+										sem.totalBilled > 0
+											? Math.min((totalTerbayar / sem.totalBilled) * 100, 100)
+											: 0;
+
+									return (
+										<div
+											key={sem.id}
+											className="border border-slate-200/90 rounded-xl overflow-hidden bg-white shadow-xs"
+										>
+											<div
+												onClick={() => toggleSemester(sem.semesterNumber)}
+												className="p-4 bg-slate-50/70 hover:bg-slate-100/60 cursor-pointer flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-colors"
+											>
+												<div className="flex items-center gap-3">
+													<div className="w-8 h-8 rounded-lg bg-[#0517B0]/10 text-[#0517B0] flex items-center justify-center font-bold text-xs">
+														S{sem.semesterNumber}
+													</div>
+													<div>
+														<h4 className="font-bold text-slate-800 text-sm">
+															Semester {sem.semesterNumber}
+														</h4>
+														<p className="text-xs text-slate-500 font-mono mt-0.5">
+															Tagihan: {formatRupiah(sem.totalBilled || 0)}
+														</p>
+													</div>
+												</div>
+
+												<div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+													<div className="text-right">
+														<span className="text-xs font-bold text-slate-700 font-mono block">
+															Terbayar: {formatRupiah(totalTerbayar)}
+														</span>
+														<span className="text-[10px] text-slate-500">
+															{Math.round(semPercentage)}% terpenuhi
+														</span>
+													</div>
+
+													{sem.isTalangan ? (
+														<Badge className="bg-indigo-100 text-indigo-800 border-0 text-xs">
+															Dana Talangan
+														</Badge>
+													) : sem.status === "LUNAS" ? (
+														<Badge className="bg-emerald-100 text-emerald-800 border-0 text-xs">
+															Lunas
+														</Badge>
+													) : (
+														<Badge
+															variant="outline"
+															className="text-amber-700 border-amber-300 text-xs"
+														>
+															{sem.status === "SEBAGIAN"
+																? "Sebagian"
+																: "Belum Lunas"}
+														</Badge>
+													)}
+
+													{isExpanded ? (
+														<ChevronUp className="w-4 h-4 text-slate-400" />
+													) : (
+														<ChevronDown className="w-4 h-4 text-slate-400" />
+													)}
+												</div>
+											</div>
+
+											{/* Detail Cicilan Accordion */}
+											{isExpanded && (
+												<div className="p-4 border-t border-slate-100 bg-white space-y-3">
+													{sem.installments && sem.installments.length > 0 ? (
+														<div className="space-y-2">
+															<span className="text-xs font-semibold text-slate-500 block">
+																Riwayat Pembayaran Cicilan:
+															</span>
+															{sem.installments.map((ins: any, idx: number) => (
+																<div
+																	key={ins.id}
+																	className="p-3 bg-slate-50 rounded-lg flex items-center justify-between text-xs border border-slate-100"
+																>
+																	<div className="flex items-center gap-2">
+																		<span className="font-bold text-slate-700">
+																			Cicilan #
+																			{ins.installmentNumber || idx + 1}
+																		</span>
+																		<span className="text-slate-400">•</span>
+																		<span className="text-slate-500 font-mono">
+																			{formatRupiah(ins.nominalPaid)}
+																		</span>
+																	</div>
+																	<span className="text-slate-400">
+																		{formatDate(ins.paymentDate)}
+																	</span>
+																</div>
+															))}
+														</div>
+													) : (
+														<p className="text-xs text-slate-400 italic py-1">
+															Belum ada catatan pembayaran cicilan untuk
+															semester ini.
+														</p>
+													)}
+												</div>
+											)}
+										</div>
+									);
+								})}
+							</div>
+						) : (
+							<div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-center text-xs text-slate-500">
+								Rincian tagihan per semester belum dikonfigurasi.
+							</div>
+						)}
+					</div>
+
+					{/* Section 3: Dana Talangan (Jika Metode Talangan) */}
+					{isTalangan && (
+						<div className="pt-6 border-t border-slate-100 space-y-4">
+							<div className="flex items-center gap-2">
+								<Wallet className="w-5 h-5 text-indigo-600" />
+								<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+									Informasi Pengajuan & Cicilan Dana Talangan
+								</h3>
+							</div>
+
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								{/* Tahap 1 Card */}
+								<div className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-4">
+									<div className="flex justify-between items-start">
+										<div>
+											<span className="text-xs font-bold text-indigo-800 uppercase tracking-wider block">
+												Dana Talangan Tahap 1
+											</span>
+											<p className="text-xs text-indigo-600 mt-0.5">
+												Akumulasi Perkuliahan + Interview Magang
+											</p>
+										</div>
+										<Badge className="bg-indigo-100 text-indigo-900 border-0 text-xs">
+											Plafon: {formatRupiah(t1TotalBill)}
+										</Badge>
+									</div>
+
+									<div className="space-y-1.5">
+										<div className="flex justify-between text-xs font-semibold text-indigo-950">
+											<span>Sudah Dicicil</span>
+											<span className="font-mono">{formatRupiah(t1Paid)}</span>
+										</div>
+										<Progress
+											value={t1TotalBill > 0 ? (t1Paid / t1TotalBill) * 100 : 0}
+											className="h-2 bg-indigo-200/50 rounded-full"
+										/>
+										<div className="flex justify-between text-[11px] text-indigo-700">
+											<span>Sisa Tagihan</span>
+											<span className="font-mono font-bold">
+												{formatRupiah(Math.max(0, t1TotalBill - t1Paid))}
+											</span>
+										</div>
+									</div>
+
+									{/* List Cicilan T1 */}
+									{t1Installments.length > 0 && (
+										<div className="pt-3 border-t border-indigo-200/50 space-y-1.5">
+											<span className="text-[11px] font-semibold text-indigo-800 block">
+												Riwayat Cicilan Tahap 1:
+											</span>
+											{t1Installments.map((ti: any, i: number) => (
+												<div
+													key={ti.id}
+													className="p-2 bg-white/70 rounded-lg flex justify-between items-center text-xs border border-indigo-100"
+												>
+													<span className="text-indigo-900 font-medium">
+														Cicilan #{ti.installmentNumber || i + 1}
+													</span>
+													<span className="font-mono font-bold text-indigo-950">
+														{formatRupiah(ti.nominalPaid)}
+													</span>
+												</div>
+											))}
+										</div>
+									)}
+								</div>
+
+								{/* Tahap 2 Card */}
+								<div className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-4">
+									<div className="flex justify-between items-start">
+										<div>
+											<span className="text-xs font-bold text-indigo-800 uppercase tracking-wider block">
+												Dana Talangan Tahap 2
+											</span>
+											<p className="text-xs text-indigo-600 mt-0.5">
+												Biaya Pemberangkatan Magang Luar Negeri
+											</p>
+										</div>
+										<Badge className="bg-indigo-100 text-indigo-900 border-0 text-xs">
+											Plafon: {formatRupiah(t2TotalBill)}
+										</Badge>
+									</div>
+
+									<div className="space-y-1.5">
+										<div className="flex justify-between text-xs font-semibold text-indigo-950">
+											<span>Sudah Dicicil</span>
+											<span className="font-mono">{formatRupiah(t2Paid)}</span>
+										</div>
+										<Progress
+											value={t2TotalBill > 0 ? (t2Paid / t2TotalBill) * 100 : 0}
+											className="h-2 bg-indigo-200/50 rounded-full"
+										/>
+										<div className="flex justify-between text-[11px] text-indigo-700">
+											<span>Sisa Tagihan</span>
+											<span className="font-mono font-bold">
+												{formatRupiah(Math.max(0, t2TotalBill - t2Paid))}
+											</span>
+										</div>
+									</div>
+
+									{/* List Cicilan T2 */}
+									{t2Installments.length > 0 && (
+										<div className="pt-3 border-t border-indigo-200/50 space-y-1.5">
+											<span className="text-[11px] font-semibold text-indigo-800 block">
+												Riwayat Cicilan Tahap 2:
+											</span>
+											{t2Installments.map((ti: any, i: number) => (
+												<div
+													key={ti.id}
+													className="p-2 bg-white/70 rounded-lg flex justify-between items-center text-xs border border-indigo-100"
+												>
+													<span className="text-indigo-900 font-medium">
+														Cicilan #{ti.installmentNumber || i + 1}
+													</span>
+													<span className="font-mono font-bold text-indigo-950">
+														{formatRupiah(ti.nominalPaid)}
+													</span>
+												</div>
+											))}
+										</div>
+									)}
+								</div>
+							</div>
+						</div>
+					)}
+
+					{/* Section 4: Biaya Tambahan Lainnya */}
+					<div className="pt-6 border-t border-slate-100 space-y-4">
+						<div className="flex items-center gap-2">
+							<Coins className="w-5 h-5 text-amber-600" />
+							<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+								Biaya Tambahan & Administrasi
+							</h3>
+						</div>
+
+						<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+							<div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80">
+								<span className="text-xs text-slate-500 font-semibold uppercase tracking-wider block">
+									Sertifikasi Bahasa (TOEIC)
+								</span>
+								<p className="text-base font-bold text-slate-800 font-mono mt-1">
+									{formatRupiah(data?.toeicNominal || 0)}
+								</p>
+								<div className="mt-2">
+									{renderMilestoneStatus(data?.toeicStatus)}
+								</div>
+							</div>
+
+							<div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80">
+								<span className="text-xs text-slate-500 font-semibold uppercase tracking-wider block">
+									Pembuatan Paspor
+								</span>
+								<p className="text-base font-bold text-slate-800 font-mono mt-1">
+									{formatRupiah(data?.pasporNominal || 0)}
+								</p>
+								<div className="mt-2">
+									{renderMilestoneStatus(data?.pasporStatus)}
+								</div>
+							</div>
+
+							{isTalangan ? (
+								<div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80">
+									<span className="text-xs text-slate-500 font-semibold uppercase tracking-wider block">
+										Administrasi Talangan
+									</span>
+									<p className="text-base font-bold text-slate-800 font-mono mt-1">
+										{formatRupiah(data?.adminTalaganNominal || 0)}
+									</p>
+									<div className="mt-2">
+										{renderMilestoneStatus(data?.adminTalaganStatus)}
+									</div>
+								</div>
+							) : data?.rumahJuangAktif ? (
+								<div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80">
+									<span className="text-xs text-slate-500 font-semibold uppercase tracking-wider block">
+										Iuran Rumah Juang
+									</span>
+									<p className="text-base font-bold text-slate-800 font-mono mt-1">
+										{formatRupiah(data?.rumahJuangNominal || 0)}
+									</p>
+									<div className="mt-2">
+										{renderMilestoneStatus(data?.rumahJuangStatus)}
+									</div>
+								</div>
+							) : null}
+						</div>
+
+						{/* Custom Fields jika ada */}
+						{data?.customFields && data.customFields.length > 0 && (
+							<div className="pt-3 space-y-2">
+								<span className="text-xs font-semibold text-slate-500 block">
+									Item Biaya Kustom Lainnya:
+								</span>
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+									{data.customFields.map((cf: any) => (
+										<div
+											key={cf.id}
+											className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between"
+										>
+											<div>
+												<span className="text-xs font-bold text-slate-800 block">
+													{cf.label}
+												</span>
+												<span className="text-xs text-slate-600 font-mono font-semibold mt-0.5 block">
+													{formatRupiah(cf.nominal || 0)}
+												</span>
+											</div>
+											<div>{renderMilestoneStatus(cf.status)}</div>
+										</div>
+									))}
+								</div>
+							</div>
+						)}
+					</div>
+
+					{/* Section 5: Dokumen & Berkas Finance */}
 					<div className="pt-6 border-t border-slate-100">
 						<div className="flex items-center gap-2 mb-4">
 							<ShieldCheck className="w-5 h-5 text-emerald-600" />
 							<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-								Dokumen & Berkas Finance
+								Bukti Pembayaran & Berkas Finance
 							</h3>
 						</div>
 						{data?.documents && data.documents.length > 0 ? (
@@ -317,7 +664,7 @@ export default function FinancePanelMahasiswa() {
 								{data.documents.map((doc: any, i: number) => (
 									<div
 										key={i}
-										className="flex items-center justify-between p-3 border border-slate-200 rounded-lg bg-white"
+										className="flex items-center justify-between p-3.5 border border-slate-200/80 rounded-xl bg-white shadow-xs"
 									>
 										<div className="flex items-center gap-3 overflow-hidden">
 											<FileText className="w-5 h-5 text-slate-400 shrink-0" />
@@ -325,20 +672,14 @@ export default function FinancePanelMahasiswa() {
 												<p className="text-sm font-semibold text-slate-700 truncate">
 													{doc.documentKey.replace(/_/g, " ").toUpperCase()}
 												</p>
-												{doc.fileName.toLowerCase().includes("dummy") ? (
-													<p className="text-xs text-amber-500 italic">
-														Belum ada file valid
-													</p>
-												) : (
-													<p className="text-xs text-slate-500 truncate">
-														{doc.fileName}
-													</p>
-												)}
+												<p className="text-xs text-slate-500 truncate">
+													{doc.fileName}
+												</p>
 											</div>
 										</div>
 										<div className="shrink-0 ml-2">
 											{doc.isVerified ? (
-												<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 px-2 py-0.5 text-[10px] border-0">
+												<Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 px-2 py-0.5 text-[10px] border-0">
 													Terverifikasi
 												</Badge>
 											) : (
@@ -354,51 +695,15 @@ export default function FinancePanelMahasiswa() {
 								))}
 							</div>
 						) : (
-							<div className="p-4 bg-slate-50 rounded-lg border border-slate-100 text-center">
+							<div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-center">
 								<p className="text-sm text-slate-500">
-									Belum ada dokumen yang diunggah.
+									Belum ada dokumen bukti bayar yang diunggah.
 								</p>
 							</div>
 						)}
 					</div>
-
-					{/* Warning Keseluruhan */}
-					{data?.status === "TIDAK_AMAN" && (
-						<div className="mt-8 p-4 bg-rose-50 border border-rose-100 rounded-lg flex items-start gap-3">
-							<AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
-							<div>
-								<h4 className="font-semibold text-rose-800 text-sm">
-									Perhatian Diperlukan
-								</h4>
-								<p className="text-sm text-rose-600 mt-1">
-									Status Keuangan Anda ditandai sebagai Tidak Aman. Harap segera
-									hubungi bagian administrasi.
-								</p>
-							</div>
-						</div>
-					)}
 				</CardContent>
 			</Card>
 		</div>
-	);
-}
-
-function RefreshCwIcon(props: any) {
-	return (
-		<svg
-			{...props}
-			xmlns="http://www.w3.org/2000/svg"
-			width="24"
-			height="24"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="2"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-		>
-			<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-			<path d="M3 3v5h5" />
-		</svg>
 	);
 }

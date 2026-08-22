@@ -131,7 +131,7 @@ export function TabPiket({ studentId }: { studentId: number }) {
 				toast.error(res.data?.error || "Gagal menambah catatan piket");
 			}
 		} catch (error: any) {
-			toast.error("Terjadi kesalahan sistem: " + (error?.message || ""));
+			toast.error(`Terjadi kesalahan sistem: ${error?.message || ""}`);
 		} finally {
 			setIsAdding(false);
 		}

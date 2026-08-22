@@ -188,7 +188,7 @@ export default function MataKuliahDetailPage() {
 			// Get students in this cohort
 			if (courseInfo?.cohort) {
 				const { data: sData, error: sErr } = await api.students.get({
-					$query: { cohort: courseInfo.cohort.toString(), isArchived: "false" },
+					$query: { cohort: courseInfo.cohort.toString(), all: "true" },
 				});
 				if (!sErr && sData?.data) {
 					const sList = (sData.data as any[]).map((item) => item.student);

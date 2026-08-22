@@ -59,15 +59,11 @@ function formatWhatsAppUrl(phone: string | null | undefined) {
 
 import { hasRole, useAuthStore } from "@/store";
 
-export function PaDashboard({ user: propUser, data: propData }: any) {
+export function PaDashboard({ user: propUser, data = [] }: any) {
 	const router = useRouter();
 	const { user: authUser } = useAuthStore();
 	const user = propUser || authUser;
 
-	const [data, setData] = useState<any[]>(propData || []);
-	const [isLoading, setIsLoading] = useState(
-		!propData || propData.length === 0,
-	);
 	const [selectedCohort, setSelectedCohort] = useState<string>("all");
 	const [selectedStatus, setSelectedStatus] = useState<string>("all");
 	const [selectedPaId, setSelectedPaId] = useState<string>("all");
@@ -76,14 +72,22 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 	const [currentPage, setCurrentPage] = useState(1);
 	const pageSize = 20;
 
-	// Cohort years starting from 2022
-	const cohortYears = useMemo(() => {
-		const currentYear = new Date().getFullYear();
-		return Array.from(
-			{ length: currentYear - 2022 + 2 },
-			(_, i) => currentYear + 1 - i,
-		);
-	}, []);
+	// Available cohorts dynamically derived from student data + fallbacks
+	const availableCohorts = useMemo(() => {
+		const cohorts = new Set<string>();
+		if (data && data.length > 0) {
+			data.forEach((s: any) => {
+				if (s.student?.cohort) cohorts.add(s.student.cohort.toString());
+			});
+		}
+		["16", "15", "14", "13", "12", "11", "10"].forEach((c) => cohorts.add(c));
+		return Array.from(cohorts).sort((a, b) => {
+			const numA = Number(a);
+			const numB = Number(b);
+			if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numB - numA;
+			return b.localeCompare(a);
+		});
+	}, [data]);
 
 	// Fetch PA List
 	useEffect(() => {
@@ -99,27 +103,6 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 		};
 		fetchPaList();
 	}, []);
-
-	useEffect(() => {
-		const fetchData = async () => {
-			try {
-				const { data: resData, error } = await api.students.get();
-				if (!error && resData?.data) {
-					setData(resData.data);
-				}
-			} catch (err) {
-				console.error("Failed fetching PA dashboard data", err);
-			} finally {
-				setIsLoading(false);
-			}
-		};
-		if (!propData || propData.length === 0) {
-			fetchData();
-		} else {
-			setData(propData);
-			setIsLoading(false);
-		}
-	}, [propData]);
 
 	// Filter data by PA assignment:
 	const isSuperadmin = hasRole(user, "superadmin");
@@ -156,7 +139,10 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 	const cohortData = useMemo(() => {
 		if (selectedCohort === "all") return paFilteredData;
 		return paFilteredData.filter(
-			(s: any) => s.student?.cohort?.toString() === selectedCohort,
+			(s: any) =>
+				s.student?.cohort?.toString() === selectedCohort ||
+				(Number(selectedCohort) >= 2000 &&
+					s.student?.cohort === Number(selectedCohort) - 2010),
 		);
 	}, [paFilteredData, selectedCohort]);
 
@@ -172,11 +158,8 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 	const countTidakAman = cohortData.filter(
 		(s: any) => s.pa?.status === "TIDAK_AMAN",
 	).length;
-	const countInterviewsDone = cohortData.filter(
-		(s: any) =>
-			s.pa?.interview1Completed &&
-			s.pa?.interview2Completed &&
-			s.pa?.interview3Completed,
+	const countKonselingSelesai = cohortData.filter(
+		(s: any) => s.pa?.counselingDone,
 	).length;
 
 	// Filtered students for Table
@@ -218,12 +201,10 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 			"Nama Mahasiswa": s.student?.name || "-",
 			Angkatan: s.student?.cohort || "-",
 			Program: s.student?.program || "-",
-			"Wawancara 1": s.pa?.interview1Completed ? "Selesai" : "Belum",
-			"Wawancara 2": s.pa?.interview2Completed ? "Selesai" : "Belum",
-			"Wawancara 3": s.pa?.interview3Completed ? "Selesai" : "Belum",
-			"Tripartite Meeting": s.pa?.tripartiteMeetingCompleted
-				? "Selesai"
-				: "Belum",
+			"Konseling Selesai": s.pa?.counselingDone ? "Ya" : "Belum",
+			"Mental Stabil": s.pa?.mentalStable ? "Ya" : "Belum",
+			"Disiplin Baik": s.pa?.disciplineGood ? "Ya" : "Belum",
+			"Catatan Disiplin": s.pa?.disciplineNotes || "-",
 			"Status PA":
 				s.pa?.status === "AMAN"
 					? "Aman"
@@ -240,13 +221,9 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 
 	const getPaChecklist = (pa: any) => {
 		const items = [
-			{ name: "Sesi Wawancara 1", done: Boolean(pa?.interview1Completed) },
-			{ name: "Sesi Wawancara 2", done: Boolean(pa?.interview2Completed) },
-			{ name: "Sesi Wawancara 3", done: Boolean(pa?.interview3Completed) },
-			{
-				name: "Tripartite Meeting",
-				done: Boolean(pa?.tripartiteMeetingCompleted),
-			},
+			{ name: "Konseling Selesai", done: Boolean(pa?.counselingDone) },
+			{ name: "Mental Stabil", done: Boolean(pa?.mentalStable) },
+			{ name: "Disiplin Baik", done: Boolean(pa?.disciplineGood) },
 		];
 		const completed = items.filter((i) => i.done).length;
 		return {
@@ -256,16 +233,6 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 			isDone: completed === items.length,
 		};
 	};
-
-	if (isLoading) {
-		return (
-			<div className="flex flex-col justify-center items-center h-80 gap-3 text-slate-500">
-				<p className="text-sm font-semibold">
-					Memuat data bimbingan akademik...
-				</p>
-			</div>
-		);
-	}
 
 	return (
 		<div className="space-y-6 pb-12">
@@ -322,13 +289,17 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 						onValueChange={(val) => setSelectedCohort(val || "all")}
 					>
 						<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
-							<SelectValue placeholder="Filter Angkatan" />
+							<SelectValue placeholder="Filter Angkatan">
+								{selectedCohort === "all"
+									? "Semua Angkatan"
+									: `Angkatan ${selectedCohort}`}
+							</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value="all">Semua Angkatan</SelectItem>
-							{cohortYears.map((year) => (
-								<SelectItem key={year} value={year.toString()}>
-									Angkatan {year}
+							{availableCohorts.map((cohort) => (
+								<SelectItem key={cohort} value={cohort}>
+									Angkatan {cohort}
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -433,10 +404,10 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								Wawancara 1-3 Selesai
+								Konseling Selesai
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countInterviewsDone}
+								{countKonselingSelesai}
 							</p>
 						</div>
 					</CardContent>
@@ -474,7 +445,17 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 							onValueChange={(val) => setSelectedStatus(val || "all")}
 						>
 							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
-								<SelectValue placeholder="Status PA" />
+								<SelectValue placeholder="Status PA">
+									{selectedStatus === "all"
+										? "Semua Status"
+										: selectedStatus === "aman"
+											? "🟢 Aman"
+											: selectedStatus === "perhatian"
+												? "🟡 Berproses"
+												: selectedStatus === "tidak_aman"
+													? "🔴 Kendala"
+													: "🛡️ Sudah ACC PA"}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Status</SelectItem>
@@ -508,7 +489,7 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 										No. WhatsApp
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
-										Progress PA (4)
+										Indikator PA (3)
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-24">
 										Aksi
@@ -552,7 +533,8 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 
 											<TableCell className="text-center font-medium text-xs text-slate-700">
 												{s.student.academicYear ||
-													(s.student.cohort && !isNaN(Number(s.student.cohort))
+													(s.student.cohort &&
+													!Number.isNaN(Number(s.student.cohort))
 														? `${2010 + Number(s.student.cohort)}/${2011 + Number(s.student.cohort)}`
 														: s.student.period || (
 																<span className="text-slate-400 italic">-</span>
@@ -611,7 +593,7 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 															<div className="flex flex-col items-center gap-1">
 																<div className="flex items-center justify-between w-full text-[11px] font-bold text-slate-700 px-1">
 																	<span>
-																		{completed}/{total} Sesi
+																		{completed}/{total} Indikator
 																	</span>
 																	<span
 																		className={
@@ -642,7 +624,7 @@ export function PaDashboard({ user: propUser, data: propData }: any) {
 														<TooltipContent className="w-64 p-3.5 bg-slate-950 text-white rounded-xl shadow-2xl border border-slate-800 text-xs flex flex-col space-y-2 z-50">
 															<div className="flex items-center justify-between border-b border-slate-800 pb-1.5 w-full">
 																<span className="font-bold text-slate-100 text-xs">
-																	Indikator Bimbingan:
+																	Indikator PA:
 																</span>
 																<span className="text-[11px] font-mono text-emerald-400 font-bold">
 																	{completed}/{total} Selesai

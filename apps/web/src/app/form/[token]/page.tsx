@@ -964,7 +964,7 @@ export default function FormMahasiswaPublic() {
 									onChange={(e) => {
 										const val = e.target.value;
 										const cNum = parseInt(val, 10);
-										if (!isNaN(cNum) && cNum >= 1 && cNum <= 99) {
+										if (!Number.isNaN(cNum) && cNum >= 1 && cNum <= 99) {
 											const startYear = 2010 + cNum;
 											setFormData((prev) => ({
 												...prev,

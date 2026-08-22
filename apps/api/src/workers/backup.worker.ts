@@ -7,36 +7,17 @@ interface BackupJobPayload {
 	filters: Record<string, unknown>;
 }
 
-/**
- * BackupWorker — consumer dari queue:backup.
- *
- * Prinsip:
- * - 1 worker saja (concurrency: 1) untuk mencegah overload disk I/O
- * - Idempotent: job yang sama bisa di-retry dengan aman berkat Redis lock
- * - Tidak pernah dipanggil langsung dari route — hanya dari queue
- * - Jika worker crash, lock otomatis expire setelah TTL (2 jam)
- *
- * Alur:
- * 1. Dequeue dari Redis (blocking, tidak polling)
- * 2. Panggil backupService.executeBackup()
- * 3. Loop kembali untuk job berikutnya
- */
 export async function startBackupWorker(): Promise<void> {
 	console.log("🔄 Backup Worker started — listening on queue:backup");
-
-	let errorBackoffMs = 1000;
 
 	// eslint-disable-next-line no-constant-condition
 	while (true) {
 		try {
-			// BRPOP: blocking dequeue, timeout 5 detik
-			// Return null jika timeout (tidak ada job), lanjut loop
 			const job = await dequeue<BackupJobPayload>("backup", 5);
-
-			// Reset backoff on successful communication with Redis
-			errorBackoffMs = 1000;
-
-			if (!job) continue;
+			if (!job) {
+				await new Promise((r) => setTimeout(r, 1000));
+				continue;
+			}
 
 			console.log(
 				`[BackupWorker] [${new Date().toISOString()}] Processing job ${job.payload.jobId} (type: ${job.payload.backupType})`,
@@ -59,9 +40,7 @@ export async function startBackupWorker(): Promise<void> {
 				`[BackupWorker] [${new Date().toISOString()}] Error processing job:`,
 				error.message,
 			);
-			// Exponential backoff up to 30 seconds
-			await new Promise((r) => setTimeout(r, errorBackoffMs));
-			errorBackoffMs = Math.min(errorBackoffMs * 2, 30000);
+			await new Promise((r) => setTimeout(r, 5000));
 		}
 	}
 }

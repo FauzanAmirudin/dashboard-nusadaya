@@ -8,6 +8,8 @@ import {
 	Calendar,
 	CheckCircle,
 	CheckCircle2,
+	ChevronLeft,
+	ChevronRight,
 	Clock,
 	Download,
 	Eye,
@@ -30,6 +32,7 @@ import {
 	Wallet,
 	XCircle,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -40,14 +43,65 @@ import {
 	Tooltip as RechartsTooltip,
 	ResponsiveContainer,
 } from "recharts";
-import { AkademikDashboard } from "@/components/dashboards/AkademikDashboard";
-import { CrmDashboard } from "@/components/dashboards/CrmDashboard";
-import { DosenDashboard } from "@/components/dashboards/DosenDashboard";
-import { EvaluatorDashboard } from "@/components/dashboards/EvaluatorDashboard";
-import { FinanceDashboard } from "@/components/dashboards/FinanceDashboard";
-import { MagangDashboard } from "@/components/dashboards/MagangDashboard";
-import { PaDashboard } from "@/components/dashboards/PaDashboard";
-import { PmbDashboard } from "@/components/dashboards/PmbDashboard";
+
+const AkademikDashboard = dynamic(
+	() =>
+		import("@/components/dashboards/AkademikDashboard").then(
+			(mod) => mod.AkademikDashboard,
+		),
+	{ ssr: false },
+);
+const CrmDashboard = dynamic(
+	() =>
+		import("@/components/dashboards/CrmDashboard").then(
+			(mod) => mod.CrmDashboard,
+		),
+	{ ssr: false },
+);
+const DosenDashboard = dynamic(
+	() =>
+		import("@/components/dashboards/DosenDashboard").then(
+			(mod) => mod.DosenDashboard,
+		),
+	{ ssr: false },
+);
+const EvaluatorDashboard = dynamic(
+	() =>
+		import("@/components/dashboards/EvaluatorDashboard").then(
+			(mod) => mod.EvaluatorDashboard,
+		),
+	{ ssr: false },
+);
+const FinanceDashboard = dynamic(
+	() =>
+		import("@/components/dashboards/FinanceDashboard").then(
+			(mod) => mod.FinanceDashboard,
+		),
+	{ ssr: false },
+);
+const MagangDashboard = dynamic(
+	() =>
+		import("@/components/dashboards/MagangDashboard").then(
+			(mod) => mod.MagangDashboard,
+		),
+	{ ssr: false },
+);
+const PaDashboard = dynamic(
+	() =>
+		import("@/components/dashboards/PaDashboard").then(
+			(mod) => mod.PaDashboard,
+		),
+	{ ssr: false },
+);
+const PmbDashboard = dynamic(
+	() =>
+		import("@/components/dashboards/PmbDashboard").then(
+			(mod) => mod.PmbDashboard,
+		),
+	{ ssr: false },
+);
+
+import { SharedDashboardLoader } from "@/components/dashboards/SharedDashboardLoader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,77 +128,66 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useDashboardSummary } from "@/hooks/useDashboardSummary";
+import { type StudentListItem, useStudentsList } from "@/hooks/useStudentsList";
 import { api } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 import { hasRole, useAuthStore } from "@/store";
-
-// Data types inferred from Eden API
-type StudentData = {
-	student: {
-		id: number;
-		nim: string | null;
-		name: string;
-		cohort: number;
-		program: string;
-		overallStatus: string | null;
-		studentStatus?: string | null;
-	};
-	pmb: { status: string | null; isAcc?: boolean } | null;
-	crm: { status: string | null; isAcc?: boolean } | null;
-	finance: { status: string | null; isAcc?: boolean } | null;
-	academic: { status: string | null; isAcc?: boolean } | null;
-	pa: { status: string | null; isAcc?: boolean } | null;
-	internship: { status: string | null; isAcc?: boolean } | null;
-	decision: {
-		isApprovedByDirector: boolean | null;
-		evaluatorDecision?: string | null;
-		departureDate?: string | null;
-		notes?: string | null;
-	} | null;
-	courseGrades?: Array<{
-		id: number | string;
-		isAcc?: boolean;
-		attendancePresent?: number;
-		totalMeetings?: number;
-	}>;
-};
 
 const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
 
 export default function DashboardPage() {
 	const router = useRouter();
 	const { user, isAuthenticated, hasHydrated } = useAuthStore();
-	const [data, setData] = useState<StudentData[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
-	const [isRefreshing, setIsRefreshing] = useState(false);
+
+	const [page, setPage] = useState(1);
+	const limit = 50;
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCohort, setSelectedCohort] = useState<string>("all");
 	const [selectedStatus, setSelectedStatus] = useState<string>("all");
-	const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+	const [isExporting, setIsExporting] = useState(false);
 
-	// Cohort years starting from 2022
-	const cohortYears = useMemo(() => {
-		const currentYear = new Date().getFullYear();
-		return Array.from(
-			{ length: currentYear - 2022 + 2 },
-			(_, i) => currentYear + 1 - i,
-		);
-	}, []);
+	// Reset page when filter changes
+	useEffect(() => {
+		setPage(1);
+	}, [searchQuery, selectedCohort, selectedStatus]);
 
-	// Fetch data
-	const fetchStudents = async () => {
-		try {
-			const { data: resData, error } = await api.students.get();
-			if (!error && resData?.data) {
-				setData(resData.data as unknown as StudentData[]);
-				setLastUpdated(new Date());
-			}
-		} catch (err) {
-			console.error("Failed fetching dashboard data", err);
-		} finally {
-			setIsLoading(false);
-		}
+	// Server-Side Summary Aggregation (super fast SQL aggregation, cached)
+	const {
+		data: summary,
+		isLoading: isSummaryLoading,
+		refetch: refetchSummary,
+	} = useDashboardSummary({ cohort: selectedCohort });
+
+	// Server-Side Paginated Students Query
+	const {
+		data: studentsResult,
+		isLoading: isStudentsLoading,
+		isFetching,
+		refetch: refetchStudents,
+	} = useStudentsList({
+		page,
+		limit,
+		cohort: selectedCohort,
+		status: selectedStatus,
+		search: searchQuery,
+	});
+
+	const students = studentsResult?.data || [];
+	const meta = studentsResult?.meta || {
+		page: 1,
+		limit: 50,
+		total: 0,
+		totalPages: 1,
 	};
+
+	// Cohorts from summary or fallback
+	const cohortYears = useMemo(() => {
+		if (summary?.cohorts && summary.cohorts.length > 0) {
+			return summary.cohorts;
+		}
+		return [16, 15, 14, 13, 12, 11, 10];
+	}, [summary?.cohorts]);
 
 	useEffect(() => {
 		if (!hasHydrated) return;
@@ -155,18 +198,12 @@ export default function DashboardPage() {
 
 		if (user?.role === "dosen") {
 			router.push("/dashboard/mata-kuliah");
-			return;
 		}
-
-		fetchStudents();
-
-		// Real-time polling every 15 seconds
-		const interval = setInterval(fetchStudents, 15000);
-		return () => clearInterval(interval);
 	}, [isAuthenticated, hasHydrated, router, user]);
 
 	// Helper for calculating accurate overall real-time status
-	const getRealtimeOverallStatus = (s: StudentData) => {
+	const getRealtimeOverallStatus = (s: StudentListItem) => {
+		if (s.student?.overallStatus) return s.student.overallStatus;
 		const panels = [
 			s.pmb?.isAcc ? "AMAN" : s.pmb?.status || "PERLU_PERHATIAN",
 			s.crm?.isAcc ? "AMAN" : s.crm?.status || "PERLU_PERHATIAN",
@@ -182,12 +219,7 @@ export default function DashboardPage() {
 	};
 
 	// Helper for checking module ACCs
-	const getStudentAccDetails = (s: StudentData) => {
-		const isDosenAcc =
-			s.courseGrades &&
-			s.courseGrades.length > 0 &&
-			s.courseGrades.every((g) => g.isAcc);
-
+	const getStudentAccDetails = (s: StudentListItem) => {
 		const modules = [
 			{
 				key: "pmb",
@@ -214,12 +246,6 @@ export default function DashboardPage() {
 				status: s.academic?.status || "PERLU_PERHATIAN",
 			},
 			{
-				key: "dosen",
-				name: "Dosen MK",
-				isAcc: Boolean(isDosenAcc),
-				status: isDosenAcc ? "AMAN" : "PERLU_PERHATIAN",
-			},
-			{
 				key: "pa",
 				name: "PA",
 				isAcc: Boolean(s.pa?.isAcc),
@@ -234,74 +260,57 @@ export default function DashboardPage() {
 		];
 
 		const accCount = modules.filter((m) => m.isAcc).length;
-		return { modules, accCount, isAllAcc: accCount === 7 };
+		return { modules, accCount, isAllAcc: accCount === 6 };
 	};
 
-	// Filtered students by Cohort, Status, and Search
-	const filteredData = useMemo(() => {
-		return data.filter((s) => {
-			const matchSearch =
-				!searchQuery ||
-				s.student?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				s.student?.nim?.toLowerCase().includes(searchQuery.toLowerCase());
-
-			const matchCohort =
-				selectedCohort === "all" ||
-				s.student?.cohort?.toString() === selectedCohort;
-
-			const rtStatus = getRealtimeOverallStatus(s);
-			const { isAllAcc } = getStudentAccDetails(s);
-			let matchStatus = true;
-			if (selectedStatus === "aman") matchStatus = rtStatus === "AMAN";
-			if (selectedStatus === "perhatian")
-				matchStatus = rtStatus === "PERLU_PERHATIAN";
-			if (selectedStatus === "tidak_aman")
-				matchStatus = rtStatus === "TIDAK_AMAN";
-			if (selectedStatus === "acc_lengkap") matchStatus = isAllAcc;
-			if (selectedStatus === "layak_berangkat")
-				matchStatus =
-					s.decision?.evaluatorDecision === "layak_berangkat" ||
-					s.decision?.isApprovedByDirector === true;
-
-			return matchSearch && matchCohort && matchStatus;
-		});
-	}, [data, searchQuery, selectedCohort, selectedStatus]);
-
-	const cohortData = useMemo(() => {
-		if (selectedCohort === "all") return data;
-		return data.filter((s) => s.student?.cohort?.toString() === selectedCohort);
-	}, [data, selectedCohort]);
-
-	const handleExport = () => {
-		if (data.length > 0) {
-			const exportData = filteredData.map((s) => {
-				const { accCount } = getStudentAccDetails(s);
-				return {
-					NIM: s.student.nim,
-					"Nama Mahasiswa": s.student.name,
-					"Program Studi": s.student.program,
-					Angkatan: s.student.cohort,
-					"Progress ACC": `${accCount}/7 Modul`,
-					"Status PMB": s.pmb?.status || "-",
-					"Status CRM": s.crm?.status || "-",
-					"Status Finance": s.finance?.status || "-",
-					"Status Akademik": s.academic?.status || "-",
-					"Status PA": s.pa?.status || "-",
-					"Status Magang": s.internship?.status || "-",
-					"Status Keseluruhan": getRealtimeOverallStatus(s),
-					"Keputusan Evaluator": s.decision?.evaluatorDecision || "menunggu",
-					"Disetujui Direktur": s.decision?.isApprovedByDirector
-						? "Ya"
-						: "Belum",
-					"Tgl Keberangkatan": s.decision?.departureDate
-						? new Date(s.decision.departureDate).toLocaleDateString("id-ID")
-						: "-",
-				};
+	// On-Demand Fast Export to CSV (fetches full list only on click)
+	const handleExport = async () => {
+		try {
+			setIsExporting(true);
+			const res = await api.students.get({
+				$query: {
+					all: "true",
+					cohort: selectedCohort !== "all" ? selectedCohort : undefined,
+					status: selectedStatus !== "all" ? selectedStatus : undefined,
+					search: searchQuery.trim() || undefined,
+				},
 			});
-			exportToCSV(
-				exportData,
-				`Dashboard_Nusadaya_${new Date().toISOString().split("T")[0]}`,
-			);
+
+			const fullData = (res.data?.data as unknown as StudentListItem[]) || [];
+			if (fullData.length > 0) {
+				const exportData = fullData.map((s) => {
+					const { accCount } = getStudentAccDetails(s);
+					return {
+						NIM: s.student.nim || "-",
+						"Nama Mahasiswa": s.student.name,
+						"Program Studi": s.student.program,
+						Angkatan: s.student.cohort,
+						"Progress ACC": `${accCount}/6 Modul`,
+						"Status PMB": s.pmb?.status || "-",
+						"Status CRM": s.crm?.status || "-",
+						"Status Finance": s.finance?.status || "-",
+						"Status Akademik": s.academic?.status || "-",
+						"Status PA": s.pa?.status || "-",
+						"Status Magang": s.internship?.status || "-",
+						"Status Keseluruhan": getRealtimeOverallStatus(s),
+						"Keputusan Evaluator": s.decision?.evaluatorDecision || "menunggu",
+						"Disetujui Direktur": s.decision?.isApprovedByDirector
+							? "Ya"
+							: "Belum",
+						"Tgl Keberangkatan": s.decision?.departureDate
+							? new Date(s.decision.departureDate).toLocaleDateString("id-ID")
+							: "-",
+					};
+				});
+				exportToCSV(
+					exportData,
+					`Dashboard_Nusadaya_${new Date().toISOString().split("T")[0]}`,
+				);
+			}
+		} catch (err) {
+			console.error("Export failed:", err);
+		} finally {
+			setIsExporting(false);
 		}
 	};
 
@@ -309,7 +318,7 @@ export default function DashboardPage() {
 		return null;
 	}
 
-	if (isLoading) {
+	if (isSummaryLoading && isStudentsLoading) {
 		return (
 			<div className="flex flex-col justify-center items-center h-80 gap-3 text-slate-500">
 				<RefreshCw className="w-8 h-8 animate-spin text-[#0517B0]" />
@@ -320,150 +329,44 @@ export default function DashboardPage() {
 		);
 	}
 
-	// Role-specific Dashboards based on active primary role or permissions
+	// Superadmin & Directors view the Master Executive Dashboard
 	if (
-		user?.role === "dosen" ||
-		(!hasRole(user, "superadmin") &&
-			hasRole(user, "dosen") &&
-			!hasRole(
-				user,
-				"pmb",
-				"crm",
-				"finance",
-				"akademik",
-				"pa",
-				"magang",
-				"evaluator",
-			))
+		user?.role === "superadmin" ||
+		user?.role === "director" ||
+		user?.role === "direktur"
 	) {
+		// Proceed down to Superadmin Executive Dashboard
+	} else if (user?.role === "dosen") {
 		return <DosenDashboard user={user} />;
-	}
-
-	if (user?.role === "pmb")
-		return (
-			<PmbDashboard
-				data={data as any}
-				searchQuery={searchQuery}
-				setSearchQuery={setSearchQuery}
-				user={user}
-			/>
-		);
-	if (user?.role === "crm")
-		return (
-			<CrmDashboard
-				data={data as any}
-				searchQuery={searchQuery}
-				setSearchQuery={setSearchQuery}
-				user={user}
-			/>
-		);
-	if (user?.role === "akademik")
-		return (
-			<AkademikDashboard
-				data={data as any}
-				searchQuery={searchQuery}
-				setSearchQuery={setSearchQuery}
-				user={user}
-			/>
-		);
-	if (user?.role === "pa")
-		return (
-			<PaDashboard
-				data={data as any}
-				searchQuery={searchQuery}
-				setSearchQuery={setSearchQuery}
-				user={user}
-			/>
-		);
-	if (user?.role === "magang") return <MagangDashboard />;
-	if (user?.role === "finance")
-		return (
-			<FinanceDashboard
-				data={data as any}
-				searchQuery={searchQuery}
-				setSearchQuery={setSearchQuery}
-				user={user}
-			/>
-		);
-	if (user?.role === "evaluator")
-		return (
-			<EvaluatorDashboard
-				data={data as any}
-				searchQuery={searchQuery}
-				setSearchQuery={setSearchQuery}
-				user={user}
-				onUpdate={() => {
-					api.students.get().then((res) => {
-						if (res.data?.data)
-							setData(res.data.data as unknown as StudentData[]);
-					});
-				}}
-			/>
-		);
-
-	// Multi-role fallbacks if user.role wasn't directly matched above
-	if (hasRole(user, "pmb"))
-		return (
-			<PmbDashboard
-				data={data as any}
-				searchQuery={searchQuery}
-				setSearchQuery={setSearchQuery}
-				user={user}
-			/>
-		);
-	if (hasRole(user, "crm"))
-		return (
-			<CrmDashboard
-				data={data as any}
-				searchQuery={searchQuery}
-				setSearchQuery={setSearchQuery}
-				user={user}
-			/>
-		);
-	if (hasRole(user, "akademik"))
-		return (
-			<AkademikDashboard
-				data={data as any}
-				searchQuery={searchQuery}
-				setSearchQuery={setSearchQuery}
-				user={user}
-			/>
-		);
-	if (hasRole(user, "pa"))
-		return (
-			<PaDashboard
-				data={data as any}
-				searchQuery={searchQuery}
-				setSearchQuery={setSearchQuery}
-				user={user}
-			/>
-		);
-	if (hasRole(user, "magang")) return <MagangDashboard />;
-	if (hasRole(user, "finance"))
-		return (
-			<FinanceDashboard
-				data={data as any}
-				searchQuery={searchQuery}
-				setSearchQuery={setSearchQuery}
-				user={user}
-			/>
-		);
-	if (hasRole(user, "evaluator"))
-		return (
-			<EvaluatorDashboard
-				data={data as any}
-				searchQuery={searchQuery}
-				setSearchQuery={setSearchQuery}
-				user={user}
-				onUpdate={() => {
-					api.students.get().then((res) => {
-						if (res.data?.data)
-							setData(res.data.data as unknown as StudentData[]);
-					});
-				}}
-			/>
-		);
-	if (hasRole(user, "dosen")) {
+	} else if (user?.role === "pmb") {
+		return <SharedDashboardLoader module="pmb" />;
+	} else if (user?.role === "crm") {
+		return <SharedDashboardLoader module="crm" />;
+	} else if (user?.role === "akademik") {
+		return <SharedDashboardLoader module="akademik" />;
+	} else if (user?.role === "pa") {
+		return <SharedDashboardLoader module="pa" />;
+	} else if (user?.role === "magang") {
+		return <SharedDashboardLoader module="magang" />;
+	} else if (user?.role === "finance") {
+		return <SharedDashboardLoader module="finance" />;
+	} else if (user?.role === "evaluator") {
+		return <SharedDashboardLoader module="evaluator" />;
+	} else if (hasRole(user, "pmb")) {
+		return <SharedDashboardLoader module="pmb" />;
+	} else if (hasRole(user, "crm")) {
+		return <SharedDashboardLoader module="crm" />;
+	} else if (hasRole(user, "akademik")) {
+		return <SharedDashboardLoader module="akademik" />;
+	} else if (hasRole(user, "pa")) {
+		return <SharedDashboardLoader module="pa" />;
+	} else if (hasRole(user, "magang")) {
+		return <SharedDashboardLoader module="magang" />;
+	} else if (hasRole(user, "finance")) {
+		return <SharedDashboardLoader module="finance" />;
+	} else if (hasRole(user, "evaluator")) {
+		return <SharedDashboardLoader module="evaluator" />;
+	} else if (hasRole(user, "dosen")) {
 		return <DosenDashboard user={user} />;
 	}
 
@@ -482,30 +385,13 @@ export default function DashboardPage() {
 	}
 
 	// ==========================================
-	// SUPERADMIN DASHBOARD
+	// SUPERADMIN DASHBOARD (DATA-DRIVEN FROM SERVER SUMMARY)
 	// ==========================================
-
-	const totalStudents = cohortData.length;
-	const countAman = cohortData.filter(
-		(s) => getRealtimeOverallStatus(s) === "AMAN",
-	).length;
-	const countPerhatian = cohortData.filter(
-		(s) => getRealtimeOverallStatus(s) === "PERLU_PERHATIAN",
-	).length;
-	const countTidakAman = cohortData.filter(
-		(s) => getRealtimeOverallStatus(s) === "TIDAK_AMAN",
-	).length;
-	const countAccLengkap = cohortData.filter(
-		(s) => getStudentAccDetails(s).isAllAcc,
-	).length;
-	const countLayakBerangkat = cohortData.filter(
-		(s) =>
-			s.decision?.evaluatorDecision === "layak_berangkat" ||
-			s.decision?.isApprovedByDirector === true,
-	).length;
-	const countDisetujuiDirektur = cohortData.filter(
-		(s) => s.decision?.isApprovedByDirector === true,
-	).length;
+	const totalStudents = summary?.totalStudents || 0;
+	const countAman = summary?.byStatus?.AMAN || 0;
+	const countPerhatian = summary?.byStatus?.PERLU_PERHATIAN || 0;
+	const countTidakAman = summary?.byStatus?.TIDAK_AMAN || 0;
+	const countLayakBerangkat = summary?.evaluator?.layakBerangkat || 0;
 
 	const pieData = [
 		{ name: "Aman", value: countAman },
@@ -513,7 +399,6 @@ export default function DashboardPage() {
 		{ name: "Tidak Aman", value: countTidakAman },
 	];
 
-	// Real-time division ACC rates based on selected cohort
 	const divisionStats = [
 		{
 			key: "pmb",
@@ -521,12 +406,9 @@ export default function DashboardPage() {
 			href: "/dashboard/pmb",
 			icon: FileText,
 			color: "text-sky-600 bg-sky-50 border-sky-200",
-			accCount: cohortData.filter((s) => s.pmb?.isAcc).length,
+			accCount: summary?.panels?.pmb?.acc || 0,
 			rate: totalStudents
-				? Math.round(
-						(cohortData.filter((s) => s.pmb?.isAcc).length / totalStudents) *
-							100,
-					)
+				? Math.round(((summary?.panels?.pmb?.acc || 0) / totalStudents) * 100)
 				: 0,
 		},
 		{
@@ -535,12 +417,9 @@ export default function DashboardPage() {
 			href: "/dashboard/crm",
 			icon: PhoneCall,
 			color: "text-violet-600 bg-violet-50 border-violet-200",
-			accCount: cohortData.filter((s) => s.crm?.isAcc).length,
+			accCount: summary?.panels?.crm?.acc || 0,
 			rate: totalStudents
-				? Math.round(
-						(cohortData.filter((s) => s.crm?.isAcc).length / totalStudents) *
-							100,
-					)
+				? Math.round(((summary?.panels?.crm?.acc || 0) / totalStudents) * 100)
 				: 0,
 		},
 		{
@@ -549,12 +428,10 @@ export default function DashboardPage() {
 			href: "/dashboard/finance",
 			icon: Wallet,
 			color: "text-emerald-600 bg-emerald-50 border-emerald-200",
-			accCount: cohortData.filter((s) => s.finance?.isAcc).length,
+			accCount: summary?.panels?.finance?.acc || 0,
 			rate: totalStudents
 				? Math.round(
-						(cohortData.filter((s) => s.finance?.isAcc).length /
-							totalStudents) *
-							100,
+						((summary?.panels?.finance?.acc || 0) / totalStudents) * 100,
 					)
 				: 0,
 		},
@@ -564,37 +441,10 @@ export default function DashboardPage() {
 			href: "/dashboard/akademik",
 			icon: GraduationCap,
 			color: "text-amber-600 bg-amber-50 border-amber-200",
-			accCount: cohortData.filter((s) => s.academic?.isAcc).length,
+			accCount: summary?.panels?.academic?.acc || 0,
 			rate: totalStudents
 				? Math.round(
-						(cohortData.filter((s) => s.academic?.isAcc).length /
-							totalStudents) *
-							100,
-					)
-				: 0,
-		},
-		{
-			key: "dosen",
-			name: "Dosen MK",
-			href: "/dashboard/mata-kuliah",
-			icon: BookOpen,
-			color: "text-orange-600 bg-orange-50 border-orange-200",
-			accCount: cohortData.filter(
-				(s) =>
-					s.courseGrades &&
-					s.courseGrades.length > 0 &&
-					s.courseGrades.every((g) => g.isAcc),
-			).length,
-			rate: totalStudents
-				? Math.round(
-						(cohortData.filter(
-							(s) =>
-								s.courseGrades &&
-								s.courseGrades.length > 0 &&
-								s.courseGrades.every((g) => g.isAcc),
-						).length /
-							totalStudents) *
-							100,
+						((summary?.panels?.academic?.acc || 0) / totalStudents) * 100,
 					)
 				: 0,
 		},
@@ -604,12 +454,9 @@ export default function DashboardPage() {
 			href: "/dashboard/pa",
 			icon: HeartHandshake,
 			color: "text-teal-600 bg-teal-50 border-teal-200",
-			accCount: cohortData.filter((s) => s.pa?.isAcc).length,
+			accCount: summary?.panels?.pa?.acc || 0,
 			rate: totalStudents
-				? Math.round(
-						(cohortData.filter((s) => s.pa?.isAcc).length / totalStudents) *
-							100,
-					)
+				? Math.round(((summary?.panels?.pa?.acc || 0) / totalStudents) * 100)
 				: 0,
 		},
 		{
@@ -618,32 +465,14 @@ export default function DashboardPage() {
 			href: "/dashboard/magang",
 			icon: Plane,
 			color: "text-cyan-600 bg-cyan-50 border-cyan-200",
-			accCount: cohortData.filter((s) => s.internship?.isAcc).length,
+			accCount: summary?.panels?.internship?.acc || 0,
 			rate: totalStudents
 				? Math.round(
-						(cohortData.filter((s) => s.internship?.isAcc).length /
-							totalStudents) *
-							100,
+						((summary?.panels?.internship?.acc || 0) / totalStudents) * 100,
 					)
 				: 0,
 		},
 	];
-
-	// Keputusan final breakdown based on cohortData
-	const countTTD = cohortData.filter(
-		(s) => s.decision?.evaluatorDecision === "ttd_kontrak",
-	).length;
-	const countInterview = cohortData.filter(
-		(s) => s.decision?.evaluatorDecision === "lanjut_interview",
-	).length;
-	const countRemedial = cohortData.filter(
-		(s) => s.decision?.evaluatorDecision === "remedial",
-	).length;
-	const countMenunggu = cohortData.filter(
-		(s) =>
-			!s.decision?.evaluatorDecision ||
-			s.decision?.evaluatorDecision === "menunggu",
-	).length;
 
 	return (
 		<div className="space-y-6 pb-12">
@@ -687,10 +516,15 @@ export default function DashboardPage() {
 					<Button
 						size="sm"
 						onClick={handleExport}
+						disabled={isExporting}
 						className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs gap-1.5 h-9"
 					>
-						<Download className="w-3.5 h-3.5" />
-						Export Data
+						{isExporting ? (
+							<RefreshCw className="w-3.5 h-3.5 animate-spin" />
+						) : (
+							<Download className="w-3.5 h-3.5" />
+						)}
+						{isExporting ? "Mengekspor..." : "Export Data"}
 					</Button>
 				</div>
 			</div>
@@ -719,11 +553,9 @@ export default function DashboardPage() {
 							<ShieldCheck className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-emerald-700 text-xs font-bold">
-								ACC Lengkap 7/7
-							</p>
+							<p className="text-emerald-700 text-xs font-bold">PMB Ter-ACC</p>
 							<p className="text-2xl font-black text-emerald-900 mt-0.5">
-								{countAccLengkap}
+								{summary?.panels?.pmb?.acc || 0}
 							</p>
 						</div>
 					</CardContent>
@@ -875,7 +707,7 @@ export default function DashboardPage() {
 					</CardContent>
 				</Card>
 
-				{/* 2. Progres & Tingkat ACC 7 Divisi */}
+				{/* 2. Progres & Tingkat ACC 6 Divisi */}
 				<Card className="bg-white border-slate-200 shadow-sm col-span-1 lg:col-span-2">
 					<CardHeader className="border-b border-slate-100 pb-3 flex flex-row items-center justify-between">
 						<CardTitle className="text-slate-800 text-base flex items-center gap-2">
@@ -938,10 +770,13 @@ export default function DashboardPage() {
 						<CardTitle className="text-slate-900 text-base font-bold flex items-center gap-2">
 							<Users className="w-4 h-4 text-[#0517B0]" />
 							Tabel Monitoring Mahasiswa Real-Time
+							{isFetching && (
+								<RefreshCw className="w-3.5 h-3.5 animate-spin text-slate-400 ml-1" />
+							)}
 						</CardTitle>
 						<p className="text-xs text-slate-500 mt-0.5">
-							Daftar seluruh mahasiswa dan status kelengkapan 7 divisi secara
-							live.
+							Daftar seluruh mahasiswa dan status kelengkapan 6 divisi secara
+							live. Menampilkan {students.length} dari {meta.total} mahasiswa.
 						</p>
 					</div>
 
@@ -986,10 +821,6 @@ export default function DashboardPage() {
 								<SelectItem value="aman">🟢 Aman</SelectItem>
 								<SelectItem value="perhatian">🟡 Perlu Perhatian</SelectItem>
 								<SelectItem value="tidak_aman">🔴 Tidak Aman</SelectItem>
-								<SelectItem value="acc_lengkap">🛡️ ACC Lengkap (7/7)</SelectItem>
-								<SelectItem value="layak_berangkat">
-									✈️ Layak Berangkat
-								</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
@@ -1007,10 +838,10 @@ export default function DashboardPage() {
 										Nama & Program
 									</TableHead>
 									<TableHead className="py-3 font-bold text-slate-700 text-xs text-center w-36">
-										Progress 7 Modul
+										Progress 6 Modul
 									</TableHead>
 									<TableHead className="py-3 font-bold text-slate-700 text-xs text-center w-48">
-										Status Divisi (P C F A D PA M)
+										Status Divisi (P C F A PA M)
 									</TableHead>
 									<TableHead className="py-3 font-bold text-slate-700 text-xs text-center w-28">
 										Kondisi
@@ -1024,7 +855,7 @@ export default function DashboardPage() {
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{filteredData.map((s) => {
+								{students.map((s) => {
 									const { modules, accCount, isAllAcc } =
 										getStudentAccDetails(s);
 									const rtStatus = getRealtimeOverallStatus(s);
@@ -1035,7 +866,7 @@ export default function DashboardPage() {
 											className="border-slate-100 hover:bg-blue-50/40 transition-colors"
 										>
 											<TableCell className="font-mono text-xs font-bold text-slate-700">
-												{s.student.nim}
+												{s.student.nim || "-"}
 											</TableCell>
 											<TableCell>
 												<div className="font-bold text-slate-900 text-sm">
@@ -1061,7 +892,7 @@ export default function DashboardPage() {
 														<TooltipTrigger className="w-full">
 															<div className="flex flex-col items-center gap-1">
 																<div className="flex items-center justify-between w-full text-[11px] font-bold text-slate-700 px-1">
-																	<span>{accCount}/7 ACC</span>
+																	<span>{accCount}/6 ACC</span>
 																	<span
 																		className={
 																			isAllAcc
@@ -1069,7 +900,7 @@ export default function DashboardPage() {
 																				: "text-slate-500"
 																		}
 																	>
-																		{Math.round((accCount / 7) * 100)}%
+																		{Math.round((accCount / 6) * 100)}%
 																	</span>
 																</div>
 																<div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
@@ -1082,7 +913,7 @@ export default function DashboardPage() {
 																					: "bg-amber-500"
 																		}`}
 																		style={{
-																			width: `${(accCount / 7) * 100}%`,
+																			width: `${(accCount / 6) * 100}%`,
 																		}}
 																	/>
 																</div>
@@ -1091,10 +922,10 @@ export default function DashboardPage() {
 														<TooltipContent className="w-64 p-3.5 bg-slate-950 text-white rounded-xl shadow-2xl border border-slate-800 text-xs flex flex-col space-y-2 z-50">
 															<div className="flex items-center justify-between border-b border-slate-800 pb-1.5 w-full">
 																<span className="font-bold text-slate-100 text-xs">
-																	Rincian ACC 7 Divisi:
+																	Rincian ACC 6 Divisi:
 																</span>
 																<span className="text-[11px] font-mono text-emerald-400 font-bold">
-																	{accCount}/7 ACC
+																	{accCount}/6 ACC
 																</span>
 															</div>
 															<div className="flex flex-col space-y-1.5 w-full">
@@ -1215,7 +1046,7 @@ export default function DashboardPage() {
 							</TableBody>
 						</Table>
 
-						{filteredData.length === 0 && (
+						{students.length === 0 && (
 							<div className="text-center py-12 text-slate-500">
 								<HelpCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
 								<p className="text-sm font-semibold">
@@ -1228,6 +1059,55 @@ export default function DashboardPage() {
 							</div>
 						)}
 					</div>
+
+					{/* Pagination Footer */}
+					{meta.total > 0 && (
+						<div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-slate-200 bg-slate-50/50">
+							<div className="text-xs text-slate-500 font-medium">
+								Menampilkan{" "}
+								<span className="font-bold text-slate-800">
+									{(meta.page - 1) * meta.limit + 1}
+								</span>{" "}
+								-{" "}
+								<span className="font-bold text-slate-800">
+									{Math.min(meta.page * meta.limit, meta.total)}
+								</span>{" "}
+								dari{" "}
+								<span className="font-bold text-slate-800">{meta.total}</span>{" "}
+								mahasiswa
+							</div>
+
+							<div className="flex items-center gap-2">
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={meta.page <= 1 || isStudentsLoading}
+									onClick={() => setPage((p) => Math.max(1, p - 1))}
+									className="h-8 px-2.5 text-xs text-slate-700 gap-1"
+								>
+									<ChevronLeft className="w-3.5 h-3.5" />
+									Sebelumnya
+								</Button>
+
+								<span className="text-xs font-semibold text-slate-700 px-2">
+									Halaman {meta.page} dari {meta.totalPages}
+								</span>
+
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={meta.page >= meta.totalPages || isStudentsLoading}
+									onClick={() =>
+										setPage((p) => Math.min(meta.totalPages, p + 1))
+									}
+									className="h-8 px-2.5 text-xs text-slate-700 gap-1"
+								>
+									Selanjutnya
+									<ChevronRight className="w-3.5 h-3.5" />
+								</Button>
+							</div>
+						</div>
+					)}
 				</CardContent>
 			</Card>
 		</div>

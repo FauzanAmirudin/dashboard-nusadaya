@@ -23,36 +23,21 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { useStudentsList } from "@/hooks/useStudentsList";
 import { api } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 import { useAuthStore } from "@/store";
 
 export function KehadiranDashboard() {
 	const { user } = useAuthStore();
-	const [students, setStudents] = useState<any[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
 	const [cohortFilter, setCohortFilter] = useState<string>("all");
 	const [searchQuery, setSearchQuery] = useState("");
 
-	const fetchStudents = async () => {
-		setIsLoading(true);
-		try {
-			const { data, error } = await api.students.get();
-			if (!error && data?.data) {
-				setStudents(data.data);
-			} else {
-				toast.error("Gagal memuat daftar mahasiswa");
-			}
-		} catch (error) {
-			toast.error("Terjadi kesalahan sistem");
-		} finally {
-			setIsLoading(false);
-		}
-	};
+	const { data: studentsResult, isLoading } = useStudentsList({
+		all: true,
+	});
 
-	useEffect(() => {
-		fetchStudents();
-	}, []);
+	const students = (studentsResult?.data || []) as any[];
 
 	const filteredStudents = students.filter((item: any) => {
 		const s = item.student;

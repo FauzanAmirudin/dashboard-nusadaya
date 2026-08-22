@@ -210,10 +210,7 @@ function ListCalendarView({
 	};
 
 	// Available Cohort Options for Filter
-	const availableCohorts = Array.from(
-		{ length: new Date().getFullYear() - 2022 + 2 },
-		(_, i) => (new Date().getFullYear() + 1 - i).toString(),
-	);
+	const availableCohorts = ["16", "15", "14", "13", "12", "11", "10"];
 
 	// Filtered Calendars List
 	const filteredCalendars = calendars.filter((c) => {
@@ -223,7 +220,10 @@ function ListCalendarView({
 			c.cohort.toString().includes(searchQuery);
 
 		const matchesCohort =
-			cohortFilter === "all" || c.cohort.toString() === cohortFilter;
+			cohortFilter === "all" ||
+			c.cohort.toString() === cohortFilter ||
+			(Number(cohortFilter) >= 2000 &&
+				c.cohort === Number(cohortFilter) - 2010);
 
 		return matchesSearch && matchesCohort;
 	});

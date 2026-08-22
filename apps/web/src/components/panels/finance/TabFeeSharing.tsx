@@ -405,7 +405,7 @@ export function TabFeeSharing({ studentId, canEdit }: TabFeeSharingProps) {
 										: 0;
 								if (pct <= 0) return null;
 								const styleCfg =
-									CATEGORY_COLORS[rec.kategori] || CATEGORY_COLORS["Mitra"];
+									CATEGORY_COLORS[rec.kategori] || CATEGORY_COLORS.Mitra;
 								return (
 									<div
 										key={rec.id}
@@ -556,7 +556,7 @@ export function TabFeeSharing({ studentId, canEdit }: TabFeeSharingProps) {
 								<TableBody>
 									{recipients.map((r) => {
 										const styleCfg =
-											CATEGORY_COLORS[r.kategori] || CATEGORY_COLORS["Mitra"];
+											CATEGORY_COLORS[r.kategori] || CATEGORY_COLORS.Mitra;
 										const proporsi =
 											totalBiayaPromosi > 0
 												? ((r.nominalFee || 0) / totalBiayaPromosi) * 100

@@ -42,77 +42,80 @@ import { requireRole } from "../../middleware/rbac";
 export const paRoutes = new Elysia()
 	.get("/:id/pa", async (context) => {
 		const id = Number(context.params.id);
-		let pa = await db.query.paData.findFirst({
-			where: eq(paData.studentId, id),
-			with: {
-				accBy: true,
-			},
-		});
-
-		if (!pa) {
-			await db.insert(paData).values({ studentId: id });
-			pa = await db.query.paData.findFirst({
+		const [
+			pa,
+			vLogs,
+			cLogs,
+			tripartiteLogs,
+			interviewLogs,
+			hafalanSessions,
+			studentNotes,
+		] = await Promise.all([
+			db.query.paData.findFirst({
 				where: eq(paData.studentId, id),
 				with: {
 					accBy: true,
 				},
+			}),
+			db.query.vocabLogs.findMany({
+				where: eq(vocabLogs.studentId, id),
+				orderBy: [desc(vocabLogs.date)],
+			}),
+			db.query.counselingLogs.findMany({
+				where: eq(counselingLogs.studentId, id),
+				orderBy: [desc(counselingLogs.date)],
+			}),
+			db.query.paTripartiteLogs.findMany({
+				where: eq(paTripartiteLogs.studentId, id),
+				orderBy: (logs, { desc }) => [desc(logs.contactDate)],
+			}),
+			db.query.paInterviewLogs.findMany({
+				where: eq(paInterviewLogs.studentId, id),
+				orderBy: (logs, { desc }) => [desc(logs.interviewDate)],
+			}),
+			db.query.paHafalanSessions
+				.findMany({
+					where: eq(paHafalanSessions.studentId, id),
+					with: {
+						createdByUser: { columns: { fullName: true, username: true } },
+					},
+					orderBy: [desc(paHafalanSessions.createdAt)],
+				})
+				.catch(() =>
+					db
+						.select()
+						.from(paHafalanSessions)
+						.where(eq(paHafalanSessions.studentId, id)),
+				),
+			db.query.paStudentNotes
+				.findMany({
+					where: eq(paStudentNotes.studentId, id),
+					with: {
+						createdByUser: { columns: { fullName: true, username: true } },
+					},
+					orderBy: [desc(paStudentNotes.createdAt)],
+				})
+				.catch(() =>
+					db
+						.select()
+						.from(paStudentNotes)
+						.where(eq(paStudentNotes.studentId, id)),
+				),
+		]);
+
+		let resolvedPa = pa;
+		if (!resolvedPa) {
+			await db.insert(paData).values({ studentId: id });
+			resolvedPa = await db.query.paData.findFirst({
+				where: eq(paData.studentId, id),
+				with: { accBy: true },
 			});
 		}
-
-		const vLogs = await db.query.vocabLogs.findMany({
-			where: eq(vocabLogs.studentId, id),
-			orderBy: [desc(vocabLogs.date)],
-		});
-
-		const cLogs = await db.query.counselingLogs.findMany({
-			where: eq(counselingLogs.studentId, id),
-			orderBy: [desc(counselingLogs.date)],
-		});
-
-		const tripartiteLogs = await db.query.paTripartiteLogs.findMany({
-			where: eq(paTripartiteLogs.studentId, id),
-			orderBy: (logs, { desc }) => [desc(logs.contactDate)],
-		});
-
-		const interviewLogs = await db.query.paInterviewLogs.findMany({
-			where: eq(paInterviewLogs.studentId, id),
-			orderBy: (logs, { desc }) => [desc(logs.interviewDate)],
-		});
-
-		const hafalanSessions = await db.query.paHafalanSessions
-			.findMany({
-				where: eq(paHafalanSessions.studentId, id),
-				with: {
-					createdByUser: { columns: { fullName: true, username: true } },
-				},
-				orderBy: [desc(paHafalanSessions.createdAt)],
-			})
-			.catch(() =>
-				db
-					.select()
-					.from(paHafalanSessions)
-					.where(eq(paHafalanSessions.studentId, id)),
-			);
-
-		const studentNotes = await db.query.paStudentNotes
-			.findMany({
-				where: eq(paStudentNotes.studentId, id),
-				with: {
-					createdByUser: { columns: { fullName: true, username: true } },
-				},
-				orderBy: [desc(paStudentNotes.createdAt)],
-			})
-			.catch(() =>
-				db
-					.select()
-					.from(paStudentNotes)
-					.where(eq(paStudentNotes.studentId, id)),
-			);
 
 		return {
 			success: true,
 			data: {
-				data: pa,
+				data: resolvedPa,
 				vocabLogs: vLogs,
 				counselingLogs: cLogs,
 				tripartiteLogs: tripartiteLogs,

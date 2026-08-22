@@ -251,13 +251,6 @@ function StudentDetailContent() {
 
 		setIsLoading(true);
 		refetchStudent().finally(() => setIsLoading(false));
-
-		// Real-time background sync every 15 seconds
-		const syncInterval = setInterval(() => {
-			refetchStudent();
-		}, 15000);
-
-		return () => clearInterval(syncInterval);
 	}, [params.id, isAuthenticated, hasHydrated, router, refetchStudent]);
 
 	const handleGenerateAccount = async () => {

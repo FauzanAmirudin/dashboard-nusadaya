@@ -68,8 +68,6 @@ export function StatusPanel({
 
 	useEffect(() => {
 		fetchStatus();
-		const interval = setInterval(fetchStatus, 30000); // Polling setiap 30 detik
-		return () => clearInterval(interval);
 	}, [studentId]);
 
 	if (isLoading && !data) {

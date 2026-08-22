@@ -37,6 +37,7 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
 import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 
@@ -128,100 +129,82 @@ export const financeRoutes = new Elysia()
 			const current = await db.query.financeData.findFirst({
 				where: eq(financeData.studentId, id),
 			});
-			if (!current) {
-				await db.insert(financeData).values({ studentId: id, ...updates });
-			} else {
-				// Convert ISO strings back to Date objects if needed, but JSON usually passes strings.
-				// Drizzle with Postgres driver handles Date objects for timestamp fields.
-				const cleanUpdates: Record<string, any> = {
-					...updates,
-					updatedAt: new Date(),
-				};
-				if (cleanUpdates.registrasiPaidDate)
-					cleanUpdates.registrasiPaidDate = new Date(
-						cleanUpdates.registrasiPaidDate,
-					);
-				if (cleanUpdates.mandiriSemesterPaidDate)
-					cleanUpdates.mandiriSemesterPaidDate = new Date(
-						cleanUpdates.mandiriSemesterPaidDate,
-					);
-				if (cleanUpdates.toeicPaidDate)
-					cleanUpdates.toeicPaidDate = new Date(cleanUpdates.toeicPaidDate);
-				if (cleanUpdates.t1SemesterPaidDate)
-					cleanUpdates.t1SemesterPaidDate = new Date(
-						cleanUpdates.t1SemesterPaidDate,
-					);
-				if (cleanUpdates.t2KeberangkatanPaidDate)
-					cleanUpdates.t2KeberangkatanPaidDate = new Date(
-						cleanUpdates.t2KeberangkatanPaidDate,
-					);
 
+			const cleanUpdates: Record<string, any> = {
+				...updates,
+				updatedAt: new Date(),
+			};
+
+			if (cleanUpdates.registrasiPaidDate)
+				cleanUpdates.registrasiPaidDate = new Date(
+					cleanUpdates.registrasiPaidDate,
+				);
+			if (cleanUpdates.mandiriSemesterPaidDate)
+				cleanUpdates.mandiriSemesterPaidDate = new Date(
+					cleanUpdates.mandiriSemesterPaidDate,
+				);
+			if (cleanUpdates.toeicPaidDate)
+				cleanUpdates.toeicPaidDate = new Date(cleanUpdates.toeicPaidDate);
+			if (cleanUpdates.t1SemesterPaidDate)
+				cleanUpdates.t1SemesterPaidDate = new Date(
+					cleanUpdates.t1SemesterPaidDate,
+				);
+			if (cleanUpdates.t2KeberangkatanPaidDate)
+				cleanUpdates.t2KeberangkatanPaidDate = new Date(
+					cleanUpdates.t2KeberangkatanPaidDate,
+				);
+
+			const merged = { ...(current || {}), ...cleanUpdates };
+
+			// Hitung checklist keuangan dari field aktual (mendukung kedua metode pembayaran)
+			let checked = 0;
+			const isTalangan = merged.metodePembayaran === "dana_talangan";
+
+			if (merged.registrasiStatus) checked++;
+			if (
+				isTalangan
+					? merged.t1SemesterStatus || merged.mandiriSemesterStatus
+					: merged.mandiriSemesterStatus
+			)
+				checked++;
+			if (isTalangan ? merged.t1InterviewStatus : merged.mandiriInterviewStatus)
+				checked++;
+			if (
+				isTalangan
+					? merged.t2KeberangkatanStatus
+					: merged.mandiriKeberangkatanStatus
+			)
+				checked++;
+
+			let status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
+			if (checked === 4) status = "AMAN";
+			else if (checked >= 2) status = "PERLU_PERHATIAN";
+
+			cleanUpdates.status = status;
+
+			if (merged.isAcc && checked < 4) {
+				cleanUpdates.isAcc = false;
+				cleanUpdates.accAt = null;
+				cleanUpdates.accBy = null;
+			}
+
+			if (!current) {
+				await db.insert(financeData).values({
+					studentId: id,
+					...cleanUpdates,
+				});
+			} else {
 				await db
 					.update(financeData)
 					.set(cleanUpdates)
 					.where(eq(financeData.studentId, id));
 			}
 
-			// Recalculate status and auto-revoke isAcc
-			const updated = await db.query.financeData.findFirst({
-				where: eq(financeData.studentId, id),
-			});
-			if (updated) {
-				// Hitung checklist keuangan dari field aktual (mendukung kedua metode pembayaran)
-				let checked = 0;
-				const isTalangan = updated.metodePembayaran === "dana_talangan";
-
-				// 1. Registrasi Awal — lunas jika registrasiStatus true
-				if (updated.registrasiStatus) checked++;
-
-				// 2. Semester — lunas jika:
-				//    Dana Talangan: t1SemesterStatus atau mandiriSemesterStatus
-				//    Dana Mandiri: mandiriSemesterStatus
-				if (
-					isTalangan
-						? updated.t1SemesterStatus || updated.mandiriSemesterStatus
-						: updated.mandiriSemesterStatus
-				)
-					checked++;
-
-				// 3. Interview Magang — lunas jika:
-				//    Dana Talangan: t1InterviewStatus
-				//    Dana Mandiri: mandiriInterviewStatus
-				if (
-					isTalangan
-						? updated.t1InterviewStatus
-						: updated.mandiriInterviewStatus
-				)
-					checked++;
-
-				// 4. Keberangkatan — lunas jika:
-				//    Dana Talangan: t2KeberangkatanStatus
-				//    Dana Mandiri: mandiriKeberangkatanStatus
-				if (
-					isTalangan
-						? updated.t2KeberangkatanStatus
-						: updated.mandiriKeberangkatanStatus
-				)
-					checked++;
-
-				let status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
-				if (checked === 4) status = "AMAN";
-				else if (checked >= 2) status = "PERLU_PERHATIAN";
-
-				const toUpdate: any = { status };
-
-				// AUTO-REVOKE isAcc if not all milestones are completed
-				if (updated.isAcc && checked < 4) {
-					toUpdate.isAcc = false;
-					toUpdate.accAt = null;
-					toUpdate.accBy = null;
-				}
-
-				await db
-					.update(financeData)
-					.set(toUpdate)
-					.where(eq(financeData.studentId, id));
-			}
+			await Promise.all([
+				cacheDel(`cache:student:${id}`),
+				cacheInvalidatePattern("cache:students:list:*"),
+				cacheInvalidatePattern(`cache:mahasiswa:*`),
+			]);
 
 			return { success: true };
 		},
@@ -264,6 +247,12 @@ export const financeRoutes = new Elysia()
 			})
 			.where(eq(financeData.studentId, id));
 
+		await Promise.all([
+			cacheDel(`cache:student:${id}`),
+			cacheInvalidatePattern("cache:students:list:*"),
+			cacheInvalidatePattern(`cache:mahasiswa:*`),
+		]);
+
 		return { success: true };
 	})
 	.delete("/:id/finance/acc", async (context) => {
@@ -283,6 +272,12 @@ export const financeRoutes = new Elysia()
 				accBy: null,
 			})
 			.where(eq(financeData.studentId, id));
+
+		await Promise.all([
+			cacheDel(`cache:student:${id}`),
+			cacheInvalidatePattern("cache:students:list:*"),
+			cacheInvalidatePattern(`cache:mahasiswa:*`),
+		]);
 
 		return { success: true };
 	})
@@ -469,6 +464,13 @@ export const financeRoutes = new Elysia()
 				})
 				.where(eq(financeSemesters.id, semesterId));
 
+			const studentId = Number(params.id);
+			await Promise.all([
+				cacheDel(`cache:student:${studentId}`),
+				cacheInvalidatePattern("cache:students:list:*"),
+				cacheInvalidatePattern(`cache:mahasiswa:*`),
+			]);
+
 			return { success: true };
 		},
 		{
@@ -550,6 +552,12 @@ export const financeRoutes = new Elysia()
 				}
 			}
 
+			await Promise.all([
+				cacheDel(`cache:student:${studentId}`),
+				cacheInvalidatePattern("cache:students:list:*"),
+				cacheInvalidatePattern(`cache:mahasiswa:*`),
+			]);
+
 			return { success: true, remainingAmount };
 		},
 		{
@@ -614,6 +622,13 @@ export const financeRoutes = new Elysia()
 					updatedAt: new Date(),
 				})
 				.where(eq(financeSemesters.id, semesterId));
+
+			const studentId = Number(params.id);
+			await Promise.all([
+				cacheDel(`cache:student:${studentId}`),
+				cacheInvalidatePattern("cache:students:list:*"),
+				cacheInvalidatePattern(`cache:mahasiswa:*`),
+			]);
 
 			return { success: true };
 		},
@@ -705,6 +720,13 @@ export const financeRoutes = new Elysia()
 					.where(eq(financeSemesters.id, semesterId));
 			}
 
+			const studentId = Number(params.id);
+			await Promise.all([
+				cacheDel(`cache:student:${studentId}`),
+				cacheInvalidatePattern("cache:students:list:*"),
+				cacheInvalidatePattern(`cache:mahasiswa:*`),
+			]);
+
 			return { success: true };
 		},
 		{
@@ -771,6 +793,13 @@ export const financeRoutes = new Elysia()
 					.where(eq(financeSemesters.id, semesterId));
 			}
 
+			const studentId = Number(params.id);
+			await Promise.all([
+				cacheDel(`cache:student:${studentId}`),
+				cacheInvalidatePattern("cache:students:list:*"),
+				cacheInvalidatePattern(`cache:mahasiswa:*`),
+			]);
+
 			return { success: true };
 		},
 	)
@@ -819,6 +848,12 @@ export const financeRoutes = new Elysia()
 				})
 				.returning();
 
+			await Promise.all([
+				cacheDel(`cache:student:${studentId}`),
+				cacheInvalidatePattern("cache:students:list:*"),
+				cacheInvalidatePattern(`cache:mahasiswa:*`),
+			]);
+
 			return { success: true, data: inserted };
 		},
 		{
@@ -857,6 +892,13 @@ export const financeRoutes = new Elysia()
 				.set(updateData)
 				.where(eq(financeTalanganInstallments.id, installmentId));
 
+			const studentId = Number(params.id);
+			await Promise.all([
+				cacheDel(`cache:student:${studentId}`),
+				cacheInvalidatePattern("cache:students:list:*"),
+				cacheInvalidatePattern(`cache:mahasiswa:*`),
+			]);
+
 			return { success: true };
 		},
 		{
@@ -882,6 +924,13 @@ export const financeRoutes = new Elysia()
 			await db
 				.delete(financeTalanganInstallments)
 				.where(eq(financeTalanganInstallments.id, installmentId));
+
+			const studentId = Number(params.id);
+			await Promise.all([
+				cacheDel(`cache:student:${studentId}`),
+				cacheInvalidatePattern("cache:students:list:*"),
+				cacheInvalidatePattern(`cache:mahasiswa:*`),
+			]);
 
 			return { success: true };
 		},

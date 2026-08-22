@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldAlert } from "lucide-react";
+import { RefreshCw, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -12,7 +12,7 @@ import { MagangDashboard } from "@/components/dashboards/MagangDashboard";
 import { PaDashboard } from "@/components/dashboards/PaDashboard";
 import { PmbDashboard } from "@/components/dashboards/PmbDashboard";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/eden";
+import { useStudentsList } from "@/hooks/useStudentsList";
 import { hasRole, useAuthStore } from "@/store";
 
 const MODULE_ROLES: Record<string, string[]> = {
@@ -38,41 +38,63 @@ export function SharedDashboardLoader({
 		| "evaluator";
 }) {
 	const { user, isAuthenticated, hasHydrated } = useAuthStore();
-	const [data, setData] = useState<any[]>([]);
 	const [searchQuery, setSearchQuery] = useState("");
-	const [isLoading, setIsLoading] = useState(true);
 	const router = useRouter();
 
 	const allowedRoles = MODULE_ROLES[module] || ["superadmin"];
 	const isAllowed = hasRole(user, ...allowedRoles);
 
+	// Fetch slim student list with TanStack query caching (all: true for panel aggregated metrics)
+	const {
+		data: studentsResult,
+		isLoading,
+		isError,
+		refetch,
+	} = useStudentsList({
+		all: true,
+	});
+
+	const data = (studentsResult?.data || []) as any[];
+
 	useEffect(() => {
 		if (!hasHydrated) return;
-		if (!isAuthenticated) return router.push("/login");
-
-		if (!isAllowed) {
-			setIsLoading(false);
-			return;
+		if (!isAuthenticated) {
+			router.push("/login");
 		}
+	}, [isAuthenticated, hasHydrated, router]);
 
-		const fetchStudents = async () => {
-			const { data: resData, error } = await api.students.get();
-			if (!error && resData?.data) {
-				setData(resData.data);
-			}
-			setIsLoading(false);
-		};
-		fetchStudents();
-		const interval = setInterval(fetchStudents, 15000);
-		return () => clearInterval(interval);
-	}, [isAuthenticated, hasHydrated, isAllowed, router]);
-
-	if (isLoading)
+	if (!hasHydrated || isLoading)
 		return (
-			<div className="p-10 text-center text-slate-500 text-sm">
-				Memuat data...
+			<div className="flex flex-col justify-center items-center h-80 gap-3 text-slate-500">
+				<RefreshCw className="w-8 h-8 animate-spin text-[#0517B0]" />
+				<p className="text-sm font-semibold">
+					Memuat data Panel {module.toUpperCase()}...
+				</p>
 			</div>
 		);
+
+	if (isError) {
+		return (
+			<div className="flex flex-col items-center justify-center min-h-[300px] text-center p-6 bg-white rounded-2xl border border-slate-200 shadow-xs max-w-md mx-auto my-12">
+				<div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3">
+					<ShieldAlert className="w-6 h-6" />
+				</div>
+				<h3 className="text-base font-bold text-slate-800 mb-1">
+					Gagal Memuat Data
+				</h3>
+				<p className="text-xs text-slate-500 mb-4">
+					Tidak dapat terhubung ke server backend atau sesi kedaluwarsa.
+				</p>
+				<Button
+					onClick={() => refetch()}
+					className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold text-xs h-9 px-4 gap-1.5"
+				>
+					<RefreshCw className="w-3.5 h-3.5" />
+					Coba Lagi
+				</Button>
+			</div>
+		);
+	}
 
 	if (!isAllowed) {
 		return (
@@ -123,9 +145,9 @@ export function SharedDashboardLoader({
 				user={user}
 			/>
 		);
-	if (module === "pa") return <PaDashboard user={user} />;
-	if (module === "magang") return <MagangDashboard />;
-	if (module === "finance") return <FinanceDashboard user={user} />;
+	if (module === "pa") return <PaDashboard user={user} data={data} />;
+	if (module === "magang") return <MagangDashboard data={data} />;
+	if (module === "finance") return <FinanceDashboard user={user} data={data} />;
 	if (module === "evaluator")
 		return (
 			<EvaluasiFinalisasiDashboard
@@ -134,9 +156,7 @@ export function SharedDashboardLoader({
 				setSearchQuery={setSearchQuery}
 				user={user}
 				onUpdate={() => {
-					api.students.get().then((res) => {
-						if (res.data?.data) setData(res.data.data);
-					});
+					refetch();
 				}}
 			/>
 		);

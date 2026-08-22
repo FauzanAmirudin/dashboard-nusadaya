@@ -69,21 +69,32 @@ export function AkademikDashboard({
 	const [currentPage, setCurrentPage] = useState(1);
 	const pageSize = 20;
 
-	// Cohort years starting from 2022
-	const cohortYears = useMemo(() => {
-		const currentYear = new Date().getFullYear();
-		return Array.from(
-			{ length: currentYear - 2022 + 2 },
-			(_, i) => currentYear + 1 - i,
-		);
-	}, []);
+	// Available cohorts dynamically derived from student data + fallbacks
+	const availableCohorts = useMemo(() => {
+		const cohorts = new Set<string>();
+		if (data && data.length > 0) {
+			data.forEach((s: any) => {
+				if (s.student?.cohort) cohorts.add(s.student.cohort.toString());
+			});
+		}
+		["16", "15", "14", "13", "12", "11", "10"].forEach((c) => cohorts.add(c));
+		return Array.from(cohorts).sort((a, b) => {
+			const numA = Number(a);
+			const numB = Number(b);
+			if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numB - numA;
+			return b.localeCompare(a);
+		});
+	}, [data]);
 
 	// Filter by cohort first for reactive KPI
 	const cohortData = useMemo(() => {
 		if (!data) return [];
 		if (selectedCohort === "all") return data;
 		return data.filter(
-			(s: any) => s.student?.cohort?.toString() === selectedCohort,
+			(s: any) =>
+				s.student?.cohort?.toString() === selectedCohort ||
+				(Number(selectedCohort) >= 2000 &&
+					s.student?.cohort === Number(selectedCohort) - 2010),
 		);
 	}, [data, selectedCohort]);
 
@@ -100,15 +111,9 @@ export function AkademikDashboard({
 		(s: any) => s.academic?.status === "TIDAK_AMAN",
 	).length;
 	const countAttendanceOk = cohortData.filter((s: any) => {
-		let totalPertemuan = 0;
-		let totalHadir = 0;
-		if (s.courseGrades) {
-			s.courseGrades.forEach((c: any) => {
-				totalPertemuan += c.totalMeetings || 16;
-				totalHadir += c.attendancePresent || 0;
-			});
-		}
-		return totalPertemuan > 0 && totalHadir / totalPertemuan >= 0.8;
+		const total = s.academic?.attendanceTotal || 0;
+		const present = s.academic?.attendancePresent || 0;
+		return total > 0 && present / total >= 0.8;
 	}).length;
 
 	// Filtered students for Table
@@ -170,18 +175,14 @@ export function AkademikDashboard({
 	};
 
 	const getAcademicChecklist = (s: any) => {
-		let totalPertemuan = 0;
-		let totalHadir = 0;
-		if (s.courseGrades) {
-			s.courseGrades.forEach((c: any) => {
-				totalPertemuan += c.totalMeetings || 16;
-				totalHadir += c.attendancePresent || 0;
-			});
-		}
+		const totalKehadiran = s.academic?.attendanceTotal || 0;
+		const hadirKehadiran = s.academic?.attendancePresent || 0;
 		const attendanceOk =
-			totalPertemuan > 0 && totalHadir / totalPertemuan >= 0.8;
+			totalKehadiran > 0 && hadirKehadiran / totalKehadiran >= 0.8;
 		const attendancePct =
-			totalPertemuan > 0 ? Math.round((totalHadir / totalPertemuan) * 100) : 0;
+			totalKehadiran > 0
+				? Math.round((hadirKehadiran / totalKehadiran) * 100)
+				: 0;
 
 		const items = [
 			{ name: "Input PDDIKTI", done: Boolean(s.academic?.pddiktiInput) },
@@ -235,13 +236,17 @@ export function AkademikDashboard({
 						onValueChange={(val) => setSelectedCohort(val || "all")}
 					>
 						<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
-							<SelectValue placeholder="Filter Angkatan" />
+							<SelectValue placeholder="Filter Angkatan">
+								{selectedCohort === "all"
+									? "Semua Angkatan"
+									: `Angkatan ${selectedCohort}`}
+							</SelectValue>
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value="all">Semua Angkatan</SelectItem>
-							{cohortYears.map((year) => (
-								<SelectItem key={year} value={year.toString()}>
-									Angkatan {year}
+							{availableCohorts.map((cohort) => (
+								<SelectItem key={cohort} value={cohort}>
+									Angkatan {cohort}
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -390,7 +395,17 @@ export function AkademikDashboard({
 							onValueChange={(val) => setSelectedStatus(val || "all")}
 						>
 							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
-								<SelectValue placeholder="Status Akademik" />
+								<SelectValue placeholder="Status Akademik">
+									{selectedStatus === "all"
+										? "Semua Status"
+										: selectedStatus === "aman"
+											? "🟢 Aman"
+											: selectedStatus === "perhatian"
+												? "🟡 Berproses"
+												: selectedStatus === "tidak_aman"
+													? "🔴 Kendala"
+													: "🛡️ Sudah ACC Akademik"}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Status</SelectItem>
@@ -467,7 +482,8 @@ export function AkademikDashboard({
 
 											<TableCell className="text-center font-medium text-xs text-slate-700">
 												{s.student.academicYear ||
-													(s.student.cohort && !isNaN(Number(s.student.cohort))
+													(s.student.cohort &&
+													!Number.isNaN(Number(s.student.cohort))
 														? `${2010 + Number(s.student.cohort)}/${2011 + Number(s.student.cohort)}`
 														: s.student.period || (
 																<span className="text-slate-400 italic">-</span>

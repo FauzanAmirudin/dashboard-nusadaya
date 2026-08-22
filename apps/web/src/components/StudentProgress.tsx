@@ -39,8 +39,6 @@ export function StudentProgress({
 		};
 
 		fetchStatus();
-		const interval = setInterval(fetchStatus, 15000);
-		return () => clearInterval(interval);
 	}, [studentId, updateTrigger]);
 
 	if (total === 0) {

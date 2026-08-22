@@ -28,6 +28,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { useStudentsList } from "@/hooks/useStudentsList";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 
@@ -74,33 +75,27 @@ const STATUS_COLORS = {
 export default function StudentsPage() {
 	const router = useRouter();
 	const { isAuthenticated, hasHydrated } = useAuthStore();
-	const [data, setData] = useState<StudentData[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 	const [selectedId, setSelectedId] = useState<number | null>(null);
 	const [isProcessing, setIsProcessing] = useState(false);
 
+	const {
+		data: studentsResult,
+		isLoading,
+		refetch,
+	} = useStudentsList({
+		archived: true,
+		all: true,
+	});
+
+	const data = (studentsResult?.data || []) as unknown as StudentData[];
+
 	useEffect(() => {
 		if (!hasHydrated) return;
 		if (!isAuthenticated) {
 			router.push("/login");
-			return;
 		}
-
-		const fetchStudents = async () => {
-			const { data: resData, error } = await api.students.get({
-				$query: { archived: "true" },
-			});
-			if (!error && resData?.data) {
-				setData(resData.data as unknown as StudentData[]);
-			}
-			setIsLoading(false);
-		};
-
-		fetchStudents();
-		const interval = setInterval(fetchStudents, 15000);
-		return () => clearInterval(interval);
 	}, [isAuthenticated, hasHydrated, router]);
 
 	if (isLoading) {
@@ -121,7 +116,7 @@ export default function StudentsPage() {
 				return;
 			}
 			toast.success("Mahasiswa berhasil dipulihkan.");
-			setData((prev) => prev.filter((s) => s.student.id !== id));
+			refetch();
 		} catch (err) {
 			toast.error("Terjadi kesalahan sistem.");
 		} finally {
@@ -141,7 +136,7 @@ export default function StudentsPage() {
 				return;
 			}
 			toast.success("Mahasiswa berhasil dihapus permanen.");
-			setData((prev) => prev.filter((s) => s.student.id !== selectedId));
+			refetch();
 			setShowDeleteDialog(false);
 		} catch (err) {
 			toast.error("Terjadi kesalahan sistem.");

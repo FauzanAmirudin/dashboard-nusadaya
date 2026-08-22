@@ -6,7 +6,13 @@ const connectionString =
 	process.env.DATABASE_URL ||
 	"postgresql://postgres:postgres@localhost:5432/nusadaya";
 
-export const client = postgres(connectionString);
+export const client = postgres(connectionString, {
+	max: 25,
+	idle_timeout: 30,
+	connect_timeout: 10,
+	max_lifetime: 60 * 30,
+	onnotice: () => {},
+});
 export const db = drizzle(client, { schema });
 
 export async function ensureDatabaseSchema() {
