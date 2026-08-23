@@ -50,8 +50,15 @@ export class BackupService {
 	private readonly backupBasePath: string;
 
 	constructor() {
-		this.backupBasePath =
-			process.env.BACKUP_PATH ?? join(process.cwd(), "../../backups");
+		if (process.env.BACKUP_PATH) {
+			this.backupBasePath = process.env.BACKUP_PATH;
+		} else {
+			const rootBackups = join(process.cwd(), "backups");
+			const relativeBackups = join(process.cwd(), "../../backups");
+			this.backupBasePath = process.cwd().endsWith("api")
+				? relativeBackups
+				: rootBackups;
+		}
 	}
 
 	/**

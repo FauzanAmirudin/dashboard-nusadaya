@@ -20,8 +20,15 @@ export class LocalStorageProvider implements StorageProvider {
 	private readonly basePath: string;
 
 	constructor() {
-		this.basePath =
-			process.env.STORAGE_PATH ?? join(process.cwd(), "../../storage");
+		if (process.env.STORAGE_PATH) {
+			this.basePath = process.env.STORAGE_PATH;
+		} else {
+			const rootStorage = join(process.cwd(), "storage");
+			const relativeStorage = join(process.cwd(), "../../storage");
+			this.basePath = process.cwd().endsWith("api")
+				? relativeStorage
+				: rootStorage;
+		}
 	}
 
 	getAbsolutePath(storagePath: string): string {

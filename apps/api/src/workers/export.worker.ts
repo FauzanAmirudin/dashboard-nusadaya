@@ -1,18 +1,14 @@
-import { createRequire } from "node:module";
+import { createWriteStream } from "node:fs";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { Readable } from "node:stream";
+import { ZipArchive } from "archiver";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { users } from "../db/schema";
 import { setJobProgress } from "../lib/job";
 import { dequeue } from "../lib/queue";
 import { fileService } from "../modules/file/service/file.service";
-
-const require = createRequire(import.meta.url);
-const archiver = require("archiver");
-
-import { createWriteStream } from "node:fs";
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
-import { Readable } from "node:stream";
 
 interface ExportJobPayload {
 	jobId: string;
@@ -87,7 +83,7 @@ async function processStudentZip(jobId: string, studentId: number) {
 		});
 
 		const output = createWriteStream(zipFilePath);
-		const archive = archiver("zip", { zlib: { level: 6 } });
+		const archive = new ZipArchive({ zlib: { level: 6 } });
 
 		await new Promise<void>((resolve, reject) => {
 			output.on("close", resolve);

@@ -185,8 +185,7 @@ export const backupRoutes = new Elysia()
 
 		const os = await import("node:os");
 		const path = await import("node:path");
-		const archiverModule = await import("archiver");
-		const archiver = ((archiverModule as any).default || archiverModule) as any;
+		const { ZipArchive } = await import("archiver");
 
 		const tmpFile = path.join(
 			os.tmpdir(),
@@ -195,7 +194,7 @@ export const backupRoutes = new Elysia()
 
 		try {
 			const output = fs.createWriteStream(tmpFile);
-			const archive = archiver("zip", { zlib: { level: 6 } });
+			const archive = new ZipArchive({ zlib: { level: 6 } });
 
 			await new Promise<void>((resolve, reject) => {
 				output.on("close", () => resolve());
@@ -214,13 +213,13 @@ export const backupRoutes = new Elysia()
 				fs.unlinkSync(tmpFile);
 			} catch {}
 
-			set.headers = {
-				"Content-Type": "application/zip",
-				"Content-Disposition": `attachment; filename="backup-${job.id}.zip"`,
-				"Content-Length": String(zipBuffer.byteLength),
-			};
-
-			return zipBuffer;
+			return new Response(zipBuffer, {
+				headers: {
+					"Content-Type": "application/zip",
+					"Content-Disposition": `attachment; filename="backup-${job.id}.zip"`,
+					"Content-Length": String(zipBuffer.byteLength),
+				},
+			});
 		} catch (err: any) {
 			// Cleanup on error
 			try {

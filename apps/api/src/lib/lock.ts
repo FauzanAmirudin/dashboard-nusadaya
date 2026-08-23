@@ -1,4 +1,4 @@
-import { redis } from "./redis";
+import { isRedisAvailable, redis } from "./redis";
 
 /**
  * Distributed lock helper menggunakan Redis SET NX EX.
@@ -27,9 +27,14 @@ export async function acquireLock(
 	key: string,
 	ttlSeconds: number,
 ): Promise<boolean> {
+	if (!isRedisAvailable) return true;
 	const lockKey = `${LOCK_PREFIX}:${key}`;
-	const result = await redis.set(lockKey, "LOCKED", "EX", ttlSeconds, "NX");
-	return result === "OK";
+	try {
+		const result = await redis.set(lockKey, "LOCKED", "EX", ttlSeconds, "NX");
+		return result === "OK";
+	} catch {
+		return true;
+	}
 }
 
 /**
@@ -37,15 +42,25 @@ export async function acquireLock(
  * Worker wajib memanggil ini setelah selesai (sukses atau gagal).
  */
 export async function releaseLock(key: string): Promise<void> {
+	if (!isRedisAvailable) return;
 	const lockKey = `${LOCK_PREFIX}:${key}`;
-	await redis.del(lockKey);
+	try {
+		await redis.del(lockKey);
+	} catch {
+		// Abaikan
+	}
 }
 
 /**
  * Cek apakah lock sedang aktif (untuk informasi ke admin).
  */
 export async function isLocked(key: string): Promise<boolean> {
+	if (!isRedisAvailable) return false;
 	const lockKey = `${LOCK_PREFIX}:${key}`;
-	const value = await redis.get(lockKey);
-	return value !== null;
+	try {
+		const value = await redis.get(lockKey);
+		return value !== null;
+	} catch {
+		return false;
+	}
 }
