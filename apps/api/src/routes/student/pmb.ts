@@ -11,8 +11,18 @@ import {
 	students,
 	users,
 } from "../../db/schema";
+import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
 import { hasRole } from "../../lib/permissions";
 import { fileService } from "../../modules/file/service/file.service";
+
+const invalidatePmbCache = async (studentId: number) => {
+	await Promise.all([
+		cacheDel(`cache:student:${studentId}`),
+		cacheInvalidatePattern("cache:students:list:*"),
+		cacheInvalidatePattern("cache:students:*"),
+		cacheInvalidatePattern("cache:mahasiswa:*"),
+	]);
+};
 
 export const pmbRoutes = new Elysia()
 	.put(
@@ -75,14 +85,22 @@ export const pmbRoutes = new Elysia()
 			];
 			const checkedCount = checkboxes.filter(Boolean).length;
 
-			let newStatus: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
+			let newStatus: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
+				"BUTUH_PERHATIAN";
 			if (checkedCount === 14) newStatus = "AMAN";
-			else if (checkedCount >= 7) newStatus = "PERLU_PERHATIAN";
+			else if (checkedCount >= 5) newStatus = "PROSES";
 
 			await db
 				.update(pmbData)
-				.set({ status: newStatus })
+				.set({
+					status: newStatus,
+					...(checkedCount < 14
+						? { isAcc: false, accAt: null, accBy: null }
+						: {}),
+				})
 				.where(eq(pmbData.studentId, id));
+
+			await invalidatePmbCache(id);
 
 			return { success: true };
 		},
@@ -118,16 +136,34 @@ export const pmbRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!hasRole(user, "pmb")) {
+			if (!hasRole(user, "superadmin", "pmb", "finance", "akademik")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
 			const id = parseInt(params.id, 10);
-			await db
-				.update(pmbData)
-				.set({ rumahJuang: body.rumahJuang, updatedAt: new Date() })
-				.where(eq(pmbData.studentId, id));
-			return { success: true };
+
+			const existingPmb = await db.query.pmbData.findFirst({
+				where: eq(pmbData.studentId, id),
+			});
+
+			if (!existingPmb) {
+				await db.insert(pmbData).values({
+					studentId: id,
+					rumahJuang: body.rumahJuang,
+				});
+			} else {
+				await db
+					.update(pmbData)
+					.set({ rumahJuang: body.rumahJuang, updatedAt: new Date() })
+					.where(eq(pmbData.studentId, id));
+			}
+
+			await invalidatePmbCache(id);
+
+			return {
+				success: true,
+				message: "Status fasilitas Rumah Juang berhasil diperbarui",
+			};
 		},
 		{
 			body: t.Object({
@@ -180,8 +216,11 @@ export const pmbRoutes = new Elysia()
 				isAcc: true,
 				accAt: new Date(),
 				accBy: user.id,
+				status: "ACC",
 			})
 			.where(eq(pmbData.studentId, id));
+
+		await invalidatePmbCache(id);
 
 		return { success: true };
 	})
@@ -194,14 +233,45 @@ export const pmbRoutes = new Elysia()
 		}
 		const id = Number(params.id);
 
+		const currentPmb = await db.query.pmbData.findFirst({
+			where: eq(pmbData.studentId, id),
+		});
+
+		const allChecks = [
+			currentPmb?.formReceived,
+			currentPmb?.documentsComplete,
+			currentPmb?.dataInputted,
+			currentPmb?.initialFollowUp,
+			currentPmb?.docKtp,
+			currentPmb?.docKk,
+			currentPmb?.docCv,
+			currentPmb?.docIjazah,
+			currentPmb?.docTranskrip,
+			currentPmb?.docPassportDepan,
+			currentPmb?.docPassportVisa,
+			currentPmb?.docSkbm,
+			currentPmb?.docMcu,
+			currentPmb?.docSertifikasiBahasa,
+		];
+		const checkedCount = allChecks.filter(Boolean).length;
+		const newStatus =
+			checkedCount === 14
+				? "AMAN"
+				: checkedCount >= 5
+					? "PROSES"
+					: "BUTUH_PERHATIAN";
+
 		await db
 			.update(pmbData)
 			.set({
 				isAcc: false,
 				accAt: null,
 				accBy: null,
+				status: newStatus,
 			})
 			.where(eq(pmbData.studentId, id));
+
+		await invalidatePmbCache(id);
 
 		return { success: true };
 	})
@@ -347,6 +417,8 @@ export const pmbRoutes = new Elysia()
 				uploadedBy: user.id,
 			});
 
+			await invalidatePmbCache(id);
+
 			return { success: true, message: "File berhasil diupload" };
 		},
 		{
@@ -392,6 +464,8 @@ export const pmbRoutes = new Elysia()
 			.set({ isVerified: true, verifiedAt: new Date(), verifiedBy: user.id })
 			.where(eq(pmbDocuments.id, Number(params.docId)));
 
+		await invalidatePmbCache(Number(params.id));
+
 		return { success: true };
 	})
 	.delete("/:id/pmb/documents/:docId", async (context) => {
@@ -415,6 +489,7 @@ export const pmbRoutes = new Elysia()
 		}
 
 		await db.delete(pmbDocuments).where(eq(pmbDocuments.id, docId));
+		await invalidatePmbCache(Number(params.id));
 		return { success: true };
 	})
 	.get("/:id/pmb/payment-plan", async ({ params }) => {
@@ -497,6 +572,8 @@ export const pmbRoutes = new Elysia()
 				}
 			}
 
+			await invalidatePmbCache(id);
+
 			return { success: true };
 		},
 		{
@@ -530,7 +607,7 @@ export const pmbRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!hasRole(user, "pmb")) {
+			if (!hasRole(user, "pmb", "superadmin", "finance")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -551,6 +628,8 @@ export const pmbRoutes = new Elysia()
 				})
 				.returning();
 
+			await invalidatePmbCache(id);
+
 			return { success: true, data: newRecipient };
 		},
 		{
@@ -570,7 +649,7 @@ export const pmbRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!hasRole(user, "pmb", "finance")) {
+			if (!hasRole(user, "pmb", "finance", "superadmin")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -604,6 +683,8 @@ export const pmbRoutes = new Elysia()
 				.set(updatePayload)
 				.where(eq(feeShareRecipients.id, recipientId));
 
+			await invalidatePmbCache(parseInt(params.id, 10));
+
 			return { success: true };
 		},
 		{
@@ -622,7 +703,7 @@ export const pmbRoutes = new Elysia()
 	.delete("/:id/pmb/fee-share-recipients/:recipientId", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!hasRole(user, "pmb")) {
+		if (!hasRole(user, "pmb", "superadmin", "finance")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -633,8 +714,6 @@ export const pmbRoutes = new Elysia()
 		});
 
 		if (recipient?.invoiceFileUrl) {
-			// Hapus file invoice lama via FileService (berdasarkan panel+documentKey)
-			// invoiceFileUrl baru berformat "/files/{id}/download"
 			try {
 				const fileId = recipient.invoiceFileUrl
 					.split("/files/")[1]
@@ -650,6 +729,7 @@ export const pmbRoutes = new Elysia()
 		await db
 			.delete(feeShareRecipients)
 			.where(eq(feeShareRecipients.id, recipientId));
+		await invalidatePmbCache(parseInt(params.id, 10));
 		return { success: true };
 	})
 	.post(
@@ -657,7 +737,7 @@ export const pmbRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!hasRole(user, "pmb")) {
+			if (!hasRole(user, "pmb", "finance", "superadmin")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -698,6 +778,8 @@ export const pmbRoutes = new Elysia()
 				})
 				.where(eq(feeShareRecipients.id, recipientId));
 
+			await invalidatePmbCache(studentId);
+
 			return { success: true, message: "Invoice berhasil diupload" };
 		},
 		{
@@ -716,19 +798,51 @@ export const pmbRoutes = new Elysia()
 
 			if (!recipient?.invoiceFileUrl) {
 				set.status = 404;
-				return { success: false, message: "Invoice tidak ditemukan" };
+				return { success: false, message: "Invoice belum diunggah" };
 			}
 
-			const file = Bun.file(recipient.invoiceFileUrl);
-			if (!(await file.exists())) {
+			let file: ReturnType<typeof Bun.file> | null = null;
+			let originalName = `invoice-${recipient.id}.pdf`;
+
+			// 1. Coba resolve via fileService jika tersimpan sebagai /files/{id}/download
+			if (recipient.invoiceFileUrl.includes("/files/")) {
+				const fileId = recipient.invoiceFileUrl
+					.split("/files/")[1]
+					?.split("/")[0];
+				if (fileId) {
+					const record = await fileService.getFileMetadata(fileId);
+					if (record) {
+						const absolutePath = fileService.getAbsolutePath(
+							record.storagePath,
+						);
+						file = Bun.file(absolutePath);
+						if (record.originalName) {
+							originalName = record.originalName;
+						}
+					}
+				}
+			}
+
+			// 2. Fallback jika tersimpan sebagai direct absolute path
+			if (!file || !(await file.exists())) {
+				const directFile = Bun.file(recipient.invoiceFileUrl);
+				if (await directFile.exists()) {
+					file = directFile;
+				}
+			}
+
+			if (!file || !(await file.exists())) {
 				set.status = 404;
-				return { success: false, message: "File tidak ditemukan di server" };
+				return {
+					success: false,
+					message: "File fisik invoice tidak ditemukan di server",
+				};
 			}
 
 			return new Response(file, {
 				headers: {
 					"Content-Type": "application/pdf",
-					"Content-Disposition": `inline; filename="invoice-${recipient.id}.pdf"`,
+					"Content-Disposition": `inline; filename="${encodeURIComponent(originalName)}"`,
 				},
 			});
 		},

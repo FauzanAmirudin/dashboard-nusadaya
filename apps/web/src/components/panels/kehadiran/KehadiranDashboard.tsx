@@ -296,7 +296,7 @@ export function KehadiranDashboard() {
 												<TableCell>{ta}</TableCell>
 												<TableCell className="text-right">
 													<Link
-														href={`/dashboard/students/${s.id}?context=kehadiran`}
+														href={`/dashboard/students/${s.id}?tab=kehadiran`}
 													>
 														<Button variant="outline" size="sm">
 															Lihat Detail

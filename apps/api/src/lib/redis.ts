@@ -1,30 +1,24 @@
 import IORedis from "ioredis";
 
 /**
- * Flag penanda apakah koneksi Redis siap digunakan.
- * Diperbarui secara otomatis melalui event listener.
+ * Redis singleton dengan exported getter function untuk isRedisAvailable.
+ * KRITIS: Jangan export primitive boolean langsung — ES module snapshot membekukan nilainya.
+ * Gunakan fungsi getter agar consumer selalu membaca nilai terkini.
  */
-let isRedisAvailable = false;
+const state = {
+	isAvailable: false,
+};
 
-/**
- * Koneksi Redis singleton menggunakan ioredis.
- *
- * Dioptimalkan dengan:
- * - enableOfflineQueue: false -> jangan memblokir / menggantung command saat Redis offline.
- * - connectTimeout: 500ms -> deteksi cepat saat Redis tidak tersedia.
- * - maxRetriesPerRequest: 1 -> cegah blocking berulang pada request API.
- */
 const redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
 	maxRetriesPerRequest: 1,
 	enableOfflineQueue: false,
-	connectTimeout: 500,
+	connectTimeout: 1000,
 	lazyConnect: false,
 	reconnectOnError() {
 		return false;
 	},
 	retryStrategy(times) {
 		if (times > 10) {
-			// Setelah 10 percobaan, coba setiap 30 detik agar tidak membebani log/CPU
 			return 30000;
 		}
 		return 5000;
@@ -32,24 +26,37 @@ const redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
 });
 
 redis.on("ready", () => {
-	isRedisAvailable = true;
+	state.isAvailable = true;
 	console.log("✅ [Redis] Connected & ready");
 });
 
 redis.on("connect", () => {
-	isRedisAvailable = true;
+	state.isAvailable = true;
 });
 
 redis.on("error", () => {
-	isRedisAvailable = false;
+	state.isAvailable = false;
 });
 
 redis.on("close", () => {
-	isRedisAvailable = false;
+	state.isAvailable = false;
 });
 
 redis.on("end", () => {
-	isRedisAvailable = false;
+	state.isAvailable = false;
 });
 
-export { isRedisAvailable, redis };
+/**
+ * Selalu kembalikan nilai terkini, bukan snapshot saat import.
+ */
+export function isRedisReady(): boolean {
+	return state.isAvailable;
+}
+
+/**
+ * @deprecated Gunakan isRedisReady() untuk mendapatkan nilai live.
+ * Variabel ini hanya untuk backward compat, tidak reliable untuk modul lain.
+ */
+export const isRedisAvailable = state;
+
+export { redis };

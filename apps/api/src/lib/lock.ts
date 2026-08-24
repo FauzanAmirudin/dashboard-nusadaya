@@ -1,4 +1,4 @@
-import { isRedisAvailable, redis } from "./redis";
+import { isRedisReady, redis } from "./redis";
 
 /**
  * Distributed lock helper menggunakan Redis SET NX EX.
@@ -27,7 +27,7 @@ export async function acquireLock(
 	key: string,
 	ttlSeconds: number,
 ): Promise<boolean> {
-	if (!isRedisAvailable) return true;
+	if (!isRedisReady()) return true;
 	const lockKey = `${LOCK_PREFIX}:${key}`;
 	try {
 		const result = await redis.set(lockKey, "LOCKED", "EX", ttlSeconds, "NX");
@@ -42,7 +42,7 @@ export async function acquireLock(
  * Worker wajib memanggil ini setelah selesai (sukses atau gagal).
  */
 export async function releaseLock(key: string): Promise<void> {
-	if (!isRedisAvailable) return;
+	if (!isRedisReady()) return;
 	const lockKey = `${LOCK_PREFIX}:${key}`;
 	try {
 		await redis.del(lockKey);
@@ -55,7 +55,7 @@ export async function releaseLock(key: string): Promise<void> {
  * Cek apakah lock sedang aktif (untuk informasi ke admin).
  */
 export async function isLocked(key: string): Promise<boolean> {
-	if (!isRedisAvailable) return false;
+	if (!isRedisReady()) return false;
 	const lockKey = `${LOCK_PREFIX}:${key}`;
 	try {
 		const value = await redis.get(lockKey);

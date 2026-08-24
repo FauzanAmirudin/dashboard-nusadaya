@@ -118,7 +118,7 @@ export function TabRumahJuang({
 				</div>
 
 				<div className="p-4 bg-amber-50/50 rounded-xl border border-amber-100 text-xs text-amber-800 space-y-1">
-					<span className="font-bold block">📌 Catatan Penting:</span>
+					<span className="font-bold block">Catatan Penting:</span>
 					<p>
 						Penentuan status Rumah Juang ini berdampak langsung pada Panel
 						Keuangan (Finance Dashboard). Apabila berstatus{" "}

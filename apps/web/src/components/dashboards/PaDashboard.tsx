@@ -12,16 +12,19 @@ import {
 	Search,
 	ShieldAlert,
 	ShieldCheck,
+	User,
 	UserCheck,
 	Users,
 	XCircle,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -48,6 +51,8 @@ import {
 } from "@/components/ui/tooltip";
 import { api } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
+import { hasRole, useAuthStore } from "@/store";
+import { normalizeStatus } from "@/utils/status";
 
 function formatWhatsAppUrl(phone: string | null | undefined) {
 	if (!phone) return null;
@@ -56,8 +61,6 @@ function formatWhatsAppUrl(phone: string | null | undefined) {
 	const formatted = clean.startsWith("0") ? `62${clean.slice(1)}` : clean;
 	return `https://wa.me/${formatted}`;
 }
-
-import { hasRole, useAuthStore } from "@/store";
 
 export function PaDashboard({ user: propUser, data = [] }: any) {
 	const router = useRouter();
@@ -150,13 +153,14 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 	const totalStudents = cohortData.length;
 	const countAcc = cohortData.filter((s: any) => s.pa?.isAcc).length;
 	const countAman = cohortData.filter(
-		(s: any) => s.pa?.status === "AMAN",
+		(s: any) => normalizeStatus(s.pa?.status, s.pa?.isAcc) === "AMAN",
+	).length;
+	const countProses = cohortData.filter(
+		(s: any) => normalizeStatus(s.pa?.status, s.pa?.isAcc) === "PROSES",
 	).length;
 	const countPerhatian = cohortData.filter(
-		(s: any) => s.pa?.status === "PERLU_PERHATIAN" || !s.pa?.status,
-	).length;
-	const countTidakAman = cohortData.filter(
-		(s: any) => s.pa?.status === "TIDAK_AMAN",
+		(s: any) =>
+			normalizeStatus(s.pa?.status, s.pa?.isAcc) === "BUTUH_PERHATIAN",
 	).length;
 	const countKonselingSelesai = cohortData.filter(
 		(s: any) => s.pa?.counselingDone,
@@ -170,16 +174,18 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 				!q ||
 				(s.student?.name || "").toLowerCase().includes(q) ||
 				(s.student?.nim || "").toLowerCase().includes(q) ||
-				(s.student?.program || "").toLowerCase().includes(q);
+				(s.student?.program || "").toLowerCase().includes(q) ||
+				(s.student?.subProgram || "").toLowerCase().includes(q) ||
+				(s.student?.destinationCountry || "").toLowerCase().includes(q) ||
+				(s.student?.phone || "").toLowerCase().includes(q);
 
-			const paStatus = s.pa?.status || "PERLU_PERHATIAN";
+			const paStatus = normalizeStatus(s.pa?.status, s.pa?.isAcc);
 			let matchStatus = true;
+			if (selectedStatus === "acc") matchStatus = paStatus === "ACC";
 			if (selectedStatus === "aman") matchStatus = paStatus === "AMAN";
-			if (selectedStatus === "perhatian")
-				matchStatus = paStatus === "PERLU_PERHATIAN";
-			if (selectedStatus === "tidak_aman")
-				matchStatus = paStatus === "TIDAK_AMAN";
-			if (selectedStatus === "acc") matchStatus = Boolean(s.pa?.isAcc);
+			if (selectedStatus === "proses") matchStatus = paStatus === "PROSES";
+			if (selectedStatus === "butuh_perhatian")
+				matchStatus = paStatus === "BUTUH_PERHATIAN";
 
 			return matchSearch && matchStatus;
 		});
@@ -195,30 +201,6 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 		return filteredData.slice(start, start + pageSize);
 	}, [filteredData, currentPage]);
 
-	const handleExport = () => {
-		const exportData = filteredData.map((s: any) => ({
-			NIM: s.student?.nim || "-",
-			"Nama Mahasiswa": s.student?.name || "-",
-			Angkatan: s.student?.cohort || "-",
-			Program: s.student?.program || "-",
-			"Konseling Selesai": s.pa?.counselingDone ? "Ya" : "Belum",
-			"Mental Stabil": s.pa?.mentalStable ? "Ya" : "Belum",
-			"Disiplin Baik": s.pa?.disciplineGood ? "Ya" : "Belum",
-			"Catatan Disiplin": s.pa?.disciplineNotes || "-",
-			"Status PA":
-				s.pa?.status === "AMAN"
-					? "Aman"
-					: s.pa?.status === "TIDAK_AMAN"
-						? "Tidak Aman"
-						: "Perlu Perhatian",
-			"Status ACC PA": s.pa?.isAcc ? "Sudah ACC" : "Belum",
-		}));
-		exportToCSV(
-			exportData,
-			`Data_PA_${new Date().toISOString().split("T")[0]}`,
-		);
-	};
-
 	const getPaChecklist = (pa: any) => {
 		const items = [
 			{ name: "Konseling Selesai", done: Boolean(pa?.counselingDone) },
@@ -232,6 +214,40 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 			total: items.length,
 			isDone: completed === items.length,
 		};
+	};
+
+	const handleExport = () => {
+		const exportData = filteredData.map((s: any) => {
+			const checklist = getPaChecklist(s.pa);
+			return {
+				NIM: s.student?.nim || "-",
+				"Nama Mahasiswa": s.student?.name || "-",
+				Angkatan: s.student?.cohort ? `Angkatan ${s.student.cohort}` : "-",
+				"Tahun Ajaran": s.student?.academicYear || s.student?.period || "-",
+				Peminatan:
+					s.student?.subProgram ||
+					s.student?.destinationCountry ||
+					s.student?.program ||
+					"-",
+				"No. WhatsApp": s.student?.phone || "-",
+				"Progress Checklist": `${checklist.completed}/3 Indikator (${Math.round((checklist.completed / 3) * 100)}%)`,
+				"Konseling Selesai": s.pa?.counselingDone ? "Ya" : "Belum",
+				"Mental Stabil": s.pa?.mentalStable ? "Ya" : "Belum",
+				"Disiplin Baik": s.pa?.disciplineGood ? "Ya" : "Belum",
+				"Catatan Disiplin": s.pa?.disciplineNotes || "-",
+				"Status PA": s.pa?.isAcc
+					? "Sudah ACC"
+					: s.pa?.status === "AMAN"
+						? "Aman"
+						: s.pa?.status === "PROSES"
+							? "Berproses"
+							: "Butuh Perhatian",
+			};
+		});
+		exportToCSV(
+			exportData,
+			`Data_PA_${new Date().toISOString().split("T")[0]}`,
+		);
 	};
 
 	return (
@@ -284,27 +300,6 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 						</Select>
 					)}
 
-					<Select
-						value={selectedCohort}
-						onValueChange={(val) => setSelectedCohort(val || "all")}
-					>
-						<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
-							<SelectValue placeholder="Filter Angkatan">
-								{selectedCohort === "all"
-									? "Semua Angkatan"
-									: `Angkatan ${selectedCohort}`}
-							</SelectValue>
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">Semua Angkatan</SelectItem>
-							{availableCohorts.map((cohort) => (
-								<SelectItem key={cohort} value={cohort}>
-									Angkatan {cohort}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-
 					<Button
 						variant="outline"
 						size="sm"
@@ -335,14 +330,14 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 					</CardContent>
 				</Card>
 
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-teal-600">
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-sky-500">
 					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-teal-50 text-teal-600 mt-0.5">
+						<div className="p-2 rounded-lg bg-sky-50 text-sky-600 mt-0.5">
 							<ShieldCheck className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-teal-700 text-xs font-bold">ACC Pembimbing</p>
-							<p className="text-2xl font-black text-teal-900 mt-0.5">
+							<p className="text-sky-700 text-xs font-bold">ACC Pembimbing</p>
+							<p className="text-2xl font-black text-sky-900 mt-0.5">
 								{countAcc}
 							</p>
 						</div>
@@ -356,7 +351,7 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								🟢 Status Aman
+								Status Aman
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countAman}
@@ -371,11 +366,9 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 							<Clock className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								🟡 Sesi Berjalan
-							</p>
+							<p className="text-slate-500 text-xs font-semibold">Berproses</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countPerhatian}
+								{countProses}
 							</p>
 						</div>
 					</CardContent>
@@ -388,10 +381,10 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								⛔ Kendala Bimbingan
+								Butuh Perhatian
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countTidakAman}
+								{countPerhatian}
 							</p>
 						</div>
 					</CardContent>
@@ -430,10 +423,10 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 
 					{/* Search & Filter */}
 					<div className="flex flex-wrap items-center gap-2.5">
-						<div className="relative w-full sm:w-60">
+						<div className="relative w-full sm:w-64">
 							<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
 							<Input
-								placeholder="Cari NIM, Nama, Program..."
+								placeholder="Cari Nama, NIM, Peminatan, WA..."
 								className="pl-9 h-9 text-xs bg-white border-slate-200"
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
@@ -441,28 +434,49 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 						</div>
 
 						<Select
+							value={selectedCohort}
+							onValueChange={(val) => setSelectedCohort(val || "all")}
+						>
+							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Semua Angkatan">
+									{selectedCohort === "all"
+										? "Semua Angkatan"
+										: `Angkatan ${selectedCohort}`}
+								</SelectValue>
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">Semua Angkatan</SelectItem>
+								{availableCohorts.map((cohort) => (
+									<SelectItem key={cohort} value={cohort}>
+										Angkatan {cohort}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+
+						<Select
 							value={selectedStatus}
 							onValueChange={(val) => setSelectedStatus(val || "all")}
 						>
-							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
-								<SelectValue placeholder="Status PA">
+							<SelectTrigger className="w-[155px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Status Filter">
 									{selectedStatus === "all"
 										? "Semua Status"
-										: selectedStatus === "aman"
-											? "🟢 Aman"
-											: selectedStatus === "perhatian"
-												? "🟡 Berproses"
-												: selectedStatus === "tidak_aman"
-													? "🔴 Kendala"
-													: "🛡️ Sudah ACC PA"}
+										: selectedStatus === "acc"
+											? "Sudah ACC"
+											: selectedStatus === "aman"
+												? "Aman"
+												: selectedStatus === "proses"
+													? "Berproses"
+													: "Butuh Perhatian"}
 								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Status</SelectItem>
-								<SelectItem value="aman">🟢 Aman</SelectItem>
-								<SelectItem value="perhatian">🟡 Berproses</SelectItem>
-								<SelectItem value="tidak_aman">🔴 Kendala</SelectItem>
-								<SelectItem value="acc">🛡️ Sudah ACC PA</SelectItem>
+								<SelectItem value="acc">Sudah ACC</SelectItem>
+								<SelectItem value="aman">Aman</SelectItem>
+								<SelectItem value="proses">Berproses</SelectItem>
+								<SelectItem value="butuh_perhatian">Butuh Perhatian</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
@@ -473,7 +487,7 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 						<Table>
 							<TableHeader className="bg-slate-50 sticky top-0 z-10">
 								<TableRow className="border-slate-200">
-									<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[180px]">
 										Nama Mahasiswa & NIM
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
@@ -489,7 +503,10 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 										No. WhatsApp
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
-										Indikator PA (3)
+										Progress (3)
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
+										Status PA
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-24">
 										Aksi
@@ -501,7 +518,6 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 									const { items, completed, total, isDone } = getPaChecklist(
 										s.pa,
 									);
-									const status = s.pa?.status || "PERLU_PERHATIAN";
 									const waUrl = formatWhatsAppUrl(s.student?.phone);
 
 									return (
@@ -509,6 +525,7 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 											key={s.student.id}
 											className="border-slate-100 hover:bg-blue-50/40 transition-colors"
 										>
+											{/* Nama & NIM */}
 											<TableCell>
 												<div className="font-bold text-slate-900 text-sm">
 													{s.student.name}
@@ -517,9 +534,15 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 													<span className="font-mono text-xs font-semibold text-slate-500">
 														{s.student.nim || "Belum ada NIM"}
 													</span>
+													{s.student.nickname && (
+														<span className="text-[11px] text-slate-400">
+															({s.student.nickname})
+														</span>
+													)}
 												</div>
 											</TableCell>
 
+											{/* Angkatan */}
 											<TableCell className="text-center">
 												<Badge
 													variant="outline"
@@ -531,6 +554,7 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 												</Badge>
 											</TableCell>
 
+											{/* Tahun Ajaran */}
 											<TableCell className="text-center font-medium text-xs text-slate-700">
 												{s.student.academicYear ||
 													(s.student.cohort &&
@@ -541,6 +565,7 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 															))}
 											</TableCell>
 
+											{/* Peminatan with Country Flag */}
 											<TableCell>
 												<div className="flex flex-col gap-1 items-start">
 													<PeminatanBadge
@@ -558,6 +583,7 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 												</div>
 											</TableCell>
 
+											{/* No. WhatsApp */}
 											<TableCell>
 												{s.student?.phone ? (
 													waUrl ? (
@@ -624,7 +650,7 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 														<TooltipContent className="w-64 p-3.5 bg-slate-950 text-white rounded-xl shadow-2xl border border-slate-800 text-xs flex flex-col space-y-2 z-50">
 															<div className="flex items-center justify-between border-b border-slate-800 pb-1.5 w-full">
 																<span className="font-bold text-slate-100 text-xs">
-																	Indikator PA:
+																	Indikator PA (3):
 																</span>
 																<span className="text-[11px] font-mono text-emerald-400 font-bold">
 																	{completed}/{total} Selesai
@@ -636,7 +662,7 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 																		key={it.name}
 																		className="flex items-center justify-between text-[11px] w-full"
 																	>
-																		<span className="text-slate-300 font-medium">
+																		<span className="text-slate-300 font-medium truncate max-w-[150px]">
 																			{it.name}
 																		</span>
 																		<span
@@ -656,21 +682,45 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 												</TooltipProvider>
 											</TableCell>
 
+											{/* Status PA */}
+											<TableCell className="text-center">
+												<PanelStatusBadge
+													status={s.pa?.status}
+													isAcc={s.pa?.isAcc}
+													completed={completed}
+													total={total}
+													size="sm"
+												/>
+											</TableCell>
+
 											{/* Action */}
 											<TableCell className="text-right pr-6">
-												<Button
-													size="sm"
-													variant="outline"
-													onClick={() =>
-														router.push(
-															`/dashboard/students/${s.student.id}?context=pa`,
-														)
-													}
-													className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5"
-												>
-													<Eye className="w-3.5 h-3.5" />
-													Periksa
-												</Button>
+												<div className="flex items-center justify-end gap-1.5">
+													<Link
+														href={`/dashboard/students/${s.student.id}/profile`}
+													>
+														<Button
+															size="sm"
+															variant="outline"
+															className="h-8 text-xs border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 gap-1 font-medium"
+														>
+															<User className="w-3.5 h-3.5 text-slate-500" />
+															Lihat
+														</Button>
+													</Link>
+													<Link
+														href={`/dashboard/students/${s.student.id}?tab=pa`}
+													>
+														<Button
+															size="sm"
+															variant="outline"
+															className="h-8 text-xs border-blue-200 text-[#0517B0] hover:bg-blue-50 hover:border-blue-300 gap-1 font-bold shadow-2xs"
+														>
+															<Eye className="w-3.5 h-3.5" />
+															Periksa
+														</Button>
+													</Link>
+												</div>
 											</TableCell>
 										</TableRow>
 									);

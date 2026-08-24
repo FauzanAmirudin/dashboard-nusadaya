@@ -139,11 +139,11 @@ export function TabKonseling({
 											<SelectValue placeholder="Kondisi" />
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="Stabil">🟢 Stabil</SelectItem>
+											<SelectItem value="Stabil">Stabil</SelectItem>
 											<SelectItem value="Perlu Perhatian">
-												🟡 Perlu Perhatian
+												Perlu Perhatian
 											</SelectItem>
-											<SelectItem value="Kritis">🔴 Kritis</SelectItem>
+											<SelectItem value="Kritis">Kritis</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>

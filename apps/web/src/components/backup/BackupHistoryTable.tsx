@@ -38,6 +38,24 @@ export function BackupHistoryTable() {
 		return `${Number.parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
 	};
 
+	const formatBackupType = (job: any) => {
+		if (!job) return "-";
+		if (job.type === "cohort") {
+			return job.filters?.cohortId
+				? `Angkatan ${job.filters.cohortId}`
+				: "Per Angkatan";
+		}
+		if (job.type === "student") {
+			return job.filters?.nim
+				? `Mahasiswa (${job.filters.nim})`
+				: "Per Mahasiswa";
+		}
+		if (job.type === "full") {
+			return "Full Backup";
+		}
+		return job.type;
+	};
+
 	const getStatusBadge = (status: string) => {
 		switch (status) {
 			case "completed":
@@ -126,8 +144,8 @@ export function BackupHistoryTable() {
 										})}
 									</td>
 									<td className="px-6 py-4">
-										<span className="font-medium capitalize text-slate-700">
-											{job.type}
+										<span className="font-medium text-slate-700">
+											{formatBackupType(job)}
 										</span>
 									</td>
 									<td className="px-6 py-4">{getStatusBadge(job.status)}</td>

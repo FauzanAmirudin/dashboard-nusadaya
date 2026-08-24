@@ -36,6 +36,19 @@ import {
 } from "../../db/schema";
 import { requireRole } from "../../middleware/rbac";
 
+function calculatePanelStatus(
+	completed: number,
+	total: number,
+	isAcc?: boolean | null,
+): "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" {
+	if (isAcc) return "ACC";
+	if (total <= 0) return "AMAN";
+	if (completed >= total) return "AMAN";
+	const pct = (completed / total) * 100;
+	if (pct > 30) return "PROSES";
+	return "BUTUH_PERHATIAN";
+}
+
 export const statusRoutes = new Elysia().get(
 	"/:id/progress",
 	async (context) => {
@@ -80,7 +93,7 @@ export const statusRoutes = new Elysia().get(
 		const incompleteIndicators: {
 			panel: string;
 			name: string;
-			status: "TIDAK_AMAN" | "PERLU_PERHATIAN";
+			status: "BUTUH_PERHATIAN" | "PROSES";
 			link: string;
 		}[] = [];
 		const panels: any[] = [];
@@ -112,7 +125,7 @@ export const statusRoutes = new Elysia().get(
 				incompleteIndicators.push({
 					panel: "PMB",
 					name: i.name,
-					status: "TIDAK_AMAN",
+					status: "BUTUH_PERHATIAN",
 					link: "pmb",
 				}),
 			);
@@ -121,13 +134,8 @@ export const statusRoutes = new Elysia().get(
 			name: "PMB",
 			completed: pmbCompleted,
 			total: 14,
-			status:
-				pmbCompleted === 14
-					? "AMAN"
-					: pmbCompleted >= 7
-						? "PERLU_PERHATIAN"
-						: "TIDAK_AMAN",
-			isAcc: pmb?.isAcc,
+			status: calculatePanelStatus(pmbCompleted, 14, pmb?.isAcc),
+			isAcc: Boolean(pmb?.isAcc),
 		});
 		totalCompleted += pmbCompleted;
 		totalIndicators += 14;
@@ -147,7 +155,7 @@ export const statusRoutes = new Elysia().get(
 				incompleteIndicators.push({
 					panel: "CRM",
 					name: i.name,
-					status: "PERLU_PERHATIAN",
+					status: "PROSES",
 					link: "crm",
 				}),
 			);
@@ -156,13 +164,8 @@ export const statusRoutes = new Elysia().get(
 			name: "CRM",
 			completed: crmCompleted,
 			total: 5,
-			status:
-				crmCompleted === 5
-					? "AMAN"
-					: crmCompleted >= 3
-						? "PERLU_PERHATIAN"
-						: "TIDAK_AMAN",
-			isAcc: crm?.isAcc,
+			status: calculatePanelStatus(crmCompleted, 5, crm?.isAcc),
+			isAcc: Boolean(crm?.isAcc),
 		});
 		totalCompleted += crmCompleted;
 		totalIndicators += 5;
@@ -201,7 +204,7 @@ export const statusRoutes = new Elysia().get(
 				incompleteIndicators.push({
 					panel: "Finance",
 					name: i.name,
-					status: "TIDAK_AMAN",
+					status: "BUTUH_PERHATIAN",
 					link: "finance",
 				}),
 			);
@@ -210,14 +213,12 @@ export const statusRoutes = new Elysia().get(
 			name: "Finance",
 			completed: financeCompleted,
 			total: financeItems.length,
-			status:
-				finance?.status ||
-				(financeCompleted === financeItems.length
-					? "AMAN"
-					: financeCompleted >= 3
-						? "PERLU_PERHATIAN"
-						: "TIDAK_AMAN"),
-			isAcc: finance?.isAcc,
+			status: calculatePanelStatus(
+				financeCompleted,
+				financeItems.length,
+				finance?.isAcc,
+			),
+			isAcc: Boolean(finance?.isAcc),
 		});
 		totalCompleted += financeCompleted;
 		totalIndicators += financeItems.length;
@@ -244,7 +245,7 @@ export const statusRoutes = new Elysia().get(
 				incompleteIndicators.push({
 					panel: "Akademik",
 					name: i.name,
-					status: "PERLU_PERHATIAN",
+					status: "PROSES",
 					link: "akademik",
 				}),
 			);
@@ -253,13 +254,8 @@ export const statusRoutes = new Elysia().get(
 			name: "Akademik",
 			completed: academicCompleted,
 			total: 7,
-			status:
-				academicCompleted === 7
-					? "AMAN"
-					: academicCompleted >= 4
-						? "PERLU_PERHATIAN"
-						: "TIDAK_AMAN",
-			isAcc: academic?.isAcc,
+			status: calculatePanelStatus(academicCompleted, 7, academic?.isAcc),
+			isAcc: Boolean(academic?.isAcc),
 		});
 		totalCompleted += academicCompleted;
 		totalIndicators += 7;
@@ -276,7 +272,7 @@ export const statusRoutes = new Elysia().get(
 				incompleteIndicators.push({
 					panel: "Dosen",
 					name: `${c.courseName}: Kehadiran <75%`,
-					status: "PERLU_PERHATIAN",
+					status: "PROSES",
 					link: "dosen",
 				});
 			if (gradeOk) dosenCompleted++;
@@ -284,7 +280,7 @@ export const statusRoutes = new Elysia().get(
 				incompleteIndicators.push({
 					panel: "Dosen",
 					name: `${c.courseName}: Belum ada nilai`,
-					status: "PERLU_PERHATIAN",
+					status: "PROSES",
 					link: "dosen",
 				});
 			if (accOk) dosenCompleted++;
@@ -292,24 +288,19 @@ export const statusRoutes = new Elysia().get(
 				incompleteIndicators.push({
 					panel: "Dosen",
 					name: `${c.courseName}: Belum di-ACC`,
-					status: "PERLU_PERHATIAN",
+					status: "PROSES",
 					link: "dosen",
 				});
 		});
+		const isAllDosenAcc =
+			courses.length > 0 && courses.every((c: any) => c.isAcc);
 		panels.push({
 			id: "dosen",
 			name: "Dosen per MK",
 			completed: dosenCompleted,
 			total: dosenTotal,
-			status:
-				dosenTotal === 0
-					? "AMAN"
-					: dosenCompleted === dosenTotal
-						? "AMAN"
-						: dosenCompleted / dosenTotal >= 0.5
-							? "PERLU_PERHATIAN"
-							: "TIDAK_AMAN",
-			isAcc: courses.length > 0 && courses.every((c: any) => c.isAcc),
+			status: calculatePanelStatus(dosenCompleted, dosenTotal, isAllDosenAcc),
+			isAcc: isAllDosenAcc,
 		});
 		totalCompleted += dosenCompleted;
 		totalIndicators += dosenTotal;
@@ -327,7 +318,7 @@ export const statusRoutes = new Elysia().get(
 				incompleteIndicators.push({
 					panel: "Pendamping Akademik",
 					name: i.name,
-					status: "PERLU_PERHATIAN",
+					status: "PROSES",
 					link: "pa",
 				}),
 			);
@@ -336,13 +327,8 @@ export const statusRoutes = new Elysia().get(
 			name: "Pendamping Akademik",
 			completed: paCompleted,
 			total: 3,
-			status:
-				paCompleted === 3
-					? "AMAN"
-					: paCompleted >= 1
-						? "PERLU_PERHATIAN"
-						: "TIDAK_AMAN",
-			isAcc: pa?.isAcc,
+			status: calculatePanelStatus(paCompleted, 3, pa?.isAcc),
+			isAcc: Boolean(pa?.isAcc),
 		});
 		totalCompleted += paCompleted;
 		totalIndicators += 3;
@@ -372,8 +358,8 @@ export const statusRoutes = new Elysia().get(
 					name: i.name,
 					status:
 						i.name === "Paspor" || i.name === "Visa"
-							? "TIDAK_AMAN"
-							: "PERLU_PERHATIAN",
+							? "BUTUH_PERHATIAN"
+							: "PROSES",
 					link: "magang",
 				}),
 			);
@@ -382,23 +368,27 @@ export const statusRoutes = new Elysia().get(
 			name: "Tim Magang",
 			completed: magangCompleted,
 			total: magangItems.length,
-			status:
-				magangCompleted === magangItems.length
-					? "AMAN"
-					: magangCompleted >= 5
-						? "PERLU_PERHATIAN"
-						: "TIDAK_AMAN",
-			isAcc: internship?.isAcc,
+			status: calculatePanelStatus(
+				magangCompleted,
+				magangItems.length,
+				internship?.isAcc,
+			),
+			isAcc: Boolean(internship?.isAcc),
 		});
 		totalCompleted += magangCompleted;
 		totalIndicators += magangItems.length;
 
-		// Overall Status Logic
-		let overallStatus = "AMAN";
-		if (panels.some((p) => p.status === "TIDAK_AMAN"))
-			overallStatus = "TIDAK_AMAN";
-		else if (panels.some((p) => p.status === "PERLU_PERHATIAN"))
-			overallStatus = "PERLU_PERHATIAN";
+		// Overall Status Logic (4 Standardized Categories)
+		let overallStatus: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" = "AMAN";
+		if (panels.some((p) => p.status === "BUTUH_PERHATIAN")) {
+			overallStatus = "BUTUH_PERHATIAN";
+		} else if (panels.some((p) => p.status === "PROSES")) {
+			overallStatus = "PROSES";
+		} else if (panels.every((p) => p.status === "ACC")) {
+			overallStatus = "ACC";
+		} else {
+			overallStatus = "AMAN";
+		}
 
 		return {
 			success: true,

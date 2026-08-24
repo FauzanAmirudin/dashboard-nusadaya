@@ -8,6 +8,7 @@
 	"scripts": {
 		"dev": "bun --filter '*' --parallel dev",
 		"build": "bun --filter web build",
+		"start": "bun --filter '*' --parallel start",
 		"prepare": "husky"
 	},
 	"devDependencies": {

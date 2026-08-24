@@ -292,11 +292,11 @@ export function FinalisasiDashboard({
 										<TableCell>
 											{s.student.overallStatus === "AMAN" ? (
 												<Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-													🟢 Aman
+													Aman
 												</Badge>
 											) : (
 												<Badge className="bg-amber-500/10 text-amber-500 border border-amber-500/20">
-													🟡 Perhatian
+													Perhatian
 												</Badge>
 											)}
 										</TableCell>

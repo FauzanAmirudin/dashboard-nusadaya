@@ -8,6 +8,7 @@ import {
 	CheckCircle,
 	CheckSquare,
 	ChevronDown,
+	ClipboardCheck,
 	Download,
 	Edit,
 	FileText,
@@ -345,19 +346,19 @@ export default function MataKuliahDetailPage() {
 			case "teori":
 				return (
 					<Badge className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 font-medium">
-						📘 Teori
+						<BookOpen className="w-3 h-3 mr-1 inline" /> Teori
 					</Badge>
 				);
 			case "praktik":
 				return (
 					<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 font-medium">
-						🛠️ Praktik
+						<Wrench className="w-3 h-3 mr-1 inline" /> Praktik
 					</Badge>
 				);
 			case "keduanya":
 				return (
 					<Badge className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 font-medium">
-						⚡ Teori & Praktik
+						<Layers className="w-3 h-3 mr-1 inline" /> Teori & Praktik
 					</Badge>
 				);
 			default:
@@ -366,7 +367,7 @@ export default function MataKuliahDetailPage() {
 						variant="outline"
 						className="text-slate-400 border-slate-300 font-normal"
 					>
-						⚪ Sesi Belum Diatur
+						Sesi Belum Diatur
 					</Badge>
 				);
 		}
@@ -713,14 +714,12 @@ export default function MataKuliahDetailPage() {
 																		<SelectValue placeholder="Pilih jenis sesi..." />
 																	</SelectTrigger>
 																	<SelectContent>
-																		<SelectItem value="teori">
-																			📘 Teori
-																		</SelectItem>
+																		<SelectItem value="teori">Teori</SelectItem>
 																		<SelectItem value="praktik">
-																			🛠️ Praktik
+																			Praktik
 																		</SelectItem>
 																		<SelectItem value="keduanya">
-																			⚡ Teori & Praktik
+																			Teori & Praktik
 																		</SelectItem>
 																	</SelectContent>
 																</Select>
@@ -788,8 +787,8 @@ export default function MataKuliahDetailPage() {
 													<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-2.5">
 														<div>
 															<h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-																<span>📋</span> Presensi Kehadiran & Penilaian
-																Harian
+																<ClipboardCheck className="w-4 h-4 text-[#0517B0]" />{" "}
+																Presensi Kehadiran & Penilaian Harian
 															</h3>
 															<p className="text-xs text-slate-500 mt-0.5">
 																Isi kehadiran dan nilai harian per mahasiswa.
@@ -918,19 +917,19 @@ export default function MataKuliahDetailPage() {
 																						</SelectTrigger>
 																						<SelectContent>
 																							<SelectItem value="unassigned">
-																								⚪ - Belum Diisi -
+																								- Belum Diisi -
 																							</SelectItem>
 																							<SelectItem value="hadir">
-																								✅ Hadir
+																								Hadir
 																							</SelectItem>
 																							<SelectItem value="izin">
-																								🟡 Izin
+																								Izin
 																							</SelectItem>
 																							<SelectItem value="sakit">
-																								🔵 Sakit
+																								Sakit
 																							</SelectItem>
 																							<SelectItem value="alpha">
-																								🔴 Alpha
+																								Alpha
 																							</SelectItem>
 																						</SelectContent>
 																					</Select>

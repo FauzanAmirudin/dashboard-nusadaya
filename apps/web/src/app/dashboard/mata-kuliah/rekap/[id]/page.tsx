@@ -603,7 +603,7 @@ export default function RekapMataKuliahDetailPage() {
 										variant="outline"
 										className="bg-white border-slate-200 text-slate-700 text-xs"
 									>
-										⚪ Hadir:{" "}
+										Hadir:{" "}
 										<span className="font-bold text-emerald-600 ml-1">H</span> |
 										Izin:{" "}
 										<span className="font-bold text-amber-600 ml-1">I</span> |

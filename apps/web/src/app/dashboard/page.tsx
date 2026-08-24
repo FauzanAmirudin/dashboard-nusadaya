@@ -44,6 +44,9 @@ import {
 	ResponsiveContainer,
 } from "recharts";
 
+import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
+import { calculateOverallStatus, normalizeStatus } from "@/utils/status";
+
 const AkademikDashboard = dynamic(
 	() =>
 		import("@/components/dashboards/AkademikDashboard").then(
@@ -201,66 +204,66 @@ export default function DashboardPage() {
 		}
 	}, [isAuthenticated, hasHydrated, router, user]);
 
-	// Helper for calculating accurate overall real-time status
-	const getRealtimeOverallStatus = (s: StudentListItem) => {
-		if (s.student?.overallStatus) return s.student.overallStatus;
-		const panels = [
-			s.pmb?.isAcc ? "AMAN" : s.pmb?.status || "PERLU_PERHATIAN",
-			s.crm?.isAcc ? "AMAN" : s.crm?.status || "PERLU_PERHATIAN",
-			s.finance?.isAcc ? "AMAN" : s.finance?.status || "PERLU_PERHATIAN",
-			s.academic?.isAcc ? "AMAN" : s.academic?.status || "PERLU_PERHATIAN",
-			s.pa?.isAcc ? "AMAN" : s.pa?.status || "PERLU_PERHATIAN",
-			s.internship?.isAcc ? "AMAN" : s.internship?.status || "PERLU_PERHATIAN",
-		];
-
-		if (panels.includes("TIDAK_AMAN")) return "TIDAK_AMAN";
-		if (panels.includes("PERLU_PERHATIAN")) return "PERLU_PERHATIAN";
-		return "AMAN";
-	};
-
-	// Helper for checking module ACCs
+	// Helper for checking module ACCs & 4-category status
 	const getStudentAccDetails = (s: StudentListItem) => {
 		const modules = [
 			{
 				key: "pmb",
 				name: "PMB",
 				isAcc: Boolean(s.pmb?.isAcc),
-				status: s.pmb?.status || "PERLU_PERHATIAN",
+				status: normalizeStatus(s.pmb?.status, Boolean(s.pmb?.isAcc)),
 			},
 			{
 				key: "crm",
 				name: "CRM",
 				isAcc: Boolean(s.crm?.isAcc),
-				status: s.crm?.status || "PERLU_PERHATIAN",
+				status: normalizeStatus(s.crm?.status, Boolean(s.crm?.isAcc)),
 			},
 			{
 				key: "finance",
 				name: "Finance",
 				isAcc: Boolean(s.finance?.isAcc),
-				status: s.finance?.status || "PERLU_PERHATIAN",
+				status: normalizeStatus(s.finance?.status, Boolean(s.finance?.isAcc)),
 			},
 			{
 				key: "academic",
 				name: "Akademik",
 				isAcc: Boolean(s.academic?.isAcc),
-				status: s.academic?.status || "PERLU_PERHATIAN",
+				status: normalizeStatus(s.academic?.status, Boolean(s.academic?.isAcc)),
 			},
 			{
 				key: "pa",
 				name: "PA",
 				isAcc: Boolean(s.pa?.isAcc),
-				status: s.pa?.status || "PERLU_PERHATIAN",
+				status: normalizeStatus(s.pa?.status, Boolean(s.pa?.isAcc)),
 			},
 			{
 				key: "internship",
 				name: "Magang",
 				isAcc: Boolean(s.internship?.isAcc),
-				status: s.internship?.status || "PERLU_PERHATIAN",
+				status: normalizeStatus(
+					s.internship?.status,
+					Boolean(s.internship?.isAcc),
+				),
 			},
 		];
 
 		const accCount = modules.filter((m) => m.isAcc).length;
-		return { modules, accCount, isAllAcc: accCount === 6 };
+		const overallStatus =
+			s.student?.overallStatus ||
+			calculateOverallStatus(modules.map((m) => m.status));
+
+		return {
+			modules,
+			accCount,
+			isAllAcc: accCount === 6,
+			overallStatus,
+		};
+	};
+
+	// Helper for calculating accurate overall real-time status
+	const getRealtimeOverallStatus = (s: StudentListItem) => {
+		return getStudentAccDetails(s).overallStatus;
 	};
 
 	// On-Demand Fast Export to CSV (fetches full list only on click)
@@ -496,23 +499,6 @@ export default function DashboardPage() {
 				</div>
 
 				<div className="flex flex-wrap items-center gap-2.5">
-					<Select
-						value={selectedCohort}
-						onValueChange={(val) => setSelectedCohort(val || "all")}
-					>
-						<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
-							<SelectValue placeholder="Filter Angkatan" />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">Semua Angkatan</SelectItem>
-							{cohortYears.map((year) => (
-								<SelectItem key={year} value={year.toString()}>
-									Angkatan {year}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-
 					<Button
 						size="sm"
 						onClick={handleExport}
@@ -568,7 +554,7 @@ export default function DashboardPage() {
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								🟢 Status Aman
+								Status Aman
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countAman}
@@ -584,7 +570,7 @@ export default function DashboardPage() {
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								🟡 Perlu Perhatian
+								Perlu Perhatian
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countPerhatian}
@@ -599,9 +585,7 @@ export default function DashboardPage() {
 							<XCircle className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								⛔ Tidak Aman
-							</p>
+							<p className="text-slate-500 text-xs font-semibold">Tidak Aman</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countTidakAman}
 							</p>
@@ -818,9 +802,9 @@ export default function DashboardPage() {
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Status</SelectItem>
-								<SelectItem value="aman">🟢 Aman</SelectItem>
-								<SelectItem value="perhatian">🟡 Perlu Perhatian</SelectItem>
-								<SelectItem value="tidak_aman">🔴 Tidak Aman</SelectItem>
+								<SelectItem value="aman">Aman</SelectItem>
+								<SelectItem value="perhatian">Perlu Perhatian</SelectItem>
+								<SelectItem value="tidak_aman">Tidak Aman</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
@@ -889,7 +873,7 @@ export default function DashboardPage() {
 											<TableCell className="text-center">
 												<TooltipProvider>
 													<Tooltip>
-														<TooltipTrigger className="w-full">
+														<TooltipTrigger className="w-full cursor-pointer">
 															<div className="flex flex-col items-center gap-1">
 																<div className="flex items-center justify-between w-full text-[11px] font-bold text-slate-700 px-1">
 																	<span>{accCount}/6 ACC</span>
@@ -922,7 +906,7 @@ export default function DashboardPage() {
 														<TooltipContent className="w-64 p-3.5 bg-slate-950 text-white rounded-xl shadow-2xl border border-slate-800 text-xs flex flex-col space-y-2 z-50">
 															<div className="flex items-center justify-between border-b border-slate-800 pb-1.5 w-full">
 																<span className="font-bold text-slate-100 text-xs">
-																	Rincian ACC 6 Divisi:
+																	Rincian Status 6 Divisi:
 																</span>
 																<span className="text-[11px] font-mono text-emerald-400 font-bold">
 																	{accCount}/6 ACC
@@ -937,15 +921,11 @@ export default function DashboardPage() {
 																		<span className="text-slate-300 font-medium">
 																			{m.name}
 																		</span>
-																		<span
-																			className={`font-semibold ${
-																				m.isAcc
-																					? "text-emerald-400"
-																					: "text-slate-500"
-																			}`}
-																		>
-																			{m.isAcc ? "✓ ACC" : "Belum ACC"}
-																		</span>
+																		<PanelStatusBadge
+																			status={m.status}
+																			size="sm"
+																			useShortLabel
+																		/>
 																	</div>
 																))}
 															</div>
@@ -954,7 +934,7 @@ export default function DashboardPage() {
 												</TooltipProvider>
 											</TableCell>
 
-											{/* Mini Module Indicators */}
+											{/* Mini Module Indicators with 4-category colors */}
 											<TableCell className="text-center">
 												<div className="flex items-center justify-center gap-1">
 													{modules.map((m) => (
@@ -962,19 +942,34 @@ export default function DashboardPage() {
 															<Tooltip>
 																<TooltipTrigger>
 																	<span
-																		className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-black ${
-																			m.isAcc
-																				? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-																				: "bg-slate-100 text-slate-400 border border-slate-200"
+																		className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-black transition-transform hover:scale-110 ${
+																			m.status === "ACC"
+																				? "bg-emerald-100 text-emerald-800 border border-emerald-400"
+																				: m.status === "AMAN"
+																					? "bg-emerald-50 text-emerald-700 border border-emerald-300"
+																					: m.status === "PROSES"
+																						? "bg-amber-50 text-amber-800 border border-amber-300"
+																						: "bg-rose-50 text-rose-800 border border-rose-300"
 																		}`}
 																	>
 																		{m.name[0]}
 																	</span>
 																</TooltipTrigger>
-																<TooltipContent className="text-xs">
-																	<p className="font-semibold">{m.name}</p>
+																<TooltipContent className="text-xs p-2">
+																	<p className="font-bold">
+																		{m.name}:{" "}
+																		{m.status === "ACC"
+																			? "Disetujui (ACC)"
+																			: m.status === "AMAN"
+																				? "Aman"
+																				: m.status === "PROSES"
+																					? "Berproses"
+																					: "Butuh Perhatian"}
+																	</p>
 																	<p className="text-[11px] text-slate-300">
-																		{m.isAcc ? "Sudah di-ACC" : "Belum ACC"}
+																		{m.isAcc
+																			? "✓ Sudah di-ACC"
+																			: "Belum di-ACC"}
 																	</p>
 																</TooltipContent>
 															</Tooltip>
@@ -983,41 +978,29 @@ export default function DashboardPage() {
 												</div>
 											</TableCell>
 
-											{/* Condition Badge */}
+											{/* Unified Condition Badge */}
 											<TableCell className="text-center">
-												{rtStatus === "AMAN" ? (
-													<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold">
-														🟢 Aman
-													</Badge>
-												) : rtStatus === "PERLU_PERHATIAN" ? (
-													<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs font-semibold">
-														🟡 Perhatian
-													</Badge>
-												) : (
-													<Badge className="bg-rose-50 text-rose-700 border-rose-200 text-xs font-semibold">
-														⛔ Blocking
-													</Badge>
-												)}
+												<PanelStatusBadge status={rtStatus} />
 											</TableCell>
 
 											{/* Final Decision */}
 											<TableCell className="text-center">
 												{s.decision?.evaluatorDecision === "layak_berangkat" ? (
 													<Badge className="bg-emerald-50 text-emerald-700 border-emerald-300 font-semibold text-xs">
-														🟢 Layak
+														Layak
 													</Badge>
 												) : s.decision?.evaluatorDecision === "ttd_kontrak" ? (
 													<Badge className="bg-blue-50 text-blue-700 border-blue-300 font-semibold text-xs">
-														🔵 Kontrak
+														Kontrak
 													</Badge>
 												) : s.decision?.evaluatorDecision ===
 													"lanjut_interview" ? (
 													<Badge className="bg-amber-50 text-amber-700 border-amber-300 font-semibold text-xs">
-														🟡 Interview
+														Interview
 													</Badge>
 												) : s.decision?.evaluatorDecision === "remedial" ? (
 													<Badge className="bg-rose-50 text-rose-700 border-rose-300 font-semibold text-xs">
-														🔴 Remedial
+														Remedial
 													</Badge>
 												) : (
 													<span className="text-xs text-slate-400 italic">

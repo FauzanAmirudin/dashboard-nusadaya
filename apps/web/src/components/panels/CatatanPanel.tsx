@@ -2,7 +2,19 @@
 
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
-import { AlertTriangle, Filter, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+	AlertTriangle,
+	Building,
+	Clock,
+	FileText,
+	Filter,
+	Info,
+	Pencil,
+	Plus,
+	StickyNote,
+	Trash2,
+	Wrench,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -40,36 +52,37 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
+import { formatDeviceDateTime } from "@/utils/format";
 
 const NOTE_TYPE_CONFIG = {
 	pengecualian_akademik: {
 		label: "Pengecualian Akademik",
-		icon: "⚠️",
+		Icon: AlertTriangle,
 		badgeClass: "bg-amber-100 text-amber-800 border-amber-300",
 	},
 	izin_resmi: {
 		label: "Izin Resmi",
-		icon: "📄",
+		Icon: FileText,
 		badgeClass: "bg-blue-100 text-blue-800 border-blue-300",
 	},
 	sedang_ods: {
 		label: "Sedang ODS",
-		icon: "🏫",
+		Icon: Building,
 		badgeClass: "bg-purple-100 text-purple-800 border-purple-300",
 	},
 	praktik_luar: {
 		label: "Praktik Luar",
-		icon: "🔧",
+		Icon: Wrench,
 		badgeClass: "bg-teal-100 text-teal-800 border-teal-300",
 	},
 	informasi_umum: {
 		label: "Informasi Umum",
-		icon: "ℹ️",
+		Icon: Info,
 		badgeClass: "bg-slate-100 text-slate-800 border-slate-300",
 	},
 	lainnya: {
 		label: "Lainnya",
-		icon: "📝",
+		Icon: StickyNote,
 		badgeClass: "bg-gray-100 text-gray-800 border-gray-300",
 	},
 };
@@ -229,7 +242,8 @@ export function CatatanPanel({ studentId }: { studentId: number }) {
 			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
 				<div>
 					<h3 className="font-semibold text-slate-800 flex items-center gap-2">
-						📝 Catatan Internal & Pengecualian
+						<StickyNote className="w-5 h-5 text-[#0517B0]" /> Catatan Internal &
+						Pengecualian
 					</h3>
 					<p className="text-sm text-slate-500 mt-1">
 						{canWrite
@@ -251,7 +265,8 @@ export function CatatanPanel({ studentId }: { studentId: number }) {
 								<SelectItem value="semua">Semua Kategori</SelectItem>
 								{Object.entries(NOTE_TYPE_CONFIG).map(([key, conf]) => (
 									<SelectItem key={key} value={key}>
-										{conf.icon} {conf.label}
+										<conf.Icon className="w-3.5 h-3.5 mr-1.5 inline text-slate-500" />{" "}
+										{conf.label}
 									</SelectItem>
 								))}
 							</SelectContent>
@@ -325,26 +340,23 @@ export function CatatanPanel({ studentId }: { studentId: number }) {
 												<div>
 													<div className="flex items-center gap-2 mb-2">
 														<Badge
-															className={`${conf.badgeClass} rounded-md px-2 py-0.5 text-xs font-semibold`}
+															className={`${conf.badgeClass} rounded-md px-2 py-0.5 text-xs font-semibold flex items-center gap-1`}
 														>
-															{conf.icon} {conf.label}
+															<conf.Icon className="w-3.5 h-3.5 mr-1 inline" />{" "}
+															{conf.label}
 														</Badge>
 														{periodText && (
 															<Badge
 																variant="outline"
-																className="text-xs bg-white text-slate-600 border-slate-200"
+																className="text-xs bg-white text-slate-600 border-slate-200 flex items-center gap-1"
 															>
-																⏱️ {periodText}
+																<Clock className="w-3 h-3 mr-1 inline" />{" "}
+																{periodText}
 															</Badge>
 														)}
 													</div>
 													<div className="text-sm text-slate-500 font-medium">
-														{format(
-															new Date(note.createdAt),
-															"dd MMM yyyy • HH:mm",
-															{ locale: idLocale },
-														)}{" "}
-														WIB
+														{formatDeviceDateTime(note.createdAt)}
 														<span className="mx-2 text-slate-300">|</span>
 														<span className="text-slate-700 font-semibold">
 															{note.author.fullName}
@@ -447,7 +459,7 @@ export function CatatanPanel({ studentId }: { studentId: number }) {
 											id={`type-${key}`}
 											className="sr-only"
 										/>
-										<span className="text-base">{conf.icon}</span>
+										<conf.Icon className="w-4 h-4 text-slate-500" />
 										<span
 											className={`text-sm font-medium ${formNoteType === key ? "text-[#0517B0]" : "text-slate-700"}`}
 										>

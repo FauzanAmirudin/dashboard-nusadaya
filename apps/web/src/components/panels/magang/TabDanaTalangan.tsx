@@ -108,7 +108,7 @@ export function TabDanaTalangan({
 			{pmbPaymentData && (
 				<div className="bg-slate-50 border-b border-slate-200 p-4 rounded-lg border">
 					<h4 className="text-xs font-bold text-slate-500 uppercase mb-3">
-						📋 Konteks Pengajuan PMB (Read-Only)
+						Konteks Pengajuan PMB (Read-Only)
 					</h4>
 
 					{pmbPaymentData.pengajuanDanaTalangan ? (

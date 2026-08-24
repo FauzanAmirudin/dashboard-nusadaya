@@ -22,6 +22,7 @@ export const studentsRouter = new Elysia({ prefix: "/students" })
 					cacheInvalidatePattern("cache:students:*"),
 					cacheInvalidatePattern("cache:student:*"),
 					cacheInvalidatePattern("cache:mahasiswa:*"),
+					cacheInvalidatePattern("cache:dashboard:*"),
 				]);
 			}
 		}

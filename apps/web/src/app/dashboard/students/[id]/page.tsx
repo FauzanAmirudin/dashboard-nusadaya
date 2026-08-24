@@ -6,28 +6,71 @@ import {
 	ChevronDown,
 	ChevronUp,
 	Clock,
-	Download,
 	FileText,
+	Globe,
 	GraduationCap,
+	Lock,
 	Phone,
 	Printer,
 	XCircle,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { AkademikPanel } from "@/components/panels/AkademikPanel";
-import { CatatanPanel } from "@/components/panels/CatatanPanel";
-import { CrmPanel } from "@/components/panels/CrmPanel";
-import { FinalDecisionPanel } from "@/components/panels/FinalDecisionPanel";
-import { FinancePanel } from "@/components/panels/FinancePanel";
-import { InternshipPanel } from "@/components/panels/InternshipPanel";
-import { KehadiranPanel } from "@/components/panels/KehadiranPanel";
-import { PaPanel } from "@/components/panels/PaPanel";
-import { PmbPanel } from "@/components/panels/PmbPanel";
-import { StatusPanel } from "@/components/panels/StatusPanel";
 import { StudentProgress } from "@/components/StudentProgress";
+import { PanelSkeleton } from "@/components/ui/PanelSkeleton";
+
+const AkademikPanel = dynamic(
+	() =>
+		import("@/components/panels/AkademikPanel").then((m) => m.AkademikPanel),
+	{ loading: () => <PanelSkeleton title="Akademik" /> },
+);
+const CatatanPanel = dynamic(
+	() => import("@/components/panels/CatatanPanel").then((m) => m.CatatanPanel),
+	{ loading: () => <PanelSkeleton title="Catatan Internal" /> },
+);
+const CrmPanel = dynamic(
+	() => import("@/components/panels/CrmPanel").then((m) => m.CrmPanel),
+	{ loading: () => <PanelSkeleton title="CRM" /> },
+);
+const FinalDecisionPanel = dynamic(
+	() =>
+		import("@/components/panels/FinalDecisionPanel").then(
+			(m) => m.FinalDecisionPanel,
+		),
+	{ loading: () => <PanelSkeleton title="Final Decision" /> },
+);
+const FinancePanel = dynamic(
+	() => import("@/components/panels/FinancePanel").then((m) => m.FinancePanel),
+	{ loading: () => <PanelSkeleton title="Keuangan" /> },
+);
+const InternshipPanel = dynamic(
+	() =>
+		import("@/components/panels/InternshipPanel").then(
+			(m) => m.InternshipPanel,
+		),
+	{ loading: () => <PanelSkeleton title="Magang" /> },
+);
+const KehadiranPanel = dynamic(
+	() =>
+		import("@/components/panels/KehadiranPanel").then((m) => m.KehadiranPanel),
+	{ loading: () => <PanelSkeleton title="Kehadiran" /> },
+);
+const PaPanel = dynamic(
+	() => import("@/components/panels/PaPanel").then((m) => m.PaPanel),
+	{ loading: () => <PanelSkeleton title="PA" /> },
+);
+const PmbPanel = dynamic(
+	() => import("@/components/panels/PmbPanel").then((m) => m.PmbPanel),
+	{ loading: () => <PanelSkeleton title="PMB" /> },
+);
+const StatusPanel = dynamic(
+	() => import("@/components/panels/StatusPanel").then((m) => m.StatusPanel),
+	{ loading: () => <PanelSkeleton title="Status Mahasiswa" /> },
+);
+
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -45,10 +88,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { useStudentDetail } from "@/hooks/useStudentsList";
 import { api } from "@/lib/eden";
 import { hasRole, useAuthStore } from "@/store";
 
@@ -76,6 +121,7 @@ type StudentDetail = {
 		addressProvince?: string | null;
 		schoolOrigin?: string | null;
 		paId?: number | null;
+		pa?: { id: number; fullName: string; username?: string } | null;
 		studentStatus?: string | null;
 		destinationCountry?: string | null;
 		period?: string | null;
@@ -182,6 +228,28 @@ const NAV_LINKS = [
 	},
 ];
 
+function normalizeTabId(raw: string | null | undefined): string | null {
+	if (!raw) return null;
+	const lower = raw.toLowerCase().trim();
+	if (lower === "pmb") return "pmb";
+	if (lower === "crm") return "crm";
+	if (lower === "finance" || lower === "keuangan") return "finance";
+	if (lower === "akademik" || lower === "academic") return "akademik";
+	if (lower === "kehadiran" || lower === "attendance") return "kehadiran";
+	if (lower === "pa") return "pa";
+	if (lower === "magang" || lower === "internship") return "magang";
+	if (lower === "status") return "status";
+	if (
+		lower === "final-decision" ||
+		lower === "final_decision" ||
+		lower === "finalisasi" ||
+		lower === "evaluator"
+	)
+		return "final-decision";
+	if (lower === "catatan" || lower === "catatan-internal") return "catatan";
+	return lower;
+}
+
 export default function StudentDetailPage() {
 	return (
 		<Suspense
@@ -198,49 +266,39 @@ function StudentDetailContent() {
 	const params = useParams();
 	const router = useRouter();
 	const searchParams = useSearchParams();
-	const context = searchParams.get("context");
+	const rawTab = searchParams.get("tab") || searchParams.get("context");
+	const requestedTab = normalizeTabId(rawTab);
 	const { isAuthenticated, user, hasHydrated } = useAuthStore();
-	const [data, setData] = useState<StudentDetail | null>(null);
-	const [isLoading, setIsLoading] = useState(true);
+	const {
+		data: studentQueryData,
+		isLoading,
+		refetch: refetchQuery,
+	} = useStudentDetail(params.id as string);
+
+	const data = (studentQueryData as unknown as StudentDetail) || null;
 	const [isArchiving, setIsArchiving] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 	const [showFullBiodata, setShowFullBiodata] = useState(false);
-	const [activeTab, setActiveTab] = useState(context || "");
+	const [activeTab, setActiveTab] = useState(requestedTab || "");
 	const [mounted, setMounted] = useState(false);
 	const [updateTrigger, setUpdateTrigger] = useState(0);
 	const [isGenerating, setIsGenerating] = useState(false);
 
 	useEffect(() => {
-		if (context && context !== "all") {
-			setActiveTab(context);
+		if (requestedTab && requestedTab !== "all") {
+			setActiveTab(requestedTab);
 		}
-	}, [context]);
-
-	const [isExporting, setIsExporting] = useState(false);
-	const [exportJobId, setExportJobId] = useState<string | null>(null);
-	const [exportStatus, setExportStatus] = useState<string | null>(null);
-	const [exportDownloadUrl, setExportDownloadUrl] = useState<string | null>(
-		null,
-	);
+	}, [requestedTab]);
 
 	useEffect(() => {
 		setMounted(true);
 	}, []);
 
 	const refetchStudent = useCallback(async () => {
-		if (!params.id) return;
-		try {
-			const { data: resData, error } =
-				await api.students[params.id as string].get();
-			if (!error && resData?.data) {
-				setData(resData.data as unknown as StudentDetail);
-				setUpdateTrigger((prev) => prev + 1);
-			}
-		} catch (err) {
-			console.error("Failed refetching student detail", err);
-		}
-	}, [params.id]);
+		await refetchQuery();
+		setUpdateTrigger((prev) => prev + 1);
+	}, [refetchQuery]);
 
 	useEffect(() => {
 		if (!hasHydrated) return;
@@ -248,10 +306,7 @@ function StudentDetailContent() {
 			router.push("/login");
 			return;
 		}
-
-		setIsLoading(true);
-		refetchStudent().finally(() => setIsLoading(false));
-	}, [params.id, isAuthenticated, hasHydrated, router, refetchStudent]);
+	}, [isAuthenticated, hasHydrated, router]);
 
 	const handleGenerateAccount = async () => {
 		if (!data?.student?.id) return;
@@ -269,53 +324,6 @@ function StudentDetailContent() {
 			toast.error("Terjadi kesalahan sistem saat menghubungi server.");
 		} finally {
 			setIsGenerating(false);
-		}
-	};
-
-	useEffect(() => {
-		if (!exportJobId) return;
-		const interval = setInterval(async () => {
-			try {
-				const res = await api.exports[exportJobId].get();
-				if (res.data?.success) {
-					const status = res.data?.data?.status;
-					setExportStatus(status ?? null);
-					if (status === "completed") {
-						setExportDownloadUrl(res.data?.data?.downloadUrl ?? null);
-						clearInterval(interval);
-						setIsExporting(false);
-						toast.success("File ZIP siap diunduh!");
-					} else if (status === "failed") {
-						clearInterval(interval);
-						setIsExporting(false);
-						toast.error("Gagal membuat file ZIP.");
-					}
-				}
-			} catch (err) {
-				console.error("Polling export error", err);
-			}
-		}, 2000);
-		return () => clearInterval(interval);
-	}, [exportJobId]);
-
-	const handleExportFiles = async () => {
-		if (!data?.student?.id) return;
-		setIsExporting(true);
-		setExportStatus("queued");
-		setExportJobId(null);
-		setExportDownloadUrl(null);
-		try {
-			const res = await api.exports.student[data.student.id].post();
-			if (res.data?.success) {
-				setExportJobId(res.data?.data?.jobId ?? null);
-				toast.info("Sedang menyiapkan file ZIP...");
-			} else {
-				toast.error(res.data?.message || "Gagal memulai ekspor.");
-				setIsExporting(false);
-			}
-		} catch (err) {
-			toast.error("Terjadi kesalahan koneksi saat ekspor.");
-			setIsExporting(false);
 		}
 	};
 
@@ -341,10 +349,12 @@ function StudentDetailContent() {
 		if (!data?.student?.id) return;
 		setIsDeleting(true);
 		try {
-			const { error } = await api.students[data.student.id].delete();
-			if (error) {
+			const res = await api.students[data.student.id].delete();
+			if (res.error || !res.data?.success) {
 				toast.error(
-					"Gagal menghapus data mahasiswa. Anda mungkin tidak memiliki izin.",
+					(res.data as any)?.message ||
+						(res.error?.value as any)?.message ||
+						"Gagal menghapus data mahasiswa.",
 				);
 				return;
 			}
@@ -371,12 +381,15 @@ function StudentDetailContent() {
 
 	useEffect(() => {
 		if (mounted && visibleLinks.length > 0) {
-			const isCurrentActiveValid = visibleLinks.some((l) => l.id === activeTab);
-			if (!isCurrentActiveValid) {
+			const targetTab = requestedTab || activeTab;
+			const isTargetValid = visibleLinks.some((l) => l.id === targetTab);
+			if (isTargetValid) {
+				setActiveTab(targetTab);
+			} else if (!visibleLinks.some((l) => l.id === activeTab)) {
 				setActiveTab(visibleLinks[0]?.id || "");
 			}
 		}
-	}, [mounted, visibleLinks, activeTab]);
+	}, [mounted, visibleLinks, requestedTab]);
 
 	const handleDirectorApproval = async () => {
 		if (!data) return;
@@ -524,6 +537,12 @@ function StudentDetailContent() {
 
 	const scrollToAnchor = (id: string) => {
 		setActiveTab(id);
+		if (typeof window !== "undefined") {
+			const url = new URL(window.location.href);
+			url.searchParams.set("tab", id);
+			url.searchParams.delete("context");
+			window.history.replaceState(null, "", url.toString());
+		}
 	};
 
 	const renderStamp = (
@@ -603,9 +622,12 @@ function StudentDetailContent() {
 							router.push(from);
 							return;
 						}
-						if (context && context !== "all") {
+						const currentContext = requestedTab || rawTab;
+						if (currentContext && currentContext !== "all") {
 							const target =
-								context === "final-decision" ? "evaluator" : context;
+								currentContext === "final-decision"
+									? "evaluator"
+									: currentContext;
 							router.push(`/dashboard/${target}`);
 							return;
 						}
@@ -635,24 +657,6 @@ function StudentDetailContent() {
 								: data?.student?.studentUserId
 									? "Akun Aktif"
 									: "Buat Akun"}
-						</Button>
-					)}
-					{hasRole(user, "superadmin") && (
-						<Button
-							size="sm"
-							variant="outline"
-							onClick={
-								exportStatus === "completed" && exportDownloadUrl
-									? () => {
-											window.location.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/exports/${exportJobId}/download`;
-										}
-									: handleExportFiles
-							}
-							disabled={isExporting}
-							className="text-xs h-8.5 font-semibold border-slate-200 text-slate-700 hover:bg-slate-50"
-						>
-							<Download className="w-3.5 h-3.5 mr-1 text-slate-500" />
-							{isExporting ? "Menyiapkan..." : "Unduh Berkas"}
 						</Button>
 					)}
 					{hasRole(user, "superadmin", "pmb") && (
@@ -718,19 +722,8 @@ function StudentDetailContent() {
 								>
 									Angkatan {s.cohort || "-"}
 								</Badge>
-								{user?.role === "superadmin" && s.overallStatus && (
-									<Badge
-										className={`${sColor.bg} ${sColor.text} ${sColor.border} border uppercase px-2 py-0.5 text-[10px] font-bold`}
-									>
-										<span className="mr-1">
-											{s.overallStatus === "AMAN"
-												? "🟢"
-												: s.overallStatus === "TIDAK_AMAN"
-													? "🔴"
-													: "🟡"}
-										</span>
-										{s.overallStatus?.replace("_", " ")}
-									</Badge>
+								{s.overallStatus && (
+									<PanelStatusBadge status={s.overallStatus} size="sm" />
 								)}
 							</div>
 							{/* Essential Metadata Strip */}
@@ -751,7 +744,7 @@ function StudentDetailContent() {
 													className="w-4 h-3 object-cover rounded-xs shadow-2xs inline-block"
 												/>
 											) : (
-												<span className="text-xs">🌐</span>
+												<Globe className="w-3.5 h-3.5 text-slate-500" />
 											)}
 											<span>{s.subProgram}</span>
 										</span>
@@ -789,6 +782,32 @@ function StudentDetailContent() {
 										<span className="font-mono text-xs">{s.phone}</span>
 									</a>
 								)}
+
+								{/* Dosen Pembimbing Akademik (PA) */}
+								<div
+									className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-medium shadow-2xs ${
+										s.pa?.fullName
+											? "bg-amber-50/90 text-amber-900 border-amber-200"
+											: "bg-slate-100/80 text-slate-500 border-slate-200/70"
+									}`}
+									title={
+										s.pa?.fullName
+											? `Dosen Pembimbing Akademik: ${s.pa.fullName}`
+											: "Dosen PA Belum Ditentukan"
+									}
+								>
+									<div
+										className={`w-3.5 h-3.5 rounded-full text-white font-bold text-[8px] flex items-center justify-center shrink-0 ${
+											s.pa?.fullName ? "bg-amber-600" : "bg-slate-400"
+										}`}
+									>
+										PA
+									</div>
+									<span className="text-slate-500 font-normal">PA:</span>
+									<span className="font-semibold text-slate-800 truncate max-w-[140px] sm:max-w-[200px]">
+										{s.pa?.fullName || "Belum Ditentukan"}
+									</span>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -892,6 +911,14 @@ function StudentDetailContent() {
 							</span>
 							<span className="font-semibold text-slate-800 font-mono">
 								{primaryParent?.phone || "-"}
+							</span>
+						</div>
+						<div className="col-span-2 md:col-span-4 pt-1 border-t border-slate-200/60 flex items-center gap-2">
+							<span className="text-slate-400 font-medium text-[11px]">
+								Dosen Pembimbing Akademik (PA):
+							</span>
+							<span className="font-semibold text-slate-800">
+								{s.pa?.fullName || "Belum Ditentukan"}
 							</span>
 						</div>
 					</div>
@@ -1088,9 +1115,11 @@ function StudentDetailContent() {
 							<div>
 								<h4 className="text-amber-700 font-bold flex items-center gap-2">
 									{data.student.overallStatus === "AMAN" ||
-									data.decision?.isApprovedByDirector
-										? "✅"
-										: "🔐"}{" "}
+									data.decision?.isApprovedByDirector ? (
+										<CheckCircle className="w-4 h-4 text-emerald-600 inline" />
+									) : (
+										<Lock className="w-4 h-4 text-amber-600 inline" />
+									)}{" "}
 									Persetujuan Akhir (Direktur)
 								</h4>
 								<p className="text-sm text-amber-600/80 mt-1">

@@ -4,6 +4,7 @@ import { desc, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { db } from "../db";
 import { backupJobs } from "../db/schema";
+import { getCacheStats } from "../lib/cache";
 import { queueLength } from "../lib/queue";
 import { redis } from "../lib/redis";
 
@@ -64,6 +65,9 @@ export const healthRoutes = new Elysia().get("/health", async ({ set }) => {
 	} catch {
 		results.queues = "unavailable";
 	}
+
+	// 5. Cache stats & hit ratio
+	results.cache = getCacheStats();
 
 	// 5. Last backup status
 	try {

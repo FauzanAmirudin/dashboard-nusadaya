@@ -1,12 +1,12 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import {
 	Archive,
 	CheckCircle,
 	CheckCircle2,
 	Clock,
 	Download,
-	Edit,
 	Eye,
 	GraduationCap,
 	HeartHandshake,
@@ -19,6 +19,7 @@ import {
 	Search,
 	ShieldAlert,
 	ShieldCheck,
+	User,
 	UserCheck,
 	UserPlus,
 	Users,
@@ -32,8 +33,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { Progress } from "@/components/ui/progress";
+import { StudentsTableSkeleton } from "@/components/ui/StudentsTableSkeleton";
 import {
 	Select,
 	SelectContent,
@@ -56,10 +59,19 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useStudentsList } from "@/hooks/useStudentsList";
+import {
+	prefetchStudentDetail,
+	useStudentsList,
+} from "@/hooks/useStudentsList";
 import { api } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 import { useAuthStore } from "@/store";
+import {
+	calculateOverallStatus,
+	calculateProgressStatus,
+	normalizeStatus,
+	type PanelStatusType,
+} from "@/utils/status";
 
 type StudentData = {
 	student: {
@@ -121,23 +133,68 @@ function getAcademicYear(student: any) {
 // Checklist Helpers for Division Progress
 const getPmbChecklist = (pmb: any) => {
 	const items = [
-		{ name: "Pendaftaran Akun", done: true },
-		{ name: "Data Pribadi & Kontak", done: Boolean(pmb?.personalDataComplete) },
-		{ name: "Pilihan Peminatan/Program", done: Boolean(pmb?.programSelected) },
-		{ name: "Biodata Orang Tua", done: Boolean(pmb?.parentDataComplete) },
 		{
-			name: "Riwayat Pendidikan",
-			done: Boolean(pmb?.educationHistoryComplete),
+			name: "Formulir Masuk",
+			done: Boolean(pmb?.formReceived),
+			category: "Utama",
 		},
-		{ name: "Dokumen KTP", done: Boolean(pmb?.docKtp) },
-		{ name: "Dokumen Kartu Keluarga", done: Boolean(pmb?.docKk) },
-		{ name: "Dokumen Ijazah / SKL", done: Boolean(pmb?.docIjazah) },
-		{ name: "Dokumen Akta Kelahiran", done: Boolean(pmb?.docAkta) },
-		{ name: "Pas Foto Berwarna", done: Boolean(pmb?.docFoto) },
-		{ name: "Surat Pernyataan / Izin", done: Boolean(pmb?.docSuratPernyataan) },
-		{ name: "Dokumen Paspor", done: Boolean(pmb?.docPaspor) },
-		{ name: "Tes Minat & Bakat", done: Boolean(pmb?.testPassed) },
-		{ name: "Wawancara PMB", done: Boolean(pmb?.interviewPassed) },
+		{
+			name: "Berkas Lengkap",
+			done: Boolean(pmb?.documentsComplete),
+			category: "Utama",
+		},
+		{
+			name: "Input Data Awal",
+			done: Boolean(pmb?.dataInputted),
+			category: "Utama",
+		},
+		{
+			name: "Follow Up Awal",
+			done: Boolean(pmb?.initialFollowUp),
+			category: "Utama",
+		},
+		{ name: "KTP", done: Boolean(pmb?.docKtp), category: "Dokumen" },
+		{
+			name: "Kartu Keluarga (KK)",
+			done: Boolean(pmb?.docKk),
+			category: "Dokumen",
+		},
+		{
+			name: "Curriculum Vitae (CV)",
+			done: Boolean(pmb?.docCv),
+			category: "Dokumen",
+		},
+		{
+			name: "Ijazah Terakhir",
+			done: Boolean(pmb?.docIjazah),
+			category: "Dokumen",
+		},
+		{
+			name: "Transkrip Nilai",
+			done: Boolean(pmb?.docTranskrip),
+			category: "Dokumen",
+		},
+		{
+			name: "Paspor Halaman Depan",
+			done: Boolean(pmb?.docPassportDepan),
+			category: "Dokumen",
+		},
+		{
+			name: "Paspor Halaman Visa",
+			done: Boolean(pmb?.docPassportVisa),
+			category: "Dokumen",
+		},
+		{ name: "Surat SKBM", done: Boolean(pmb?.docSkbm), category: "Dokumen" },
+		{
+			name: "Hasil Lab MCU",
+			done: Boolean(pmb?.docMcu),
+			category: "Dokumen",
+		},
+		{
+			name: "Sertifikasi Bahasa",
+			done: Boolean(pmb?.docSertifikasiBahasa),
+			category: "Dokumen",
+		},
 	];
 	const completed = items.filter((i) => i.done).length;
 	return {
@@ -312,74 +369,114 @@ const getPaChecklist = (pa: any) => {
 };
 
 // Helper for Superadmin 7-module status
-const getRealtimeOverallStatus = (s: StudentData) => {
-	const panels = [
-		s.pmb?.isAcc ? "AMAN" : s.pmb?.status || "PERLU_PERHATIAN",
-		s.crm?.isAcc ? "AMAN" : s.crm?.status || "PERLU_PERHATIAN",
-		s.finance?.isAcc ? "AMAN" : s.finance?.status || "PERLU_PERHATIAN",
-		s.academic?.isAcc ? "AMAN" : s.academic?.status || "PERLU_PERHATIAN",
-		s.pa?.isAcc ? "AMAN" : s.pa?.status || "PERLU_PERHATIAN",
-		s.internship?.isAcc ? "AMAN" : s.internship?.status || "PERLU_PERHATIAN",
-	];
-
-	if (panels.includes("TIDAK_AMAN")) return "TIDAK_AMAN";
-	if (panels.includes("PERLU_PERHATIAN")) return "PERLU_PERHATIAN";
-	return "AMAN";
+const getRealtimeOverallStatus = (s: StudentData): PanelStatusType => {
+	const { overallStatus } = getStudentAccDetails(s);
+	return overallStatus;
 };
 
 const getStudentAccDetails = (s: StudentData) => {
+	const pmbCl = getPmbChecklist(s.pmb);
+	const crmCl = getCrmChecklist(s.crm);
+	const finCl = getFinanceChecklist(s.finance);
+	const acadCl = getAcademicChecklist(s);
+	const paCl = getPaChecklist(s.pa);
+	const internCl = getInternshipChecklist(s.internship);
+
 	const isDosenAcc =
 		s.courseGrades &&
 		s.courseGrades.length > 0 &&
 		s.courseGrades.every((g) => g.isAcc);
 
-	const modules = [
+	const modules: Array<{
+		key: string;
+		name: string;
+		isAcc: boolean;
+		completed: number;
+		total: number;
+		status: PanelStatusType;
+	}> = [
 		{
 			key: "pmb",
 			name: "PMB",
 			isAcc: Boolean(s.pmb?.isAcc),
-			status: s.pmb?.status || "PERLU_PERHATIAN",
+			completed: pmbCl.completed,
+			total: pmbCl.total,
+			status: calculateProgressStatus(
+				pmbCl.completed,
+				pmbCl.total,
+				s.pmb?.isAcc,
+			),
 		},
 		{
 			key: "crm",
 			name: "CRM",
 			isAcc: Boolean(s.crm?.isAcc),
-			status: s.crm?.status || "PERLU_PERHATIAN",
+			completed: crmCl.completed,
+			total: crmCl.total,
+			status: calculateProgressStatus(
+				crmCl.completed,
+				crmCl.total,
+				s.crm?.isAcc,
+			),
 		},
 		{
 			key: "finance",
 			name: "Finance",
 			isAcc: Boolean(s.finance?.isAcc),
-			status: s.finance?.status || "PERLU_PERHATIAN",
+			completed: finCl.completed,
+			total: finCl.total,
+			status: calculateProgressStatus(
+				finCl.completed,
+				finCl.total,
+				s.finance?.isAcc,
+			),
 		},
 		{
 			key: "academic",
 			name: "Akademik",
 			isAcc: Boolean(s.academic?.isAcc),
-			status: s.academic?.status || "PERLU_PERHATIAN",
+			completed: acadCl.completed,
+			total: acadCl.total,
+			status: calculateProgressStatus(
+				acadCl.completed,
+				acadCl.total,
+				s.academic?.isAcc,
+			),
 		},
 		{
 			key: "dosen",
 			name: "Dosen MK",
 			isAcc: Boolean(isDosenAcc),
-			status: isDosenAcc ? "AMAN" : "PERLU_PERHATIAN",
+			completed: isDosenAcc ? 1 : 0,
+			total: 1,
+			status: calculateProgressStatus(isDosenAcc ? 1 : 0, 1, isDosenAcc),
 		},
 		{
 			key: "pa",
 			name: "PA",
 			isAcc: Boolean(s.pa?.isAcc),
-			status: s.pa?.status || "PERLU_PERHATIAN",
+			completed: paCl.completed,
+			total: paCl.total,
+			status: calculateProgressStatus(paCl.completed, paCl.total, s.pa?.isAcc),
 		},
 		{
 			key: "internship",
 			name: "Magang",
 			isAcc: Boolean(s.internship?.isAcc),
-			status: s.internship?.status || "PERLU_PERHATIAN",
+			completed: internCl.completed,
+			total: internCl.total,
+			status: calculateProgressStatus(
+				internCl.completed,
+				internCl.total,
+				s.internship?.isAcc,
+			),
 		},
 	];
 
 	const accCount = modules.filter((m) => m.isAcc).length;
-	return { modules, accCount, isAllAcc: accCount === 7 };
+	const overallStatus = calculateOverallStatus(modules);
+
+	return { modules, accCount, isAllAcc: accCount === 7, overallStatus };
 };
 
 export default function StudentsPage() {
@@ -407,9 +504,12 @@ export default function StudentsPage() {
 	// Wait for auth hydration AND data loading before rendering
 	if (!hasHydrated || isLoading) {
 		return (
-			<div className="flex flex-col justify-center items-center h-80 gap-3 text-slate-500">
-				<RefreshCw className="w-8 h-8 animate-spin text-[#0517B0]" />
-				<p className="text-sm font-semibold">Memuat data semua mahasiswa...</p>
+			<div className="space-y-6">
+				<div className="space-y-1">
+					<div className="h-8 w-64 bg-slate-200 rounded animate-pulse" />
+					<div className="h-4 w-96 bg-slate-100 rounded animate-pulse" />
+				</div>
+				<StudentsTableSkeleton rows={8} />
 			</div>
 		);
 	}
@@ -460,6 +560,7 @@ function DivisionStudentsView({
 	role: string;
 }) {
 	const router = useRouter();
+	const queryClient = useQueryClient();
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCohort, setSelectedCohort] = useState<string>("all");
 	const [selectedStatus, setSelectedStatus] = useState<string>("all");
@@ -583,16 +684,20 @@ function DivisionStudentsView({
 				(Number(selectedCohort) >= 2000 &&
 					s.student?.cohort === Number(selectedCohort) - 2010);
 
-			const status = config.getStatus(s);
+			const checklist = config.getChecklist(s);
 			const isAcc = config.getIsAcc(s);
+			const studentStatus = calculateProgressStatus(
+				checklist.completed,
+				checklist.total,
+				isAcc,
+			);
 
 			let matchStatus = true;
-			if (selectedStatus === "aman") matchStatus = status === "AMAN";
-			if (selectedStatus === "perhatian")
-				matchStatus = status === "PERLU_PERHATIAN";
-			if (selectedStatus === "tidak_aman")
-				matchStatus = status === "TIDAK_AMAN";
-			if (selectedStatus === "acc") matchStatus = isAcc;
+			if (selectedStatus === "acc") matchStatus = studentStatus === "ACC";
+			if (selectedStatus === "aman") matchStatus = studentStatus === "AMAN";
+			if (selectedStatus === "proses") matchStatus = studentStatus === "PROSES";
+			if (selectedStatus === "butuh_perhatian")
+				matchStatus = studentStatus === "BUTUH_PERHATIAN";
 
 			return matchSearch && matchCohort && matchStatus;
 		});
@@ -608,23 +713,47 @@ function DivisionStudentsView({
 		return filteredData.slice(start, start + pageSize);
 	}, [filteredData, currentPage]);
 
-	// KPI Metrics based on baseData
+	// KPI Metrics based on baseData using 4 standardized categories
 	const totalStudents = baseData.length;
-	const countAcc = baseData.filter((s) => config.getIsAcc(s)).length;
-	const countAman = baseData.filter(
-		(s) => config.getStatus(s) === "AMAN",
-	).length;
-	const countPerhatian = baseData.filter(
-		(s) => config.getStatus(s) === "PERLU_PERHATIAN" || !config.getStatus(s),
-	).length;
-	const countTidakAman = baseData.filter(
-		(s) => config.getStatus(s) === "TIDAK_AMAN",
-	).length;
+	const countAcc = baseData.filter((s) => {
+		const cl = config.getChecklist(s);
+		return (
+			calculateProgressStatus(cl.completed, cl.total, config.getIsAcc(s)) ===
+			"ACC"
+		);
+	}).length;
+	const countAman = baseData.filter((s) => {
+		const cl = config.getChecklist(s);
+		return (
+			calculateProgressStatus(cl.completed, cl.total, config.getIsAcc(s)) ===
+			"AMAN"
+		);
+	}).length;
+	const countProses = baseData.filter((s) => {
+		const cl = config.getChecklist(s);
+		return (
+			calculateProgressStatus(cl.completed, cl.total, config.getIsAcc(s)) ===
+			"PROSES"
+		);
+	}).length;
+	const countPerhatian = baseData.filter((s) => {
+		const cl = config.getChecklist(s);
+		return (
+			calculateProgressStatus(cl.completed, cl.total, config.getIsAcc(s)) ===
+			"BUTUH_PERHATIAN"
+		);
+	}).length;
 
 	const handleExport = () => {
 		if (filteredData.length > 0) {
 			const exportData = filteredData.map((s) => {
 				const checklist = config.getChecklist(s);
+				const isAcc = config.getIsAcc(s);
+				const statusCat = calculateProgressStatus(
+					checklist.completed,
+					checklist.total,
+					isAcc,
+				);
 				return {
 					NIM: s.student?.nim || "-",
 					"Nama Mahasiswa": s.student?.name || "-",
@@ -633,8 +762,8 @@ function DivisionStudentsView({
 					Peminatan: s.student?.subProgram || s.student?.program || "-",
 					"No WhatsApp": s.student?.phone || "-",
 					Progress: `${checklist.completed}/${checklist.total} (${Math.round((checklist.completed / checklist.total) * 100)}%)`,
-					Status: config.getStatus(s),
-					ACC: config.getIsAcc(s) ? "Sudah ACC" : "Belum",
+					Status: statusCat,
+					ACC: isAcc ? "Sudah ACC" : "Belum",
 				};
 			});
 			exportToCSV(
@@ -672,37 +801,28 @@ function DivisionStudentsView({
 				</div>
 
 				<div className="flex flex-wrap items-center gap-2.5">
-					<Select
-						value={selectedCohort}
-						onValueChange={(val) => setSelectedCohort(val || "all")}
-					>
-						<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
-							<SelectValue placeholder="Filter Angkatan">
-								{selectedCohort === "all"
-									? "Semua Angkatan"
-									: `Angkatan ${selectedCohort}`}
-							</SelectValue>
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">Semua Angkatan</SelectItem>
-							{availableCohorts.map((cohort) => (
-								<SelectItem key={cohort} value={cohort}>
-									Angkatan {cohort}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-
 					{role === "pmb" && (
-						<Link href="/dashboard/students/add">
-							<Button
-								size="sm"
-								className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs gap-1.5 h-9 font-bold shadow-sm"
-							>
-								<UserPlus className="w-3.5 h-3.5" />
-								Tambah Mahasiswa
-							</Button>
-						</Link>
+						<>
+							<Link href="/dashboard/students/archive">
+								<Button
+									variant="outline"
+									size="sm"
+									className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9 font-medium"
+								>
+									<Archive className="w-3.5 h-3.5 text-slate-500" />
+									Lihat Arsip
+								</Button>
+							</Link>
+							<Link href="/dashboard/students/add">
+								<Button
+									size="sm"
+									className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs gap-1.5 h-9 font-bold shadow-sm"
+								>
+									<UserPlus className="w-3.5 h-3.5" />
+									Tambah Mahasiswa
+								</Button>
+							</Link>
+						</>
 					)}
 
 					<Button
@@ -717,8 +837,8 @@ function DivisionStudentsView({
 				</div>
 			</div>
 
-			{/* KPI Summary Cards */}
-			<div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+			{/* KPI Summary Cards (5 Standardized Categories) */}
+			<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
 				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
 					<CardContent className="p-4 flex items-start gap-3">
 						<div className="p-2 rounded-lg bg-blue-50 text-[#0517B0] mt-0.5">
@@ -758,7 +878,7 @@ function DivisionStudentsView({
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								🟢 Status Aman
+								Status Aman
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countAman}
@@ -773,8 +893,22 @@ function DivisionStudentsView({
 							<Clock className="h-5 w-5" />
 						</div>
 						<div>
+							<p className="text-slate-500 text-xs font-semibold">Berproses</p>
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
+								{countProses}
+							</p>
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-rose-500 col-span-2 sm:col-span-1">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-rose-50 text-rose-500 mt-0.5">
+							<XCircle className="h-5 w-5" />
+						</div>
+						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								🟡 Berproses / Perhatian
+								Butuh Perhatian
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countPerhatian}
@@ -834,25 +968,25 @@ function DivisionStudentsView({
 							value={selectedStatus}
 							onValueChange={(val) => setSelectedStatus(val || "all")}
 						>
-							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
+							<SelectTrigger className="w-[155px] h-9 text-xs bg-white border-slate-200">
 								<SelectValue placeholder="Status Filter">
 									{selectedStatus === "all"
 										? "Semua Status"
-										: selectedStatus === "aman"
-											? "🟢 Aman"
-											: selectedStatus === "perhatian"
-												? "🟡 Berproses"
-												: selectedStatus === "tidak_aman"
-													? "🔴 Kendala"
-													: "🛡️ Sudah ACC"}
+										: selectedStatus === "acc"
+											? "Sudah ACC"
+											: selectedStatus === "aman"
+												? "Aman"
+												: selectedStatus === "proses"
+													? "Berproses"
+													: "Butuh Perhatian"}
 								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Status</SelectItem>
-								<SelectItem value="aman">🟢 Aman</SelectItem>
-								<SelectItem value="perhatian">🟡 Berproses</SelectItem>
-								<SelectItem value="tidak_aman">🔴 Kendala</SelectItem>
-								<SelectItem value="acc">🛡️ Sudah ACC</SelectItem>
+								<SelectItem value="acc">Sudah ACC</SelectItem>
+								<SelectItem value="aman">Aman</SelectItem>
+								<SelectItem value="proses">Berproses</SelectItem>
+								<SelectItem value="butuh_perhatian">Butuh Perhatian</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
@@ -878,8 +1012,8 @@ function DivisionStudentsView({
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[140px]">
 										No. WhatsApp
 									</TableHead>
-									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
-										{config.progressLabel}
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center min-w-[180px]">
+										{config.progressLabel} & Status
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-24">
 										Aksi
@@ -890,12 +1024,21 @@ function DivisionStudentsView({
 								{paginatedData.map((s) => {
 									const { items, completed, total, isDone } =
 										config.getChecklist(s);
+									const isAcc = config.getIsAcc(s);
+									const studentStatus = calculateProgressStatus(
+										completed,
+										total,
+										isAcc,
+									);
 									const waUrl = formatWhatsAppUrl(s.student?.phone);
 
 									return (
 										<TableRow
 											key={s.student.id}
-											className="border-slate-100 hover:bg-blue-50/40 transition-colors"
+											className="border-slate-100 hover:bg-blue-50/40 transition-colors cursor-pointer"
+											onMouseEnter={() =>
+												prefetchStudentDetail(queryClient, s.student.id)
+											}
 										>
 											<TableCell>
 												<div className="font-bold text-slate-900 text-sm">
@@ -963,34 +1106,30 @@ function DivisionStudentsView({
 												)}
 											</TableCell>
 
-											{/* Checklist Progress with Tooltip */}
+											{/* Checklist Progress + Status Badge */}
 											<TableCell className="text-center">
 												<TooltipProvider>
 													<Tooltip>
-														<TooltipTrigger className="w-full">
-															<div className="flex flex-col items-center gap-1">
+														<TooltipTrigger className="w-full cursor-pointer">
+															<div className="flex flex-col items-center gap-1.5">
 																<div className="flex items-center justify-between w-full text-[11px] font-bold text-slate-700 px-1">
 																	<span>
 																		{completed}/{total} Item
 																	</span>
-																	<span
-																		className={
-																			isDone
-																				? "text-emerald-600"
-																				: "text-slate-500"
-																		}
-																	>
-																		{Math.round((completed / total) * 100)}%
-																	</span>
+																	<PanelStatusBadge
+																		status={studentStatus}
+																		size="sm"
+																		useShortLabel
+																	/>
 																</div>
 																<div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
 																	<div
 																		className={`h-full rounded-full transition-all duration-300 ${
-																			isDone
+																			isAcc || isDone
 																				? "bg-emerald-500"
-																				: completed >= Math.ceil(total / 2)
-																					? "bg-blue-500"
-																					: "bg-amber-500"
+																				: completed / total > 0.3
+																					? "bg-amber-500"
+																					: "bg-rose-500"
 																		}`}
 																		style={{
 																			width: `${(completed / total) * 100}%`,
@@ -1036,19 +1175,38 @@ function DivisionStudentsView({
 
 											{/* Action */}
 											<TableCell className="text-right pr-6">
-												<Button
-													size="sm"
-													variant="outline"
-													onClick={() =>
-														router.push(
-															`/dashboard/students/${s.student.id}?context=${config.context}`,
-														)
-													}
-													className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5"
-												>
-													<Eye className="w-3.5 h-3.5" />
-													Periksa
-												</Button>
+												<div className="flex items-center justify-end gap-1.5">
+													{role === "pmb" && (
+														<Button
+															size="sm"
+															variant="outline"
+															onClick={() =>
+																router.push(
+																	`/dashboard/students/${s.student.id}/profile`,
+																)
+															}
+															className="h-8 text-xs font-semibold text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900 gap-1 px-2.5 shadow-2xs cursor-pointer"
+															title="Lihat & Edit Detail Profil Mahasiswa"
+														>
+															<User className="w-3.5 h-3.5 text-[#0517B0]" />
+															Lihat
+														</Button>
+													)}
+													<Button
+														size="sm"
+														variant="outline"
+														onClick={() =>
+															router.push(
+																`/dashboard/students/${s.student.id}?tab=${config.context}`,
+															)
+														}
+														className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5 shadow-2xs cursor-pointer"
+														title="Periksa Progres Divisi"
+													>
+														<Eye className="w-3.5 h-3.5" />
+														Periksa
+													</Button>
+												</div>
 											</TableCell>
 										</TableRow>
 									);
@@ -1093,6 +1251,7 @@ function SuperadminStudentsView({
 	user: any;
 }) {
 	const router = useRouter();
+	const queryClient = useQueryClient();
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCohort, setSelectedCohort] = useState<string>("all");
 	const [selectedStatus, setSelectedStatus] = useState<string>("all");
@@ -1133,15 +1292,13 @@ function SuperadminStudentsView({
 				(Number(selectedCohort) >= 2000 &&
 					s.student?.cohort === Number(selectedCohort) - 2010);
 
-			const rtStatus = getRealtimeOverallStatus(s);
-			const { isAllAcc } = getStudentAccDetails(s);
+			const { isAllAcc, overallStatus } = getStudentAccDetails(s);
 			let matchStatus = true;
-			if (selectedStatus === "aman") matchStatus = rtStatus === "AMAN";
-			if (selectedStatus === "perhatian")
-				matchStatus = rtStatus === "PERLU_PERHATIAN";
-			if (selectedStatus === "tidak_aman")
-				matchStatus = rtStatus === "TIDAK_AMAN";
 			if (selectedStatus === "acc_lengkap") matchStatus = isAllAcc;
+			if (selectedStatus === "aman") matchStatus = overallStatus === "AMAN";
+			if (selectedStatus === "proses") matchStatus = overallStatus === "PROSES";
+			if (selectedStatus === "butuh_perhatian")
+				matchStatus = overallStatus === "BUTUH_PERHATIAN";
 			if (selectedStatus === "layak_berangkat")
 				matchStatus =
 					s.decision?.evaluatorDecision === "layak_berangkat" ||
@@ -1171,19 +1328,19 @@ function SuperadminStudentsView({
 		);
 	}, [data, selectedCohort]);
 
-	// KPI Stats based on selected cohort
+	// KPI Stats based on selected cohort using 4 standardized categories
 	const totalStudents = cohortData.length;
+	const countAccLengkap = cohortData.filter(
+		(s) => getStudentAccDetails(s).isAllAcc,
+	).length;
 	const countAman = cohortData.filter(
 		(s) => getRealtimeOverallStatus(s) === "AMAN",
 	).length;
+	const countProses = cohortData.filter(
+		(s) => getRealtimeOverallStatus(s) === "PROSES",
+	).length;
 	const countPerhatian = cohortData.filter(
-		(s) => getRealtimeOverallStatus(s) === "PERLU_PERHATIAN",
-	).length;
-	const countTidakAman = cohortData.filter(
-		(s) => getRealtimeOverallStatus(s) === "TIDAK_AMAN",
-	).length;
-	const countAccLengkap = cohortData.filter(
-		(s) => getStudentAccDetails(s).isAllAcc,
+		(s) => getRealtimeOverallStatus(s) === "BUTUH_PERHATIAN",
 	).length;
 	const countLayakBerangkat = cohortData.filter(
 		(s) =>
@@ -1194,7 +1351,7 @@ function SuperadminStudentsView({
 	const handleExport = () => {
 		if (filteredData.length > 0) {
 			const exportData = filteredData.map((s) => {
-				const { accCount } = getStudentAccDetails(s);
+				const { accCount, overallStatus } = getStudentAccDetails(s);
 				return {
 					NIM: s.student.nim,
 					"Nama Mahasiswa": s.student.name,
@@ -1209,7 +1366,7 @@ function SuperadminStudentsView({
 					"Status Akademik": s.academic?.status || "-",
 					"Status PA": s.pa?.status || "-",
 					"Status Magang": s.internship?.status || "-",
-					"Status Keseluruhan": getRealtimeOverallStatus(s),
+					"Status Keseluruhan": overallStatus,
 					"Keputusan Evaluator": s.decision?.evaluatorDecision || "menunggu",
 					"Disetujui Direktur": s.decision?.isApprovedByDirector
 						? "Ya"
@@ -1248,27 +1405,6 @@ function SuperadminStudentsView({
 				</div>
 
 				<div className="flex flex-wrap items-center gap-2.5">
-					<Select
-						value={selectedCohort}
-						onValueChange={(val) => setSelectedCohort(val || "all")}
-					>
-						<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
-							<SelectValue placeholder="Filter Angkatan">
-								{selectedCohort === "all"
-									? "Semua Angkatan"
-									: `Angkatan ${selectedCohort}`}
-							</SelectValue>
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">Semua Angkatan</SelectItem>
-							{availableCohorts.map((cohort) => (
-								<SelectItem key={cohort} value={cohort}>
-									Angkatan {cohort}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-
 					<Link href="/dashboard/students/archive">
 						<Button
 							variant="outline"
@@ -1302,7 +1438,7 @@ function SuperadminStudentsView({
 				</div>
 			</div>
 
-			{/* KPI Summary Cards */}
+			{/* KPI Summary Cards (4 Standardized Categories) */}
 			<div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
 				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
 					<CardContent className="p-4 flex items-start gap-3">
@@ -1343,7 +1479,7 @@ function SuperadminStudentsView({
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								🟢 Status Aman
+								Status Aman
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countAman}
@@ -1358,11 +1494,9 @@ function SuperadminStudentsView({
 							<Clock className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								🟡 Perlu Perhatian
-							</p>
+							<p className="text-slate-500 text-xs font-semibold">Berproses</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countPerhatian}
+								{countProses}
 							</p>
 						</div>
 					</CardContent>
@@ -1375,10 +1509,10 @@ function SuperadminStudentsView({
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								⛔ Tidak Aman
+								Butuh Perhatian
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countTidakAman}
+								{countPerhatian}
 							</p>
 						</div>
 					</CardContent>
@@ -1452,30 +1586,28 @@ function SuperadminStudentsView({
 							value={selectedStatus}
 							onValueChange={(val) => setSelectedStatus(val || "all")}
 						>
-							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
+							<SelectTrigger className="w-[155px] h-9 text-xs bg-white border-slate-200">
 								<SelectValue placeholder="Status Filter">
 									{selectedStatus === "all"
 										? "Semua Status"
-										: selectedStatus === "aman"
-											? "🟢 Aman"
-											: selectedStatus === "perhatian"
-												? "🟡 Perlu Perhatian"
-												: selectedStatus === "tidak_aman"
-													? "🔴 Tidak Aman"
-													: selectedStatus === "acc_lengkap"
-														? "🛡️ ACC Lengkap"
-														: "✈️ Layak Berangkat"}
+										: selectedStatus === "acc_lengkap"
+											? "ACC Lengkap"
+											: selectedStatus === "aman"
+												? "Aman"
+												: selectedStatus === "proses"
+													? "Berproses"
+													: selectedStatus === "butuh_perhatian"
+														? "Butuh Perhatian"
+														: "Layak Berangkat"}
 								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Status</SelectItem>
-								<SelectItem value="aman">🟢 Aman</SelectItem>
-								<SelectItem value="perhatian">🟡 Perlu Perhatian</SelectItem>
-								<SelectItem value="tidak_aman">🔴 Tidak Aman</SelectItem>
-								<SelectItem value="acc_lengkap">🛡️ ACC Lengkap (7/7)</SelectItem>
-								<SelectItem value="layak_berangkat">
-									✈️ Layak Berangkat
-								</SelectItem>
+								<SelectItem value="acc_lengkap">ACC Lengkap (7/7)</SelectItem>
+								<SelectItem value="aman">Aman</SelectItem>
+								<SelectItem value="proses">Berproses</SelectItem>
+								<SelectItem value="butuh_perhatian">Butuh Perhatian</SelectItem>
+								<SelectItem value="layak_berangkat">Layak Berangkat</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
@@ -1507,7 +1639,7 @@ function SuperadminStudentsView({
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-48">
 										Status Divisi (P C F A D PA M)
 									</TableHead>
-									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
 										Kondisi
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
@@ -1520,15 +1652,17 @@ function SuperadminStudentsView({
 							</TableHeader>
 							<TableBody>
 								{paginatedData.map((s) => {
-									const { modules, accCount, isAllAcc } =
+									const { modules, accCount, isAllAcc, overallStatus } =
 										getStudentAccDetails(s);
-									const rtStatus = getRealtimeOverallStatus(s);
 									const waUrl = formatWhatsAppUrl(s.student?.phone);
 
 									return (
 										<TableRow
 											key={s.student.id}
-											className="border-slate-100 hover:bg-blue-50/40 transition-colors"
+											className="border-slate-100 hover:bg-blue-50/40 transition-colors cursor-pointer"
+											onMouseEnter={() =>
+												prefetchStudentDetail(queryClient, s.student.id)
+											}
 										>
 											<TableCell>
 												<div className="font-bold text-slate-900 text-sm">
@@ -1600,7 +1734,7 @@ function SuperadminStudentsView({
 											<TableCell className="text-center">
 												<TooltipProvider>
 													<Tooltip>
-														<TooltipTrigger className="w-full">
+														<TooltipTrigger className="w-full cursor-pointer">
 															<div className="flex flex-col items-center gap-1">
 																<div className="flex items-center justify-between w-full text-[11px] font-bold text-slate-700 px-1">
 																	<span>{accCount}/7 ACC</span>
@@ -1633,7 +1767,7 @@ function SuperadminStudentsView({
 														<TooltipContent className="w-64 p-3.5 bg-slate-950 text-white rounded-xl shadow-2xl border border-slate-800 text-xs flex flex-col space-y-2 z-50">
 															<div className="flex items-center justify-between border-b border-slate-800 pb-1.5 w-full">
 																<span className="font-bold text-slate-100 text-xs">
-																	Rincian ACC 7 Divisi:
+																	Rincian Status 7 Divisi:
 																</span>
 																<span className="text-[11px] font-mono text-emerald-400 font-bold">
 																	{accCount}/7 ACC
@@ -1648,15 +1782,11 @@ function SuperadminStudentsView({
 																		<span className="text-slate-300 font-medium">
 																			{m.name}
 																		</span>
-																		<span
-																			className={`font-semibold ${
-																				m.isAcc
-																					? "text-emerald-400"
-																					: "text-slate-500"
-																			}`}
-																		>
-																			{m.isAcc ? "✓ ACC" : "Belum ACC"}
-																		</span>
+																		<PanelStatusBadge
+																			status={m.status}
+																			size="sm"
+																			useShortLabel
+																		/>
 																	</div>
 																))}
 															</div>
@@ -1665,7 +1795,7 @@ function SuperadminStudentsView({
 												</TooltipProvider>
 											</TableCell>
 
-											{/* Mini Module Indicators */}
+											{/* Mini Module Indicators with 4 Standardized Status Colors */}
 											<TableCell className="text-center">
 												<div className="flex items-center justify-center gap-1">
 													{modules.map((m) => (
@@ -1673,19 +1803,34 @@ function SuperadminStudentsView({
 															<Tooltip>
 																<TooltipTrigger>
 																	<span
-																		className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-black ${
-																			m.isAcc
-																				? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-																				: "bg-slate-100 text-slate-400 border border-slate-200"
+																		className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-black transition-transform hover:scale-110 ${
+																			m.status === "ACC"
+																				? "bg-emerald-100 text-emerald-800 border border-emerald-400"
+																				: m.status === "AMAN"
+																					? "bg-emerald-50 text-emerald-700 border border-emerald-300"
+																					: m.status === "PROSES"
+																						? "bg-amber-50 text-amber-800 border border-amber-300"
+																						: "bg-rose-50 text-rose-800 border border-rose-300"
 																		}`}
 																	>
 																		{m.name[0]}
 																	</span>
 																</TooltipTrigger>
-																<TooltipContent className="text-xs">
-																	<p className="font-semibold">{m.name}</p>
+																<TooltipContent className="text-xs p-2">
+																	<p className="font-bold">
+																		{m.name}:{" "}
+																		{m.status === "ACC"
+																			? "Disetujui (ACC)"
+																			: m.status === "AMAN"
+																				? "Aman"
+																				: m.status === "PROSES"
+																					? "Berproses"
+																					: "Butuh Perhatian"}
+																	</p>
 																	<p className="text-[11px] text-slate-300">
-																		{m.isAcc ? "Sudah di-ACC" : "Belum ACC"}
+																		{m.isAcc
+																			? "✓ Sudah di-ACC"
+																			: `${m.completed}/${m.total} Selesai`}
 																	</p>
 																</TooltipContent>
 															</Tooltip>
@@ -1694,41 +1839,29 @@ function SuperadminStudentsView({
 												</div>
 											</TableCell>
 
-											{/* Condition Badge */}
+											{/* Unified Condition Badge (4 Standardized Categories) */}
 											<TableCell className="text-center">
-												{rtStatus === "AMAN" ? (
-													<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold">
-														🟢 Aman
-													</Badge>
-												) : rtStatus === "PERLU_PERHATIAN" ? (
-													<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs font-semibold">
-														🟡 Perhatian
-													</Badge>
-												) : (
-													<Badge className="bg-rose-50 text-rose-700 border-rose-200 text-xs font-semibold">
-														⛔ Blocking
-													</Badge>
-												)}
+												<PanelStatusBadge status={overallStatus} />
 											</TableCell>
 
 											{/* Final Decision Badge */}
 											<TableCell className="text-center">
 												{s.decision?.evaluatorDecision === "layak_berangkat" ? (
 													<Badge className="bg-emerald-50 text-emerald-700 border-emerald-300 font-semibold text-xs">
-														🟢 Layak
+														Layak
 													</Badge>
 												) : s.decision?.evaluatorDecision === "ttd_kontrak" ? (
 													<Badge className="bg-blue-50 text-blue-700 border-blue-300 font-semibold text-xs">
-														🔵 Kontrak
+														Kontrak
 													</Badge>
 												) : s.decision?.evaluatorDecision ===
 													"lanjut_interview" ? (
 													<Badge className="bg-amber-50 text-amber-700 border-amber-300 font-semibold text-xs">
-														🟡 Interview
+														Interview
 													</Badge>
 												) : s.decision?.evaluatorDecision === "remedial" ? (
 													<Badge className="bg-rose-50 text-rose-700 border-rose-300 font-semibold text-xs">
-														🔴 Remedial
+														Remedial
 													</Badge>
 												) : (
 													<span className="text-xs text-slate-400 italic">
@@ -1740,29 +1873,34 @@ function SuperadminStudentsView({
 											{/* Actions */}
 											<TableCell className="text-right pr-6">
 												<div className="flex items-center justify-end gap-1.5">
+													{(user?.role === "superadmin" ||
+														user?.role === "pmb") && (
+														<Button
+															size="sm"
+															variant="outline"
+															onClick={() =>
+																router.push(
+																	`/dashboard/students/${s.student.id}/profile`,
+																)
+															}
+															className="h-8 text-xs font-semibold text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900 gap-1 px-2.5 shadow-2xs cursor-pointer"
+															title="Lihat & Edit Detail Profil Mahasiswa"
+														>
+															<User className="w-3.5 h-3.5 text-[#0517B0]" />
+															Lihat
+														</Button>
+													)}
 													<Button
 														size="sm"
 														variant="outline"
 														onClick={() =>
 															router.push(`/dashboard/students/${s.student.id}`)
 														}
-														className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5"
+														className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5 shadow-2xs cursor-pointer"
+														title="Periksa Evaluasi & Status 7 Divisi"
 													>
 														<Eye className="w-3.5 h-3.5" />
 														Periksa
-													</Button>
-													<Button
-														size="sm"
-														variant="ghost"
-														onClick={() =>
-															router.push(
-																`/dashboard/students/${s.student.id}/edit`,
-															)
-														}
-														className="h-8 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 px-2"
-														title="Edit Data Mahasiswa"
-													>
-														<Edit className="w-3.5 h-3.5" />
 													</Button>
 												</div>
 											</TableCell>

@@ -8,18 +8,21 @@ import {
 	Clock,
 	Download,
 	Edit3,
+	Eye,
 	FileCheck,
 	FileText,
 	GraduationCap,
 	HeartHandshake,
 	HelpCircle,
 	Layers,
+	MessageCircle,
 	Plane,
 	Printer,
 	RefreshCw,
 	Search,
 	ShieldAlert,
 	ShieldCheck,
+	User,
 	UserCheck,
 	Users,
 	Wallet,
@@ -52,6 +55,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -61,6 +65,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { TablePagination } from "@/components/ui/TablePagination";
 import {
 	Table,
 	TableBody,
@@ -79,6 +84,364 @@ import {
 } from "@/components/ui/tooltip";
 import { api } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
+import {
+	calculateOverallStatus,
+	calculateProgressStatus,
+	normalizeStatus,
+	type PanelStatusType,
+} from "@/utils/status";
+
+// Checklist Helpers for Division Progress (matching /dashboard/students)
+const getPmbChecklist = (pmb: any) => {
+	const items = [
+		{
+			name: "Formulir Masuk",
+			done: Boolean(pmb?.formReceived),
+			category: "Utama",
+		},
+		{
+			name: "Berkas Lengkap",
+			done: Boolean(pmb?.documentsComplete),
+			category: "Utama",
+		},
+		{
+			name: "Input Data Awal",
+			done: Boolean(pmb?.dataInputted),
+			category: "Utama",
+		},
+		{
+			name: "Follow Up Awal",
+			done: Boolean(pmb?.initialFollowUp),
+			category: "Utama",
+		},
+		{ name: "KTP", done: Boolean(pmb?.docKtp), category: "Dokumen" },
+		{
+			name: "Kartu Keluarga (KK)",
+			done: Boolean(pmb?.docKk),
+			category: "Dokumen",
+		},
+		{
+			name: "Curriculum Vitae (CV)",
+			done: Boolean(pmb?.docCv),
+			category: "Dokumen",
+		},
+		{
+			name: "Ijazah Terakhir",
+			done: Boolean(pmb?.docIjazah),
+			category: "Dokumen",
+		},
+		{
+			name: "Transkrip Nilai",
+			done: Boolean(pmb?.docTranskrip),
+			category: "Dokumen",
+		},
+		{
+			name: "Paspor Halaman Depan",
+			done: Boolean(pmb?.docPassportDepan),
+			category: "Dokumen",
+		},
+		{
+			name: "Paspor Halaman Visa",
+			done: Boolean(pmb?.docPassportVisa),
+			category: "Dokumen",
+		},
+		{ name: "Surat SKBM", done: Boolean(pmb?.docSkbm), category: "Dokumen" },
+		{
+			name: "Hasil Lab MCU",
+			done: Boolean(pmb?.docMcu),
+			category: "Dokumen",
+		},
+		{
+			name: "Sertifikasi Bahasa",
+			done: Boolean(pmb?.docSertifikasiBahasa),
+			category: "Dokumen",
+		},
+	];
+	const completed = items.filter((i) => i.done).length;
+	return {
+		items,
+		completed,
+		total: items.length,
+		isDone: completed === items.length,
+	};
+};
+
+const getCrmChecklist = (crm: any) => {
+	const items = [
+		{ name: "Pendataan Kontak & Minat", done: Boolean(crm?.contactFollowedUp) },
+		{
+			name: "Konsultasi Program & Karir",
+			done: Boolean(crm?.careerConsultationDone),
+		},
+		{
+			name: "Verifikasi Lokasi & Minat Kerja",
+			done: Boolean(crm?.locationPreferenceVerified),
+		},
+		{
+			name: "Praktik Industri / On-Site",
+			done: Boolean(crm?.practiceAttendance || crm?.isMonitoringIndustry),
+		},
+		{
+			name: "Dokumen Persetujuan Ortu",
+			done: Boolean(crm?.parentApprovalLetter || crm?.parentConsent),
+		},
+		{
+			name: "Pernyataan Komitmen",
+			done: Boolean(crm?.commitmentStatement || crm?.commitmentLetter),
+		},
+	];
+	const completed = items.filter((i) => i.done).length;
+	return {
+		items,
+		completed,
+		total: items.length,
+		isDone: completed === items.length,
+	};
+};
+
+const getAcademicChecklist = (s: any) => {
+	const items = [
+		{ name: "Lulus Ujian Masuk", done: Boolean(s.academic?.entryExamPassed) },
+		{
+			name: "Placement Test Bahasa",
+			done: Boolean(s.academic?.placementTestPassed),
+		},
+		{
+			name: "Kehadiran Min. 80%",
+			done: Boolean(
+				s.academic?.attendancePercentage &&
+					s.academic.attendancePercentage >= 80,
+			),
+		},
+		{
+			name: "Bebas Masalah Disiplin",
+			done: Boolean(s.academic?.disciplinaryClean),
+		},
+		{
+			name: "Ujian Akhir Semester / Modul",
+			done: Boolean(s.academic?.finalExamPassed),
+		},
+	];
+	const completed = items.filter((i) => i.done).length;
+	return {
+		items,
+		completed,
+		total: items.length,
+		isDone: completed === items.length,
+	};
+};
+
+const getFinanceChecklist = (finance: any) => {
+	const items = [
+		{ name: "Biaya Pendaftaran", done: Boolean(finance?.regFeePaid) },
+		{
+			name: "Biaya Program",
+			done: Boolean(finance?.programFeeStatus || finance?.programFeePaid),
+		},
+		{
+			name: "Biaya Pelatihan / Kursus",
+			done: Boolean(finance?.trainingFeePaid),
+		},
+		{
+			name: "Biaya Semester 1",
+			done: Boolean(finance?.t1SemesterStatus || finance?.semesterPaid),
+		},
+		{
+			name: "Biaya Uji Kompetensi",
+			done: Boolean(finance?.competencyTestPaid),
+		},
+		{
+			name: "Biaya Visa & Dokumen Magang",
+			done: Boolean(finance?.visaDocPaid),
+		},
+	];
+	const completed = items.filter((i) => i.done).length;
+	return {
+		items,
+		completed,
+		total: items.length,
+		isDone: completed === items.length,
+	};
+};
+
+const getInternshipChecklist = (internship: any) => {
+	const items = [
+		{ name: "Paspor Siap", done: Boolean(internship?.passportReady) },
+		{ name: "Visa Disetujui", done: Boolean(internship?.visaReady) },
+		{ name: "Medical Check Up (MCU)", done: Boolean(internship?.mcuReady) },
+		{ name: "Tiket Keberangkatan", done: Boolean(internship?.ticketReady) },
+		{
+			name: "Letter of Acceptance (LoA)",
+			done: Boolean(internship?.loaConfirmed),
+		},
+		{
+			name: "Kontrak Kerja Industri",
+			done: Boolean(internship?.contractReady),
+		},
+	];
+	const completed = items.filter((i) => i.done).length;
+	return {
+		items,
+		completed,
+		total: items.length,
+		isDone: completed === items.length,
+	};
+};
+
+const getPaChecklist = (pa: any) => {
+	const items = [
+		{ name: "Sesi 1: Perkenalan & Adaptasi", done: Boolean(pa?.session1Done) },
+		{ name: "Sesi 2: Monitoring Akademik", done: Boolean(pa?.session2Done) },
+		{
+			name: "Sesi 3: Kesiapan Magang & Karir",
+			done: Boolean(pa?.session3Done),
+		},
+		{
+			name: "Sesi 4: Evaluasi Final Pra-Terbang",
+			done: Boolean(pa?.session4Done),
+		},
+	];
+	const completed = items.filter((i) => i.done).length;
+	return {
+		items,
+		completed,
+		total: items.length,
+		isDone: completed === items.length,
+	};
+};
+
+// WhatsApp Link Helper
+function formatWhatsAppUrl(phone: string | null | undefined) {
+	if (!phone) return null;
+	const clean = phone.replace(/[^0-9]/g, "");
+	if (!clean) return null;
+	const formatted = clean.startsWith("0") ? `62${clean.slice(1)}` : clean;
+	return `https://wa.me/${formatted}`;
+}
+
+// Academic Year Helper
+function getAcademicYear(student: any) {
+	if (student?.academicYear) return student.academicYear;
+	if (student?.cohort && !Number.isNaN(Number(student.cohort))) {
+		const startYear = 2010 + Number(student.cohort);
+		return `${startYear}/${startYear + 1}`;
+	}
+	return student?.period || "-";
+}
+
+// Calculate 7-Module Details
+const getStudentAccDetails = (s: any) => {
+	const pmbCl = getPmbChecklist(s.pmb);
+	const crmCl = getCrmChecklist(s.crm);
+	const finCl = getFinanceChecklist(s.finance);
+	const acadCl = getAcademicChecklist(s);
+	const paCl = getPaChecklist(s.pa);
+	const internCl = getInternshipChecklist(s.internship);
+
+	const isDosenAcc =
+		s.courseGrades &&
+		s.courseGrades.length > 0 &&
+		s.courseGrades.every((g: any) => g.isAcc);
+
+	const modules: Array<{
+		key: string;
+		name: string;
+		shortCode: string;
+		isAcc: boolean;
+		completed: number;
+		total: number;
+		status: PanelStatusType;
+	}> = [
+		{
+			key: "pmb",
+			name: "PMB",
+			shortCode: "P",
+			isAcc: Boolean(s.pmb?.isAcc),
+			completed: pmbCl.completed,
+			total: pmbCl.total,
+			status: calculateProgressStatus(
+				pmbCl.completed,
+				pmbCl.total,
+				s.pmb?.isAcc,
+			),
+		},
+		{
+			key: "crm",
+			name: "CRM",
+			shortCode: "C",
+			isAcc: Boolean(s.crm?.isAcc),
+			completed: crmCl.completed,
+			total: crmCl.total,
+			status: calculateProgressStatus(
+				crmCl.completed,
+				crmCl.total,
+				s.crm?.isAcc,
+			),
+		},
+		{
+			key: "finance",
+			name: "Finance",
+			shortCode: "F",
+			isAcc: Boolean(s.finance?.isAcc),
+			completed: finCl.completed,
+			total: finCl.total,
+			status: calculateProgressStatus(
+				finCl.completed,
+				finCl.total,
+				s.finance?.isAcc,
+			),
+		},
+		{
+			key: "academic",
+			name: "Akademik",
+			shortCode: "A",
+			isAcc: Boolean(s.academic?.isAcc),
+			completed: acadCl.completed,
+			total: acadCl.total,
+			status: calculateProgressStatus(
+				acadCl.completed,
+				acadCl.total,
+				s.academic?.isAcc,
+			),
+		},
+		{
+			key: "dosen",
+			name: "Dosen MK",
+			shortCode: "D",
+			isAcc: Boolean(isDosenAcc),
+			completed: isDosenAcc ? 1 : 0,
+			total: 1,
+			status: calculateProgressStatus(isDosenAcc ? 1 : 0, 1, isDosenAcc),
+		},
+		{
+			key: "pa",
+			name: "PA",
+			shortCode: "PA",
+			isAcc: Boolean(s.pa?.isAcc),
+			completed: paCl.completed,
+			total: paCl.total,
+			status: calculateProgressStatus(paCl.completed, paCl.total, s.pa?.isAcc),
+		},
+		{
+			key: "internship",
+			name: "Magang",
+			shortCode: "M",
+			isAcc: Boolean(s.internship?.isAcc),
+			completed: internCl.completed,
+			total: internCl.total,
+			status: calculateProgressStatus(
+				internCl.completed,
+				internCl.total,
+				s.internship?.isAcc,
+			),
+		},
+	];
+
+	const accCount = modules.filter((m) => m.isAcc).length;
+	const overallStatus = calculateOverallStatus(modules);
+
+	return { modules, accCount, isAllAcc: accCount === 7, overallStatus };
+};
 
 interface EvaluasiFinalisasiDashboardProps {
 	data: any[];
@@ -140,64 +503,18 @@ export function EvaluasiFinalisasiDashboard({
 		});
 	}, [data]);
 
-	// Helper for calculating 7-module progress
-	const getModuleBreakdown = (s: any) => {
-		const isDosenAcc =
-			s.courseGrades &&
-			s.courseGrades.length > 0 &&
-			s.courseGrades.every((g: any) => g.isAcc);
-
-		const modules = [
-			{
-				name: "PMB",
-				isAcc: Boolean(s.pmb?.isAcc),
-				status: s.pmb?.status || "MENUNGGU",
-			},
-			{
-				name: "CRM",
-				isAcc: Boolean(s.crm?.isAcc),
-				status: s.crm?.status || "MENUNGGU",
-			},
-			{
-				name: "Finance",
-				isAcc: Boolean(s.finance?.isAcc),
-				status: s.finance?.status || "MENUNGGU",
-			},
-			{
-				name: "Akademik",
-				isAcc: Boolean(s.academic?.isAcc),
-				status: s.academic?.status || "MENUNGGU",
-			},
-			{
-				name: "Dosen MK",
-				isAcc: Boolean(isDosenAcc),
-				status: isDosenAcc ? "AMAN" : "MENUNGGU",
-			},
-			{
-				name: "PA",
-				isAcc: Boolean(s.pa?.isAcc),
-				status: s.pa?.status || "MENUNGGU",
-			},
-			{
-				name: "Magang",
-				isAcc: Boolean(s.internship?.isAcc),
-				status: s.internship?.status || "MENUNGGU",
-			},
-		];
-
-		const accCount = modules.filter((m) => m.isAcc).length;
-		return { modules, accCount, isAllAcc: accCount === 7 };
-	};
-
 	// Filtered for Main Table (Evaluasi Tab)
 	const filteredData = useMemo(() => {
 		if (!data) return [];
 		return data.filter((s: any) => {
 			// Search filter
+			const q = searchQuery.toLowerCase();
 			const matchSearch =
-				!searchQuery ||
-				s.student?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				s.student?.nim?.toLowerCase().includes(searchQuery.toLowerCase());
+				!q ||
+				(s.student?.name || "").toLowerCase().includes(q) ||
+				(s.student?.nim || "").toLowerCase().includes(q) ||
+				(s.student?.phone || "").toLowerCase().includes(q) ||
+				(s.student?.program || "").toLowerCase().includes(q);
 
 			// Cohort filter
 			const matchCohort =
@@ -213,13 +530,19 @@ export function EvaluasiFinalisasiDashboard({
 				studentDecision === selectedDecisionFilter;
 
 			// Status filter
-			const { isAllAcc } = getModuleBreakdown(s);
-			const isAman = s.student?.overallStatus === "AMAN";
+			const { isAllAcc, overallStatus } = getStudentAccDetails(s);
 			let matchStatus = true;
 			if (selectedStatusFilter === "acc_lengkap") matchStatus = isAllAcc;
-			if (selectedStatusFilter === "belum_lengkap") matchStatus = !isAllAcc;
-			if (selectedStatusFilter === "aman") matchStatus = isAman;
-			if (selectedStatusFilter === "blocking") matchStatus = !isAman;
+			if (selectedStatusFilter === "aman")
+				matchStatus = overallStatus === "AMAN";
+			if (selectedStatusFilter === "proses")
+				matchStatus = overallStatus === "PROSES";
+			if (selectedStatusFilter === "butuh_perhatian")
+				matchStatus = overallStatus === "BUTUH_PERHATIAN";
+			if (selectedStatusFilter === "layak_berangkat")
+				matchStatus =
+					s.decision?.evaluatorDecision === "layak_berangkat" ||
+					s.decision?.isApprovedByDirector === true;
 
 			return matchSearch && matchCohort && matchDecision && matchStatus;
 		});
@@ -240,6 +563,32 @@ export function EvaluasiFinalisasiDashboard({
 		);
 	}, [filteredData]);
 
+	// Pagination States
+	const [evaluasiPage, setEvaluasiPage] = useState(1);
+	const [evaluasiPageSize, setEvaluasiPageSize] = useState(20);
+	const [finalisasiPage, setFinalisasiPage] = useState(1);
+	const [finalisasiPageSize, setFinalisasiPageSize] = useState(20);
+
+	useEffect(() => {
+		setEvaluasiPage(1);
+		setFinalisasiPage(1);
+	}, [
+		searchQuery,
+		selectedCohort,
+		selectedDecisionFilter,
+		selectedStatusFilter,
+	]);
+
+	const paginatedEvaluasiData = useMemo(() => {
+		const start = (evaluasiPage - 1) * evaluasiPageSize;
+		return filteredData.slice(start, start + evaluasiPageSize);
+	}, [filteredData, evaluasiPage, evaluasiPageSize]);
+
+	const paginatedFinalisasiData = useMemo(() => {
+		const start = (finalisasiPage - 1) * finalisasiPageSize;
+		return candidatesData.slice(start, start + finalisasiPageSize);
+	}, [candidatesData, finalisasiPage, finalisasiPageSize]);
+
 	const cohortData = useMemo(() => {
 		if (!data) return [];
 		if (selectedCohort === "all") return data;
@@ -248,25 +597,24 @@ export function EvaluasiFinalisasiDashboard({
 		);
 	}, [data, selectedCohort]);
 
-	// KPI Stats based on selected cohort
+	// KPI Stats based on selected cohort (matching /dashboard/students)
 	const totalStudents = cohortData.length;
 	const countAccLengkap = cohortData.filter(
-		(s: any) => getModuleBreakdown(s).isAllAcc,
+		(s: any) => getStudentAccDetails(s).isAllAcc,
 	).length;
-	const countLayak = cohortData.filter(
-		(s: any) => s.decision?.evaluatorDecision === "layak_berangkat",
+	const countAman = cohortData.filter(
+		(s: any) => getStudentAccDetails(s).overallStatus === "AMAN",
 	).length;
-	const countTTD = cohortData.filter(
-		(s: any) => s.decision?.evaluatorDecision === "ttd_kontrak",
+	const countProses = cohortData.filter(
+		(s: any) => getStudentAccDetails(s).overallStatus === "PROSES",
 	).length;
-	const countLanjut = cohortData.filter(
-		(s: any) => s.decision?.evaluatorDecision === "lanjut_interview",
+	const countPerhatian = cohortData.filter(
+		(s: any) => getStudentAccDetails(s).overallStatus === "BUTUH_PERHATIAN",
 	).length;
-	const countRemedial = cohortData.filter(
-		(s: any) => s.decision?.evaluatorDecision === "remedial",
-	).length;
-	const countDisetujuiDirektur = cohortData.filter(
-		(s: any) => s.decision?.isApprovedByDirector,
+	const countLayakBerangkat = cohortData.filter(
+		(s: any) =>
+			s.decision?.evaluatorDecision === "layak_berangkat" ||
+			s.decision?.isApprovedByDirector === true,
 	).length;
 
 	// Handle Quick Decision Modal open
@@ -363,15 +711,16 @@ export function EvaluasiFinalisasiDashboard({
 	const handleExport = (tab: "evaluasi" | "finalisasi") => {
 		if (tab === "evaluasi") {
 			const exportData = filteredData.map((s: any) => {
-				const { accCount } = getModuleBreakdown(s);
+				const { accCount, overallStatus } = getStudentAccDetails(s);
 				return {
 					NIM: s.student.nim,
 					"Nama Mahasiswa": s.student.name,
 					Angkatan: s.student.cohort,
+					"Tahun Ajaran": getAcademicYear(s.student),
+					"No HP": s.student.phone || "-",
 					Program: s.student.program,
 					"Progress ACC": `${accCount}/7 Modul`,
-					"Status Sistem":
-						s.student.overallStatus === "AMAN" ? "Aman" : "Blocking",
+					"Status Keseluruhan": overallStatus,
 					"Keputusan Final":
 						s.decision?.evaluatorDecision === "layak_berangkat"
 							? "Layak Berangkat"
@@ -381,71 +730,36 @@ export function EvaluasiFinalisasiDashboard({
 									? "Lanjut Interview"
 									: s.decision?.evaluatorDecision === "remedial"
 										? "Remedial / Tunda"
-										: "Menunggu Evaluasi",
+										: "Menunggu",
 					"Catatan Evaluator": s.decision?.evaluatorNotes || "-",
 				};
 			});
 			exportToCSV(
 				exportData,
-				`Data_Evaluasi_Progres_${new Date().toISOString().split("T")[0]}`,
+				`Evaluasi_Finalisasi_${new Date().toISOString().split("T")[0]}`,
 			);
 		} else {
-			const exportData = candidatesData.map((s: any) => ({
-				NIM: s.student.nim,
-				"Nama Mahasiswa": s.student.name,
-				Angkatan: s.student.cohort,
-				Program: s.student.program,
-				"Tgl Keberangkatan": s.decision?.departureDate
-					? new Date(s.decision.departureDate).toLocaleDateString("id-ID")
-					: "Belum Diatur",
-				"Persetujuan Direktur": s.decision?.isApprovedByDirector
-					? "Disetujui"
-					: "Menunggu",
-				"Catatan Direktur": s.decision?.notes || "-",
-			}));
+			const exportData = candidatesData.map((s: any) => {
+				return {
+					NIM: s.student.nim,
+					"Nama Mahasiswa": s.student.name,
+					Angkatan: s.student.cohort,
+					"Tahun Ajaran": getAcademicYear(s.student),
+					"No HP": s.student.phone || "-",
+					Program: s.student.program,
+					"Tgl Keberangkatan": s.decision?.departureDate
+						? new Date(s.decision.departureDate).toLocaleDateString("id-ID")
+						: "Belum Diatur",
+					"Status Persetujuan Direktur": s.decision?.isApprovedByDirector
+						? "Disetujui"
+						: "Menunggu",
+					"Catatan Direktur": s.decision?.notes || "-",
+				};
+			});
 			exportToCSV(
 				exportData,
-				`Data_Kandidat_Keberangkatan_${new Date().toISOString().split("T")[0]}`,
+				`Kandidat_Keberangkatan_SK_${new Date().toISOString().split("T")[0]}`,
 			);
-		}
-	};
-
-	const renderDecisionBadge = (decision: string | null | undefined) => {
-		switch (decision) {
-			case "layak_berangkat":
-				return (
-					<Badge className="bg-emerald-50 text-emerald-700 border-emerald-300 font-semibold gap-1">
-						<CheckCircle className="w-3 h-3 text-emerald-600" />
-						Layak Berangkat
-					</Badge>
-				);
-			case "ttd_kontrak":
-				return (
-					<Badge className="bg-blue-50 text-blue-700 border-blue-300 font-semibold gap-1">
-						<FileCheck className="w-3 h-3 text-blue-600" />
-						TTD Kontrak
-					</Badge>
-				);
-			case "lanjut_interview":
-				return (
-					<Badge className="bg-amber-50 text-amber-700 border-amber-300 font-semibold gap-1">
-						<Clock className="w-3 h-3 text-amber-600" />
-						Lanjut Interview
-					</Badge>
-				);
-			case "remedial":
-				return (
-					<Badge className="bg-rose-50 text-rose-700 border-rose-300 font-semibold gap-1">
-						<XCircle className="w-3 h-3 text-rose-600" />
-						Remedial
-					</Badge>
-				);
-			default:
-				return (
-					<Badge className="bg-slate-100 text-slate-600 border-slate-300 font-medium">
-						Menunggu Evaluasi
-					</Badge>
-				);
 		}
 	};
 
@@ -460,7 +774,7 @@ export function EvaluasiFinalisasiDashboard({
 						</div>
 						<div>
 							<h1 className="text-2xl font-bold text-slate-900">
-								Panel Keputusan Final & SK
+								Panel Finalisasi & SK
 							</h1>
 							<p className="text-slate-500 text-xs sm:text-sm mt-0.5">
 								Pusat evaluasi progres real-time antar divisi dan penetapan
@@ -494,7 +808,7 @@ export function EvaluasiFinalisasiDashboard({
 					<Button
 						size="sm"
 						onClick={() => handleExport(activeTab as any)}
-						className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs gap-1.5 h-9"
+						className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs gap-1.5 h-9 font-bold shadow-sm"
 					>
 						<Download className="w-3.5 h-3.5" />
 						Export CSV ({activeTab === "evaluasi" ? "Evaluasi" : "Finalisasi"})
@@ -502,7 +816,7 @@ export function EvaluasiFinalisasiDashboard({
 				</div>
 			</div>
 
-			{/* KPI Summary Cards */}
+			{/* KPI Summary Cards (matching /dashboard/students) */}
 			<div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
 				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
 					<CardContent className="p-4 flex items-start gap-3">
@@ -543,26 +857,24 @@ export function EvaluasiFinalisasiDashboard({
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								Layak Berangkat
+								Status Aman
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countLayak}
+								{countAman}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
 
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-blue-500">
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-amber-500">
 					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-blue-50 text-blue-500 mt-0.5">
-							<FileCheck className="h-5 w-5" />
+						<div className="p-2 rounded-lg bg-amber-50 text-amber-600 mt-0.5">
+							<Clock className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								TTD / Interview
-							</p>
+							<p className="text-slate-500 text-xs font-semibold">Berproses</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countTTD + countLanjut}
+								{countProses}
 							</p>
 						</div>
 					</CardContent>
@@ -571,14 +883,14 @@ export function EvaluasiFinalisasiDashboard({
 				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-rose-500">
 					<CardContent className="p-4 flex items-start gap-3">
 						<div className="p-2 rounded-lg bg-rose-50 text-rose-500 mt-0.5">
-							<XCircle className="h-5 w-5" />
+							<AlertTriangle className="h-5 w-5" />
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								Remedial / Tunda
+								Butuh Perhatian
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countRemedial}
+								{countPerhatian}
 							</p>
 						</div>
 					</CardContent>
@@ -591,55 +903,65 @@ export function EvaluasiFinalisasiDashboard({
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								Disetujui Direktur
+								Layak Berangkat
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countDisetujuiDirektur}
+								{countLayakBerangkat}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
 			</div>
 
-			{/* Main Tabs Container */}
+			{/* Main Card with Tabs */}
 			<Card className="bg-white border-slate-200 shadow-sm overflow-hidden">
 				<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-					<div className="border-b border-slate-200 bg-slate-50/70 px-4 sm:px-6 pt-3 flex flex-col md:flex-row md:items-center justify-between gap-4">
-						<TabsList className="bg-slate-200/80 p-1 rounded-lg">
-							<TabsTrigger
-								value="evaluasi"
-								className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm text-xs sm:text-sm font-bold gap-2 px-4 py-2"
-							>
-								<UserCheck className="w-4 h-4" />
-								1. Evaluasi & Progres Real-Time
-								<Badge
-									variant="secondary"
-									className="ml-1 text-[11px] bg-blue-100 text-[#0517B0] px-1.5 py-0.2"
+					{/* Tabs Header Toolbar */}
+					<div className="border-b border-slate-200 bg-slate-50/50 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+						<div>
+							<TabsList className="bg-slate-200/80 p-1 rounded-lg">
+								<TabsTrigger
+									value="evaluasi"
+									className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm text-xs sm:text-sm font-bold gap-2 px-4 py-2 cursor-pointer"
 								>
-									{filteredData.length}
-								</Badge>
-							</TabsTrigger>
-							<TabsTrigger
-								value="finalisasi"
-								className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm text-xs sm:text-sm font-bold gap-2 px-4 py-2"
-							>
-								<ShieldCheck className="w-4 h-4" />
-								2. Finalisasi Keberangkatan & SK
-								<Badge
-									variant="secondary"
-									className="ml-1 text-[11px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2"
+									<UserCheck className="w-4 h-4" />
+									1. Evaluasi & Progres Real-Time
+									<Badge
+										variant="secondary"
+										className="ml-1 text-[11px] bg-blue-100 text-[#0517B0] px-1.5 py-0.2"
+									>
+										{filteredData.length}
+									</Badge>
+								</TabsTrigger>
+								<TabsTrigger
+									value="finalisasi"
+									className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm text-xs sm:text-sm font-bold gap-2 px-4 py-2 cursor-pointer"
 								>
-									{candidatesData.length}
-								</Badge>
-							</TabsTrigger>
-						</TabsList>
+									<ShieldCheck className="w-4 h-4" />
+									2. Finalisasi Keberangkatan & SK
+									<Badge
+										variant="secondary"
+										className="ml-1 text-[11px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2"
+									>
+										{candidatesData.length}
+									</Badge>
+								</TabsTrigger>
+							</TabsList>
+							<p className="text-xs text-slate-500 mt-2">
+								Menampilkan{" "}
+								{activeTab === "evaluasi"
+									? filteredData.length
+									: candidatesData.length}{" "}
+								dari {totalStudents} mahasiswa terdaftar.
+							</p>
+						</div>
 
-						{/* Search & Filter Bar */}
-						<div className="flex flex-wrap items-center gap-2 pb-3 md:pb-0">
-							<div className="relative w-full sm:w-56">
+						{/* Filters & Search Toolbar */}
+						<div className="flex flex-wrap items-center gap-2.5">
+							<div className="relative w-full sm:w-60">
 								<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
 								<Input
-									placeholder="Cari NIM atau Nama..."
+									placeholder="Cari NIM, Nama, No HP..."
 									className="pl-9 h-9 text-xs bg-white border-slate-200"
 									value={searchQuery}
 									onChange={(e) => setSearchQuery(e.target.value)}
@@ -650,7 +972,7 @@ export function EvaluasiFinalisasiDashboard({
 								value={selectedCohort}
 								onValueChange={(val) => setSelectedCohort(val || "all")}
 							>
-								<SelectTrigger className="w-[130px] h-9 text-xs bg-white border-slate-200">
+								<SelectTrigger className="w-[130px] h-9 text-xs bg-white border-slate-200 cursor-pointer">
 									<SelectValue placeholder="Angkatan">
 										{selectedCohort === "all"
 											? "Semua Angkatan"
@@ -670,12 +992,49 @@ export function EvaluasiFinalisasiDashboard({
 							{activeTab === "evaluasi" && (
 								<>
 									<Select
+										value={selectedStatusFilter}
+										onValueChange={(val) =>
+											setSelectedStatusFilter(val || "all")
+										}
+									>
+										<SelectTrigger className="w-[155px] h-9 text-xs bg-white border-slate-200 cursor-pointer">
+											<SelectValue placeholder="Status Filter">
+												{selectedStatusFilter === "all"
+													? "Semua Status"
+													: selectedStatusFilter === "acc_lengkap"
+														? "ACC Lengkap (7/7)"
+														: selectedStatusFilter === "aman"
+															? "Aman"
+															: selectedStatusFilter === "proses"
+																? "Berproses"
+																: selectedStatusFilter === "butuh_perhatian"
+																	? "Butuh Perhatian"
+																	: "Layak Berangkat"}
+											</SelectValue>
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="all">Semua Status</SelectItem>
+											<SelectItem value="acc_lengkap">
+												ACC Lengkap (7/7)
+											</SelectItem>
+											<SelectItem value="aman">Aman</SelectItem>
+											<SelectItem value="proses">Berproses</SelectItem>
+											<SelectItem value="butuh_perhatian">
+												Butuh Perhatian
+											</SelectItem>
+											<SelectItem value="layak_berangkat">
+												Layak Berangkat
+											</SelectItem>
+										</SelectContent>
+									</Select>
+
+									<Select
 										value={selectedDecisionFilter}
 										onValueChange={(val) =>
 											setSelectedDecisionFilter(val || "all")
 										}
 									>
-										<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
+										<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 cursor-pointer">
 											<SelectValue placeholder="Keputusan" />
 										</SelectTrigger>
 										<SelectContent>
@@ -691,28 +1050,6 @@ export function EvaluasiFinalisasiDashboard({
 											<SelectItem value="menunggu">Menunggu</SelectItem>
 										</SelectContent>
 									</Select>
-
-									<Select
-										value={selectedStatusFilter}
-										onValueChange={(val) =>
-											setSelectedStatusFilter(val || "all")
-										}
-									>
-										<SelectTrigger className="w-[130px] h-9 text-xs bg-white border-slate-200">
-											<SelectValue placeholder="Status Modul" />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="all">Semua Modul</SelectItem>
-											<SelectItem value="acc_lengkap">
-												ACC Lengkap (7/7)
-											</SelectItem>
-											<SelectItem value="belum_lengkap">
-												Belum Lengkap
-											</SelectItem>
-											<SelectItem value="aman">Aman</SelectItem>
-											<SelectItem value="blocking">Blocking</SelectItem>
-										</SelectContent>
-									</Select>
 								</>
 							)}
 						</div>
@@ -724,23 +1061,32 @@ export function EvaluasiFinalisasiDashboard({
 							<Table>
 								<TableHeader className="bg-slate-50 sticky top-0 z-10">
 									<TableRow className="border-slate-200">
-										<TableHead className="py-3.5 font-bold text-slate-700 text-xs w-28">
-											NIM
-										</TableHead>
 										<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
-											Mahasiswa & Program
+											Nama Mahasiswa & NIM
+										</TableHead>
+										<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+											Angkatan
+										</TableHead>
+										<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-32">
+											Tahun Ajaran
+										</TableHead>
+										<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[160px]">
+											Peminatan
+										</TableHead>
+										<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[140px]">
+											No. WhatsApp
 										</TableHead>
 										<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
 											Progress 7 Modul
 										</TableHead>
 										<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-48">
-											Status per Divisi
+											Status Divisi (P C F A D PA M)
 										</TableHead>
-										<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+										<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
 											Kondisi
 										</TableHead>
-										<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-40">
-											Keputusan Evaluasi
+										<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
+											Keputusan Final
 										</TableHead>
 										<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-36">
 											Aksi
@@ -748,44 +1094,94 @@ export function EvaluasiFinalisasiDashboard({
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{filteredData.map((s: any) => {
-										const { modules, accCount, isAllAcc } =
-											getModuleBreakdown(s);
-										const isAman = s.student.overallStatus === "AMAN";
+									{paginatedEvaluasiData.map((s: any) => {
+										const { modules, accCount, isAllAcc, overallStatus } =
+											getStudentAccDetails(s);
+										const waUrl = formatWhatsAppUrl(s.student?.phone);
 
 										return (
 											<TableRow
 												key={s.student.id}
-												className="border-slate-100 hover:bg-blue-50/40 transition-colors"
+												className="border-slate-100 hover:bg-blue-50/40 transition-colors cursor-pointer"
 											>
-												<TableCell className="font-mono text-xs font-bold text-slate-700">
-													{s.student.nim}
-												</TableCell>
+												{/* Nama & NIM */}
 												<TableCell>
 													<div className="font-bold text-slate-900 text-sm">
 														{s.student.name}
 													</div>
-													<div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-														<Badge
-															variant="outline"
-															className="text-[10px] px-1.5 py-0 text-slate-500 border-slate-200"
-														>
-															Angkatan {s.student.cohort}
-														</Badge>
-														<PeminatanBadge
-															subProgram={s.student.subProgram}
-															destinationCountry={s.student.destinationCountry}
-															program={s.student.program}
-														/>
+													<div className="flex items-center gap-1.5 mt-0.5">
+														<span className="font-mono text-xs font-semibold text-slate-500">
+															{s.student.nim || "Belum ada NIM"}
+														</span>
+														{s.student.nickname && (
+															<span className="text-[11px] text-slate-400">
+																({s.student.nickname})
+															</span>
+														)}
 													</div>
 												</TableCell>
 
-												{/* Progress Bar with Tooltip */}
+												{/* Angkatan */}
+												<TableCell className="text-center">
+													<Badge
+														variant="outline"
+														className="text-xs font-bold text-slate-700 bg-slate-50 border-slate-200 px-2 py-0.5"
+													>
+														{s.student.cohort
+															? `Angkatan ${s.student.cohort}`
+															: "-"}
+													</Badge>
+												</TableCell>
+
+												{/* Tahun Ajaran */}
+												<TableCell className="text-center font-medium text-xs text-slate-700">
+													{getAcademicYear(s.student)}
+												</TableCell>
+
+												{/* Peminatan */}
+												<TableCell>
+													<PeminatanBadge
+														subProgram={s.student.subProgram}
+														destinationCountry={s.student.destinationCountry}
+														program={s.student.program}
+													/>
+												</TableCell>
+
+												{/* No WhatsApp */}
+												<TableCell>
+													{s.student?.phone ? (
+														waUrl ? (
+															<a
+																href={waUrl}
+																target="_blank"
+																rel="noopener noreferrer"
+																className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 hover:text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-md transition-colors group"
+																title="Chat WhatsApp"
+																onClick={(e) => e.stopPropagation()}
+															>
+																<MessageCircle className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
+																<span className="font-mono">
+																	{s.student.phone}
+																</span>
+															</a>
+														) : (
+															<span className="text-xs font-mono text-slate-700">
+																{s.student.phone}
+															</span>
+														)
+													) : (
+														<span className="text-slate-400 text-xs italic">
+															-
+														</span>
+													)}
+												</TableCell>
+
+												{/* Progress Bar with Enhanced Tooltip */}
 												<TableCell className="text-center">
 													<TooltipProvider>
 														<Tooltip>
-															<TooltipTrigger className="w-full">
-																<div className="flex flex-col items-center gap-1.5">
+															<TooltipTrigger className="w-full cursor-pointer">
+																<div className="flex flex-col items-center gap-1">
 																	<div className="flex items-center justify-between w-full text-[11px] font-bold text-slate-700 px-1">
 																		<span>{accCount}/7 ACC</span>
 																		<span
@@ -798,12 +1194,12 @@ export function EvaluasiFinalisasiDashboard({
 																			{Math.round((accCount / 7) * 100)}%
 																		</span>
 																	</div>
-																	<div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
+																	<div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
 																		<div
 																			className={`h-full rounded-full transition-all duration-300 ${
 																				isAllAcc
 																					? "bg-emerald-500"
-																					: accCount >= 5
+																					: accCount >= 4
 																						? "bg-blue-500"
 																						: "bg-amber-500"
 																			}`}
@@ -817,7 +1213,7 @@ export function EvaluasiFinalisasiDashboard({
 															<TooltipContent className="w-64 p-3.5 bg-slate-950 text-white rounded-xl shadow-2xl border border-slate-800 text-xs flex flex-col space-y-2 z-50">
 																<div className="flex items-center justify-between border-b border-slate-800 pb-1.5 w-full">
 																	<span className="font-bold text-slate-100 text-xs">
-																		Rincian ACC 7 Divisi:
+																		Rincian Status 7 Divisi:
 																	</span>
 																	<span className="text-[11px] font-mono text-emerald-400 font-bold">
 																		{accCount}/7 ACC
@@ -832,15 +1228,11 @@ export function EvaluasiFinalisasiDashboard({
 																			<span className="text-slate-300 font-medium">
 																				{m.name}
 																			</span>
-																			<span
-																				className={`font-semibold ${
-																					m.isAcc
-																						? "text-emerald-400"
-																						: "text-slate-500"
-																				}`}
-																			>
-																				{m.isAcc ? "✓ ACC" : "Belum ACC"}
-																			</span>
+																			<PanelStatusBadge
+																				status={m.status}
+																				size="sm"
+																				useShortLabel
+																			/>
 																		</div>
 																	))}
 																</div>
@@ -849,7 +1241,7 @@ export function EvaluasiFinalisasiDashboard({
 													</TooltipProvider>
 												</TableCell>
 
-												{/* Mini Module Indicators */}
+												{/* Mini Module Indicators (P C F A D PA M) */}
 												<TableCell className="text-center">
 													<div className="flex items-center justify-center gap-1">
 														{modules.map((m) => (
@@ -857,19 +1249,34 @@ export function EvaluasiFinalisasiDashboard({
 																<Tooltip>
 																	<TooltipTrigger>
 																		<span
-																			className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-black ${
-																				m.isAcc
-																					? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-																					: "bg-slate-100 text-slate-400 border border-slate-200"
+																			className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-black transition-transform hover:scale-110 ${
+																				m.status === "ACC"
+																					? "bg-emerald-100 text-emerald-800 border border-emerald-400"
+																					: m.status === "AMAN"
+																						? "bg-emerald-50 text-emerald-700 border border-emerald-300"
+																						: m.status === "PROSES"
+																							? "bg-amber-50 text-amber-800 border border-amber-300"
+																							: "bg-rose-50 text-rose-800 border border-rose-300"
 																			}`}
 																		>
-																			{m.name[0]}
+																			{m.shortCode}
 																		</span>
 																	</TooltipTrigger>
-																	<TooltipContent className="text-xs">
-																		<p className="font-semibold">{m.name}</p>
+																	<TooltipContent className="text-xs p-2">
+																		<p className="font-bold">
+																			{m.name}:{" "}
+																			{m.status === "ACC"
+																				? "Disetujui (ACC)"
+																				: m.status === "AMAN"
+																					? "Aman"
+																					: m.status === "PROSES"
+																						? "Berproses"
+																						: "Butuh Perhatian"}
+																		</p>
 																		<p className="text-[11px] text-slate-300">
-																			{m.isAcc ? "Sudah di-ACC" : "Belum ACC"}
+																			{m.isAcc
+																				? "✓ Sudah di-ACC"
+																				: `${m.completed}/${m.total} Selesai`}
 																		</p>
 																	</TooltipContent>
 																</Tooltip>
@@ -878,22 +1285,37 @@ export function EvaluasiFinalisasiDashboard({
 													</div>
 												</TableCell>
 
-												{/* Blocking/Aman Status */}
+												{/* Unified Condition Badge */}
 												<TableCell className="text-center">
-													{isAman ? (
-														<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold">
-															✅ Aman
-														</Badge>
-													) : (
-														<Badge className="bg-rose-50 text-rose-700 border-rose-200 text-xs font-semibold">
-															⛔ Blocking
-														</Badge>
-													)}
+													<PanelStatusBadge status={overallStatus} />
 												</TableCell>
 
-												{/* Decision Badge */}
+												{/* Final Decision Badge */}
 												<TableCell className="text-center">
-													{renderDecisionBadge(s.decision?.evaluatorDecision)}
+													{s.decision?.evaluatorDecision ===
+													"layak_berangkat" ? (
+														<Badge className="bg-emerald-50 text-emerald-700 border-emerald-300 font-semibold text-xs">
+															Layak
+														</Badge>
+													) : s.decision?.evaluatorDecision ===
+														"ttd_kontrak" ? (
+														<Badge className="bg-blue-50 text-blue-700 border-blue-300 font-semibold text-xs">
+															Kontrak
+														</Badge>
+													) : s.decision?.evaluatorDecision ===
+														"lanjut_interview" ? (
+														<Badge className="bg-amber-50 text-amber-700 border-amber-300 font-semibold text-xs">
+															Interview
+														</Badge>
+													) : s.decision?.evaluatorDecision === "remedial" ? (
+														<Badge className="bg-rose-50 text-rose-700 border-rose-300 font-semibold text-xs">
+															Remedial
+														</Badge>
+													) : (
+														<span className="text-xs text-slate-400 italic">
+															Menunggu
+														</span>
+													)}
 												</TableCell>
 
 												{/* Actions */}
@@ -902,25 +1324,45 @@ export function EvaluasiFinalisasiDashboard({
 														<Button
 															size="sm"
 															variant="outline"
-															onClick={() => handleOpenDecision(s)}
-															className="h-8 text-xs font-semibold border-blue-200 text-[#0517B0] hover:bg-blue-50 gap-1 px-2.5"
-															title="Beri Keputusan Evaluator Cepat"
+															onClick={(e) => {
+																e.stopPropagation();
+																router.push(
+																	`/dashboard/students/${s.student.id}/profile`,
+																);
+															}}
+															className="h-8 text-xs font-semibold text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900 gap-1 px-2.5 shadow-2xs cursor-pointer"
+															title="Lihat Detail Profil Mahasiswa"
 														>
-															<Edit3 className="w-3.5 h-3.5" />
-															Beri Keputusan
+															<User className="w-3.5 h-3.5 text-[#0517B0]" />
+															Lihat
 														</Button>
 														<Button
 															size="sm"
-															variant="ghost"
-															onClick={() =>
+															variant="outline"
+															onClick={(e) => {
+																e.stopPropagation();
 																router.push(
-																	`/dashboard/students/${s.student.id}?context=final-decision`,
-																)
-															}
-															className="h-8 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100 px-2"
+																	`/dashboard/students/${s.student.id}?tab=final-decision`,
+																);
+															}}
+															className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5 shadow-2xs cursor-pointer"
 															title="Periksa Detail Lengkap Mahasiswa"
 														>
-															Detail
+															<Eye className="w-3.5 h-3.5" />
+															Periksa
+														</Button>
+														<Button
+															size="sm"
+															variant="outline"
+															onClick={(e) => {
+																e.stopPropagation();
+																handleOpenDecision(s);
+															}}
+															className="h-8 text-xs font-semibold text-emerald-700 border-emerald-200 hover:bg-emerald-50 gap-1 px-2.5 shadow-2xs cursor-pointer"
+															title="Beri Keputusan Evaluator"
+														>
+															<Edit3 className="w-3.5 h-3.5 text-emerald-600" />
+															Keputusan
 														</Button>
 													</div>
 												</TableCell>
@@ -941,6 +1383,14 @@ export function EvaluasiFinalisasiDashboard({
 									</p>
 								</div>
 							)}
+
+							<TablePagination
+								currentPage={evaluasiPage}
+								pageSize={evaluasiPageSize}
+								totalItems={filteredData.length}
+								onPageChange={setEvaluasiPage}
+								itemName="Mahasiswa"
+							/>
 						</div>
 					</TabsContent>
 
@@ -965,14 +1415,20 @@ export function EvaluasiFinalisasiDashboard({
 							<Table>
 								<TableHeader className="bg-slate-50 sticky top-0 z-10">
 									<TableRow className="border-slate-200">
-										<TableHead className="py-3.5 font-bold text-slate-700 text-xs w-28">
-											NIM
-										</TableHead>
 										<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
-											Nama Kandidat
+											Nama Kandidat & NIM
 										</TableHead>
-										<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
-											Program & Angkatan
+										<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+											Angkatan
+										</TableHead>
+										<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-32">
+											Tahun Ajaran
+										</TableHead>
+										<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[160px]">
+											Peminatan
+										</TableHead>
+										<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[140px]">
+											No. WhatsApp
 										</TableHead>
 										<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
 											Tgl Keberangkatan
@@ -980,28 +1436,37 @@ export function EvaluasiFinalisasiDashboard({
 										<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
 											Status Persetujuan
 										</TableHead>
-										<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-56">
+										<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-64">
 											Dokumen & Aksi
 										</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{candidatesData.map((s: any) => {
+									{paginatedFinalisasiData.map((s: any) => {
 										const isApproved =
 											s.decision?.isApprovedByDirector === true;
 										const hasDeparture = Boolean(s.decision?.departureDate);
+										const waUrl = formatWhatsAppUrl(s.student?.phone);
 
 										return (
 											<TableRow
 												key={s.student.id}
-												className="border-slate-100 hover:bg-emerald-50/30 transition-colors"
+												className="border-slate-100 hover:bg-emerald-50/30 transition-colors cursor-pointer"
 											>
-												<TableCell className="font-mono text-xs font-bold text-slate-700">
-													{s.student.nim}
-												</TableCell>
+												{/* Nama & NIM */}
 												<TableCell>
 													<div className="font-bold text-slate-900 text-sm">
 														{s.student.name}
+													</div>
+													<div className="flex items-center gap-1.5 mt-0.5">
+														<span className="font-mono text-xs font-semibold text-slate-500">
+															{s.student.nim || "Belum ada NIM"}
+														</span>
+														{s.student.nickname && (
+															<span className="text-[11px] text-slate-400">
+																({s.student.nickname})
+															</span>
+														)}
 													</div>
 													{s.decision?.notes && (
 														<div className="text-[11px] text-slate-500 italic mt-0.5 truncate max-w-xs">
@@ -1009,21 +1474,63 @@ export function EvaluasiFinalisasiDashboard({
 														</div>
 													)}
 												</TableCell>
-												<TableCell>
-													<div className="flex flex-wrap items-center gap-1.5">
-														<Badge
-															variant="outline"
-															className="text-[10px] px-1.5 py-0 text-slate-500 border-slate-200"
-														>
-															Angkatan {s.student.cohort}
-														</Badge>
-														<PeminatanBadge
-															subProgram={s.student.subProgram}
-															destinationCountry={s.student.destinationCountry}
-															program={s.student.program}
-														/>
-													</div>
+
+												{/* Angkatan */}
+												<TableCell className="text-center">
+													<Badge
+														variant="outline"
+														className="text-xs font-bold text-slate-700 bg-slate-50 border-slate-200 px-2 py-0.5"
+													>
+														{s.student.cohort
+															? `Angkatan ${s.student.cohort}`
+															: "-"}
+													</Badge>
 												</TableCell>
+
+												{/* Tahun Ajaran */}
+												<TableCell className="text-center font-medium text-xs text-slate-700">
+													{getAcademicYear(s.student)}
+												</TableCell>
+
+												{/* Peminatan */}
+												<TableCell>
+													<PeminatanBadge
+														subProgram={s.student.subProgram}
+														destinationCountry={s.student.destinationCountry}
+														program={s.student.program}
+													/>
+												</TableCell>
+
+												{/* No WhatsApp */}
+												<TableCell>
+													{s.student?.phone ? (
+														waUrl ? (
+															<a
+																href={waUrl}
+																target="_blank"
+																rel="noopener noreferrer"
+																className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 hover:text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-md transition-colors group"
+																title="Chat WhatsApp"
+																onClick={(e) => e.stopPropagation()}
+															>
+																<MessageCircle className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
+																<span className="font-mono">
+																	{s.student.phone}
+																</span>
+															</a>
+														) : (
+															<span className="text-xs font-mono text-slate-700">
+																{s.student.phone}
+															</span>
+														)
+													) : (
+														<span className="text-slate-400 text-xs italic">
+															-
+														</span>
+													)}
+												</TableCell>
+
+												{/* Tgl Keberangkatan */}
 												<TableCell className="text-center font-medium">
 													{s.decision?.departureDate ? (
 														<div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-[#0517B0] rounded-md font-semibold text-xs border border-blue-100">
@@ -1042,6 +1549,8 @@ export function EvaluasiFinalisasiDashboard({
 														</span>
 													)}
 												</TableCell>
+
+												{/* Status Persetujuan */}
 												<TableCell className="text-center">
 													{isApproved ? (
 														<Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 font-bold text-xs gap-1">
@@ -1055,18 +1564,52 @@ export function EvaluasiFinalisasiDashboard({
 														</Badge>
 													)}
 												</TableCell>
+
+												{/* Dokumen & Aksi */}
 												<TableCell className="text-right pr-6">
 													<div className="flex items-center justify-end gap-1.5">
+														<Button
+															size="sm"
+															variant="outline"
+															onClick={(e) => {
+																e.stopPropagation();
+																router.push(
+																	`/dashboard/students/${s.student.id}/profile`,
+																);
+															}}
+															className="h-8 text-xs font-semibold text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900 gap-1 px-2.5 shadow-2xs cursor-pointer"
+															title="Lihat Detail Profil Mahasiswa"
+														>
+															<User className="w-3.5 h-3.5 text-[#0517B0]" />
+															Lihat
+														</Button>
+														<Button
+															size="sm"
+															variant="outline"
+															onClick={(e) => {
+																e.stopPropagation();
+																router.push(
+																	`/dashboard/students/${s.student.id}?tab=final-decision`,
+																);
+															}}
+															className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5 shadow-2xs cursor-pointer"
+															title="Periksa Detail Lengkap Mahasiswa"
+														>
+															<Eye className="w-3.5 h-3.5" />
+															Periksa
+														</Button>
+
 														{/* Data PDF Button */}
 														<Button
 															variant="outline"
 															size="sm"
-															onClick={() =>
+															onClick={(e) => {
+																e.stopPropagation();
 																router.push(
 																	`/dashboard/finalisasi/${s.student.id}/data`,
-																)
-															}
-															className="h-8 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 gap-1 px-2"
+																);
+															}}
+															className="h-8 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 gap-1 px-2 shadow-2xs cursor-pointer"
 															title="Cetak Data Rekap Finalisasi (PDF)"
 														>
 															<FileText className="w-3.5 h-3.5 text-slate-500" />
@@ -1077,8 +1620,11 @@ export function EvaluasiFinalisasiDashboard({
 														<Button
 															variant="outline"
 															size="sm"
-															onClick={() => handleOpenDeparture(s)}
-															className="h-8 text-xs font-semibold border-emerald-200 text-emerald-700 hover:bg-emerald-50 gap-1 px-2"
+															onClick={(e) => {
+																e.stopPropagation();
+																handleOpenDeparture(s);
+															}}
+															className="h-8 text-xs font-semibold border-emerald-200 text-emerald-700 hover:bg-emerald-50 gap-1 px-2 shadow-2xs cursor-pointer"
 														>
 															<Calendar className="w-3.5 h-3.5" />
 															Atur Jadwal
@@ -1088,14 +1634,15 @@ export function EvaluasiFinalisasiDashboard({
 														<Button
 															size="sm"
 															disabled={!hasDeparture}
-															onClick={() =>
+															onClick={(e) => {
+																e.stopPropagation();
 																router.push(
 																	`/dashboard/finalisasi/${s.student.id}/sk`,
-																)
-															}
+																);
+															}}
 															className={`h-8 text-xs font-bold gap-1.5 px-3 ${
 																hasDeparture
-																	? "bg-[#0517B0] hover:bg-blue-800 text-white shadow-sm"
+																	? "bg-[#0517B0] hover:bg-blue-800 text-white shadow-2xs cursor-pointer"
 																	: "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
 															}`}
 															title={
@@ -1127,6 +1674,14 @@ export function EvaluasiFinalisasiDashboard({
 									</p>
 								</div>
 							)}
+
+							<TablePagination
+								currentPage={finalisasiPage}
+								pageSize={finalisasiPageSize}
+								totalItems={candidatesData.length}
+								onPageChange={setFinalisasiPage}
+								itemName="Kandidat"
+							/>
 						</div>
 					</TabsContent>
 				</Tabs>
@@ -1150,84 +1705,71 @@ export function EvaluasiFinalisasiDashboard({
 					<div className="space-y-4 py-2">
 						<div className="space-y-2">
 							<Label className="text-xs font-bold text-slate-700">
-								Pilih Keputusan:
+								Status Keputusan
 							</Label>
 							<RadioGroup
 								value={selectedDecision}
-								onValueChange={(val) => setSelectedDecision(val || "menunggu")}
-								className="space-y-2"
+								onValueChange={setSelectedDecision}
+								className="grid grid-cols-2 gap-2"
 							>
-								<div className="flex items-center space-x-2 p-2.5 rounded-lg border border-emerald-200 hover:bg-emerald-50/50 cursor-pointer">
-									<RadioGroupItem value="layak_berangkat" id="d-layak" />
+								<div className="flex items-center space-x-2 border border-slate-200 rounded-lg p-2.5 hover:bg-slate-50 cursor-pointer">
+									<RadioGroupItem value="layak_berangkat" id="r_layak" />
 									<Label
-										htmlFor="d-layak"
-										className="text-xs font-bold text-emerald-800 flex items-center gap-1.5 cursor-pointer flex-1"
+										htmlFor="r_layak"
+										className="text-xs font-semibold text-emerald-700 cursor-pointer"
 									>
-										🟢 Layak Berangkat (Memenuhi syarat & masuk daftar SK)
+										Layak Berangkat
 									</Label>
 								</div>
-								<div className="flex items-center space-x-2 p-2.5 rounded-lg border border-blue-200 hover:bg-blue-50/50 cursor-pointer">
-									<RadioGroupItem value="ttd_kontrak" id="d-ttd" />
+								<div className="flex items-center space-x-2 border border-slate-200 rounded-lg p-2.5 hover:bg-slate-50 cursor-pointer">
+									<RadioGroupItem value="ttd_kontrak" id="r_kontrak" />
 									<Label
-										htmlFor="d-ttd"
-										className="text-xs font-bold text-blue-800 flex items-center gap-1.5 cursor-pointer flex-1"
+										htmlFor="r_kontrak"
+										className="text-xs font-semibold text-blue-700 cursor-pointer"
 									>
-										🔵 TTD Kontrak (Siap penandatanganan kerja sama)
+										TTD Kontrak
 									</Label>
 								</div>
-								<div className="flex items-center space-x-2 p-2.5 rounded-lg border border-amber-200 hover:bg-amber-50/50 cursor-pointer">
-									<RadioGroupItem value="lanjut_interview" id="d-interview" />
+								<div className="flex items-center space-x-2 border border-slate-200 rounded-lg p-2.5 hover:bg-slate-50 cursor-pointer">
+									<RadioGroupItem value="lanjut_interview" id="r_interview" />
 									<Label
-										htmlFor="d-interview"
-										className="text-xs font-bold text-amber-800 flex items-center gap-1.5 cursor-pointer flex-1"
+										htmlFor="r_interview"
+										className="text-xs font-semibold text-amber-700 cursor-pointer"
 									>
-										🟡 Lanjut Interview (Perlu wawancara tambahan)
+										Lanjut Interview
 									</Label>
 								</div>
-								<div className="flex items-center space-x-2 p-2.5 rounded-lg border border-rose-200 hover:bg-rose-50/50 cursor-pointer">
-									<RadioGroupItem value="remedial" id="d-remedial" />
+								<div className="flex items-center space-x-2 border border-slate-200 rounded-lg p-2.5 hover:bg-slate-50 cursor-pointer">
+									<RadioGroupItem value="remedial" id="r_remedial" />
 									<Label
-										htmlFor="d-remedial"
-										className="text-xs font-bold text-rose-800 flex items-center gap-1.5 cursor-pointer flex-1"
+										htmlFor="r_remedial"
+										className="text-xs font-semibold text-rose-700 cursor-pointer"
 									>
-										🔴 Remedial / Tunda (Perlu perbaikan modul/nilai)
-									</Label>
-								</div>
-								<div className="flex items-center space-x-2 p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
-									<RadioGroupItem value="menunggu" id="d-menunggu" />
-									<Label
-										htmlFor="d-menunggu"
-										className="text-xs font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer flex-1"
-									>
-										⚪ Menunggu (Belum diputuskan)
+										Remedial / Tunda
 									</Label>
 								</div>
 							</RadioGroup>
 						</div>
 
 						<div className="space-y-1.5">
-							<Label
-								htmlFor="evaluator-notes"
-								className="text-xs font-bold text-slate-700"
-							>
-								Catatan Evaluasi (Opsional):
+							<Label className="text-xs font-bold text-slate-700">
+								Catatan Evaluator (Opsional)
 							</Label>
 							<Textarea
-								id="evaluator-notes"
-								placeholder="Tambahkan catatan evaluasi untuk mahasiswa ini..."
+								placeholder="Tambahkan catatan khusus evaluasi untuk mahasiswa ini..."
 								value={decisionNotes}
 								onChange={(e) => setDecisionNotes(e.target.value)}
-								className="text-xs border-slate-200 min-h-[75px]"
+								className="text-xs min-h-[80px]"
 							/>
 						</div>
 					</div>
 
-					<DialogFooter className="gap-2 sm:gap-0">
+					<DialogFooter className="gap-2">
 						<Button
 							variant="outline"
 							size="sm"
 							onClick={() => setDecisionModalOpen(false)}
-							className="text-xs border-slate-200"
+							className="text-xs"
 						>
 							Batal
 						</Button>
@@ -1235,12 +1777,9 @@ export function EvaluasiFinalisasiDashboard({
 							size="sm"
 							onClick={handleSaveDecision}
 							disabled={isSavingDecision}
-							className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs font-bold gap-1.5"
+							className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs gap-1.5"
 						>
-							{isSavingDecision && (
-								<RefreshCw className="w-3.5 h-3.5 animate-spin" />
-							)}
-							Simpan Keputusan
+							{isSavingDecision ? "Menyimpan..." : "Simpan Keputusan"}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
@@ -1248,103 +1787,84 @@ export function EvaluasiFinalisasiDashboard({
 
 			{/* DEPARTURE & APPROVAL MODAL */}
 			<Dialog open={departureModalOpen} onOpenChange={setDepartureModalOpen}>
-				<DialogContent className="max-w-lg">
+				<DialogContent className="max-w-md">
 					<DialogHeader>
 						<DialogTitle className="flex items-center gap-2 text-slate-900 text-lg">
-							<Plane className="w-5 h-5 text-emerald-600" />
-							Atur Jadwal & Persetujuan Keberangkatan
+							<Calendar className="w-5 h-5 text-[#0517B0]" />
+							Atur Keberangkatan & SK Mahasiswa
 						</DialogTitle>
 						<DialogDescription className="text-xs text-slate-500">
-							Atur jadwal keberangkatan dan persetujuan SK untuk{" "}
+							Atur jadwal terbang dan persetujuan direktur untuk{" "}
 							<strong>{departureStudent?.student?.name}</strong>.
 						</DialogDescription>
 					</DialogHeader>
 
 					<div className="space-y-4 py-2">
 						<div className="space-y-1.5">
-							<Label
-								htmlFor="departure-date"
-								className="text-xs font-bold text-slate-700 flex items-center gap-1.5"
-							>
-								<Calendar className="w-3.5 h-3.5 text-[#0517B0]" />
-								Tanggal Keberangkatan:
+							<Label className="text-xs font-bold text-slate-700">
+								Tanggal Keberangkatan
 							</Label>
 							<Input
-								id="departure-date"
 								type="date"
 								value={departureDate}
 								onChange={(e) => setDepartureDate(e.target.value)}
-								className="text-xs border-slate-200"
+								className="text-xs h-9"
 							/>
 						</div>
 
 						<div className="space-y-1.5">
-							<Label
-								htmlFor="director-notes"
-								className="text-xs font-bold text-slate-700"
-							>
-								Catatan Direktur / Superadmin (Opsional):
+							<Label className="text-xs font-bold text-slate-700">
+								Catatan Direktur (Akan tampil pada SK)
 							</Label>
 							<Textarea
-								id="director-notes"
-								placeholder="Catatan resmi dari Direktur..."
+								placeholder="Catatan resmi persetujuan direktur..."
 								value={directorNotes}
 								onChange={(e) => setDirectorNotes(e.target.value)}
-								className="text-xs border-slate-200 min-h-[70px]"
+								className="text-xs min-h-[70px]"
 							/>
 						</div>
 
-						<div className="space-y-1.5 pt-1">
-							<Label
-								htmlFor="confidential-notes"
-								className="text-xs font-bold text-rose-700 flex items-center gap-1"
-							>
-								<ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
-								Catatan Rahasia Manajemen (Terenkripsi):
+						<div className="space-y-1.5">
+							<Label className="text-xs font-bold text-slate-700">
+								Catatan Rahasia (Hanya Internal)
 							</Label>
 							<Textarea
-								id="confidential-notes"
-								placeholder="Instruksi rahasia khusus pimpinan/admin..."
+								placeholder="Catatan khusus internal manajemen..."
 								value={confidentialNotes}
 								onChange={(e) => setConfidentialNotes(e.target.value)}
-								className="text-xs border-rose-200 bg-rose-50/20 min-h-[60px]"
+								className="text-xs min-h-[60px]"
 							/>
 						</div>
 					</div>
 
-					<DialogFooter className="flex flex-col sm:flex-row justify-between items-center gap-2 pt-2 border-t border-slate-100">
-						{departureStudent?.decision?.isApprovedByDirector ? (
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() => handleSaveDeparture(false)}
-								disabled={isSavingDeparture}
-								className="text-rose-600 border-rose-200 hover:bg-rose-50 text-xs font-semibold mr-auto"
-							>
-								Cabut Persetujuan
-							</Button>
-						) : (
-							<div />
-						)}
+					<DialogFooter className="flex-col sm:flex-row gap-2">
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => setDepartureModalOpen(false)}
+							className="text-xs"
+						>
+							Tutup
+						</Button>
 						<div className="flex items-center gap-2">
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() => setDepartureModalOpen(false)}
-								className="text-xs border-slate-200"
-							>
-								Tutup
-							</Button>
+							{departureStudent?.decision?.isApprovedByDirector && (
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => handleSaveDeparture(false)}
+									disabled={isSavingDeparture}
+									className="text-xs border-rose-200 text-rose-700 hover:bg-rose-50"
+								>
+									Cabut ACC
+								</Button>
+							)}
 							<Button
 								size="sm"
 								onClick={() => handleSaveDeparture(true)}
 								disabled={isSavingDeparture}
-								className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold gap-1.5 shadow-sm"
+								className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5"
 							>
-								{isSavingDeparture && (
-									<RefreshCw className="w-3.5 h-3.5 animate-spin" />
-								)}
-								Setujui & Simpan
+								{isSavingDeparture ? "Menyimpan..." : "Setujui & Simpan"}
 							</Button>
 						</div>
 					</DialogFooter>

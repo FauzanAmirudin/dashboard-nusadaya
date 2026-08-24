@@ -3,19 +3,42 @@
 import {
 	BookMarked,
 	Briefcase,
+	CheckCircle,
+	CheckCircle2,
 	CheckSquare,
+	Clock,
+	HeartHandshake,
 	Loader2,
 	MessageCircle,
 	Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { API_URL, api, getToken } from "@/lib/eden";
 import { hasRole, useAuthStore } from "@/store";
+import { formatDeviceDateTime } from "@/utils/format";
 
 import { TabChecklistPa } from "./pa/TabChecklistPa";
 import { TabHafalan } from "./pa/TabHafalan";
@@ -41,7 +64,7 @@ interface PaPanelProps {
 
 export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 	const { user } = useAuthStore();
-	const isPa = hasRole(user, "pa", "akademik");
+	const isPa = hasRole(user, "pa", "akademik", "superadmin");
 	const isSuperadmin = hasRole(user, "superadmin");
 
 	const [paData, setPaData] = useState<PaData | null>(null);
@@ -54,8 +77,18 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 	const [loadingItem, setLoadingItem] = useState<string | null>(null);
 	const [activeTab, setActiveTab] = useState("checklist");
 
+	const isCounselingDone = Boolean(paData?.counselingDone);
+	const isMentalStable = Boolean(paData?.mentalStable);
+	const isDisciplineGood = Boolean(paData?.disciplineGood);
+	const completedCount = [
+		isCounselingDone,
+		isMentalStable,
+		isDisciplineGood,
+	].filter(Boolean).length;
+	const isAllChecksDone = completedCount === 3;
+
 	// Role PA, Akademik, and Superadmin have full CRUD permissions to manage hafalan, counseling, tripartite, interview, etc.
-	const canEdit = isPa || isSuperadmin;
+	const canEdit = isPa;
 
 	const fetchPaData = async () => {
 		try {
@@ -331,12 +364,7 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 	const targetVocab = paData?.vocabTarget || 500;
 	const isVocabDone = totalVocab >= targetVocab;
 
-	const completedChecklistCount = [
-		paData?.counselingDone,
-		paData?.mentalStable,
-		paData?.disciplineGood,
-	].filter(Boolean).length;
-
+	const completedChecklistCount = completedCount;
 	const totalProgressItems = completedChecklistCount + (isVocabDone ? 1 : 0);
 	const totalChecklistProgress = Math.round((totalProgressItems / 4) * 100);
 
@@ -349,25 +377,6 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 		);
 	}
 
-	let panelStatusBadge = (
-		<Badge className="bg-emerald-50 text-emerald-600 border-emerald-200">
-			🟢 AMAN
-		</Badge>
-	);
-	if (paData?.status === "TIDAK_AMAN") {
-		panelStatusBadge = (
-			<Badge className="bg-rose-50 text-rose-600 border-rose-200">
-				🔴 TIDAK AMAN
-			</Badge>
-		);
-	} else if (paData?.status === "PERLU_PERHATIAN") {
-		panelStatusBadge = (
-			<Badge className="bg-amber-50 text-amber-600 border-amber-200">
-				🟡 PERLU PERHATIAN
-			</Badge>
-		);
-	}
-
 	return (
 		<div className="space-y-6">
 			{/* Header */}
@@ -375,7 +384,8 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 					<div>
 						<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
-							<span className="text-xl">🤝</span> PA — Pendamping Akademik
+							<HeartHandshake className="w-5 h-5 text-[#0517B0]" /> PA —
+							Pendamping Akademik
 							<span className="ml-2 text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
 								Progres: {totalProgressItems}/4 Item ({completedChecklistCount}
 								/3 Checklist • {totalVocab} Kosakata • {totalSentence} Kalimat)
@@ -391,10 +401,15 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 								variant="outline"
 								className="text-slate-400 border-slate-300"
 							>
-								👁 Mode Lihat Saja
+								Mode Lihat Saja
 							</Badge>
 						)}
-						{panelStatusBadge}
+						<PanelStatusBadge
+							isAcc={paData?.isAcc}
+							completed={totalProgressItems}
+							total={4}
+							size="lg"
+						/>
 					</div>
 				</div>
 				<div className="mt-4 flex items-center gap-4">
@@ -534,6 +549,155 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 					/>
 				</TabsContent>
 			</Tabs>
+
+			{/* Status ACC Panel Card (Persistent across all tabs) */}
+			<Card
+				className={`border shadow-sm overflow-hidden mt-6 ${
+					paData?.isAcc
+						? "bg-slate-50 border-slate-200"
+						: "bg-blue-50/50 border-blue-200"
+				}`}
+			>
+				<CardContent className="p-0">
+					<div className="flex flex-col sm:flex-row items-center justify-between p-6">
+						<div className="flex items-center gap-4 mb-4 sm:mb-0">
+							{paData?.isAcc ? (
+								<>
+									<div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+										<CheckCircle className="w-6 h-6 text-emerald-600" />
+									</div>
+									<div>
+										<h4 className="text-slate-800 font-bold text-lg">
+											Disetujui (ACC PA) oleh {paData.accBy?.fullName || "PA"}
+										</h4>
+										<p className="text-sm text-slate-600 mt-0.5">
+											Pada {formatDeviceDateTime(paData.accAt)}
+										</p>
+									</div>
+								</>
+							) : (
+								<>
+									<div
+										className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
+											isAllChecksDone
+												? "bg-blue-100 text-[#0517B0]"
+												: "bg-amber-100 text-amber-600"
+										}`}
+									>
+										{isAllChecksDone ? (
+											<CheckCircle2 className="w-6 h-6 text-[#0517B0]" />
+										) : (
+											<Clock className="w-6 h-6 text-amber-600" />
+										)}
+									</div>
+									<div>
+										<h4 className="text-slate-900 font-bold text-lg">
+											{!isAllChecksDone
+												? `Menunggu ACC PA (${3 - completedCount} item belum selesai)`
+												: "ACC Panel Pendamping Akademik (PA)"}
+										</h4>
+										<p className="text-sm text-slate-600 max-w-md mt-0.5">
+											{!isAllChecksDone
+												? "Selesaikan semua checklist pendampingan (Akademik, Vocab, Konseling) sebelum memberikan ACC."
+												: "Seluruh progres pendampingan mahasiswa telah selesai. Anda dapat memberikan persetujuan ACC resmi sekarang."}
+										</p>
+									</div>
+								</>
+							)}
+						</div>
+
+						{isPa && paData?.isAcc && (
+							<AlertDialog>
+								<AlertDialogTrigger
+									render={
+										<Button
+											variant="outline"
+											className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 shrink-0 font-semibold text-xs h-9 cursor-pointer"
+											disabled={isSaving}
+										>
+											{isSaving ? "Membatalkan..." : "Batalkan ACC PA"}
+										</Button>
+									}
+								/>
+								<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
+									<AlertDialogHeader>
+										<AlertDialogTitle>
+											Konfirmasi Pembatalan ACC PA
+										</AlertDialogTitle>
+										<AlertDialogDescription className="text-slate-500 text-xs sm:text-sm">
+											Apakah Anda yakin ingin membatalkan status ACC untuk panel
+											Pendamping Akademik ini? Status mahasiswa akan kembali ke
+											tahap proses.
+										</AlertDialogDescription>
+									</AlertDialogHeader>
+									<div className="flex justify-end gap-3 mt-4">
+										<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50">
+											Batal
+										</AlertDialogCancel>
+										<AlertDialogAction
+											onClick={handleCancelAcc}
+											className="bg-rose-600 hover:bg-rose-700 text-white"
+										>
+											Ya, Batalkan ACC
+										</AlertDialogAction>
+									</div>
+								</AlertDialogContent>
+							</AlertDialog>
+						)}
+
+						{isPa && !paData?.isAcc && (
+							<TooltipProvider>
+								<Tooltip>
+									<TooltipTrigger render={<span className="inline-block" />}>
+										<span>
+											<AlertDialog>
+												<AlertDialogTrigger
+													render={
+														<Button
+															disabled={!isAllChecksDone || isSaving}
+															className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold text-xs h-9 min-w-[130px] disabled:opacity-50 disabled:cursor-not-allowed shadow-xs cursor-pointer"
+														>
+															{isSaving ? "Menyimpan..." : "Berikan ACC PA"}
+														</Button>
+													}
+												/>
+												<AlertDialogContent className="bg-white border-slate-200">
+													<AlertDialogHeader>
+														<AlertDialogTitle>
+															Konfirmasi ACC PA
+														</AlertDialogTitle>
+														<AlertDialogDescription className="text-slate-600 text-xs sm:text-sm">
+															Apakah Anda yakin ingin memberikan ACC? Ini akan
+															menandakan kelulusan pendampingan akademik dan
+															mengunci evaluasi PA mahasiswa ini.
+														</AlertDialogDescription>
+													</AlertDialogHeader>
+													<div className="flex justify-end gap-3 mt-4">
+														<AlertDialogCancel>Batal</AlertDialogCancel>
+														<AlertDialogAction
+															onClick={handleAcc}
+															className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold"
+														>
+															Ya, Berikan ACC
+														</AlertDialogAction>
+													</div>
+												</AlertDialogContent>
+											</AlertDialog>
+										</span>
+									</TooltipTrigger>
+									{!isAllChecksDone && (
+										<TooltipContent>
+											<p className="text-xs">
+												Selesaikan 3/3 checklist pendampingan sebelum ACC
+											</p>
+										</TooltipContent>
+									)}
+								</Tooltip>
+							</TooltipProvider>
+						)}
+					</div>
+				</CardContent>
+			</Card>
 		</div>
 	);
 }

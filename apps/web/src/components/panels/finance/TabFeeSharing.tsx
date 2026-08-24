@@ -660,15 +660,50 @@ export function TabFeeSharing({ studentId, canEdit }: TabFeeSharingProps) {
 												</TableCell>
 												<TableCell className="py-3">
 													{r.invoiceFileUrl ? (
-														<a
-															href={`${API_URL}/students/${studentId}/pmb/fee-share-recipients/${r.id}/invoice`}
-															target="_blank"
-															rel="noreferrer"
-															className="inline-flex items-center gap-1 text-xs text-[#0517B0] hover:text-blue-800 font-bold underline underline-offset-2 transition-colors"
-														>
-															<Eye className="w-3.5 h-3.5" />
-															Lihat Invoice
-														</a>
+														<div className="flex items-center gap-1.5">
+															<Button
+																variant="outline"
+																size="sm"
+																className="h-7 text-xs font-medium text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 gap-1.5 cursor-pointer shadow-2xs"
+																title="Review Dokumen Invoice"
+																onClick={() => {
+																	const invoiceUrl = `/students/${studentId}/pmb/fee-share-recipients/${r.id}/invoice`;
+																	const invoiceName = `Invoice - ${r.namaReferral} (${r.kategori}).pdf`;
+																	window.open(
+																		`/dashboard/students/${studentId}/documents/${r.id}?url=${encodeURIComponent(invoiceUrl)}&name=${encodeURIComponent(invoiceName)}&token=${getToken()}`,
+																		"_blank",
+																	);
+																}}
+															>
+																<Eye className="w-3.5 h-3.5" />
+																<span>Review</span>
+															</Button>
+															{canEdit &&
+																isEditing &&
+																r.statusPencairan !== "sudah_dibayarkan" && (
+																	<label
+																		className="inline-flex items-center gap-1 text-[11px] text-slate-600 hover:text-[#0517B0] cursor-pointer border border-dashed border-slate-300 rounded-lg px-2 py-1 bg-slate-50 hover:bg-blue-50/50 transition-colors"
+																		title="Ganti Berkas Invoice (PDF)"
+																	>
+																		{uploadingId === r.id ? (
+																			<Loader2 className="w-3 h-3 animate-spin text-[#0517B0]" />
+																		) : (
+																			<UploadCloud className="w-3 h-3 text-[#0517B0]" />
+																		)}
+																		<span className="font-semibold">Ganti</span>
+																		<input
+																			type="file"
+																			accept="application/pdf"
+																			className="hidden"
+																			onChange={(e) => {
+																				const file = e.target.files?.[0];
+																				if (file)
+																					handleInvoiceUpload(r.id, file);
+																			}}
+																		/>
+																	</label>
+																)}
+														</div>
 													) : canEdit && isEditing ? (
 														<label className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-[#0517B0] cursor-pointer border border-dashed border-slate-300 rounded-lg px-2.5 py-1 bg-slate-50 hover:bg-blue-50/50 transition-colors">
 															{uploadingId === r.id ? (

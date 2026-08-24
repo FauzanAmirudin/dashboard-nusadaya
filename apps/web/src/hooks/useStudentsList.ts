@@ -130,9 +130,51 @@ export function useStudentsList(params: UseStudentsListParams = {}) {
 			};
 		},
 		placeholderData: keepPreviousData,
-		staleTime: 10 * 1000, // 10 seconds — re-fetch if older than 10s
+		staleTime: 30 * 1000, // 30 seconds fresh data window
 		gcTime: 5 * 60 * 1000, // 5 minutes garbage collection
 		retry: 2,
 		retryDelay: 1000,
+	});
+}
+
+/**
+ * Hook for fetching single student detail with TanStack React Query caching.
+ */
+export function useStudentDetail(id: number | string | null | undefined) {
+	const studentId = id ? id.toString() : "";
+	return useQuery({
+		queryKey: ["student", studentId],
+		queryFn: async () => {
+			if (!studentId) return null;
+			const res = await (api.students as any)[studentId].get();
+			if (res.error) {
+				throw new Error(
+					res.error?.value?.message || "Gagal mengambil data detail mahasiswa",
+				);
+			}
+			return res.data?.data || null;
+		},
+		enabled: Boolean(studentId),
+		staleTime: 60 * 1000, // 1 minute fresh cache
+		gcTime: 10 * 60 * 1000, // 10 minutes retention
+	});
+}
+
+/**
+ * Prefetch single student detail for instant page transitions on row hover.
+ */
+export function prefetchStudentDetail(
+	queryClient: import("@tanstack/react-query").QueryClient,
+	id: number,
+) {
+	if (!id || Number.isNaN(id)) return;
+	const studentId = id.toString();
+	return queryClient.prefetchQuery({
+		queryKey: ["student", studentId],
+		queryFn: async () => {
+			const res = await (api.students as any)[studentId].get();
+			return res.data?.data || null;
+		},
+		staleTime: 60 * 1000,
 	});
 }

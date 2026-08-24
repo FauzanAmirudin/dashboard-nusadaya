@@ -14,7 +14,6 @@ export function BackupManualForm() {
 	const [type, setType] = useState("full");
 	const [nim, setNim] = useState("");
 	const [cohortId, setCohortId] = useState("");
-	const [programId, setProgramId] = useState("");
 
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
@@ -66,18 +65,11 @@ export function BackupManualForm() {
 				payload.filters = { nim: nim.trim() };
 			} else if (type === "cohort") {
 				if (!cohortId) {
-					setError("Tahun angkatan wajib diisi.");
+					setError("Nomor angkatan wajib diisi (Contoh: 14, 15, dst).");
 					setLoading(false);
 					return;
 				}
-				payload.filters = { cohortId: parseInt(cohortId) };
-			} else if (type === "program") {
-				if (!programId) {
-					setError("Nama program studi wajib diisi.");
-					setLoading(false);
-					return;
-				}
-				payload.filters = { programId: programId.trim() };
+				payload.filters = { cohortId: parseInt(cohortId, 10) };
 			}
 
 			const res = await api.backups.post(payload);
@@ -216,10 +208,11 @@ export function BackupManualForm() {
 						disabled={loading}
 						className="w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3 border outline-none bg-white"
 					>
-						<option value="full">Full Backup (Seluruh Sistem)</option>
-						<option value="student">Per Mahasiswa</option>
-						<option value="cohort">Per Angkatan (Tahun Masuk)</option>
-						<option value="program">Per Program Studi</option>
+						<option value="full">
+							Full Backup (Seluruh Sistem & Database)
+						</option>
+						<option value="cohort">Per Angkatan</option>
+						<option value="student">Per Mahasiswa (NIM)</option>
 					</select>
 				</div>
 
@@ -233,8 +226,8 @@ export function BackupManualForm() {
 							value={nim}
 							onChange={(e) => setNim(e.target.value)}
 							disabled={loading}
-							placeholder="Masukkan NIM Mahasiswa (Contoh: 12345678)"
-							className="w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3 border outline-none bg-white"
+							placeholder="Masukkan NIM Mahasiswa (Contoh: 250005)"
+							className="w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3 border outline-none bg-white font-mono"
 						/>
 					</div>
 				)}
@@ -242,31 +235,17 @@ export function BackupManualForm() {
 				{type === "cohort" && (
 					<div className="animate-in fade-in slide-in-from-top-2">
 						<label className="block text-sm font-medium text-slate-700 mb-1">
-							Tahun Angkatan
+							Nomor Angkatan
 						</label>
 						<input
 							type="number"
+							min="1"
+							step="1"
 							value={cohortId}
 							onChange={(e) => setCohortId(e.target.value)}
 							disabled={loading}
-							placeholder="Masukkan Tahun Angkatan (Contoh: 2023)"
-							className="w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3 border outline-none bg-white"
-						/>
-					</div>
-				)}
-
-				{type === "program" && (
-					<div className="animate-in fade-in slide-in-from-top-2">
-						<label className="block text-sm font-medium text-slate-700 mb-1">
-							Program Studi
-						</label>
-						<input
-							type="text"
-							value={programId}
-							onChange={(e) => setProgramId(e.target.value)}
-							disabled={loading}
-							placeholder="Masukkan Nama Program (Contoh: Housekeeping)"
-							className="w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3 border outline-none bg-white"
+							placeholder="Masukkan Angkatan (Contoh: 14, 15, dst)"
+							className="w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-2 px-3 border outline-none bg-white font-mono"
 						/>
 					</div>
 				)}

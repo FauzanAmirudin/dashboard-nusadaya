@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Building, FileText, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -100,7 +100,8 @@ export function TabOds({
 			<Card className="border border-slate-200 shadow-sm overflow-hidden">
 				<div className="bg-slate-50 border-b border-slate-200 p-4 flex justify-between items-center">
 					<h3 className="font-bold text-slate-800 flex items-center gap-2">
-						<span className="text-xl">🏢</span> Pelaksanaan One Day Service
+						<Building className="w-5 h-5 text-[#0517B0]" /> Pelaksanaan One Day
+						Service
 					</h3>
 					{canEdit && !isEditing && (
 						<Button
@@ -245,7 +246,8 @@ export function TabOds({
 			<Card className="border border-slate-200 shadow-sm overflow-hidden">
 				<div className="bg-slate-50 border-b border-slate-200 p-4">
 					<h3 className="font-bold text-slate-800 flex items-center gap-2">
-						<span className="text-xl">📄</span> Upload Dokumen Laporan
+						<FileText className="w-5 h-5 text-[#0517B0]" /> Upload Dokumen
+						Laporan
 					</h3>
 				</div>
 				<CardContent className="p-6">

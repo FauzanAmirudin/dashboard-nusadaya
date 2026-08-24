@@ -41,7 +41,10 @@ import {
 	weeklyEvents,
 } from "../../db/schema";
 import {
+	CACHE_TTL_DETAIL,
+	CACHE_TTL_STUDENT_LIST,
 	cacheDel,
+	cacheFetch,
 	cacheGet,
 	cacheInvalidatePattern,
 	cacheSet,
@@ -273,273 +276,290 @@ export const coreRoutes = new Elysia()
 				);
 			}
 
-			if (status === "aman") {
+			if (status === "acc") {
+				conditions.push(eq(students.overallStatus, "ACC"));
+			} else if (status === "aman") {
 				conditions.push(eq(students.overallStatus, "AMAN"));
-			} else if (status === "perhatian") {
-				conditions.push(eq(students.overallStatus, "PERLU_PERHATIAN"));
-			} else if (status === "tidak_aman") {
-				conditions.push(eq(students.overallStatus, "TIDAK_AMAN"));
+			} else if (status === "proses" || status === "perhatian") {
+				conditions.push(
+					or(
+						eq(students.overallStatus, "PROSES"),
+						eq(students.overallStatus, "PERLU_PERHATIAN"),
+					)!,
+				);
+			} else if (status === "butuh_perhatian" || status === "tidak_aman") {
+				conditions.push(
+					or(
+						eq(students.overallStatus, "BUTUH_PERHATIAN"),
+						eq(students.overallStatus, "TIDAK_AMAN"),
+					)!,
+				);
 			}
 
 			const whereClause = and(...conditions);
 
 			// Cache key for pagination & filter combination
 			const cacheKey = `cache:students:list:p${page}:l${limit}:c${cohort || "all"}:s${status || "all"}:q${search || ""}:a${isArchived}`;
-			const cached = await cacheGet<{ data: any[]; meta: any }>(cacheKey);
-			if (cached) {
-				return { success: true, data: cached.data, meta: cached.meta };
-			}
 
-			// 1. Get total count for pagination
-			const [countResult] = await db
-				.select({ total: sql<number>`count(*)` })
-				.from(students)
-				.where(whereClause);
+			const responsePayload = await cacheFetch(
+				cacheKey,
+				async () => {
+					// 1. Get total count for pagination
+					const [countResult] = await db
+						.select({ total: sql<number>`count(*)` })
+						.from(students)
+						.where(whereClause);
 
-			const total = Number(countResult?.total || 0);
-			const totalPages = Math.ceil(total / limit) || 1;
+					const total = Number(countResult?.total || 0);
+					const totalPages = Math.ceil(total / limit) || 1;
 
-			if (total === 0) {
-				const emptyRes = {
-					data: [],
-					meta: { page, limit, total: 0, totalPages: 1 },
-				};
-				await cacheSet(cacheKey, emptyRes, 60);
-				return { success: true, data: [], meta: emptyRes.meta };
-			}
+					if (total === 0) {
+						return {
+							data: [],
+							meta: { page, limit, total: 0, totalPages: 1 },
+						};
+					}
 
-			// 2. Select slim flat columns directly from single joined query
-			const results = await db
-				.select({
-					student: {
-						id: students.id,
-						nim: students.nim,
-						name: students.name,
-						nickname: students.nickname,
-						cohort: students.cohort,
-						program: students.program,
-						subProgram: students.subProgram,
-						phone: students.phone,
-						email: students.email,
-						destinationCountry: students.destinationCountry,
-						academicYear: students.academicYear,
-						batch: students.batch,
-						classType: students.classType,
-						period: students.period,
-						paId: students.paId,
-						studentStatus: students.studentStatus,
-						overallStatus: students.overallStatus,
-						profilePhotoUrl: students.profilePhotoUrl,
-						updatedAt: students.updatedAt,
-						createdAt: students.createdAt,
-					},
-					pmb: {
-						id: pmbData.id,
-						status: pmbData.status,
-						isAcc: pmbData.isAcc,
-						formReceived: pmbData.formReceived,
-						documentsComplete: pmbData.documentsComplete,
-						dataInputted: pmbData.dataInputted,
-						initialFollowUp: pmbData.initialFollowUp,
-						docKtp: pmbData.docKtp,
-						docKk: pmbData.docKk,
-						docCv: pmbData.docCv,
-						docIjazah: pmbData.docIjazah,
-						docTranskrip: pmbData.docTranskrip,
-						docPassportDepan: pmbData.docPassportDepan,
-						docPassportVisa: pmbData.docPassportVisa,
-						docSkbm: pmbData.docSkbm,
-						docMcu: pmbData.docMcu,
-						docSertifikasiBahasa: pmbData.docSertifikasiBahasa,
-						timVisit: pmbData.timVisit,
-						timSosialisasi: pmbData.timSosialisasi,
-						roReferral: pmbData.roReferral,
-						mitraSponsor: pmbData.mitraSponsor,
-						koordinator: pmbData.koordinator,
-						rekomendasi: pmbData.rekomendasi,
-						rumahJuang: pmbData.rumahJuang,
-					},
-					crm: {
-						id: crmData.id,
-						status: crmData.status,
-						isAcc: crmData.isAcc,
-						isMonitoringParent: crmData.isMonitoringParent,
-						isMonitoringIndustry: crmData.isMonitoringIndustry,
-						isVocabComplete: crmData.isVocabComplete,
-						hasStudyPermit: crmData.hasStudyPermit,
-						practiceAttendance: crmData.practiceAttendance,
-						practiceDaysPresent: crmData.practiceDaysPresent,
-						practiceDaysTotal: crmData.practiceDaysTotal,
-						isOdsReport: crmData.isOdsReport,
-						odsDocumentation: crmData.odsDocumentation,
-						isPrammagangReport: crmData.isPrammagangReport,
-						isPrammagangDocumentation: crmData.isPrammagangDocumentation,
-						hasActiveCase: crmData.hasActiveCase,
-						pramagangStartDate: crmData.pramagangStartDate,
-						pramagangEndDate: crmData.pramagangEndDate,
-						pramagangIndustry: crmData.pramagangIndustry,
-						caseNotes: crmData.caseNotes,
-					},
-					finance: {
-						id: financeData.id,
-						status: financeData.status,
-						isAcc: financeData.isAcc,
-						totalBiayaPendidikan: financeData.totalBiayaPendidikan,
-						totalBiayaPromosi: financeData.totalBiayaPromosi,
-						registrasiNominal: financeData.registrasiNominal,
-						registrasiPaidDate: financeData.registrasiPaidDate,
-						registrasiBuktiBayarUrl: financeData.registrasiBuktiBayarUrl,
-						registrasiStatus: financeData.registrasiStatus,
-						metodePembayaran: financeData.metodePembayaran,
-						mandiriSemesterNominal: financeData.mandiriSemesterNominal,
-						mandiriSemesterStatus: financeData.mandiriSemesterStatus,
-						mandiriInterviewNominal: financeData.mandiriInterviewNominal,
-						mandiriInterviewStatus: financeData.mandiriInterviewStatus,
-						mandiriKeberangkatanNominal:
-							financeData.mandiriKeberangkatanNominal,
-						mandiriKeberangkatanStatus: financeData.mandiriKeberangkatanStatus,
-						t1SemesterNominalTotal: financeData.t1SemesterNominalTotal,
-						t1SemesterNominalDibayar: financeData.t1SemesterNominalDibayar,
-						t1SemesterNominalTalangan: financeData.t1SemesterNominalTalangan,
-						t1SemesterStatus: financeData.t1SemesterStatus,
-						t1InterviewNominal: financeData.t1InterviewNominal,
-						t1InterviewStatus: financeData.t1InterviewStatus,
-						t2KeberangkatanNominal: financeData.t2KeberangkatanNominal,
-						t2KeberangkatanStatus: financeData.t2KeberangkatanStatus,
-						adminTalaganNominal: financeData.adminTalaganNominal,
-						adminTalaganStatus: financeData.adminTalaganStatus,
-						toeicNominal: financeData.toeicNominal,
-						toeicStatus: financeData.toeicStatus,
-						pasporNominal: financeData.pasporNominal,
-						pasporStatus: financeData.pasporStatus,
-						rumahJuangNominal: financeData.rumahJuangNominal,
-						rumahJuangStatus: financeData.rumahJuangStatus,
-					},
-					academic: {
-						id: academicData.id,
-						status: academicData.status,
-						isAcc: academicData.isAcc,
-						gpa: academicData.gpa,
-						creditsCompleted: academicData.creditsCompleted,
-						pddiktiInput: academicData.pddiktiInput,
-						utsPassed: academicData.utsPassed,
-						uasPassed: academicData.uasPassed,
-						attitudeIndicator: academicData.attitudeIndicator,
-						assignmentsCompleted: academicData.assignmentsCompleted,
-						academicCommunication: academicData.academicCommunication,
-						attendanceTotal: academicData.attendanceTotal,
-						attendancePresent: academicData.attendancePresent,
-						attendanceAlphaNote: academicData.attendanceAlphaNote,
-						assessmentCompleted: academicData.assessmentCompleted,
-						attendancePiketTotal: academicData.attendancePiketTotal,
-						attendancePiketPresent: academicData.attendancePiketPresent,
-						attendanceOdsTotal: academicData.attendanceOdsTotal,
-						attendanceOdsPresent: academicData.attendanceOdsPresent,
-						attendancePramagangTotal: academicData.attendancePramagangTotal,
-						attendancePramagangPresent: academicData.attendancePramagangPresent,
-					},
-					pa: {
-						id: paData.id,
-						status: paData.status,
-						isAcc: paData.isAcc,
-						counselingDone: paData.counselingDone,
-						mentalStable: paData.mentalStable,
-						disciplineGood: paData.disciplineGood,
-						vocabTarget: paData.vocabTarget,
-						disciplineNotes: paData.disciplineNotes,
-					},
-					internship: {
-						id: internshipData.id,
-						status: internshipData.status,
-						isAcc: internshipData.isAcc,
-						praPasporPasFoto: internshipData.praPasporPasFoto,
-						praPasporKtm: internshipData.praPasporKtm,
-						praPasporKtp: internshipData.praPasporKtp,
-						praPasporKk: internshipData.praPasporKk,
-						praPasporAktaKelahiran: internshipData.praPasporAktaKelahiran,
-						praPasporSl21: internshipData.praPasporSl21,
-						praPasporSkma: internshipData.praPasporSkma,
-						praPasporRekomendasiDisdik:
-							internshipData.praPasporRekomendasiDisdik,
-						praPasporGapYear: internshipData.praPasporGapYear,
-						praPasporPddikti: internshipData.praPasporPddikti,
-						praPasporCv: internshipData.praPasporCv,
-						passportReady: internshipData.passportReady,
-						passportNo: internshipData.passportNo,
-						interviewReady: internshipData.interviewReady,
-						interviewDate: internshipData.interviewDate,
-						interviewResult: internshipData.interviewResult,
-						loaReady: internshipData.loaReady,
-						loaCompany: internshipData.loaCompany,
-						loaPosition: internshipData.loaPosition,
-						loaConfirmed: internshipData.loaConfirmed,
-						contractReady: internshipData.contractReady,
-						contractDate: internshipData.contractDate,
-						mcuReady: internshipData.mcuReady,
-						mcuResult: internshipData.mcuResult,
-						visaReady: internshipData.visaReady,
-						visaType: internshipData.visaType,
-						visaStatus: internshipData.visaStatus,
-						ticketReady: internshipData.ticketReady,
-						pdtReady: internshipData.pdtReady,
-						lolReady: internshipData.lolReady,
-						moaReady: internshipData.moaReady,
-						isDanaTahap2Disbursed: internshipData.isDanaTahap2Disbursed,
-						logbookReady: internshipData.logbookReady,
-						laporanAkhirReady: internshipData.laporanAkhirReady,
-						videoDokumentasiReady: internshipData.videoDokumentasiReady,
-						videoDokumentasiLink: internshipData.videoDokumentasiLink,
-						internshipCompany: internshipData.internshipCompany,
-						estDepartureDate: internshipData.estDepartureDate,
-					},
-					decision: {
-						id: finalDecision.id,
-						evaluatorDecision: finalDecision.evaluatorDecision,
-						evaluatorNotes: finalDecision.evaluatorNotes,
-						decidedAt: finalDecision.decidedAt,
-						isApprovedByDirector: finalDecision.isApprovedByDirector,
-						departureDate: finalDecision.departureDate,
-						notes: finalDecision.notes,
-						confidentialNotes: finalDecision.confidentialNotes,
-						skDocumentUrl: finalDecision.skDocumentUrl,
-					},
-				})
-				.from(students)
-				.leftJoin(pmbData, eq(students.id, pmbData.studentId))
-				.leftJoin(crmData, eq(students.id, crmData.studentId))
-				.leftJoin(financeData, eq(students.id, financeData.studentId))
-				.leftJoin(academicData, eq(students.id, academicData.studentId))
-				.leftJoin(paData, eq(students.id, paData.studentId))
-				.leftJoin(internshipData, eq(students.id, internshipData.studentId))
-				.leftJoin(finalDecision, eq(students.id, finalDecision.studentId))
-				.where(whereClause)
-				.orderBy(desc(students.updatedAt), desc(students.id))
-				.limit(limit)
-				.offset(offset);
+					// 2. Select slim flat columns directly from single joined query
+					const results = await db
+						.select({
+							student: {
+								id: students.id,
+								nim: students.nim,
+								name: students.name,
+								nickname: students.nickname,
+								cohort: students.cohort,
+								program: students.program,
+								subProgram: students.subProgram,
+								phone: students.phone,
+								email: students.email,
+								destinationCountry: students.destinationCountry,
+								academicYear: students.academicYear,
+								batch: students.batch,
+								classType: students.classType,
+								period: students.period,
+								paId: students.paId,
+								studentStatus: students.studentStatus,
+								overallStatus: students.overallStatus,
+								profilePhotoUrl: students.profilePhotoUrl,
+								updatedAt: students.updatedAt,
+								createdAt: students.createdAt,
+							},
+							pmb: {
+								id: pmbData.id,
+								status: pmbData.status,
+								isAcc: pmbData.isAcc,
+								formReceived: pmbData.formReceived,
+								documentsComplete: pmbData.documentsComplete,
+								dataInputted: pmbData.dataInputted,
+								initialFollowUp: pmbData.initialFollowUp,
+								docKtp: pmbData.docKtp,
+								docKk: pmbData.docKk,
+								docCv: pmbData.docCv,
+								docIjazah: pmbData.docIjazah,
+								docTranskrip: pmbData.docTranskrip,
+								docPassportDepan: pmbData.docPassportDepan,
+								docPassportVisa: pmbData.docPassportVisa,
+								docSkbm: pmbData.docSkbm,
+								docMcu: pmbData.docMcu,
+								docSertifikasiBahasa: pmbData.docSertifikasiBahasa,
+								timVisit: pmbData.timVisit,
+								timSosialisasi: pmbData.timSosialisasi,
+								roReferral: pmbData.roReferral,
+								mitraSponsor: pmbData.mitraSponsor,
+								koordinator: pmbData.koordinator,
+								rekomendasi: pmbData.rekomendasi,
+								rumahJuang: pmbData.rumahJuang,
+							},
+							crm: {
+								id: crmData.id,
+								status: crmData.status,
+								isAcc: crmData.isAcc,
+								isMonitoringParent: crmData.isMonitoringParent,
+								isMonitoringIndustry: crmData.isMonitoringIndustry,
+								isVocabComplete: crmData.isVocabComplete,
+								hasStudyPermit: crmData.hasStudyPermit,
+								practiceAttendance: crmData.practiceAttendance,
+								practiceDaysPresent: crmData.practiceDaysPresent,
+								practiceDaysTotal: crmData.practiceDaysTotal,
+								isOdsReport: crmData.isOdsReport,
+								odsDocumentation: crmData.odsDocumentation,
+								isPrammagangReport: crmData.isPrammagangReport,
+								isPrammagangDocumentation: crmData.isPrammagangDocumentation,
+								hasActiveCase: crmData.hasActiveCase,
+								pramagangStartDate: crmData.pramagangStartDate,
+								pramagangEndDate: crmData.pramagangEndDate,
+								pramagangIndustry: crmData.pramagangIndustry,
+								caseNotes: crmData.caseNotes,
+							},
+							finance: {
+								id: financeData.id,
+								status: financeData.status,
+								isAcc: financeData.isAcc,
+								totalBiayaPendidikan: financeData.totalBiayaPendidikan,
+								totalBiayaPromosi: financeData.totalBiayaPromosi,
+								registrasiNominal: financeData.registrasiNominal,
+								registrasiPaidDate: financeData.registrasiPaidDate,
+								registrasiBuktiBayarUrl: financeData.registrasiBuktiBayarUrl,
+								registrasiStatus: financeData.registrasiStatus,
+								metodePembayaran: financeData.metodePembayaran,
+								mandiriSemesterNominal: financeData.mandiriSemesterNominal,
+								mandiriSemesterStatus: financeData.mandiriSemesterStatus,
+								mandiriInterviewNominal: financeData.mandiriInterviewNominal,
+								mandiriInterviewStatus: financeData.mandiriInterviewStatus,
+								mandiriKeberangkatanNominal:
+									financeData.mandiriKeberangkatanNominal,
+								mandiriKeberangkatanStatus:
+									financeData.mandiriKeberangkatanStatus,
+								t1SemesterNominalTotal: financeData.t1SemesterNominalTotal,
+								t1SemesterNominalDibayar: financeData.t1SemesterNominalDibayar,
+								t1SemesterNominalTalangan:
+									financeData.t1SemesterNominalTalangan,
+								t1SemesterStatus: financeData.t1SemesterStatus,
+								t1InterviewNominal: financeData.t1InterviewNominal,
+								t1InterviewStatus: financeData.t1InterviewStatus,
+								t2KeberangkatanNominal: financeData.t2KeberangkatanNominal,
+								t2KeberangkatanStatus: financeData.t2KeberangkatanStatus,
+								adminTalaganNominal: financeData.adminTalaganNominal,
+								adminTalaganStatus: financeData.adminTalaganStatus,
+								toeicNominal: financeData.toeicNominal,
+								toeicStatus: financeData.toeicStatus,
+								pasporNominal: financeData.pasporNominal,
+								pasporStatus: financeData.pasporStatus,
+								rumahJuangNominal: financeData.rumahJuangNominal,
+								rumahJuangStatus: financeData.rumahJuangStatus,
+							},
+							academic: {
+								id: academicData.id,
+								status: academicData.status,
+								isAcc: academicData.isAcc,
+								gpa: academicData.gpa,
+								creditsCompleted: academicData.creditsCompleted,
+								pddiktiInput: academicData.pddiktiInput,
+								utsPassed: academicData.utsPassed,
+								uasPassed: academicData.uasPassed,
+								attitudeIndicator: academicData.attitudeIndicator,
+								assignmentsCompleted: academicData.assignmentsCompleted,
+								academicCommunication: academicData.academicCommunication,
+								attendanceTotal: academicData.attendanceTotal,
+								attendancePresent: academicData.attendancePresent,
+								attendanceAlphaNote: academicData.attendanceAlphaNote,
+								assessmentCompleted: academicData.assessmentCompleted,
+								attendancePiketTotal: academicData.attendancePiketTotal,
+								attendancePiketPresent: academicData.attendancePiketPresent,
+								attendanceOdsTotal: academicData.attendanceOdsTotal,
+								attendanceOdsPresent: academicData.attendanceOdsPresent,
+								attendancePramagangTotal: academicData.attendancePramagangTotal,
+								attendancePramagangPresent:
+									academicData.attendancePramagangPresent,
+							},
+							pa: {
+								id: paData.id,
+								status: paData.status,
+								isAcc: paData.isAcc,
+								counselingDone: paData.counselingDone,
+								mentalStable: paData.mentalStable,
+								disciplineGood: paData.disciplineGood,
+								vocabTarget: paData.vocabTarget,
+								disciplineNotes: paData.disciplineNotes,
+							},
+							internship: {
+								id: internshipData.id,
+								status: internshipData.status,
+								isAcc: internshipData.isAcc,
+								praPasporPasFoto: internshipData.praPasporPasFoto,
+								praPasporKtm: internshipData.praPasporKtm,
+								praPasporKtp: internshipData.praPasporKtp,
+								praPasporKk: internshipData.praPasporKk,
+								praPasporAktaKelahiran: internshipData.praPasporAktaKelahiran,
+								praPasporSl21: internshipData.praPasporSl21,
+								praPasporSkma: internshipData.praPasporSkma,
+								praPasporRekomendasiDisdik:
+									internshipData.praPasporRekomendasiDisdik,
+								praPasporGapYear: internshipData.praPasporGapYear,
+								praPasporPddikti: internshipData.praPasporPddikti,
+								praPasporCv: internshipData.praPasporCv,
+								passportReady: internshipData.passportReady,
+								passportNo: internshipData.passportNo,
+								interviewReady: internshipData.interviewReady,
+								interviewDate: internshipData.interviewDate,
+								interviewResult: internshipData.interviewResult,
+								loaReady: internshipData.loaReady,
+								loaCompany: internshipData.loaCompany,
+								loaPosition: internshipData.loaPosition,
+								loaConfirmed: internshipData.loaConfirmed,
+								contractReady: internshipData.contractReady,
+								contractDate: internshipData.contractDate,
+								mcuReady: internshipData.mcuReady,
+								mcuResult: internshipData.mcuResult,
+								visaReady: internshipData.visaReady,
+								visaType: internshipData.visaType,
+								visaStatus: internshipData.visaStatus,
+								ticketReady: internshipData.ticketReady,
+								pdtReady: internshipData.pdtReady,
+								lolReady: internshipData.lolReady,
+								moaReady: internshipData.moaReady,
+								isDanaTahap2Disbursed: internshipData.isDanaTahap2Disbursed,
+								logbookReady: internshipData.logbookReady,
+								laporanAkhirReady: internshipData.laporanAkhirReady,
+								videoDokumentasiReady: internshipData.videoDokumentasiReady,
+								videoDokumentasiLink: internshipData.videoDokumentasiLink,
+								internshipCompany: internshipData.internshipCompany,
+								estDepartureDate: internshipData.estDepartureDate,
+							},
+							decision: {
+								id: finalDecision.id,
+								evaluatorDecision: finalDecision.evaluatorDecision,
+								evaluatorNotes: finalDecision.evaluatorNotes,
+								decidedAt: finalDecision.decidedAt,
+								isApprovedByDirector: finalDecision.isApprovedByDirector,
+								departureDate: finalDecision.departureDate,
+								notes: finalDecision.notes,
+								confidentialNotes: finalDecision.confidentialNotes,
+								skDocumentUrl: finalDecision.skDocumentUrl,
+							},
+						})
+						.from(students)
+						.leftJoin(pmbData, eq(students.id, pmbData.studentId))
+						.leftJoin(crmData, eq(students.id, crmData.studentId))
+						.leftJoin(financeData, eq(students.id, financeData.studentId))
+						.leftJoin(academicData, eq(students.id, academicData.studentId))
+						.leftJoin(paData, eq(students.id, paData.studentId))
+						.leftJoin(internshipData, eq(students.id, internshipData.studentId))
+						.leftJoin(finalDecision, eq(students.id, finalDecision.studentId))
+						.where(whereClause)
+						.orderBy(desc(students.updatedAt), desc(students.id))
+						.limit(limit)
+						.offset(offset);
 
-			// Transform data structure to match frontend expectations while keeping payload ultra-slim
-			const slimData = results.map((r) => ({
-				...r,
-				courseGrades: [],
-				financeSemesters: [],
-				financeInstallments: [],
-				financeCustomFields: [],
-				financeTalanganInstallments: [],
-			}));
+					// Transform data structure to match frontend expectations while keeping payload ultra-slim
+					const slimData = results.map((r) => ({
+						...r,
+						courseGrades: [],
+						financeSemesters: [],
+						financeInstallments: [],
+						financeCustomFields: [],
+						financeTalanganInstallments: [],
+					}));
 
-			const responsePayload = {
-				data: slimData,
-				meta: {
-					page,
-					limit,
-					total,
-					totalPages,
+					return {
+						data: slimData,
+						meta: {
+							page,
+							limit,
+							total,
+							totalPages,
+						},
+					};
 				},
+				CACHE_TTL_STUDENT_LIST,
+			);
+
+			return {
+				success: true,
+				data: responsePayload.data,
+				meta: responsePayload.meta,
 			};
-
-			await cacheSet(cacheKey, responsePayload, 120);
-
-			return { success: true, data: slimData, meta: responsePayload.meta };
 		},
 		{
 			query: t.Optional(
@@ -1062,59 +1082,134 @@ export const coreRoutes = new Elysia()
 			set.status = 403;
 			return {
 				success: false,
-				message: "Forbidden: Only superadmin or pmb can delete",
+				message:
+					"Forbidden: Hanya Superadmin dan PMB yang memiliki izin menghapus mahasiswa",
 			};
 		}
 		const id = parseInt(params.id, 10);
 
-		// Hapus seluruh data relasional dalam transaksi database
-		await db.transaction(async (tx) => {
-			await tx.delete(pmbDocuments).where(eq(pmbDocuments.studentId, id));
-			await tx.delete(pmbData).where(eq(pmbData.studentId, id));
-
-			await tx.delete(crmDocuments).where(eq(crmDocuments.studentId, id));
-			await tx.delete(crmLogs).where(eq(crmLogs.studentId, id));
-			await tx.delete(crmData).where(eq(crmData.studentId, id));
-
-			await tx
-				.delete(financeDocuments)
-				.where(eq(financeDocuments.studentId, id));
-			await tx.delete(financeData).where(eq(financeData.studentId, id));
-			await tx
-				.delete(financeSemesters)
-				.where(eq(financeSemesters.studentId, id));
-			await tx
-				.delete(financeCustomFields)
-				.where(eq(financeCustomFields.studentId, id));
-			await tx
-				.delete(financeTalanganInstallments)
-				.where(eq(financeTalanganInstallments.studentId, id));
-
-			await tx
-				.delete(courseGradeDocuments)
-				.where(eq(courseGradeDocuments.studentId, id));
-			await tx.delete(courseGrades).where(eq(courseGrades.studentId, id));
-			await tx
-				.delete(academicDocuments)
-				.where(eq(academicDocuments.studentId, id));
-			await tx.delete(academicData).where(eq(academicData.studentId, id));
-
-			await tx.delete(vocabLogs).where(eq(vocabLogs.studentId, id));
-			await tx.delete(counselingLogs).where(eq(counselingLogs.studentId, id));
-			await tx.delete(paData).where(eq(paData.studentId, id));
-
-			await tx.delete(internshipData).where(eq(internshipData.studentId, id));
-			await tx.delete(finalDecision).where(eq(finalDecision.studentId, id));
-			await tx.delete(internalNotes).where(eq(internalNotes.studentId, id));
-			await tx
-				.delete(auditLogs)
-				.where(
-					and(eq(auditLogs.entity, "student"), eq(auditLogs.entityId, id)),
-				);
-
-			// Hapus data utama
-			await tx.delete(students).where(eq(students.id, id));
+		const student = await db.query.students.findFirst({
+			where: eq(students.id, id),
 		});
+
+		if (!student) {
+			set.status = 404;
+			return {
+				success: false,
+				message: "Mahasiswa tidak ditemukan",
+			};
+		}
+
+		// Hapus seluruh data relasional dalam transaksi database
+		try {
+			await db.transaction(async (tx) => {
+				// 1. PMB Relations
+				await tx
+					.delete(pmbFeeDisbursements)
+					.where(eq(pmbFeeDisbursements.studentId, id));
+				await tx
+					.delete(feeShareRecipients)
+					.where(eq(feeShareRecipients.studentId, id));
+				await tx.delete(pmbPaymentPlan).where(eq(pmbPaymentPlan.studentId, id));
+				await tx.delete(pmbDocuments).where(eq(pmbDocuments.studentId, id));
+				await tx.delete(pmbData).where(eq(pmbData.studentId, id));
+
+				// 2. Personal & Health & Parents
+				await tx.delete(studentHealth).where(eq(studentHealth.studentId, id));
+				await tx.delete(studentParents).where(eq(studentParents.studentId, id));
+
+				// 3. CRM Relations
+				await tx.delete(crmDocuments).where(eq(crmDocuments.studentId, id));
+				await tx.delete(crmLogs).where(eq(crmLogs.studentId, id));
+				await tx.delete(crmData).where(eq(crmData.studentId, id));
+
+				// 4. Finance Relations
+				await tx
+					.delete(financeDocuments)
+					.where(eq(financeDocuments.studentId, id));
+				const sems = await tx
+					.select({ id: financeSemesters.id })
+					.from(financeSemesters)
+					.where(eq(financeSemesters.studentId, id));
+				if (sems.length > 0) {
+					await tx.delete(financeSemesterInstallments).where(
+						inArray(
+							financeSemesterInstallments.semesterId,
+							sems.map((s) => s.id),
+						),
+					);
+				}
+				await tx
+					.delete(financeSemesters)
+					.where(eq(financeSemesters.studentId, id));
+				await tx
+					.delete(financeCustomFields)
+					.where(eq(financeCustomFields.studentId, id));
+				await tx
+					.delete(financeTalanganInstallments)
+					.where(eq(financeTalanganInstallments.studentId, id));
+				await tx.delete(financeData).where(eq(financeData.studentId, id));
+
+				// 5. Academic & Grades Relations
+				await tx
+					.delete(academicAttitudeLogs)
+					.where(eq(academicAttitudeLogs.studentId, id));
+				await tx
+					.delete(courseGradeDocuments)
+					.where(eq(courseGradeDocuments.studentId, id));
+				await tx.delete(courseGrades).where(eq(courseGrades.studentId, id));
+				await tx
+					.delete(academicDocuments)
+					.where(eq(academicDocuments.studentId, id));
+				await tx.delete(academicData).where(eq(academicData.studentId, id));
+
+				// 6. PA Relations
+				await tx.delete(vocabLogs).where(eq(vocabLogs.studentId, id));
+				await tx.delete(counselingLogs).where(eq(counselingLogs.studentId, id));
+				await tx
+					.delete(paInterviewLogs)
+					.where(eq(paInterviewLogs.studentId, id));
+				await tx
+					.delete(paTripartiteLogs)
+					.where(eq(paTripartiteLogs.studentId, id));
+				await tx.delete(paDocuments).where(eq(paDocuments.studentId, id));
+				await tx.delete(paData).where(eq(paData.studentId, id));
+
+				// 7. Magang / Internship & Decisions Relations
+				await tx
+					.delete(postInternshipDocs)
+					.where(eq(postInternshipDocs.studentId, id));
+				await tx
+					.delete(entrepreneurshipRecords)
+					.where(eq(entrepreneurshipRecords.studentId, id));
+				await tx
+					.delete(internshipDocuments)
+					.where(eq(internshipDocuments.studentId, id));
+				await tx.delete(internshipData).where(eq(internshipData.studentId, id));
+				await tx.delete(finalDecision).where(eq(finalDecision.studentId, id));
+				await tx.delete(internalNotes).where(eq(internalNotes.studentId, id));
+				await tx
+					.delete(auditLogs)
+					.where(
+						and(eq(auditLogs.entity, "student"), eq(auditLogs.entityId, id)),
+					);
+
+				// 8. Hapus data utama mahasiswa
+				await tx.delete(students).where(eq(students.id, id));
+
+				// 9. Hapus user login mahasiswa jika ada
+				if (student.studentUserId) {
+					await tx.delete(users).where(eq(users.id, student.studentUserId));
+				}
+			});
+		} catch (dbErr: any) {
+			console.error("[DELETE /students/:id] Transaction error:", dbErr);
+			set.status = 500;
+			return {
+				success: false,
+				message: `Gagal menghapus mahasiswa: ${dbErr?.message || "Kesalahan database"}`,
+			};
+		}
 
 		await Promise.all([
 			cacheDel(`cache:student:${id}`),
@@ -1135,85 +1230,91 @@ export const coreRoutes = new Elysia()
 		}
 
 		const cacheKey = `cache:student:${id}`;
-		const cached = await cacheGet<any>(cacheKey);
-		if (cached) {
-			return { success: true, data: cached };
-		}
+		const responseData = await cacheFetch(
+			cacheKey,
+			async () => {
+				const student = await db.query.students.findFirst({
+					where: eq(students.id, id),
+					with: {
+						pa: { columns: { id: true, fullName: true, username: true } },
+					},
+				});
 
-		const student = await db.query.students.findFirst({
-			where: eq(students.id, id),
-		});
+				if (!student) {
+					return null;
+				}
 
-		if (!student) {
+				const [
+					pmb,
+					pmbPayment,
+					crm,
+					finance,
+					academic,
+					pa,
+					internship,
+					decision,
+					grades,
+					parents,
+				] = await Promise.all([
+					db.query.pmbData.findFirst({
+						where: eq(pmbData.studentId, id),
+						with: { accBy: { columns: { fullName: true } } },
+					}),
+					db.query.pmbPaymentPlan.findFirst({
+						where: eq(pmbPaymentPlan.studentId, id),
+					}),
+					db.query.crmData.findFirst({
+						where: eq(crmData.studentId, id),
+						with: { accBy: { columns: { fullName: true } } },
+					}),
+					db.query.financeData.findFirst({
+						where: eq(financeData.studentId, id),
+						with: { accBy: { columns: { fullName: true } } },
+					}),
+					db.query.academicData.findFirst({
+						where: eq(academicData.studentId, id),
+						with: { accBy: { columns: { fullName: true } } },
+					}),
+					db.query.paData.findFirst({
+						where: eq(paData.studentId, id),
+						with: { accBy: { columns: { fullName: true } } },
+					}),
+					db.query.internshipData.findFirst({
+						where: eq(internshipData.studentId, id),
+						with: { accBy: { columns: { fullName: true } } },
+					}),
+					db.query.finalDecision.findFirst({
+						where: eq(finalDecision.studentId, id),
+					}),
+					db.query.courseGrades.findMany({
+						where: eq(courseGrades.studentId, id),
+						with: { accBy: { columns: { fullName: true } } },
+					}),
+					db.query.studentParents.findMany({
+						where: eq(studentParents.studentId, id),
+					}),
+				]);
+
+				return {
+					student,
+					pmb: pmb ? { ...pmb, paymentPlan: pmbPayment, finance } : null,
+					crm,
+					finance,
+					academic,
+					pa,
+					internship,
+					decision,
+					courseGrades: grades,
+					parents,
+				};
+			},
+			CACHE_TTL_DETAIL,
+		);
+
+		if (!responseData) {
 			set.status = 404;
 			return { success: false, message: "Student not found" };
 		}
-
-		const [
-			pmb,
-			pmbPayment,
-			crm,
-			finance,
-			academic,
-			pa,
-			internship,
-			decision,
-			grades,
-			parents,
-		] = await Promise.all([
-			db.query.pmbData.findFirst({
-				where: eq(pmbData.studentId, id),
-				with: { accBy: { columns: { fullName: true } } },
-			}),
-			db.query.pmbPaymentPlan.findFirst({
-				where: eq(pmbPaymentPlan.studentId, id),
-			}),
-			db.query.crmData.findFirst({
-				where: eq(crmData.studentId, id),
-				with: { accBy: { columns: { fullName: true } } },
-			}),
-			db.query.financeData.findFirst({
-				where: eq(financeData.studentId, id),
-				with: { accBy: { columns: { fullName: true } } },
-			}),
-			db.query.academicData.findFirst({
-				where: eq(academicData.studentId, id),
-				with: { accBy: { columns: { fullName: true } } },
-			}),
-			db.query.paData.findFirst({
-				where: eq(paData.studentId, id),
-				with: { accBy: { columns: { fullName: true } } },
-			}),
-			db.query.internshipData.findFirst({
-				where: eq(internshipData.studentId, id),
-				with: { accBy: { columns: { fullName: true } } },
-			}),
-			db.query.finalDecision.findFirst({
-				where: eq(finalDecision.studentId, id),
-			}),
-			db.query.courseGrades.findMany({
-				where: eq(courseGrades.studentId, id),
-				with: { accBy: { columns: { fullName: true } } },
-			}),
-			db.query.studentParents.findMany({
-				where: eq(studentParents.studentId, id),
-			}),
-		]);
-
-		const responseData = {
-			student,
-			pmb: pmb ? { ...pmb, paymentPlan: pmbPayment, finance } : null,
-			crm,
-			finance,
-			academic,
-			pa,
-			internship,
-			decision,
-			courseGrades: grades,
-			parents,
-		};
-
-		await cacheSet(cacheKey, responseData, 120);
 
 		return {
 			success: true,
@@ -1236,14 +1337,22 @@ export const coreRoutes = new Elysia()
 	})
 	// GET list of all PA users (for dropdown)
 	.get("/pa-list", async ({ set, user }: any) => {
-		if (!hasRole(user, "superadmin", "pmb", "akademik")) {
+		if (!hasRole(user, "superadmin", "pmb", "akademik", "pa")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
 		const paUsers = await db
 			.select({ id: users.id, fullName: users.fullName })
 			.from(users)
-			.where(eq(users.role, "pa"));
+			.where(
+				or(
+					eq(users.role, "pa"),
+					eq(users.role, "dosen"),
+					sql`${users.roles} @> '["pa"]'::jsonb`,
+					sql`${users.roles} @> '["dosen"]'::jsonb`,
+				)!,
+			)
+			.orderBy(users.fullName);
 		return { success: true, data: paUsers };
 	})
 	// PATCH student status

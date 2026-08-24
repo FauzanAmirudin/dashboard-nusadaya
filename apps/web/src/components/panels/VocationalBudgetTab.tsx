@@ -240,7 +240,7 @@ export function VocationalBudgetTab() {
 			<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
 				<div className="bg-slate-50 border-b border-slate-200 px-5 py-4">
 					<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-						📝 Pengajuan Anggaran Praktik Mingguan
+						Pengajuan Anggaran Praktik Mingguan
 					</h3>
 				</div>
 				<div className="p-5">
@@ -433,7 +433,7 @@ export function VocationalBudgetTab() {
 			<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
 				<div className="bg-slate-50 border-b border-slate-200 px-5 py-4 flex justify-between items-center">
 					<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-						📊 Riwayat Pengajuan Anggaran Praktik
+						Riwayat Pengajuan Anggaran Praktik
 					</h3>
 				</div>
 				<div className="p-5 overflow-x-auto">
@@ -549,7 +549,7 @@ export function VocationalBudgetTab() {
 			<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mt-8">
 				<div className="bg-slate-50 border-b border-slate-200 px-5 py-4 flex justify-between items-center">
 					<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-						📦 Laporan Sisa Bahan Praktik (Storage)
+						Laporan Sisa Bahan Praktik (Storage)
 					</h3>
 				</div>
 				<div className="p-5">
@@ -673,7 +673,7 @@ export function VocationalBudgetTab() {
 
 					{/* Tabel Riwayat Sisa Bahan */}
 					<h4 className="text-sm font-bold text-slate-700 mb-3 uppercase flex items-center">
-						📋 Daftar Inventaris Sisa Bahan
+						Daftar Inventaris Sisa Bahan
 					</h4>
 					<div className="overflow-x-auto border border-slate-200 rounded-md">
 						<table className="w-full text-sm text-left">

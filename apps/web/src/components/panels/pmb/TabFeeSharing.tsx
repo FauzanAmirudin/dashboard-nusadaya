@@ -425,16 +425,48 @@ export function TabFeeSharing({
 										</TableCell>
 										<TableCell>
 											{rec.invoiceFileUrl ? (
-												<div className="flex items-center gap-2">
-													<a
-														href={`${API_URL}/students/${studentId}/pmb/fee-share-recipients/${rec.id}/invoice`}
-														target="_blank"
-														rel="noreferrer"
-														className="inline-flex items-center gap-1 text-xs text-[#0517B0] hover:underline font-semibold"
+												<div className="flex items-center gap-1.5">
+													<Button
+														variant="outline"
+														size="sm"
+														className="h-7 text-xs font-medium text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 gap-1.5 cursor-pointer shadow-2xs"
+														title="Review Dokumen Invoice"
+														onClick={() => {
+															const invoiceUrl = `/students/${studentId}/pmb/fee-share-recipients/${rec.id}/invoice`;
+															const invoiceName = `Invoice - ${rec.namaReferral} (${rec.kategori}).pdf`;
+															window.open(
+																`/dashboard/students/${studentId}/documents/${rec.id}?url=${encodeURIComponent(invoiceUrl)}&name=${encodeURIComponent(invoiceName)}&token=${getToken()}`,
+																"_blank",
+															);
+														}}
 													>
 														<Eye className="w-3.5 h-3.5" />
-														Lihat Invoice
-													</a>
+														<span>Review</span>
+													</Button>
+
+													{canEdit &&
+														rec.statusPencairan !== "sudah_dibayarkan" && (
+															<label
+																className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-amber-600 cursor-pointer border border-dashed border-slate-300 rounded px-2 py-1 bg-slate-50 hover:bg-amber-50/50 transition-colors"
+																title="Ganti Berkas Invoice (PDF)"
+															>
+																{uploadingFeeId === rec.id ? (
+																	<Loader2 className="w-3 h-3 animate-spin" />
+																) : (
+																	<UploadCloud className="w-3 h-3" />
+																)}
+																<span>Ganti</span>
+																<input
+																	type="file"
+																	accept="application/pdf"
+																	className="hidden"
+																	onChange={(e) => {
+																		const file = e.target.files?.[0];
+																		if (file) handleInvoiceUpload(rec.id, file);
+																	}}
+																/>
+															</label>
+														)}
 												</div>
 											) : (
 												canEdit &&
@@ -462,11 +494,11 @@ export function TabFeeSharing({
 										<TableCell>
 											{rec.statusPencairan === "sudah_dibayarkan" ? (
 												<Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
-													🟢 Sudah Dibayarkan
+													Sudah Dibayarkan
 												</Badge>
 											) : (
 												<Badge className="bg-rose-500/10 text-rose-500 border-rose-500/20 text-[10px]">
-													🔴 Belum Dibayarkan
+													Belum Dibayarkan
 												</Badge>
 											)}
 										</TableCell>

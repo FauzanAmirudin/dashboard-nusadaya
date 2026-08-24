@@ -17,7 +17,6 @@ export const backupRoutes = new Elysia()
 		"/backups",
 		async (context) => {
 			const { body, set } = context;
-			// biome-ignore lint/suspicious/noExplicitAny: Elysia type inference workaround
 			const user = (context as any).user;
 
 			if (!user) {
@@ -80,7 +79,6 @@ export const backupRoutes = new Elysia()
 	// GET /backups — daftar semua backup jobs
 	.get("/backups", async (context) => {
 		const { set } = context;
-		// biome-ignore lint/suspicious/noExplicitAny: Elysia type inference workaround
 		const user = (context as any).user;
 
 		if (!user) {
@@ -100,7 +98,6 @@ export const backupRoutes = new Elysia()
 	// GET /backups/:id — status backup dengan progress real-time dari Redis
 	.get("/backups/:id", async (context) => {
 		const { params, set } = context;
-		// biome-ignore lint/suspicious/noExplicitAny: Elysia type inference workaround
 		const user = (context as any).user;
 
 		if (!user) {
@@ -166,7 +163,8 @@ export const backupRoutes = new Elysia()
 		}
 
 		const job = await backupRepository.findJobById(params.id);
-		if (!job || !job.outputPath) {
+		const outputPath = job?.outputPath;
+		if (!job || !outputPath) {
 			set.status = 404;
 			return {
 				success: false,
@@ -175,7 +173,7 @@ export const backupRoutes = new Elysia()
 		}
 
 		const fs = await import("node:fs");
-		if (!fs.existsSync(job.outputPath)) {
+		if (!fs.existsSync(outputPath)) {
 			set.status = 404;
 			return {
 				success: false,
@@ -202,7 +200,7 @@ export const backupRoutes = new Elysia()
 				archive.on("error", (err: any) => reject(err));
 
 				archive.pipe(output);
-				archive.directory(job.outputPath, false);
+				archive.directory(outputPath, false);
 				archive.finalize();
 			});
 

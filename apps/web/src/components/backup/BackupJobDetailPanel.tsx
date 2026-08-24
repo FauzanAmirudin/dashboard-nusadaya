@@ -37,10 +37,10 @@ export function BackupJobDetailPanel({
 
 	return (
 		<div className="fixed inset-0 z-50 flex justify-end">
-			{/* biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop click only */}
-			{/* biome-ignore lint/a11y/noStaticElementInteractions: Backdrop overlay */}
-			<div
-				className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm"
+			<button
+				type="button"
+				aria-label="Tutup panel backdrop"
+				className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm w-full h-full border-none cursor-default"
 				onClick={onClose}
 			/>
 
@@ -101,8 +101,14 @@ export function BackupJobDetailPanel({
 								<p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
 									Tipe Backup
 								</p>
-								<p className="text-sm font-medium text-slate-900 capitalize">
-									{job.type}
+								<p className="text-sm font-medium text-slate-900">
+									{job.type === "cohort"
+										? `Per Angkatan (Angkatan ${job.filters?.cohortId ?? "-"})`
+										: job.type === "student"
+											? `Per Mahasiswa (NIM ${job.filters?.nim ?? "-"})`
+											: job.type === "full"
+												? "Full Backup (Seluruh Sistem & Database)"
+												: job.type}
 								</p>
 							</div>
 
@@ -132,11 +138,36 @@ export function BackupJobDetailPanel({
 
 							<div>
 								<p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-									Filter Digunakan
+									Cakupan / Filter
 								</p>
-								<pre className="text-xs bg-slate-50 p-3 rounded-lg border border-slate-100 overflow-x-auto text-slate-700">
-									{JSON.stringify(job.filters || {}, null, 2)}
-								</pre>
+								<div className="text-xs bg-slate-50 p-3 rounded-lg border border-slate-100 text-slate-700 space-y-1">
+									{job.type === "full" && (
+										<p>Seluruh data database & dokumen fisik sistem</p>
+									)}
+									{job.type === "cohort" && (
+										<p>
+											Nomor Angkatan:{" "}
+											<strong className="font-semibold text-slate-900">
+												Angkatan {job.filters?.cohortId ?? "-"}
+											</strong>
+										</p>
+									)}
+									{job.type === "student" && (
+										<p>
+											NIM Mahasiswa:{" "}
+											<strong className="font-mono font-semibold text-slate-900">
+												{job.filters?.nim ?? "-"}
+											</strong>
+										</p>
+									)}
+									{job.type !== "full" &&
+										job.type !== "cohort" &&
+										job.type !== "student" && (
+											<pre className="font-mono text-xs">
+												{JSON.stringify(job.filters || {}, null, 2)}
+											</pre>
+										)}
+								</div>
 							</div>
 
 							<div className="grid grid-cols-2 gap-4 pt-2">

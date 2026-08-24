@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CheckCircle } from "lucide-react";
+import { Activity, AlertTriangle, BookOpen, CheckCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -91,7 +91,8 @@ export function TabKehadiran({
 			<Card className="border border-slate-200 shadow-sm overflow-hidden">
 				<div className="bg-slate-50 border-b border-slate-200 p-4">
 					<h3 className="font-bold text-slate-800 flex items-center gap-2">
-						<span className="text-xl">📊</span> Ringkasan Kehadiran Akademik
+						<Activity className="w-5 h-5 text-[#0517B0]" /> Ringkasan Kehadiran
+						Akademik
 					</h3>
 				</div>
 				<CardContent className="p-6">
@@ -152,7 +153,8 @@ export function TabKehadiran({
 					{kehadiranState?.academic?.attendanceAlphaNote && (
 						<div className="mt-4 p-4 bg-amber-50 border border-amber-100 rounded-lg">
 							<p className="text-sm font-semibold text-amber-800 mb-1 flex items-center gap-2">
-								<span>⚠️</span> Catatan Ketidakhadiran (Alpha):
+								<AlertTriangle className="w-4 h-4 text-amber-600 inline" />{" "}
+								Catatan Ketidakhadiran (Alpha):
 							</p>
 							<p className="text-sm text-amber-700">
 								{kehadiranState.academic.attendanceAlphaNote}
@@ -166,8 +168,8 @@ export function TabKehadiran({
 			<Card className="border border-slate-200 shadow-sm overflow-hidden">
 				<div className="bg-slate-50 border-b border-slate-200 p-4">
 					<h3 className="font-bold text-slate-800 flex items-center gap-2">
-						<span className="text-xl">📚</span> Kehadiran Per Mata Kuliah (Dari
-						Dosen)
+						<BookOpen className="w-5 h-5 text-[#0517B0]" /> Kehadiran Per Mata
+						Kuliah (Dari Dosen)
 					</h3>
 				</div>
 				<CardContent className="p-0">
@@ -298,7 +300,7 @@ export function TabKehadiran({
 										className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold px-8 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 										disabled={!isEligible || isLoading}
 									>
-										✔ Memenuhi Minimal Jumlah Kehadiran
+										Memenuhi Minimal Jumlah Kehadiran
 									</AlertDialogTrigger>
 									<AlertDialogContent>
 										<AlertDialogTitle>
@@ -307,7 +309,7 @@ export function TabKehadiran({
 										<AlertDialogDescription>
 											Anda akan menyetujui kehadiran mahasiswa ini. Aksi ini
 											akan menandai checklist <b>Kehadiran Praktik</b> sebagai
-											selesai (✅) di panel CRM.
+											selesai di panel CRM.
 										</AlertDialogDescription>
 										<div className="flex justify-end gap-3 mt-4">
 											<AlertDialogCancel>Batal</AlertDialogCancel>

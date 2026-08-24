@@ -30,6 +30,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -40,6 +41,7 @@ import {
 } from "@/components/ui/tooltip";
 import { api } from "@/lib/eden";
 import { hasRole, useAuthStore } from "@/store";
+import { formatDeviceDateTime } from "@/utils/format";
 import { TabDanaTalangan } from "./magang/TabDanaTalangan";
 import { TabDokumen } from "./magang/TabDokumen";
 import { TabPraPaspor } from "./magang/TabPraPaspor";
@@ -131,12 +133,18 @@ interface InternshipPanelProps {
 
 export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 	const { user } = useAuthStore();
-	const isMagang = hasRole(user, "magang", "akademik");
+	const isMagang = hasRole(
+		user,
+		"magang",
+		"internship",
+		"akademik",
+		"superadmin",
+	);
 	const isSuperadmin = hasRole(user, "superadmin");
 	const [data, setData] = useState<InternshipData | null>(null);
 
-	const canEdit = isMagang || isSuperadmin;
-	const canEditPostInternship = isMagang || isSuperadmin;
+	const canEdit = isMagang;
+	const canEditPostInternship = isMagang;
 
 	const [isSaving, setIsSaving] = useState(false);
 	const [loadingItem, setLoadingItem] = useState<string | null>(null);
@@ -388,18 +396,12 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 						</div>
 
 						<div className="flex items-center gap-2 shrink-0">
-							<Badge
-								variant="outline"
-								className={`text-xs font-bold px-3 py-1 ${
-									progressPercent === 100
-										? "bg-emerald-50 text-emerald-700 border-emerald-200"
-										: progressPercent >= 50
-											? "bg-blue-50 text-[#0517B0] border-blue-200"
-											: "bg-slate-50 text-slate-600 border-slate-200"
-								}`}
-							>
-								{validatedCount}/{totalCount} Checklist ({progressPercent}%)
-							</Badge>
+							<PanelStatusBadge
+								isAcc={data?.isAcc}
+								completed={validatedCount}
+								total={totalCount}
+								size="lg"
+							/>
 						</div>
 					</div>
 
@@ -573,15 +575,7 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 												<strong className="text-slate-800">
 													{data.accBy?.fullName || "Tim Magang"}
 												</strong>{" "}
-												pada{" "}
-												{new Date(data.accAt!).toLocaleDateString("id-ID", {
-													day: "numeric",
-													month: "long",
-													year: "numeric",
-													hour: "2-digit",
-													minute: "2-digit",
-												})}{" "}
-												WIB
+												pada {formatDeviceDateTime(data.accAt)}
 											</p>
 										</>
 									) : (
@@ -639,43 +633,59 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 								)}
 
 								{isMagang && !data?.isAcc && (
-									<AlertDialog>
-										<AlertDialogTrigger
-											render={
-												<Button
-													size="sm"
-													disabled={isSaving}
-													className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs font-semibold px-4"
-												>
-													{isSaving ? (
-														<Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-													) : (
-														<CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-													)}
-													Berikan ACC Magang
-												</Button>
-											}
-										/>
-										<AlertDialogContent className="bg-white border-slate-200">
-											<AlertDialogTitle>
-												Konfirmasi Persetujuan ACC Magang
-											</AlertDialogTitle>
-											<AlertDialogDescription className="text-slate-600">
-												Apakah Anda yakin ingin memberikan status ACC Magang
-												untuk mahasiswa ini? Tindakan ini akan tercatat dalam
-												log audit sistem.
-											</AlertDialogDescription>
-											<div className="flex justify-end gap-3 mt-4">
-												<AlertDialogCancel>Batal</AlertDialogCancel>
-												<AlertDialogAction
-													onClick={handleAcc}
-													className="bg-[#0517B0] hover:bg-blue-800 text-white"
-												>
-													Ya, Berikan ACC
-												</AlertDialogAction>
-											</div>
-										</AlertDialogContent>
-									</AlertDialog>
+									<Tooltip>
+										<TooltipTrigger render={<span className="inline-block" />}>
+											<span>
+												<AlertDialog>
+													<AlertDialogTrigger
+														render={
+															<Button
+																size="sm"
+																disabled={
+																	isSaving || validatedCount < totalCount
+																}
+																className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs font-semibold px-4 disabled:opacity-50 disabled:cursor-not-allowed"
+															>
+																{isSaving ? (
+																	<Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+																) : (
+																	<CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+																)}
+																Berikan ACC Magang
+															</Button>
+														}
+													/>
+													<AlertDialogContent className="bg-white border-slate-200">
+														<AlertDialogTitle>
+															Konfirmasi Persetujuan ACC Magang
+														</AlertDialogTitle>
+														<AlertDialogDescription className="text-slate-600">
+															Apakah Anda yakin ingin memberikan status ACC
+															Magang untuk mahasiswa ini? Tindakan ini akan
+															tercatat dalam log audit sistem.
+														</AlertDialogDescription>
+														<div className="flex justify-end gap-3 mt-4">
+															<AlertDialogCancel>Batal</AlertDialogCancel>
+															<AlertDialogAction
+																onClick={handleAcc}
+																className="bg-[#0517B0] hover:bg-blue-800 text-white"
+															>
+																Ya, Berikan ACC
+															</AlertDialogAction>
+														</div>
+													</AlertDialogContent>
+												</AlertDialog>
+											</span>
+										</TooltipTrigger>
+										{validatedCount < totalCount && (
+											<TooltipContent>
+												<p className="text-xs">
+													Selesaikan {totalCount - validatedCount} item
+													checklist terlebih dahulu
+												</p>
+											</TooltipContent>
+										)}
+									</Tooltip>
 								)}
 							</div>
 						</div>

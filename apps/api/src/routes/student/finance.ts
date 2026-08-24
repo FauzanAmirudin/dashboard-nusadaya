@@ -176,9 +176,11 @@ export const financeRoutes = new Elysia()
 			)
 				checked++;
 
-			let status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
-			if (checked === 4) status = "AMAN";
-			else if (checked >= 2) status = "PERLU_PERHATIAN";
+			let status: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
+				"BUTUH_PERHATIAN";
+			if (merged.isAcc) status = "ACC";
+			else if (checked === 4) status = "AMAN";
+			else if ((checked / 4) * 100 > 30) status = "PROSES";
 
 			cleanUpdates.status = status;
 
@@ -244,6 +246,7 @@ export const financeRoutes = new Elysia()
 				isAcc: true,
 				accAt: new Date(),
 				accBy: user.id,
+				status: "ACC",
 			})
 			.where(eq(financeData.studentId, id));
 
@@ -264,12 +267,47 @@ export const financeRoutes = new Elysia()
 		}
 		const id = Number(params.id);
 
+		const currentFinance = await db.query.financeData.findFirst({
+			where: eq(financeData.studentId, id),
+		});
+		let checked = 0;
+		if (currentFinance) {
+			const isTalangan = currentFinance.metodePembayaran === "dana_talangan";
+			if (currentFinance.registrasiStatus) checked++;
+			if (
+				isTalangan
+					? currentFinance.t1SemesterStatus ||
+						currentFinance.mandiriSemesterStatus
+					: currentFinance.mandiriSemesterStatus
+			)
+				checked++;
+			if (
+				isTalangan
+					? currentFinance.t1InterviewStatus
+					: currentFinance.mandiriInterviewStatus
+			)
+				checked++;
+			if (
+				isTalangan
+					? currentFinance.t2KeberangkatanStatus
+					: currentFinance.mandiriKeberangkatanStatus
+			)
+				checked++;
+		}
+		const fallbackStatus =
+			checked === 4
+				? "AMAN"
+				: (checked / 4) * 100 > 30
+					? "PROSES"
+					: "BUTUH_PERHATIAN";
+
 		await db
 			.update(financeData)
 			.set({
 				isAcc: false,
 				accAt: null,
 				accBy: null,
+				status: fallbackStatus,
 			})
 			.where(eq(financeData.studentId, id));
 

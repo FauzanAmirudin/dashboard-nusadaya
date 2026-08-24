@@ -1,6 +1,7 @@
 "use client";
 
 import {
+	Archive,
 	CheckCircle,
 	CheckCircle2,
 	CheckSquare,
@@ -16,6 +17,7 @@ import {
 	Search,
 	ShieldAlert,
 	ShieldCheck,
+	User,
 	UserPlus,
 	Users,
 	XCircle,
@@ -27,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -52,8 +55,10 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { api } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
-import { hasRole } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
+import { calculateProgressStatus, normalizeStatus } from "@/utils/status";
 import { FormMahasiswaModule } from "./pmb/FormMahasiswaModule";
 
 function formatWhatsAppUrl(phone: string | null | undefined) {
@@ -108,17 +113,18 @@ export function PmbDashboard({
 		);
 	}, [data, selectedCohort]);
 
-	// KPI Metrics based on cohortData
+	// KPI Metrics based on cohortData using 4 standardized categories
 	const totalStudents = cohortData.length;
 	const countAcc = cohortData.filter((s: any) => s.pmb?.isAcc).length;
 	const countAman = cohortData.filter(
-		(s: any) => s.pmb?.status === "AMAN",
+		(s: any) => normalizeStatus(s.pmb?.status, s.pmb?.isAcc) === "AMAN",
+	).length;
+	const countProses = cohortData.filter(
+		(s: any) => normalizeStatus(s.pmb?.status, s.pmb?.isAcc) === "PROSES",
 	).length;
 	const countPerhatian = cohortData.filter(
-		(s: any) => s.pmb?.status === "PERLU_PERHATIAN" || !s.pmb?.status,
-	).length;
-	const countTidakAman = cohortData.filter(
-		(s: any) => s.pmb?.status === "TIDAK_AMAN",
+		(s: any) =>
+			normalizeStatus(s.pmb?.status, s.pmb?.isAcc) === "BUTUH_PERHATIAN",
 	).length;
 
 	const getPmbChecklist = (pmb: any) => {
@@ -212,14 +218,13 @@ export function PmbDashboard({
 				(s.student?.destinationCountry || "").toLowerCase().includes(q) ||
 				(s.student?.phone || "").toLowerCase().includes(q);
 
-			const pmbStatus = s.pmb?.status || "PERLU_PERHATIAN";
+			const pmbStatus = normalizeStatus(s.pmb?.status, s.pmb?.isAcc);
 			let matchStatus = true;
+			if (selectedStatus === "acc") matchStatus = pmbStatus === "ACC";
 			if (selectedStatus === "aman") matchStatus = pmbStatus === "AMAN";
-			if (selectedStatus === "perhatian")
-				matchStatus = pmbStatus === "PERLU_PERHATIAN";
-			if (selectedStatus === "tidak_aman")
-				matchStatus = pmbStatus === "TIDAK_AMAN";
-			if (selectedStatus === "acc") matchStatus = Boolean(s.pmb?.isAcc);
+			if (selectedStatus === "proses") matchStatus = pmbStatus === "PROSES";
+			if (selectedStatus === "butuh_perhatian")
+				matchStatus = pmbStatus === "BUTUH_PERHATIAN";
 
 			return matchSearch && matchStatus;
 		});
@@ -254,13 +259,13 @@ export function PmbDashboard({
 				"Berkas Lengkap": s.pmb?.documentsComplete ? "Sudah" : "Belum",
 				"Data Terinput": s.pmb?.dataInputted ? "Sudah" : "Belum",
 				"Follow Up Awal": s.pmb?.initialFollowUp ? "Sudah" : "Belum",
-				"Status Checklist PMB":
-					s.pmb?.status === "AMAN"
+				"Status PMB": s.pmb?.isAcc
+					? "Sudah ACC"
+					: s.pmb?.status === "AMAN"
 						? "Aman"
-						: s.pmb?.status === "TIDAK_AMAN"
-							? "Tidak Aman"
-							: "Perlu Perhatian",
-				"Status ACC PMB": s.pmb?.isAcc ? "Sudah ACC" : "Belum",
+						: s.pmb?.status === "PROSES"
+							? "Berproses"
+							: "Butuh Perhatian",
 			};
 		});
 		exportToCSV(
@@ -291,45 +296,28 @@ export function PmbDashboard({
 				</div>
 
 				<div className="flex flex-wrap items-center gap-2.5">
-					<Select
-						value={selectedCohort}
-						onValueChange={(val) => setSelectedCohort(val || "all")}
-					>
-						<SelectTrigger className="w-[180px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
-							<SelectValue placeholder="Filter Angkatan">
-								{selectedCohort === "all"
-									? "Semua Angkatan"
-									: `Angkatan ${selectedCohort}`}
-							</SelectValue>
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">Semua Angkatan</SelectItem>
-							{availableCohorts.map((cohort) => {
-								const cNum = Number(cohort);
-								const ayLabel =
-									!Number.isNaN(cNum) && cNum >= 10 && cNum <= 30
-										? ` (${2010 + cNum}/${2011 + cNum})`
-										: "";
-								return (
-									<SelectItem key={cohort} value={cohort}>
-										Angkatan {cohort}
-										{ayLabel}
-									</SelectItem>
-								);
-							})}
-						</SelectContent>
-					</Select>
-
 					{hasRole(user, "pmb") && (
-						<Link href="/dashboard/students/add">
-							<Button
-								size="sm"
-								className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs gap-1.5 h-9 font-bold shadow-sm"
-							>
-								<UserPlus className="w-3.5 h-3.5" />
-								Tambah Mahasiswa
-							</Button>
-						</Link>
+						<>
+							<Link href="/dashboard/students/archive">
+								<Button
+									variant="outline"
+									size="sm"
+									className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9 font-medium"
+								>
+									<Archive className="w-3.5 h-3.5 text-slate-500" />
+									Lihat Arsip
+								</Button>
+							</Link>
+							<Link href="/dashboard/students/add">
+								<Button
+									size="sm"
+									className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs gap-1.5 h-9 font-bold shadow-sm"
+								>
+									<UserPlus className="w-3.5 h-3.5" />
+									Tambah Mahasiswa
+								</Button>
+							</Link>
+						</>
 					)}
 
 					<Button
@@ -383,7 +371,7 @@ export function PmbDashboard({
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								🟢 Status Aman
+								Status Aman
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countAman}
@@ -398,11 +386,9 @@ export function PmbDashboard({
 							<Clock className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								🟡 Berproses
-							</p>
+							<p className="text-slate-500 text-xs font-semibold">Berproses</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countPerhatian}
+								{countProses}
 							</p>
 						</div>
 					</CardContent>
@@ -415,10 +401,10 @@ export function PmbDashboard({
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								⛔ Kendala Berkas
+								Butuh Perhatian
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countTidakAman}
+								{countPerhatian}
 							</p>
 						</div>
 					</CardContent>
@@ -494,28 +480,51 @@ export function PmbDashboard({
 								</div>
 
 								<Select
+									value={selectedCohort}
+									onValueChange={(val) => setSelectedCohort(val || "all")}
+								>
+									<SelectTrigger className="w-[130px] h-9 text-xs bg-white border-slate-200">
+										<SelectValue placeholder="Angkatan">
+											{selectedCohort === "all"
+												? "Semua Angkatan"
+												: `Angkatan ${selectedCohort}`}
+										</SelectValue>
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="all">Semua Angkatan</SelectItem>
+										{availableCohorts.map((cohort) => (
+											<SelectItem key={cohort} value={cohort}>
+												Angkatan {cohort}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+
+								<Select
 									value={selectedStatus}
 									onValueChange={(val) => setSelectedStatus(val || "all")}
 								>
-									<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
-										<SelectValue placeholder="Status PMB">
+									<SelectTrigger className="w-[155px] h-9 text-xs bg-white border-slate-200">
+										<SelectValue placeholder="Status Filter">
 											{selectedStatus === "all"
 												? "Semua Status"
-												: selectedStatus === "aman"
-													? "🟢 Aman"
-													: selectedStatus === "perhatian"
-														? "🟡 Berproses"
-														: selectedStatus === "tidak_aman"
-															? "🔴 Kendala"
-															: "🛡️ Sudah ACC PMB"}
+												: selectedStatus === "acc"
+													? "Sudah ACC"
+													: selectedStatus === "aman"
+														? "Aman"
+														: selectedStatus === "proses"
+															? "Berproses"
+															: "Butuh Perhatian"}
 										</SelectValue>
 									</SelectTrigger>
 									<SelectContent>
 										<SelectItem value="all">Semua Status</SelectItem>
-										<SelectItem value="aman">🟢 Aman</SelectItem>
-										<SelectItem value="perhatian">🟡 Berproses</SelectItem>
-										<SelectItem value="tidak_aman">🔴 Kendala</SelectItem>
-										<SelectItem value="acc">🛡️ Sudah ACC PMB</SelectItem>
+										<SelectItem value="acc">Sudah ACC</SelectItem>
+										<SelectItem value="aman">Aman</SelectItem>
+										<SelectItem value="proses">Berproses</SelectItem>
+										<SelectItem value="butuh_perhatian">
+											Butuh Perhatian
+										</SelectItem>
 									</SelectContent>
 								</Select>
 							</div>
@@ -544,11 +553,8 @@ export function PmbDashboard({
 											<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
 												Progress (14)
 											</TableHead>
-											<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
+											<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
 												Status PMB
-											</TableHead>
-											<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-24">
-												ACC PMB
 											</TableHead>
 											<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-24">
 												Aksi
@@ -716,51 +722,49 @@ export function PmbDashboard({
 														</TooltipProvider>
 													</TableCell>
 
-													{/* Status PMB */}
+													{/* Status PMB (Sudah termasuk ACC) */}
 													<TableCell className="text-center">
-														{status === "AMAN" ? (
-															<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold">
-																🟢 Aman
-															</Badge>
-														) : status === "PERLU_PERHATIAN" ? (
-															<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs font-semibold">
-																🟡 Berproses
-															</Badge>
-														) : (
-															<Badge className="bg-rose-50 text-rose-700 border-rose-200 text-xs font-semibold">
-																⛔ Kendala
-															</Badge>
-														)}
-													</TableCell>
-
-													{/* ACC PMB */}
-													<TableCell className="text-center">
-														{s.pmb?.isAcc ? (
-															<Badge className="bg-sky-50 text-sky-700 border-sky-200 text-xs font-bold">
-																✓ ACC
-															</Badge>
-														) : (
-															<span className="text-xs text-slate-400 italic">
-																Belum
-															</span>
-														)}
+														<PanelStatusBadge
+															status={s.pmb?.status}
+															isAcc={s.pmb?.isAcc}
+															completed={completed}
+															total={14}
+															size="sm"
+														/>
 													</TableCell>
 
 													{/* Action */}
 													<TableCell className="text-right pr-6">
-														<Button
-															size="sm"
-															variant="outline"
-															onClick={() =>
-																router.push(
-																	`/dashboard/students/${s.student.id}?context=pmb`,
-																)
-															}
-															className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5"
-														>
-															<Eye className="w-3.5 h-3.5" />
-															Periksa
-														</Button>
+														<div className="flex items-center justify-end gap-1.5">
+															<Button
+																size="sm"
+																variant="outline"
+																onClick={() =>
+																	router.push(
+																		`/dashboard/students/${s.student.id}/profile`,
+																	)
+																}
+																className="h-8 text-xs font-semibold text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900 gap-1 px-2.5 shadow-2xs cursor-pointer"
+																title="Lihat & Edit Detail Profil Mahasiswa"
+															>
+																<User className="w-3.5 h-3.5 text-[#0517B0]" />
+																Lihat
+															</Button>
+															<Button
+																size="sm"
+																variant="outline"
+																onClick={() =>
+																	router.push(
+																		`/dashboard/students/${s.student.id}?tab=pmb`,
+																	)
+																}
+																className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5 shadow-2xs cursor-pointer"
+																title="Periksa Berkas & Modul PMB"
+															>
+																<Eye className="w-3.5 h-3.5" />
+																Periksa
+															</Button>
+														</div>
 													</TableCell>
 												</TableRow>
 											);

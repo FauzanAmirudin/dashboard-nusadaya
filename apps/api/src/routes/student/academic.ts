@@ -111,10 +111,11 @@ export const academicRoutes = new Elysia()
 				if (overseasChecklist.suhhanChecked) checked++;
 			}
 
-			let status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
-			if (checked === totalRequired) status = "AMAN";
-			else if (checked >= Math.floor(totalRequired / 2))
-				status = "PERLU_PERHATIAN";
+			let status: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
+				"BUTUH_PERHATIAN";
+			if (merged.isAcc) status = "ACC";
+			else if (checked === totalRequired) status = "AMAN";
+			else if ((checked / totalRequired) * 100 > 30) status = "PROSES";
 
 			const cleanUpdates: Record<string, any> = {
 				...updates,
@@ -161,13 +162,38 @@ export const academicRoutes = new Elysia()
 			return { success: false, message: "Unauthorized" };
 		}
 
-		// Academic ACC allows "warning" bypass, so we just set isAcc to true regardless of check count
+		if (!hasRole(user, "akademik")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		const current = await db.query.academicData.findFirst({
+			where: eq(academicData.studentId, id),
+		});
+
+		if (
+			!current?.pddiktiInput ||
+			!current?.utsPassed ||
+			!current?.uasPassed ||
+			!current?.attitudeIndicator ||
+			!current?.assignmentsCompleted ||
+			!current?.academicCommunication
+		) {
+			set.status = 400;
+			return {
+				success: false,
+				message:
+					"Semua checklist indikator akademik harus selesai sebelum melakukan ACC.",
+			};
+		}
+
 		await db
 			.update(academicData)
 			.set({
 				isAcc: true,
 				accAt: new Date(),
 				accBy: user.id,
+				status: "ACC",
 			})
 			.where(eq(academicData.studentId, id));
 
@@ -182,12 +208,34 @@ export const academicRoutes = new Elysia()
 		}
 		const id = Number(params.id);
 
+		const current = await db.query.academicData.findFirst({
+			where: eq(academicData.studentId, id),
+		});
+		let checked = 0;
+		const totalRequired = 7;
+		if (current) {
+			if (current.pddiktiInput) checked++;
+			if (current.utsPassed) checked++;
+			if (current.uasPassed) checked++;
+			if (current.attitudeIndicator) checked++;
+			if (current.assignmentsCompleted) checked++;
+			if (current.academicCommunication) checked++;
+			if (current.assessmentCompleted) checked++;
+		}
+		const fallbackStatus =
+			checked === totalRequired
+				? "AMAN"
+				: (checked / totalRequired) * 100 > 30
+					? "PROSES"
+					: "BUTUH_PERHATIAN";
+
 		await db
 			.update(academicData)
 			.set({
 				isAcc: false,
 				accAt: null,
 				accBy: null,
+				status: fallbackStatus,
 			})
 			.where(eq(academicData.studentId, id));
 

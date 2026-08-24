@@ -6,6 +6,7 @@ import {
 	ChevronUp,
 	Edit2,
 	Loader2,
+	Lock,
 	Save,
 	X,
 	XCircle,
@@ -175,8 +176,8 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 											{g.courseCode || "MK"}
 										</Badge>
 										{g.isAcc && (
-											<Badge className="bg-slate-200 text-slate-600 hover:bg-slate-200 border-none h-5 px-1.5 text-[10px]">
-												🔒 Terkunci
+											<Badge className="bg-slate-200 text-slate-600 hover:bg-slate-200 border-none h-5 px-1.5 text-[10px] flex items-center gap-1">
+												<Lock className="w-2.5 h-2.5 inline" /> Terkunci
 											</Badge>
 										)}
 									</div>

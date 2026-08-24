@@ -195,9 +195,11 @@ export const crmRoutes = new Elysia()
 				const checkedCount = crmChecks.filter((c) => c === true).length;
 				const totalChecks = 13;
 
-				let status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
-				if (checkedCount === totalChecks) status = "AMAN";
-				else if (checkedCount >= 6) status = "PERLU_PERHATIAN";
+				let status: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
+					"BUTUH_PERHATIAN";
+				if (updated.isAcc) status = "ACC";
+				else if (checkedCount === totalChecks) status = "AMAN";
+				else if ((checkedCount / totalChecks) * 100 > 30) status = "PROSES";
 
 				const extraUpdates: any = { status };
 				if (checkedCount < totalChecks && updated.isAcc) {
@@ -345,6 +347,7 @@ export const crmRoutes = new Elysia()
 				isAcc: true,
 				accAt: new Date(),
 				accBy: user.id,
+				status: "ACC",
 			})
 			.where(eq(crmData.studentId, id));
 
@@ -359,12 +362,50 @@ export const crmRoutes = new Elysia()
 		}
 		const id = Number(params.id);
 
+		const currentCrm = await db.query.crmData.findFirst({
+			where: eq(crmData.studentId, id),
+		});
+		let fallbackStatus: "AMAN" | "PROSES" | "BUTUH_PERHATIAN" = "PROSES";
+		if (currentCrm) {
+			const odsProgressChecks = [false, false, false, false, false];
+			try {
+				if (currentCrm.odsDetails) {
+					let parsed = currentCrm.odsDetails;
+					if (typeof parsed === "string") parsed = JSON.parse(parsed);
+					if (Array.isArray(parsed)) {
+						parsed.forEach((ods: any, index: number) => {
+							if (index < 5 && ods.isDone) odsProgressChecks[index] = true;
+						});
+					}
+				}
+			} catch (e) {}
+			const crmChecks = [
+				currentCrm.isMonitoringParent,
+				currentCrm.isMonitoringIndustry,
+				currentCrm.isVocabComplete,
+				currentCrm.practiceAttendance,
+				currentCrm.isOdsReport,
+				currentCrm.odsDocumentation,
+				currentCrm.isPrammagangReport,
+				currentCrm.isPrammagangDocumentation,
+				...odsProgressChecks,
+			];
+			const count = crmChecks.filter(Boolean).length;
+			fallbackStatus =
+				count === 13
+					? "AMAN"
+					: (count / 13) * 100 > 30
+						? "PROSES"
+						: "BUTUH_PERHATIAN";
+		}
+
 		await db
 			.update(crmData)
 			.set({
 				isAcc: false,
 				accAt: null,
 				accBy: null,
+				status: fallbackStatus,
 			})
 			.where(eq(crmData.studentId, id));
 

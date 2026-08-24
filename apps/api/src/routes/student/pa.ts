@@ -36,6 +36,7 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
 import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 
@@ -132,51 +133,101 @@ export const paRoutes = new Elysia()
 			const user = (context as any).user;
 			const id = Number(params.id);
 
-			if (!hasRole(user, "pa", "akademik")) {
+			if (!hasRole(user, "superadmin", "pmb", "akademik", "pa")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
 
-			const pa = await db.query.paData.findFirst({
-				where: eq(paData.studentId, id),
-			});
-			if (!pa) return { success: false, message: "PA data not found" };
-
-			if (pa.isAcc && !hasRole(user, "superadmin")) {
-				set.status = 403;
-				return { success: false, message: "Cannot edit after ACC" };
+			// 1. Handle Dosen PA assignment to student record
+			if ((body as any).paId !== undefined) {
+				await db
+					.update(students)
+					.set({
+						paId: (body as any).paId ? Number((body as any).paId) : null,
+						updatedAt: new Date(),
+					})
+					.where(eq(students.id, id));
 			}
 
-			await db
-				.update(paData)
-				.set({
-					...(body as any),
+			// 2. Handle PA checklist fields
+			const hasChecklistFields =
+				(body as any).counselingDone !== undefined ||
+				(body as any).mentalStable !== undefined ||
+				(body as any).disciplineGood !== undefined ||
+				(body as any).vocabTarget !== undefined ||
+				(body as any).disciplineNotes !== undefined;
+
+			if (hasChecklistFields) {
+				const pa = await db.query.paData.findFirst({
+					where: eq(paData.studentId, id),
+				});
+				if (!pa) {
+					await db.insert(paData).values({ studentId: id });
+				}
+
+				const currentPa = await db.query.paData.findFirst({
+					where: eq(paData.studentId, id),
+				});
+				if (currentPa?.isAcc && !hasRole(user, "superadmin")) {
+					set.status = 403;
+					return { success: false, message: "Cannot edit after ACC" };
+				}
+
+				const updatePayload: Record<string, unknown> = {
 					updatedAt: new Date(),
-				})
-				.where(eq(paData.studentId, id));
+				};
+				if ((body as any).counselingDone !== undefined)
+					updatePayload.counselingDone = (body as any).counselingDone;
+				if ((body as any).mentalStable !== undefined)
+					updatePayload.mentalStable = (body as any).mentalStable;
+				if ((body as any).disciplineGood !== undefined)
+					updatePayload.disciplineGood = (body as any).disciplineGood;
+				if ((body as any).vocabTarget !== undefined)
+					updatePayload.vocabTarget = (body as any).vocabTarget;
+				if ((body as any).disciplineNotes !== undefined)
+					updatePayload.disciplineNotes = (body as any).disciplineNotes;
 
-			// Update status
-			const updatedPa = await db.query.paData.findFirst({
-				where: eq(paData.studentId, id),
-			});
-			if (updatedPa) {
-				const checks = [
-					updatedPa.counselingDone,
-					updatedPa.mentalStable,
-					updatedPa.disciplineGood,
-				];
-				const completed = checks.filter(Boolean).length;
-				let status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" = "TIDAK_AMAN";
-				if (completed === 3) status = "AMAN";
-				else if (completed > 0) status = "PERLU_PERHATIAN";
+				await db
+					.update(paData)
+					.set(updatePayload)
+					.where(eq(paData.studentId, id));
 
-				await db.update(paData).set({ status }).where(eq(paData.studentId, id));
+				// Update status
+				const updatedPa = await db.query.paData.findFirst({
+					where: eq(paData.studentId, id),
+				});
+				if (updatedPa) {
+					const checks = [
+						updatedPa.counselingDone,
+						updatedPa.mentalStable,
+						updatedPa.disciplineGood,
+					];
+					const completed = checks.filter(Boolean).length;
+					let status: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
+						"BUTUH_PERHATIAN";
+					if (updatedPa.isAcc) status = "ACC";
+					else if (completed === 3) status = "AMAN";
+					else if (completed > 0) status = "PROSES";
+
+					await db
+						.update(paData)
+						.set({ status })
+						.where(eq(paData.studentId, id));
+				}
 			}
 
-			return { success: true };
+			await Promise.all([
+				cacheDel(`cache:student:${id}`),
+				cacheInvalidatePattern("cache:students:*"),
+				cacheInvalidatePattern("cache:mahasiswa:*"),
+				cacheInvalidatePattern("cache:dashboard:*"),
+			]);
+
+			return { success: true, message: "Data PA berhasil diperbarui" };
 		},
 		{
 			body: t.Object({
+				paId: t.Optional(t.Nullable(t.Number())),
 				counselingDone: t.Optional(t.Boolean()),
 				mentalStable: t.Optional(t.Boolean()),
 				disciplineGood: t.Optional(t.Boolean()),
@@ -425,12 +476,24 @@ export const paRoutes = new Elysia()
 			return { success: false, message: "Forbidden" };
 		}
 		const id = Number(params.id);
+		const pa = await db.query.paData.findFirst({
+			where: eq(paData.studentId, id),
+		});
+		if (!pa?.counselingDone || !pa?.mentalStable || !pa?.disciplineGood) {
+			set.status = 400;
+			return {
+				success: false,
+				message:
+					"Semua indikator evaluasi PA (Konseling, Mental Stabil, Disiplin) harus selesai sebelum memberikan ACC.",
+			};
+		}
 		await db
 			.update(paData)
 			.set({
 				isAcc: true,
 				accAt: new Date(),
 				accBy: user.id,
+				status: "ACC",
 				updatedAt: new Date(),
 			})
 			.where(eq(paData.studentId, id));
@@ -442,12 +505,24 @@ export const paRoutes = new Elysia()
 			return { success: false, message: "Forbidden" };
 		}
 		const id = Number(params.id);
+		const pa = await db.query.paData.findFirst({
+			where: eq(paData.studentId, id),
+		});
+		let fallbackStatus: "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
+			"BUTUH_PERHATIAN";
+		if (pa) {
+			const checks = [pa.counselingDone, pa.mentalStable, pa.disciplineGood];
+			const completed = checks.filter(Boolean).length;
+			fallbackStatus =
+				completed === 3 ? "AMAN" : completed > 0 ? "PROSES" : "BUTUH_PERHATIAN";
+		}
 		await db
 			.update(paData)
 			.set({
 				isAcc: false,
 				accAt: null,
 				accBy: null,
+				status: fallbackStatus,
 				updatedAt: new Date(),
 			})
 			.where(eq(paData.studentId, id));

@@ -13,15 +13,18 @@ import {
 	Search,
 	ShieldAlert,
 	ShieldCheck,
+	User,
 	Users,
 	XCircle,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -47,6 +50,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { exportToCSV } from "@/lib/export";
+import { normalizeStatus } from "@/utils/status";
 
 function formatWhatsAppUrl(phone: string | null | undefined) {
 	if (!phone) return null;
@@ -102,13 +106,17 @@ export function AkademikDashboard({
 	const totalStudents = cohortData.length;
 	const countAcc = cohortData.filter((s: any) => s.academic?.isAcc).length;
 	const countAman = cohortData.filter(
-		(s: any) => s.academic?.status === "AMAN",
+		(s: any) =>
+			normalizeStatus(s.academic?.status, s.academic?.isAcc) === "AMAN",
+	).length;
+	const countProses = cohortData.filter(
+		(s: any) =>
+			normalizeStatus(s.academic?.status, s.academic?.isAcc) === "PROSES",
 	).length;
 	const countPerhatian = cohortData.filter(
-		(s: any) => s.academic?.status === "PERLU_PERHATIAN" || !s.academic?.status,
-	).length;
-	const countTidakAman = cohortData.filter(
-		(s: any) => s.academic?.status === "TIDAK_AMAN",
+		(s: any) =>
+			normalizeStatus(s.academic?.status, s.academic?.isAcc) ===
+			"BUTUH_PERHATIAN",
 	).length;
 	const countAttendanceOk = cohortData.filter((s: any) => {
 		const total = s.academic?.attendanceTotal || 0;
@@ -124,16 +132,22 @@ export function AkademikDashboard({
 				!q ||
 				(s.student?.name || "").toLowerCase().includes(q) ||
 				(s.student?.nim || "").toLowerCase().includes(q) ||
-				(s.student?.program || "").toLowerCase().includes(q);
+				(s.student?.program || "").toLowerCase().includes(q) ||
+				(s.student?.subProgram || "").toLowerCase().includes(q) ||
+				(s.student?.destinationCountry || "").toLowerCase().includes(q) ||
+				(s.student?.phone || "").toLowerCase().includes(q);
 
-			const academicStatus = s.academic?.status || "PERLU_PERHATIAN";
+			const academicStatus = normalizeStatus(
+				s.academic?.status,
+				s.academic?.isAcc,
+			);
 			let matchStatus = true;
+			if (selectedStatus === "acc") matchStatus = academicStatus === "ACC";
 			if (selectedStatus === "aman") matchStatus = academicStatus === "AMAN";
-			if (selectedStatus === "perhatian")
-				matchStatus = academicStatus === "PERLU_PERHATIAN";
-			if (selectedStatus === "tidak_aman")
-				matchStatus = academicStatus === "TIDAK_AMAN";
-			if (selectedStatus === "acc") matchStatus = Boolean(s.academic?.isAcc);
+			if (selectedStatus === "proses")
+				matchStatus = academicStatus === "PROSES";
+			if (selectedStatus === "butuh_perhatian")
+				matchStatus = academicStatus === "BUTUH_PERHATIAN";
 
 			return matchSearch && matchStatus;
 		});
@@ -148,31 +162,6 @@ export function AkademikDashboard({
 		const start = (currentPage - 1) * pageSize;
 		return filteredData.slice(start, start + pageSize);
 	}, [filteredData, currentPage]);
-
-	const handleExport = () => {
-		const exportData = filteredData.map((s: any) => ({
-			NIM: s.student?.nim || "-",
-			"Nama Mahasiswa": s.student?.name || "-",
-			Angkatan: s.student?.cohort || "-",
-			Program: s.student?.program || "-",
-			"Input PDDIKTI": s.academic?.pddiktiInput ? "Sudah" : "Belum",
-			"Lulus UTS": s.academic?.utsPassed ? "Ya" : "Tidak",
-			"Lulus UAS": s.academic?.uasPassed ? "Ya" : "Tidak",
-			"Tugas Selesai": s.academic?.assignmentsCompleted ? "Ya" : "Tidak",
-			"Indikator Sikap": s.academic?.attitudeIndicator || "-",
-			"Status Akademik":
-				s.academic?.status === "AMAN"
-					? "Aman"
-					: s.academic?.status === "TIDAK_AMAN"
-						? "Tidak Aman"
-						: "Perlu Perhatian",
-			"Status ACC Akademik": s.academic?.isAcc ? "Sudah ACC" : "Belum",
-		}));
-		exportToCSV(
-			exportData,
-			`Data_Akademik_${new Date().toISOString().split("T")[0]}`,
-		);
-	};
 
 	const getAcademicChecklist = (s: any) => {
 		const totalKehadiran = s.academic?.attendanceTotal || 0;
@@ -209,6 +198,41 @@ export function AkademikDashboard({
 		};
 	};
 
+	const handleExport = () => {
+		const exportData = filteredData.map((s: any) => {
+			const checklist = getAcademicChecklist(s);
+			return {
+				NIM: s.student?.nim || "-",
+				"Nama Mahasiswa": s.student?.name || "-",
+				Angkatan: s.student?.cohort ? `Angkatan ${s.student.cohort}` : "-",
+				"Tahun Ajaran": s.student?.academicYear || s.student?.period || "-",
+				Peminatan:
+					s.student?.subProgram ||
+					s.student?.destinationCountry ||
+					s.student?.program ||
+					"-",
+				"No. WhatsApp": s.student?.phone || "-",
+				"Progress Checklist": `${checklist.completed}/7 Item (${Math.round((checklist.completed / 7) * 100)}%)`,
+				"Input PDDIKTI": s.academic?.pddiktiInput ? "Sudah" : "Belum",
+				"Lulus UTS": s.academic?.utsPassed ? "Ya" : "Tidak",
+				"Lulus UAS": s.academic?.uasPassed ? "Ya" : "Tidak",
+				"Tugas Selesai": s.academic?.assignmentsCompleted ? "Ya" : "Tidak",
+				"Indikator Sikap": s.academic?.attitudeIndicator || "-",
+				"Status Akademik": s.academic?.isAcc
+					? "Sudah ACC"
+					: s.academic?.status === "AMAN"
+						? "Aman"
+						: s.academic?.status === "PROSES"
+							? "Berproses"
+							: "Butuh Perhatian",
+			};
+		});
+		exportToCSV(
+			exportData,
+			`Data_Akademik_${new Date().toISOString().split("T")[0]}`,
+		);
+	};
+
 	return (
 		<div className="space-y-6 pb-12">
 			{/* Top Header */}
@@ -231,27 +255,6 @@ export function AkademikDashboard({
 				</div>
 
 				<div className="flex flex-wrap items-center gap-2.5">
-					<Select
-						value={selectedCohort}
-						onValueChange={(val) => setSelectedCohort(val || "all")}
-					>
-						<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
-							<SelectValue placeholder="Filter Angkatan">
-								{selectedCohort === "all"
-									? "Semua Angkatan"
-									: `Angkatan ${selectedCohort}`}
-							</SelectValue>
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">Semua Angkatan</SelectItem>
-							{availableCohorts.map((cohort) => (
-								<SelectItem key={cohort} value={cohort}>
-									Angkatan {cohort}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-
 					<Button
 						variant="outline"
 						size="sm"
@@ -282,14 +285,14 @@ export function AkademikDashboard({
 					</CardContent>
 				</Card>
 
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-amber-600">
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-sky-500">
 					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-amber-50 text-amber-600 mt-0.5">
+						<div className="p-2 rounded-lg bg-sky-50 text-sky-600 mt-0.5">
 							<ShieldCheck className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-amber-700 text-xs font-bold">ACC Akademik</p>
-							<p className="text-2xl font-black text-amber-900 mt-0.5">
+							<p className="text-sky-700 text-xs font-bold">ACC Akademik</p>
+							<p className="text-2xl font-black text-sky-900 mt-0.5">
 								{countAcc}
 							</p>
 						</div>
@@ -303,7 +306,7 @@ export function AkademikDashboard({
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								🟢 Status Aman
+								Status Aman
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countAman}
@@ -318,11 +321,9 @@ export function AkademikDashboard({
 							<Clock className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								🟡 Berproses
-							</p>
+							<p className="text-slate-500 text-xs font-semibold">Berproses</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countPerhatian}
+								{countProses}
 							</p>
 						</div>
 					</CardContent>
@@ -335,10 +336,10 @@ export function AkademikDashboard({
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								⛔ Kendala Nilai/Absen
+								Butuh Perhatian
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countTidakAman}
+								{countPerhatian}
 							</p>
 						</div>
 					</CardContent>
@@ -377,10 +378,10 @@ export function AkademikDashboard({
 
 					{/* Search & Filter */}
 					<div className="flex flex-wrap items-center gap-2.5">
-						<div className="relative w-full sm:w-60">
+						<div className="relative w-full sm:w-64">
 							<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
 							<Input
-								placeholder="Cari NIM, Nama, Program..."
+								placeholder="Cari Nama, NIM, Peminatan, WA..."
 								className="pl-9 h-9 text-xs bg-white border-slate-200"
 								value={searchQuery !== undefined ? searchQuery : localSearch}
 								onChange={(e) => {
@@ -391,28 +392,49 @@ export function AkademikDashboard({
 						</div>
 
 						<Select
+							value={selectedCohort}
+							onValueChange={(val) => setSelectedCohort(val || "all")}
+						>
+							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Semua Angkatan">
+									{selectedCohort === "all"
+										? "Semua Angkatan"
+										: `Angkatan ${selectedCohort}`}
+								</SelectValue>
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">Semua Angkatan</SelectItem>
+								{availableCohorts.map((cohort) => (
+									<SelectItem key={cohort} value={cohort}>
+										Angkatan {cohort}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+
+						<Select
 							value={selectedStatus}
 							onValueChange={(val) => setSelectedStatus(val || "all")}
 						>
-							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
-								<SelectValue placeholder="Status Akademik">
+							<SelectTrigger className="w-[155px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Status Filter">
 									{selectedStatus === "all"
 										? "Semua Status"
-										: selectedStatus === "aman"
-											? "🟢 Aman"
-											: selectedStatus === "perhatian"
-												? "🟡 Berproses"
-												: selectedStatus === "tidak_aman"
-													? "🔴 Kendala"
-													: "🛡️ Sudah ACC Akademik"}
+										: selectedStatus === "acc"
+											? "Sudah ACC"
+											: selectedStatus === "aman"
+												? "Aman"
+												: selectedStatus === "proses"
+													? "Berproses"
+													: "Butuh Perhatian"}
 								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Status</SelectItem>
-								<SelectItem value="aman">🟢 Aman</SelectItem>
-								<SelectItem value="perhatian">🟡 Berproses</SelectItem>
-								<SelectItem value="tidak_aman">🔴 Kendala</SelectItem>
-								<SelectItem value="acc">🛡️ Sudah ACC Akademik</SelectItem>
+								<SelectItem value="acc">Sudah ACC</SelectItem>
+								<SelectItem value="aman">Aman</SelectItem>
+								<SelectItem value="proses">Berproses</SelectItem>
+								<SelectItem value="butuh_perhatian">Butuh Perhatian</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
@@ -423,7 +445,7 @@ export function AkademikDashboard({
 						<Table>
 							<TableHeader className="bg-slate-50 sticky top-0 z-10">
 								<TableRow className="border-slate-200">
-									<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[180px]">
 										Nama Mahasiswa & NIM
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
@@ -439,7 +461,10 @@ export function AkademikDashboard({
 										No. WhatsApp
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
-										Progress Akademik (7)
+										Progress (7)
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
+										Status Akademik
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-24">
 										Aksi
@@ -448,9 +473,8 @@ export function AkademikDashboard({
 							</TableHeader>
 							<TableBody>
 								{paginatedData.map((s: any) => {
-									const { items, completed, total, isDone, attendancePct } =
+									const { items, completed, total, isDone } =
 										getAcademicChecklist(s);
-									const status = s.academic?.status || "PERLU_PERHATIAN";
 									const waUrl = formatWhatsAppUrl(s.student?.phone);
 
 									return (
@@ -458,6 +482,7 @@ export function AkademikDashboard({
 											key={s.student.id}
 											className="border-slate-100 hover:bg-blue-50/40 transition-colors"
 										>
+											{/* Nama & NIM */}
 											<TableCell>
 												<div className="font-bold text-slate-900 text-sm">
 													{s.student.name}
@@ -466,9 +491,15 @@ export function AkademikDashboard({
 													<span className="font-mono text-xs font-semibold text-slate-500">
 														{s.student.nim || "Belum ada NIM"}
 													</span>
+													{s.student.nickname && (
+														<span className="text-[11px] text-slate-400">
+															({s.student.nickname})
+														</span>
+													)}
 												</div>
 											</TableCell>
 
+											{/* Angkatan */}
 											<TableCell className="text-center">
 												<Badge
 													variant="outline"
@@ -480,6 +511,7 @@ export function AkademikDashboard({
 												</Badge>
 											</TableCell>
 
+											{/* Tahun Ajaran */}
 											<TableCell className="text-center font-medium text-xs text-slate-700">
 												{s.student.academicYear ||
 													(s.student.cohort &&
@@ -490,6 +522,7 @@ export function AkademikDashboard({
 															))}
 											</TableCell>
 
+											{/* Peminatan with Country Flag */}
 											<TableCell>
 												<PeminatanBadge
 													subProgram={s.student.subProgram}
@@ -498,6 +531,7 @@ export function AkademikDashboard({
 												/>
 											</TableCell>
 
+											{/* No. WhatsApp */}
 											<TableCell>
 												{s.student?.phone ? (
 													waUrl ? (
@@ -550,7 +584,7 @@ export function AkademikDashboard({
 																		className={`h-full rounded-full transition-all duration-300 ${
 																			isDone
 																				? "bg-emerald-500"
-																				: completed >= 4
+																				: completed >= 3
 																					? "bg-blue-500"
 																					: "bg-amber-500"
 																		}`}
@@ -564,7 +598,7 @@ export function AkademikDashboard({
 														<TooltipContent className="w-64 p-3.5 bg-slate-950 text-white rounded-xl shadow-2xl border border-slate-800 text-xs flex flex-col space-y-2 z-50">
 															<div className="flex items-center justify-between border-b border-slate-800 pb-1.5 w-full">
 																<span className="font-bold text-slate-100 text-xs">
-																	Indikator Akademik:
+																	Indikator Akademik (7):
 																</span>
 																<span className="text-[11px] font-mono text-emerald-400 font-bold">
 																	{completed}/{total} Selesai
@@ -576,7 +610,7 @@ export function AkademikDashboard({
 																		key={it.name}
 																		className="flex items-center justify-between text-[11px] w-full"
 																	>
-																		<span className="text-slate-300 font-medium">
+																		<span className="text-slate-300 font-medium truncate max-w-[150px]">
 																			{it.name}
 																		</span>
 																		<span
@@ -596,21 +630,45 @@ export function AkademikDashboard({
 												</TooltipProvider>
 											</TableCell>
 
+											{/* Status Akademik */}
+											<TableCell className="text-center">
+												<PanelStatusBadge
+													status={s.academic?.status}
+													isAcc={s.academic?.isAcc}
+													completed={completed}
+													total={total}
+													size="sm"
+												/>
+											</TableCell>
+
 											{/* Action */}
 											<TableCell className="text-right pr-6">
-												<Button
-													size="sm"
-													variant="outline"
-													onClick={() =>
-														router.push(
-															`/dashboard/students/${s.student.id}?context=akademik`,
-														)
-													}
-													className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5"
-												>
-													<Eye className="w-3.5 h-3.5" />
-													Periksa
-												</Button>
+												<div className="flex items-center justify-end gap-1.5">
+													<Link
+														href={`/dashboard/students/${s.student.id}/profile`}
+													>
+														<Button
+															size="sm"
+															variant="outline"
+															className="h-8 text-xs border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 gap-1 font-medium"
+														>
+															<User className="w-3.5 h-3.5 text-slate-500" />
+															Lihat
+														</Button>
+													</Link>
+													<Link
+														href={`/dashboard/students/${s.student.id}?tab=akademik`}
+													>
+														<Button
+															size="sm"
+															variant="outline"
+															className="h-8 text-xs border-blue-200 text-[#0517B0] hover:bg-blue-50 hover:border-blue-300 gap-1 font-bold shadow-2xs"
+														>
+															<Eye className="w-3.5 h-3.5" />
+															Periksa
+														</Button>
+													</Link>
+												</div>
 											</TableCell>
 										</TableRow>
 									);

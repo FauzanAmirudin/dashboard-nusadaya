@@ -1,13 +1,6 @@
 "use client";
 
-import {
-	CheckCircle,
-	CheckCircle2,
-	Clock,
-	FileText,
-	FolderCheck,
-	Loader2,
-} from "lucide-react";
+import { CheckCircle, FileText, FolderCheck, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -53,49 +46,49 @@ const ADDITIONAL_DOCS = [
 		key: "cv",
 		propKey: "docCv",
 		label: "Curriculum Vitae (CV)",
-		desc: "Dokumen CV / Resume format PDF terbaru",
+		desc: "Berkas riwayat hidup resmi mahasiswa dalam format PDF",
 	},
 	{
 		key: "ijazah",
 		propKey: "docIjazah",
-		label: "Ijazah Terakhir",
-		desc: "Scan Ijazah SMA / SMK / Sederajat asli",
+		label: "Ijazah Pendidikan Terakhir",
+		desc: "Scan legalisir Ijazah SMA/SMK/Diploma/S1 asli",
 	},
 	{
 		key: "transkrip",
 		propKey: "docTranskrip",
-		label: "Transkrip Nilai Ijazah",
-		desc: "Scan Transkrip Nilai / SKHUN resmi",
+		label: "Transkrip Nilai / SKL",
+		desc: "Scan Transkrip Nilai atau Surat Keterangan Lulus resmi",
 	},
 	{
 		key: "passport_depan",
 		propKey: "docPassportDepan",
-		label: "Passport (Halaman Depan)",
-		desc: "Scan halaman identitas dan foto paspor",
+		label: "Paspor Halaman Depan (Identitas)",
+		desc: "Halaman identitas paspor berstandar internasional",
 	},
 	{
 		key: "passport_visa",
 		propKey: "docPassportVisa",
-		label: "Passport (Halaman Visa)",
-		desc: "Scan halaman visa atau stempel resmi keberangkatan",
+		label: "Paspor Halaman Visa / Tambahan",
+		desc: "Halaman catatan visa atau lembar pengesahan paspor",
 	},
 	{
 		key: "skbm",
 		propKey: "docSkbm",
-		label: "Surat Keterangan Belum Menikah (SKBM)",
-		desc: "Surat resmi dari kelurahan / desa setempat",
+		label: "Surat Keterangan Bebas Masalah (SKBM / SKCK)",
+		desc: "Surat berkelakuan baik resmi dari kepolisian / instansi berwenang",
 	},
 	{
 		key: "mcu",
 		propKey: "docMcu",
-		label: "Hasil Pre Medical Checkup (MCU)",
-		desc: "Hasil pemeriksaan laboratorium dan rekomendasi dokter",
+		label: "Medical Check Up (MCU)",
+		desc: "Hasil pemeriksaan kesehatan dan bebas penyakit menular",
 	},
 	{
 		key: "sertifikasi_bahasa",
 		propKey: "docSertifikasiBahasa",
-		label: "Sertifikasi Bahasa",
-		desc: "Sertifikat TOEIC, TOCFL, JLPT, atau setara",
+		label: "Sertifikasi Bahasa (TOEIC / JLPT / Topik)",
+		desc: "Sertifikat kompetensi bahasa sesuai program negara tujuan",
 	},
 ];
 
@@ -306,7 +299,7 @@ export function TabChecklist({
 									<div className="flex items-center justify-between mb-1.5">
 										<span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
 											<FileText className="w-3 h-3 text-indigo-600" />
-											Upload Bukti Dokumen {item.label} (PDF/Gambar)
+											Upload Bukti Dokumen {item.label} (PDF)
 										</span>
 									</div>
 									<DocumentUpload
@@ -419,7 +412,7 @@ export function TabChecklist({
 										<div className="flex items-center justify-between mb-1.5">
 											<span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
 												<FileText className="w-3 h-3 text-indigo-600" />
-												Upload Berkas {doc.label} (PDF/Gambar)
+												Upload Berkas {doc.label} (PDF)
 											</span>
 										</div>
 										<DocumentUpload

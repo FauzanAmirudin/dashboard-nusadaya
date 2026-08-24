@@ -1,0 +1,10 @@
+{
+	"compilerOptions": {
+		"baseUrl": ".",
+		"paths": {
+			"@/*": ["./apps/web/src/*"]
+		}
+	},
+	"references": [{ "path": "./apps/web" }, { "path": "./apps/api" }],
+	"files": []
+}

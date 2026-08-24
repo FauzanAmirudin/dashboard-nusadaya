@@ -1,5 +1,12 @@
 "use client";
 
+import {
+	BookOpen,
+	Briefcase,
+	CalendarDays,
+	CheckSquare,
+	Zap,
+} from "lucide-react";
 import { TabMataKuliah } from "@/components/panels/kehadiran/detail/TabMataKuliah";
 import { TabODS } from "@/components/panels/kehadiran/detail/TabODS";
 import { TabPiket } from "@/components/panels/kehadiran/detail/TabPiket";
@@ -20,8 +27,8 @@ export function KehadiranPanel({ studentId }: KehadiranPanelProps) {
 					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 						<div>
 							<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
-								<span className="text-xl">📋</span> Kehadiran — Absensi Sesi &
-								Acara
+								<CalendarDays className="w-5 h-5 text-[#0517B0]" /> Kehadiran —
+								Absensi Sesi & Acara
 							</CardTitle>
 							<p className="text-sm text-slate-500 mt-1">
 								Dikelola oleh: Akademik
@@ -38,25 +45,25 @@ export function KehadiranPanel({ studentId }: KehadiranPanelProps) {
 						value="mata-kuliah"
 						className="data-[state=active]:bg-white data-[state=active]:text-slate-800 data-[state=active]:shadow-sm rounded-md py-2 transition-all flex items-center justify-center gap-2 font-bold"
 					>
-						<span>📚</span> Mata Kuliah
+						<BookOpen className="w-4 h-4" /> Mata Kuliah
 					</TabsTrigger>
 					<TabsTrigger
 						value="piket"
 						className="data-[state=active]:bg-white data-[state=active]:text-slate-800 data-[state=active]:shadow-sm rounded-md py-2 transition-all flex items-center justify-center gap-2 font-bold"
 					>
-						<span>🧹</span> Piket
+						<CheckSquare className="w-4 h-4" /> Piket
 					</TabsTrigger>
 					<TabsTrigger
 						value="ods"
 						className="data-[state=active]:bg-white data-[state=active]:text-slate-800 data-[state=active]:shadow-sm rounded-md py-2 transition-all flex items-center justify-center gap-2 font-bold"
 					>
-						<span>🎪</span> One Day Service
+						<Zap className="w-4 h-4" /> One Day Service
 					</TabsTrigger>
 					<TabsTrigger
 						value="pramagang"
 						className="data-[state=active]:bg-white data-[state=active]:text-slate-800 data-[state=active]:shadow-sm rounded-md py-2 transition-all flex items-center justify-center gap-2 font-bold"
 					>
-						<span>💼</span> Pra Magang
+						<Briefcase className="w-4 h-4" /> Pra Magang
 					</TabsTrigger>
 				</TabsList>
 

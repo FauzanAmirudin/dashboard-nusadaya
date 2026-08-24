@@ -265,12 +265,12 @@ export const internshipRoutes = new Elysia()
 				const completedCount = checks.filter(Boolean).length;
 				const totalCount = checks.length;
 
-				let newStatus: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" =
-					"PERLU_PERHATIAN";
+				let newStatus: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
+					"BUTUH_PERHATIAN";
 
-				if (completedCount === totalCount) newStatus = "AMAN";
-				else if (completedCount <= Math.floor(totalCount / 3))
-					newStatus = "TIDAK_AMAN";
+				if (current.isAcc) newStatus = "ACC";
+				else if (completedCount === totalCount) newStatus = "AMAN";
+				else if ((completedCount / totalCount) * 100 > 30) newStatus = "PROSES";
 
 				await db
 					.update(internshipData)
@@ -385,6 +385,7 @@ export const internshipRoutes = new Elysia()
 				isAcc: true,
 				accAt: new Date(),
 				accBy: user.id,
+				status: "ACC",
 			})
 			.where(eq(internshipData.studentId, id));
 
@@ -400,12 +401,68 @@ export const internshipRoutes = new Elysia()
 			return { success: false, message: "Forbidden" };
 		}
 
+		const current = await db.query.internshipData.findFirst({
+			where: eq(internshipData.studentId, id),
+		});
+		let fallbackStatus: "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
+			"BUTUH_PERHATIAN";
+		if (current) {
+			const pmbDataRow = await db.query.pmbData.findFirst({
+				where: eq(pmbData.studentId, id),
+			});
+			const isGapYear = pmbDataRow?.isGapYear || false;
+			const praPasporChecks = [
+				current.praPasporPasFoto,
+				current.praPasporKtm,
+				current.praPasporKtp,
+				current.praPasporKk,
+				current.praPasporAktaKelahiran,
+				current.praPasporSl21,
+				current.praPasporSkma,
+				current.praPasporRekomendasiDisdik,
+				...(isGapYear ? [current.praPasporGapYear] : []),
+				current.praPasporPddikti,
+				current.praPasporCv,
+			];
+			const dokumenChecks = [
+				current.passportReady,
+				current.interviewReady,
+				current.contractReady,
+				current.loaReady,
+				current.mcuReady,
+				current.visaReady,
+				current.pdtReady,
+				current.dokumentasiReady,
+				current.ticketReady,
+				current.agenReady,
+			];
+			const syaratAkhirChecks = [
+				current.logbookReady,
+				current.laporanAkhirReady,
+				current.videoDokumentasiReady,
+			];
+			const checks = [
+				...praPasporChecks,
+				...dokumenChecks,
+				...syaratAkhirChecks,
+			];
+			const completedCount = checks.filter(Boolean).length;
+			const totalCount = checks.length;
+			fallbackStatus =
+				completedCount === totalCount
+					? "AMAN"
+					: (completedCount / totalCount) * 100 > 30
+						? "PROSES"
+						: "BUTUH_PERHATIAN";
+		}
+
 		await db
 			.update(internshipData)
 			.set({
 				isAcc: false,
 				accAt: null,
 				accBy: null,
+				status: fallbackStatus,
 			})
 			.where(eq(internshipData.studentId, id));
 

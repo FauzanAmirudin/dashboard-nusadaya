@@ -13,15 +13,18 @@ import {
 	Search,
 	ShieldAlert,
 	ShieldCheck,
+	User,
 	Users,
 	XCircle,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -47,6 +50,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { exportToCSV } from "@/lib/export";
+import { normalizeStatus } from "@/utils/status";
 
 function formatWhatsAppUrl(phone: string | null | undefined) {
 	if (!phone) return null;
@@ -98,17 +102,18 @@ export function CrmDashboard({
 		);
 	}, [data, selectedCohort]);
 
-	// KPI Metrics based on cohortData
+	// KPI Metrics based on cohortData using 4 standardized categories
 	const totalStudents = cohortData.length;
 	const countAcc = cohortData.filter((s: any) => s.crm?.isAcc).length;
 	const countAman = cohortData.filter(
-		(s: any) => s.crm?.status === "AMAN",
+		(s: any) => normalizeStatus(s.crm?.status, s.crm?.isAcc) === "AMAN",
+	).length;
+	const countProses = cohortData.filter(
+		(s: any) => normalizeStatus(s.crm?.status, s.crm?.isAcc) === "PROSES",
 	).length;
 	const countPerhatian = cohortData.filter(
-		(s: any) => s.crm?.status === "PERLU_PERHATIAN" || !s.crm?.status,
-	).length;
-	const countTidakAman = cohortData.filter(
-		(s: any) => s.crm?.status === "TIDAK_AMAN",
+		(s: any) =>
+			normalizeStatus(s.crm?.status, s.crm?.isAcc) === "BUTUH_PERHATIAN",
 	).length;
 	const countPracticeOk = cohortData.filter(
 		(s: any) => s.crm?.practiceAttendance || s.crm?.isMonitoringIndustry,
@@ -122,16 +127,18 @@ export function CrmDashboard({
 				!q ||
 				(s.student?.name || "").toLowerCase().includes(q) ||
 				(s.student?.nim || "").toLowerCase().includes(q) ||
-				(s.student?.program || "").toLowerCase().includes(q);
+				(s.student?.program || "").toLowerCase().includes(q) ||
+				(s.student?.subProgram || "").toLowerCase().includes(q) ||
+				(s.student?.destinationCountry || "").toLowerCase().includes(q) ||
+				(s.student?.phone || "").toLowerCase().includes(q);
 
-			const crmStatus = s.crm?.status || "PERLU_PERHATIAN";
+			const crmStatus = normalizeStatus(s.crm?.status, s.crm?.isAcc);
 			let matchStatus = true;
+			if (selectedStatus === "acc") matchStatus = crmStatus === "ACC";
 			if (selectedStatus === "aman") matchStatus = crmStatus === "AMAN";
-			if (selectedStatus === "perhatian")
-				matchStatus = crmStatus === "PERLU_PERHATIAN";
-			if (selectedStatus === "tidak_aman")
-				matchStatus = crmStatus === "TIDAK_AMAN";
-			if (selectedStatus === "acc") matchStatus = Boolean(s.crm?.isAcc);
+			if (selectedStatus === "proses") matchStatus = crmStatus === "PROSES";
+			if (selectedStatus === "butuh_perhatian")
+				matchStatus = crmStatus === "BUTUH_PERHATIAN";
 
 			return matchSearch && matchStatus;
 		});
@@ -146,35 +153,6 @@ export function CrmDashboard({
 		const start = (currentPage - 1) * pageSize;
 		return filteredData.slice(start, start + pageSize);
 	}, [filteredData, currentPage]);
-
-	const handleExport = () => {
-		const exportData = filteredData.map((s: any) => ({
-			NIM: s.student?.nim || "-",
-			"Nama Mahasiswa": s.student?.name || "-",
-			Angkatan: s.student?.cohort || "-",
-			Program: s.student?.program || "-",
-			"Monitoring Ortu": s.crm?.isMonitoringParent ? "Selesai" : "Belum",
-			"Monitoring Industri": s.crm?.isMonitoringIndustry ? "Selesai" : "Belum",
-			"Kendali Vocab": s.crm?.isVocabComplete ? "Selesai" : "Belum",
-			"Surat Izin Belajar": s.crm?.hasStudyPermit ? "Ada" : "Tidak",
-			"Rekap Kehadiran": s.crm?.practiceAttendance ? "Selesai" : "Belum",
-			"Hari Hadir Praktik": s.crm?.practiceDaysPresent || 0,
-			"Total Hari Praktik": s.crm?.practiceDaysTotal || 0,
-			"Laporan ODS": s.crm?.isOdsReport ? "Selesai" : "Belum",
-			"Dokumentasi ODS": s.crm?.odsDocumentation ? "Selesai" : "Belum",
-			"Status CRM":
-				s.crm?.status === "AMAN"
-					? "Aman"
-					: s.crm?.status === "TIDAK_AMAN"
-						? "Tidak Aman"
-						: "Perlu Perhatian",
-			"Status ACC CRM": s.crm?.isAcc ? "Sudah ACC" : "Belum",
-		}));
-		exportToCSV(
-			exportData,
-			`Data_CRM_${new Date().toISOString().split("T")[0]}`,
-		);
-	};
 
 	const getCrmChecklist = (crm: any) => {
 		const items = [
@@ -200,6 +178,44 @@ export function CrmDashboard({
 		};
 	};
 
+	const handleExport = () => {
+		const exportData = filteredData.map((s: any) => {
+			const checklist = getCrmChecklist(s.crm);
+			return {
+				NIM: s.student?.nim || "-",
+				"Nama Mahasiswa": s.student?.name || "-",
+				Angkatan: s.student?.cohort ? `Angkatan ${s.student.cohort}` : "-",
+				"Tahun Ajaran": s.student?.academicYear || s.student?.period || "-",
+				Peminatan:
+					s.student?.subProgram ||
+					s.student?.destinationCountry ||
+					s.student?.program ||
+					"-",
+				"No. WhatsApp": s.student?.phone || "-",
+				"Progress Checklist": `${checklist.completed}/6 Item (${Math.round((checklist.completed / 6) * 100)}%)`,
+				"Monitoring Ortu": s.crm?.isMonitoringParent ? "Selesai" : "Belum",
+				"Monitoring Industri": s.crm?.isMonitoringIndustry
+					? "Selesai"
+					: "Belum",
+				"Kendali Vocab": s.crm?.isVocabComplete ? "Selesai" : "Belum",
+				"Surat Izin Belajar": s.crm?.hasStudyPermit ? "Ada" : "Tidak",
+				"Presensi Praktik": s.crm?.practiceAttendance ? "Selesai" : "Belum",
+				"Dokumentasi ODS": s.crm?.odsDocumentation ? "Selesai" : "Belum",
+				"Status CRM": s.crm?.isAcc
+					? "Sudah ACC"
+					: s.crm?.status === "AMAN"
+						? "Aman"
+						: s.crm?.status === "PROSES"
+							? "Berproses"
+							: "Butuh Perhatian",
+			};
+		});
+		exportToCSV(
+			exportData,
+			`Data_CRM_${new Date().toISOString().split("T")[0]}`,
+		);
+	};
+
 	return (
 		<div className="space-y-6 pb-12">
 			{/* Top Header */}
@@ -222,27 +238,6 @@ export function CrmDashboard({
 				</div>
 
 				<div className="flex flex-wrap items-center gap-2.5">
-					<Select
-						value={selectedCohort}
-						onValueChange={(val) => setSelectedCohort(val || "all")}
-					>
-						<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
-							<SelectValue placeholder="Filter Angkatan">
-								{selectedCohort === "all"
-									? "Semua Angkatan"
-									: `Angkatan ${selectedCohort}`}
-							</SelectValue>
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">Semua Angkatan</SelectItem>
-							{availableCohorts.map((cohort) => (
-								<SelectItem key={cohort} value={cohort}>
-									Angkatan {cohort}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-
 					<Button
 						variant="outline"
 						size="sm"
@@ -273,16 +268,14 @@ export function CrmDashboard({
 					</CardContent>
 				</Card>
 
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-violet-600">
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-sky-500">
 					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-violet-50 text-violet-600 mt-0.5">
+						<div className="p-2 rounded-lg bg-sky-50 text-sky-600 mt-0.5">
 							<ShieldCheck className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-violet-700 text-xs font-bold">
-								ACC Divisi CRM
-							</p>
-							<p className="text-2xl font-black text-violet-900 mt-0.5">
+							<p className="text-sky-700 text-xs font-bold">ACC Divisi CRM</p>
+							<p className="text-2xl font-black text-sky-900 mt-0.5">
 								{countAcc}
 							</p>
 						</div>
@@ -296,7 +289,7 @@ export function CrmDashboard({
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								🟢 Status Aman
+								Status Aman
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{countAman}
@@ -311,11 +304,9 @@ export function CrmDashboard({
 							<Clock className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								🟡 Berproses
-							</p>
+							<p className="text-slate-500 text-xs font-semibold">Berproses</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countPerhatian}
+								{countProses}
 							</p>
 						</div>
 					</CardContent>
@@ -328,10 +319,10 @@ export function CrmDashboard({
 						</div>
 						<div>
 							<p className="text-slate-500 text-xs font-semibold">
-								⛔ Ada Kendala
+								Butuh Perhatian
 							</p>
 							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countTidakAman}
+								{countPerhatian}
 							</p>
 						</div>
 					</CardContent>
@@ -370,10 +361,10 @@ export function CrmDashboard({
 
 					{/* Search & Filter */}
 					<div className="flex flex-wrap items-center gap-2.5">
-						<div className="relative w-full sm:w-60">
+						<div className="relative w-full sm:w-64">
 							<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
 							<Input
-								placeholder="Cari NIM, Nama, Program..."
+								placeholder="Cari Nama, NIM, Peminatan, WA..."
 								className="pl-9 h-9 text-xs bg-white border-slate-200"
 								value={searchQuery !== undefined ? searchQuery : localSearch}
 								onChange={(e) => {
@@ -384,28 +375,49 @@ export function CrmDashboard({
 						</div>
 
 						<Select
+							value={selectedCohort}
+							onValueChange={(val) => setSelectedCohort(val || "all")}
+						>
+							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Semua Angkatan">
+									{selectedCohort === "all"
+										? "Semua Angkatan"
+										: `Angkatan ${selectedCohort}`}
+								</SelectValue>
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">Semua Angkatan</SelectItem>
+								{availableCohorts.map((cohort) => (
+									<SelectItem key={cohort} value={cohort}>
+										Angkatan {cohort}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+
+						<Select
 							value={selectedStatus}
 							onValueChange={(val) => setSelectedStatus(val || "all")}
 						>
-							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
-								<SelectValue placeholder="Status CRM">
+							<SelectTrigger className="w-[155px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Status Filter">
 									{selectedStatus === "all"
 										? "Semua Status"
-										: selectedStatus === "aman"
-											? "🟢 Aman"
-											: selectedStatus === "perhatian"
-												? "🟡 Berproses"
-												: selectedStatus === "tidak_aman"
-													? "🔴 Kendala"
-													: "🛡️ Sudah ACC CRM"}
+										: selectedStatus === "acc"
+											? "Sudah ACC"
+											: selectedStatus === "aman"
+												? "Aman"
+												: selectedStatus === "proses"
+													? "Berproses"
+													: "Butuh Perhatian"}
 								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Status</SelectItem>
-								<SelectItem value="aman">🟢 Aman</SelectItem>
-								<SelectItem value="perhatian">🟡 Berproses</SelectItem>
-								<SelectItem value="tidak_aman">🔴 Kendala</SelectItem>
-								<SelectItem value="acc">🛡️ Sudah ACC CRM</SelectItem>
+								<SelectItem value="acc">Sudah ACC</SelectItem>
+								<SelectItem value="aman">Aman</SelectItem>
+								<SelectItem value="proses">Berproses</SelectItem>
+								<SelectItem value="butuh_perhatian">Butuh Perhatian</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
@@ -416,7 +428,7 @@ export function CrmDashboard({
 						<Table>
 							<TableHeader className="bg-slate-50 sticky top-0 z-10">
 								<TableRow className="border-slate-200">
-									<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[180px]">
 										Nama Mahasiswa & NIM
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
@@ -432,7 +444,10 @@ export function CrmDashboard({
 										No. WhatsApp
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
-										Progress CRM (6)
+										Progress (6)
+									</TableHead>
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
+										Status CRM
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-24">
 										Aksi
@@ -444,7 +459,6 @@ export function CrmDashboard({
 									const { items, completed, total, isDone } = getCrmChecklist(
 										s.crm,
 									);
-									const status = s.crm?.status || "PERLU_PERHATIAN";
 									const waUrl = formatWhatsAppUrl(s.student?.phone);
 
 									return (
@@ -452,6 +466,7 @@ export function CrmDashboard({
 											key={s.student.id}
 											className="border-slate-100 hover:bg-blue-50/40 transition-colors"
 										>
+											{/* Nama & NIM */}
 											<TableCell>
 												<div className="font-bold text-slate-900 text-sm">
 													{s.student.name}
@@ -460,9 +475,15 @@ export function CrmDashboard({
 													<span className="font-mono text-xs font-semibold text-slate-500">
 														{s.student.nim || "Belum ada NIM"}
 													</span>
+													{s.student.nickname && (
+														<span className="text-[11px] text-slate-400">
+															({s.student.nickname})
+														</span>
+													)}
 												</div>
 											</TableCell>
 
+											{/* Angkatan */}
 											<TableCell className="text-center">
 												<Badge
 													variant="outline"
@@ -474,6 +495,7 @@ export function CrmDashboard({
 												</Badge>
 											</TableCell>
 
+											{/* Tahun Ajaran */}
 											<TableCell className="text-center font-medium text-xs text-slate-700">
 												{s.student.academicYear ||
 													(s.student.cohort &&
@@ -484,6 +506,7 @@ export function CrmDashboard({
 															))}
 											</TableCell>
 
+											{/* Peminatan with Country Flag */}
 											<TableCell>
 												<PeminatanBadge
 													subProgram={s.student.subProgram}
@@ -492,6 +515,7 @@ export function CrmDashboard({
 												/>
 											</TableCell>
 
+											{/* No. WhatsApp */}
 											<TableCell>
 												{s.student?.phone ? (
 													waUrl ? (
@@ -527,7 +551,16 @@ export function CrmDashboard({
 															<div className="flex flex-col items-center gap-1">
 																<div className="flex items-center justify-between w-full text-[11px] font-bold text-slate-700 px-1">
 																	<span>
-																		{completed}/{total}
+																		{completed}/{total} Item
+																	</span>
+																	<span
+																		className={
+																			isDone
+																				? "text-emerald-600"
+																				: "text-slate-500"
+																		}
+																	>
+																		{Math.round((completed / total) * 100)}%
 																	</span>
 																</div>
 																<div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
@@ -535,7 +568,7 @@ export function CrmDashboard({
 																		className={`h-full rounded-full transition-all duration-300 ${
 																			isDone
 																				? "bg-emerald-500"
-																				: completed >= 3
+																				: completed >= 2
 																					? "bg-blue-500"
 																					: "bg-amber-500"
 																		}`}
@@ -549,7 +582,7 @@ export function CrmDashboard({
 														<TooltipContent className="w-64 p-3.5 bg-slate-950 text-white rounded-xl shadow-2xl border border-slate-800 text-xs flex flex-col space-y-2 z-50">
 															<div className="flex items-center justify-between border-b border-slate-800 pb-1.5 w-full">
 																<span className="font-bold text-slate-100 text-xs">
-																	Indikator CRM:
+																	Indikator CRM (6):
 																</span>
 																<span className="text-[11px] font-mono text-emerald-400 font-bold">
 																	{completed}/{total} Selesai
@@ -561,7 +594,7 @@ export function CrmDashboard({
 																		key={it.name}
 																		className="flex items-center justify-between text-[11px] w-full"
 																	>
-																		<span className="text-slate-300 font-medium">
+																		<span className="text-slate-300 font-medium truncate max-w-[150px]">
 																			{it.name}
 																		</span>
 																		<span
@@ -581,21 +614,45 @@ export function CrmDashboard({
 												</TooltipProvider>
 											</TableCell>
 
+											{/* Status CRM */}
+											<TableCell className="text-center">
+												<PanelStatusBadge
+													status={s.crm?.status}
+													isAcc={s.crm?.isAcc}
+													completed={completed}
+													total={total}
+													size="sm"
+												/>
+											</TableCell>
+
 											{/* Action */}
 											<TableCell className="text-right pr-6">
-												<Button
-													size="sm"
-													variant="outline"
-													onClick={() =>
-														router.push(
-															`/dashboard/students/${s.student.id}?context=crm`,
-														)
-													}
-													className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5"
-												>
-													<Eye className="w-3.5 h-3.5" />
-													Periksa
-												</Button>
+												<div className="flex items-center justify-end gap-1.5">
+													<Link
+														href={`/dashboard/students/${s.student.id}/profile`}
+													>
+														<Button
+															size="sm"
+															variant="outline"
+															className="h-8 text-xs border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 gap-1 font-medium"
+														>
+															<User className="w-3.5 h-3.5 text-slate-500" />
+															Lihat
+														</Button>
+													</Link>
+													<Link
+														href={`/dashboard/students/${s.student.id}?tab=crm`}
+													>
+														<Button
+															size="sm"
+															variant="outline"
+															className="h-8 text-xs border-blue-200 text-[#0517B0] hover:bg-blue-50 hover:border-blue-300 gap-1 font-bold shadow-2xs"
+														>
+															<Eye className="w-3.5 h-3.5" />
+															Periksa
+														</Button>
+													</Link>
+												</div>
 											</TableCell>
 										</TableRow>
 									);

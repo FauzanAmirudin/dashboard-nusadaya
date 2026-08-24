@@ -79,10 +79,8 @@ export function Navbar({ onToggleSidebar }: NavbarProps) {
 				)}
 			</div>
 
-			{/* Right: Bell + Role Chip + Avatar Dropdown */}
+			{/* Center / Right: Role Chip + Avatar Dropdown */}
 			<div className="flex items-center gap-3">
-				{/* Notification Bell Removed */}
-
 				{/* User Dropdown */}
 				<DropdownMenu>
 					<DropdownMenuTrigger className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100 transition-colors outline-none">

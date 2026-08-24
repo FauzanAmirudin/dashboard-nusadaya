@@ -21,6 +21,7 @@ import {
 	Wallet,
 	X,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -80,7 +81,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 		icon: ClipboardList,
 		label: "Panel PMB",
 		href: "/dashboard/pmb",
-		roles: ["superadmin", "pmb"],
+		roles: ["superadmin"],
 	},
 	{
 		icon: PhoneCall,
@@ -157,7 +158,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 	},
 	{
 		icon: ShieldCheck,
-		label: "Panel Keputusan Final",
+		label: "Finalisasi",
 		href: "/dashboard/evaluator",
 		roles: ["superadmin", "evaluator"],
 	},
@@ -185,7 +186,7 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 	const pathname = usePathname();
 	const router = useRouter();
 	const searchParams = useSearchParams();
-	const context = searchParams.get("context");
+	const context = searchParams.get("tab") || searchParams.get("context");
 	const { user, logout } = useAuthStore();
 	const [mounted, setMounted] = useState(false);
 
@@ -262,22 +263,33 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 			>
 				{/* Header */}
 				<div className="flex items-center justify-between px-4 h-16 border-b border-slate-200 shrink-0">
-					{!collapsed && (
-						<span className="font-bold text-lg text-slate-900 tracking-tight">
-							Nusadaya<span className="font-light text-[#0517B0]">Academy</span>
-						</span>
-					)}
-					{collapsed && (
-						<div className="w-8 h-8 rounded-lg bg-[#0517B0] flex items-center justify-center mx-auto">
-							<span className="font-bold text-white text-sm">N</span>
-						</div>
-					)}
+					<Link
+						href={
+							user?.role === "mahasiswa" ? "/mahasiswa/dashboard" : "/dashboard"
+						}
+						className="flex items-center gap-2.5 hover:opacity-85 transition-opacity group cursor-pointer"
+						title="Menuju ke Halaman Dashboard"
+					>
+						<Image
+							src="/logonusadaya.png"
+							alt="Logo Nusadaya"
+							width={28}
+							height={28}
+							className="object-contain shrink-0 group-hover:scale-105 transition-transform"
+						/>
+						{!collapsed && (
+							<span className="font-bold text-lg text-slate-900 tracking-tight flex items-center">
+								Nusadaya
+								<span className="font-light text-[#0517B0]">Academy</span>
+							</span>
+						)}
+					</Link>
 					{/* Mobile Close Button */}
 					{mobileOpen && !collapsed && (
 						<button
 							type="button"
 							onClick={onClose}
-							className="lg:hidden text-slate-500 hover:text-slate-900"
+							className="lg:hidden text-slate-500 hover:text-slate-900 cursor-pointer"
 						>
 							<X className="h-5 w-5" />
 						</button>
@@ -358,19 +370,35 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 function checkItemActive(
 	href: string | undefined,
 	pathname: string,
-	context: string | null,
+	rawContext: string | null,
 ): boolean {
 	if (!href) return false;
 
-	if (context && pathname.startsWith("/dashboard/students/")) {
+	if (rawContext && pathname.startsWith("/dashboard/students/")) {
+		const context = rawContext.toLowerCase();
 		if (href === "/dashboard/students") {
 			return false;
 		}
-		if (href === `/dashboard/${context}`) {
+		if (
+			href === `/dashboard/${context}` ||
+			((context === "akademik" || context === "academic") &&
+				href === "/dashboard/akademik") ||
+			((context === "finance" || context === "keuangan") &&
+				href === "/dashboard/finance") ||
+			((context === "magang" || context === "internship") &&
+				href === "/dashboard/magang") ||
+			(context === "pmb" && href === "/dashboard/pmb") ||
+			(context === "crm" && href === "/dashboard/crm") ||
+			(context === "pa" && href === "/dashboard/pa") ||
+			(context === "kehadiran" && href === "/dashboard/kehadiran")
+		) {
 			return true;
 		}
 		if (
-			context === "final-decision" &&
+			(context === "final-decision" ||
+				context === "status" ||
+				context === "evaluator" ||
+				context === "finalisasi") &&
 			(href === "/dashboard/evaluator" || href === "/dashboard/finalisasi")
 		) {
 			return true;

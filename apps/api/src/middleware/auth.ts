@@ -51,5 +51,26 @@ export const authSetup = new Elysia({ name: "auth-base" })
 			}
 		}
 
+		// 3. Fallback to token in URL query parameter (for direct browser file opening like PDFs/invoices)
+		try {
+			const url = new URL(request.url);
+			const queryToken = url.searchParams.get("token");
+			if (queryToken) {
+				const profile = await jwt.verify(queryToken);
+				if (profile) {
+					return {
+						user: profile as {
+							id: number;
+							username: string;
+							role: string;
+							roles?: string[];
+						},
+					};
+				}
+			}
+		} catch {
+			// Ignore URL parse error
+		}
+
 		return { user: null };
 	});

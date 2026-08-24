@@ -130,11 +130,11 @@ export function TabDataTambahan({
 		setSelectedStatus(studentData?.studentStatus || "aktif");
 		setNim(studentData?.nim || "");
 		setSelectedPaId(studentData?.paId ? String(studentData.paId) : "");
-	}, [studentData]);
+	}, [studentData?.studentStatus, studentData?.nim, studentData?.paId]);
 
 	useEffect(() => {
 		setRumahJuang(!!pmbData?.rumahJuang);
-	}, [pmbData]);
+	}, [pmbData?.rumahJuang]);
 
 	// Fetch PA list
 	useEffect(() => {
@@ -491,7 +491,7 @@ export function TabDataTambahan({
 							</span>
 							{pmbData?.rumahJuang ? (
 								<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold px-2.5 py-0.5">
-									🏠 Aktif (Peserta)
+									Aktif (Peserta)
 								</Badge>
 							) : (
 								<Badge className="bg-slate-100 text-slate-600 border-slate-200 text-xs font-medium px-2.5 py-0.5">

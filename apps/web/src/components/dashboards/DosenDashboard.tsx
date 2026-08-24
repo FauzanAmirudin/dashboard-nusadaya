@@ -100,89 +100,98 @@ export function DosenDashboard({ user }: DosenDashboardProps) {
 
 	return (
 		<div className="space-y-6 pb-12">
-			{/* Welcome Banner */}
-			<div className="bg-gradient-to-r from-[#0517B0] via-blue-700 to-indigo-700 rounded-2xl p-6 sm:p-8 text-white shadow-sm">
-				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-					<div className="space-y-1.5">
-						<div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-white text-xs font-semibold backdrop-blur-xs">
-							<GraduationCap className="w-3.5 h-3.5" />
-							Panel Dosen Pengajar
+			{/* Top Header */}
+			<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+				<div>
+					<div className="flex items-center gap-3">
+						<div className="p-2.5 bg-blue-50 text-[#0517B0] rounded-lg border border-blue-100">
+							<GraduationCap className="w-6 h-6" />
 						</div>
-						<h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-							Selamat Datang, {user?.fullName || user?.username}!
-						</h1>
-						<p className="text-blue-100 text-xs sm:text-sm max-w-xl">
-							Kelola kelas perkuliahan, isi presensi kehadiran pertemuan, dan
-							pantau rekapitulasi penilaian mahasiswa Anda.
-						</p>
+						<div>
+							<div className="flex items-center gap-2">
+								<h1 className="text-2xl font-bold text-slate-900">
+									Dashboard Dosen Pengajar
+								</h1>
+								<Badge className="bg-blue-50 text-[#0517B0] border-blue-200 text-xs">
+									Dosen
+								</Badge>
+							</div>
+							<p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+								Selamat datang, {user?.fullName || user?.username}! Kelola
+								perkuliahan, presensi, dan rekap penilaian mahasiswa.
+							</p>
+						</div>
 					</div>
-					<div className="flex flex-wrap gap-2.5 shrink-0">
-						<Link href="/dashboard/mata-kuliah">
-							<Button
-								variant="secondary"
-								className="bg-white text-[#0517B0] hover:bg-blue-50 font-bold text-xs sm:text-sm h-10 px-4 shadow-sm"
-							>
-								<BookOpen className="w-4 h-4 mr-2" />
-								Mata Kuliah
-							</Button>
-						</Link>
-						<Link href="/dashboard/mata-kuliah/rekap">
-							<Button
-								variant="outline"
-								className="bg-white/10 text-white border-white/20 hover:bg-white/20 font-bold text-xs sm:text-sm h-10 px-4"
-							>
-								<CheckSquare className="w-4 h-4 mr-2" />
-								Rekap Nilai
-							</Button>
-						</Link>
-					</div>
+				</div>
+
+				<div className="flex flex-wrap items-center gap-2.5">
+					<Link href="/dashboard/mata-kuliah">
+						<Button
+							variant="outline"
+							size="sm"
+							className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9 font-medium"
+						>
+							<BookOpen className="w-3.5 h-3.5" />
+							Mata Kuliah
+						</Button>
+					</Link>
+					<Link href="/dashboard/mata-kuliah/rekap">
+						<Button
+							variant="outline"
+							size="sm"
+							className="border-blue-200 text-[#0517B0] hover:bg-blue-50 text-xs gap-1.5 h-9 font-bold"
+						>
+							<CheckSquare className="w-3.5 h-3.5" />
+							Rekap Nilai
+						</Button>
+					</Link>
 				</div>
 			</div>
 
 			{/* KPI Summary Cards */}
-			<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-				<Card className="border-slate-200 shadow-xs bg-white">
-					<CardContent className="p-5 flex items-center gap-4">
-						<div className="w-12 h-12 rounded-xl bg-blue-50 text-[#0517B0] flex items-center justify-center shrink-0">
-							<BookOpen className="w-6 h-6" />
+			<div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-blue-50 text-[#0517B0] mt-0.5">
+							<BookOpen className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+							<p className="text-slate-500 text-xs font-semibold">
 								Mata Kuliah Diampu
 							</p>
-							<p className="text-2xl font-bold text-slate-900 mt-0.5">
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{courses.length}
 							</p>
 						</div>
 					</CardContent>
 				</Card>
 
-				<Card className="border-slate-200 shadow-xs bg-white">
-					<CardContent className="p-5 flex items-center gap-4">
-						<div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0">
-							<Layers className="w-6 h-6" />
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-indigo-600">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 mt-0.5">
+							<Layers className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+							<p className="text-slate-500 text-xs font-semibold">
 								Kelas Teori
 							</p>
-							<p className="text-2xl font-bold text-slate-900 mt-0.5">
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{totalTeori} Kelas
 							</p>
 						</div>
 					</CardContent>
 				</Card>
 
-				<Card className="border-slate-200 shadow-xs bg-white">
-					<CardContent className="p-5 flex items-center gap-4">
-						<div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
-							<CheckCircle2 className="w-6 h-6" />
+				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
+					<CardContent className="p-4 flex items-start gap-3">
+						<div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 mt-0.5">
+							<CheckCircle2 className="h-5 w-5" />
 						</div>
 						<div>
-							<p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+							<p className="text-slate-500 text-xs font-semibold">
 								Kelas Praktik
 							</p>
-							<p className="text-2xl font-bold text-slate-900 mt-0.5">
+							<p className="text-2xl font-black text-slate-900 mt-0.5">
 								{totalPraktik} Kelas
 							</p>
 						</div>
@@ -191,30 +200,28 @@ export function DosenDashboard({ user }: DosenDashboardProps) {
 			</div>
 
 			{/* Course List Section */}
-			<Card className="border-slate-200 shadow-sm bg-white">
-				<CardHeader className="border-b border-slate-100 pb-4">
-					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-						<div>
-							<CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-								<BookOpen className="w-5 h-5 text-[#0517B0]" />
-								Daftar Mata Kuliah Saya
-							</CardTitle>
-							<CardDescription className="text-xs text-slate-500">
-								Pilih mata kuliah untuk melihat detail pertemuan, mengisi
-								presensi, atau menginput nilai.
-							</CardDescription>
-						</div>
+			<Card className="bg-white border-slate-200 shadow-sm overflow-hidden">
+				<CardHeader className="border-b border-slate-200 bg-slate-50/70 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+					<div>
+						<CardTitle className="text-slate-900 text-base font-bold flex items-center gap-2">
+							<BookOpen className="w-4 h-4 text-[#0517B0]" />
+							Daftar Mata Kuliah Saya
+						</CardTitle>
+						<p className="text-xs text-slate-500 mt-0.5">
+							Pilih mata kuliah untuk melihat detail sesi pertemuan, presensi,
+							atau nilai.
+						</p>
+					</div>
 
-						{/* Search Bar */}
-						<div className="relative w-full sm:w-72">
-							<Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-							<Input
-								placeholder="Cari mata kuliah..."
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-								className="pl-9 h-9 text-xs bg-slate-50 border-slate-200 focus:bg-white"
-							/>
-						</div>
+					{/* Search Bar */}
+					<div className="relative w-full sm:w-64">
+						<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+						<Input
+							placeholder="Cari mata kuliah, kode..."
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							className="pl-9 h-9 text-xs bg-white border-slate-200"
+						/>
 					</div>
 				</CardHeader>
 
@@ -237,7 +244,7 @@ export function DosenDashboard({ user }: DosenDashboardProps) {
 							{filteredCourses.map((course) => (
 								<div
 									key={course.id}
-									className="border border-slate-200/80 hover:border-[#0517B0]/40 rounded-xl p-5 bg-white hover:shadow-md transition-all duration-200 flex flex-col justify-between group"
+									className="border border-slate-200 hover:border-[#0517B0]/40 rounded-xl p-5 bg-white hover:shadow-md transition-all duration-200 flex flex-col justify-between group"
 								>
 									<div className="space-y-3">
 										<div className="flex items-start justify-between gap-2">
@@ -264,9 +271,12 @@ export function DosenDashboard({ user }: DosenDashboardProps) {
 												{course.name}
 											</h3>
 											<div className="flex flex-wrap items-center gap-2 mt-2">
-												<span className="text-xs text-slate-500 font-medium">
+												<Badge
+													variant="outline"
+													className="text-xs font-bold text-slate-700 bg-slate-50 border-slate-200 px-2 py-0.5"
+												>
 													Angkatan {course.cohort}
-												</span>
+												</Badge>
 												{course.peminatan && (
 													<PeminatanBadge
 														subProgram={course.peminatan}

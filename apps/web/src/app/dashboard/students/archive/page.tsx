@@ -1,6 +1,13 @@
 "use client";
 
-import { ArrowLeft, CheckCircle, Clock, Search, XCircle } from "lucide-react";
+import {
+	ArrowLeft,
+	CheckCircle,
+	Clock,
+	Search,
+	User,
+	XCircle,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -128,10 +135,12 @@ export default function StudentsPage() {
 		if (!selectedId) return;
 		setIsProcessing(true);
 		try {
-			const { error } = await api.students[selectedId].delete();
-			if (error) {
+			const res = await api.students[selectedId].delete();
+			if (res.error || !res.data?.success) {
 				toast.error(
-					"Gagal menghapus mahasiswa. Anda mungkin tidak memiliki izin.",
+					(res.data as any)?.message ||
+						(res.error?.value as any)?.message ||
+						"Gagal menghapus mahasiswa.",
 				);
 				return;
 			}
@@ -271,13 +280,31 @@ export default function StudentsPage() {
 										</TableCell>
 										<TableCell>{s.student.phone || "-"}</TableCell>
 										<TableCell className="text-right">
-											<div className="flex justify-end gap-2">
+											<div className="flex justify-end gap-1.5">
+												{(useAuthStore.getState().user?.role === "superadmin" ||
+													useAuthStore.getState().user?.role === "pmb") && (
+													<Button
+														variant="outline"
+														size="sm"
+														onClick={(e) => {
+															e.stopPropagation();
+															router.push(
+																`/dashboard/students/${s.student.id}/profile`,
+															);
+														}}
+														className="h-8 text-xs font-semibold text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900 gap-1 px-2.5 shadow-2xs cursor-pointer"
+														title="Lihat Detail Profil Mahasiswa"
+													>
+														<User className="w-3.5 h-3.5 text-[#0517B0]" />
+														Lihat
+													</Button>
+												)}
 												<Button
 													variant="outline"
 													size="sm"
 													disabled={isProcessing}
 													onClick={(e) => handleRestore(e, s.student.id)}
-													className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 h-8 text-xs px-2"
+													className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 h-8 text-xs px-2.5 font-medium cursor-pointer"
 												>
 													Kembalikan
 												</Button>
@@ -292,7 +319,7 @@ export default function StudentsPage() {
 															setSelectedId(s.student.id);
 															setShowDeleteDialog(true);
 														}}
-														className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100 h-8 text-xs px-2"
+														className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100 h-8 text-xs px-2.5 font-medium cursor-pointer"
 													>
 														Hapus
 													</Button>

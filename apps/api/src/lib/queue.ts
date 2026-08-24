@@ -1,4 +1,4 @@
-import { isRedisAvailable, redis } from "./redis";
+import { isRedisReady, redis } from "./redis";
 
 /**
  * Queue helper menggunakan Redis Lists (LPUSH/BRPOP).
@@ -26,7 +26,7 @@ export async function enqueue<T>(
 	queueName: string,
 	job: QueueJob<T>,
 ): Promise<void> {
-	if (!isRedisAvailable) {
+	if (!isRedisReady()) {
 		console.warn(
 			`[Queue] Cannot enqueue to '${queueName}' because Redis is not available`,
 		);
@@ -40,15 +40,27 @@ export async function enqueue<T>(
 	}
 }
 
+const blockingClients = new Map<string, typeof redis>();
+
+function getBlockingClient(queueName: string) {
+	let client = blockingClients.get(queueName);
+	if (!client) {
+		client = redis.duplicate();
+		blockingClients.set(queueName, client);
+	}
+	return client;
+}
+
 /**
  * Ambil satu job dari queue secara blocking (BRPOP).
+ * Menggunakan dedicated connection agar tidak memblokir main Redis cache & rate limiter.
  * Jika Redis tidak aktif atau error, tidur sejenak agar worker tidak tight loop.
  */
 export async function dequeue<T>(
 	queueName: string,
 	timeoutSeconds = 5,
 ): Promise<QueueJob<T> | null> {
-	if (!isRedisAvailable) {
+	if (!isRedisReady()) {
 		// Tidur 5 detik agar worker tidak membakar CPU saat Redis offline
 		await new Promise((r) => setTimeout(r, 5000));
 		return null;
@@ -56,7 +68,8 @@ export async function dequeue<T>(
 
 	const key = `${QUEUE_PREFIX}:${queueName}`;
 	try {
-		const result = await redis.brpop(key, timeoutSeconds);
+		const blockingClient = getBlockingClient(queueName);
+		const result = await blockingClient.brpop(key, timeoutSeconds);
 		if (!result) return null;
 		return JSON.parse(result[1]) as QueueJob<T>;
 	} catch {
@@ -69,7 +82,7 @@ export async function dequeue<T>(
  * Ambil panjang queue (untuk monitoring).
  */
 export async function queueLength(queueName: string): Promise<number> {
-	if (!isRedisAvailable) return 0;
+	if (!isRedisReady()) return 0;
 	const key = `${QUEUE_PREFIX}:${queueName}`;
 	try {
 		return await redis.llen(key);

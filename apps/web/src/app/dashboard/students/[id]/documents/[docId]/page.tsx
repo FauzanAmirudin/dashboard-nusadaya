@@ -13,9 +13,23 @@ function DocumentReviewContent() {
 	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 	const cleanFileUrl = fileUrl?.startsWith("./") ? fileUrl.slice(1) : fileUrl;
-	let fullUrl = cleanFileUrl ? `${API_URL}${cleanFileUrl}` : "";
-	if (fullUrl && token) {
-		fullUrl += `?token=${token}`;
+	let fullUrl = "";
+	if (cleanFileUrl) {
+		if (
+			cleanFileUrl.startsWith("http://") ||
+			cleanFileUrl.startsWith("https://")
+		) {
+			fullUrl = cleanFileUrl;
+		} else {
+			const normalizedPath = cleanFileUrl.startsWith("/")
+				? cleanFileUrl
+				: `/${cleanFileUrl}`;
+			fullUrl = `${API_URL}${normalizedPath}`;
+		}
+		if (token && !fullUrl.includes("token=")) {
+			const separator = fullUrl.includes("?") ? "&" : "?";
+			fullUrl += `${separator}token=${token}`;
+		}
 	}
 
 	return (

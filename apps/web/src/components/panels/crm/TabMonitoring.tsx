@@ -1,11 +1,13 @@
 "use client";
 
 import {
+	Building2,
 	Calendar,
 	FileText,
 	Image as ImageIcon,
 	Loader2,
 	Trash2,
+	Users,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -65,13 +67,13 @@ export function TabMonitoring({
 						value="orang-tua"
 						className="data-[state=active]:bg-white data-[state=active]:text-slate-800 data-[state=active]:shadow-sm rounded-md py-2 transition-all flex items-center justify-center gap-2 font-bold"
 					>
-						<span>👨‍👩‍👧</span> Monitoring Orang Tua
+						<Users className="w-4 h-4" /> Monitoring Orang Tua
 					</TabsTrigger>
 					<TabsTrigger
 						value="industri"
 						className="data-[state=active]:bg-white data-[state=active]:text-slate-800 data-[state=active]:shadow-sm rounded-md py-2 transition-all flex items-center justify-center gap-2 font-bold"
 					>
-						<span>🏭</span> Monitoring Industri
+						<Building2 className="w-4 h-4" /> Monitoring Industri
 					</TabsTrigger>
 				</TabsList>
 

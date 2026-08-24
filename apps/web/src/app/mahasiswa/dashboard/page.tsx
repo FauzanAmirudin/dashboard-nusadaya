@@ -150,7 +150,7 @@ export default function MahasiswaDashboard() {
 							</span>
 						</div>
 						<h1 className="text-2xl sm:text-3xl font-extrabold mb-2 tracking-tight">
-							Halo, {student?.name}! 👋
+							Halo, {student?.name}!
 						</h1>
 						<p className="text-blue-100 text-sm mb-6 max-w-xl">
 							Pantau secara real-time status validasi berkas, nilai akademik,

@@ -16,16 +16,19 @@ import {
 	Sparkles,
 	Target,
 	TrendingUp,
+	User,
 	Users,
 	Wallet,
 	XCircle,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -574,12 +577,17 @@ export function FinanceDashboard({ user, data = [] }: any) {
 	const countAman = cohortData.filter(
 		(s: any) => s.finance?.status === "AMAN",
 	).length;
+	const countProses = cohortData.filter(
+		(s: any) => s.finance?.status === "PROSES",
+	).length;
 	const countPerhatian = cohortData.filter(
-		(s: any) => s.finance?.status === "PERLU_PERHATIAN" || !s.finance?.status,
+		(s: any) =>
+			s.finance?.status === "BUTUH_PERHATIAN" ||
+			s.finance?.status === "PERLU_PERHATIAN" ||
+			s.finance?.status === "TIDAK_AMAN" ||
+			!s.finance?.status,
 	).length;
-	const countTidakAman = cohortData.filter(
-		(s: any) => s.finance?.status === "TIDAK_AMAN",
-	).length;
+	const countTidakAman = countPerhatian;
 	const countLunasRegistrasi = cohortData.filter(
 		(s: any) => s.finance?.registrasiStatus || s.finance?.registrationPaid,
 	).length;
@@ -599,12 +607,19 @@ export function FinanceDashboard({ user, data = [] }: any) {
 
 			const financeStatus = s.finance?.status || "PERLU_PERHATIAN";
 			let matchStatus = true;
-			if (selectedStatus === "aman") matchStatus = financeStatus === "AMAN";
-			if (selectedStatus === "perhatian")
-				matchStatus = financeStatus === "PERLU_PERHATIAN";
-			if (selectedStatus === "tidak_aman")
-				matchStatus = financeStatus === "TIDAK_AMAN";
 			if (selectedStatus === "acc") matchStatus = Boolean(s.finance?.isAcc);
+			if (selectedStatus === "aman") matchStatus = financeStatus === "AMAN";
+			if (selectedStatus === "proses" || selectedStatus === "perhatian")
+				matchStatus =
+					financeStatus === "PROSES" || financeStatus === "PERLU_PERHATIAN";
+			if (
+				selectedStatus === "butuh_perhatian" ||
+				selectedStatus === "tidak_aman"
+			)
+				matchStatus =
+					financeStatus === "BUTUH_PERHATIAN" ||
+					financeStatus === "TIDAK_AMAN" ||
+					financeStatus === "PERLU_PERHATIAN";
 
 			return matchSearch && matchStatus;
 		});
@@ -736,7 +751,6 @@ export function FinanceDashboard({ user, data = [] }: any) {
 			value: countAman,
 			icon: CheckCircle,
 			iconBg: "bg-emerald-50 text-emerald-600",
-			indicator: "🟢",
 			valueColor: "text-emerald-700",
 		},
 		{
@@ -744,7 +758,6 @@ export function FinanceDashboard({ user, data = [] }: any) {
 			value: countPerhatian,
 			icon: Clock,
 			iconBg: "bg-amber-50 text-amber-600",
-			indicator: "🟡",
 			valueColor: "text-amber-700",
 		},
 		{
@@ -752,7 +765,6 @@ export function FinanceDashboard({ user, data = [] }: any) {
 			value: countTidakAman,
 			icon: XCircle,
 			iconBg: "bg-rose-50 text-rose-600",
-			indicator: "⛔",
 			valueColor: "text-rose-700",
 		},
 		{
@@ -760,7 +772,6 @@ export function FinanceDashboard({ user, data = [] }: any) {
 			value: countAcc,
 			icon: ShieldCheck,
 			iconBg: "bg-indigo-50 text-indigo-600",
-			indicator: "🛡️",
 			valueColor: "text-indigo-700",
 		},
 		{
@@ -852,7 +863,6 @@ export function FinanceDashboard({ user, data = [] }: any) {
 						>
 							<div>
 								<p className="text-slate-500 text-[11px] font-semibold flex items-center gap-1">
-									{kpi.indicator && <span>{kpi.indicator}</span>}
 									<span>{kpi.label}</span>
 								</p>
 								<p
@@ -1070,8 +1080,8 @@ export function FinanceDashboard({ user, data = [] }: any) {
 									{achievementPercentage >= 100
 										? "✓ Tercapai"
 										: achievementPercentage >= 50
-											? "📈 Berjalan Baik"
-											: "⏳ Perlu Dikejar"}
+											? "Berjalan Baik"
+											: "Perlu Dikejar"}
 								</Badge>
 							</div>
 							<div className="mt-2.5">
@@ -1126,7 +1136,7 @@ export function FinanceDashboard({ user, data = [] }: any) {
 								</p>
 								<p className="text-[11px] text-slate-400 mt-1.5">
 									{realisasiRiilPeriod >= targetNominal
-										? "Target telah tercapai penuh 🎉"
+										? "Target telah tercapai penuh"
 										: "Nominal yang masih harus dikejar"}
 								</p>
 							</div>
@@ -1205,17 +1215,17 @@ export function FinanceDashboard({ user, data = [] }: any) {
 							>
 								<SelectTrigger className="w-[145px] h-8.5 text-xs bg-white border-slate-200 font-medium text-slate-700 shadow-2xs rounded-lg">
 									<SelectValue placeholder="Urutkan">
-										{sortBy === "recent" && "🕒 Terbaru"}
-										{sortBy === "oldest" && "🕒 Terlama"}
-										{sortBy === "name" && "🔤 Nama (A-Z)"}
-										{sortBy === "paid_desc" && "💰 Total Bayar"}
+										{sortBy === "recent" && "Terbaru"}
+										{sortBy === "oldest" && "Terlama"}
+										{sortBy === "name" && "Nama (A-Z)"}
+										{sortBy === "paid_desc" && "Total Bayar"}
 									</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
-									<SelectItem value="recent">🕒 Terbaru</SelectItem>
-									<SelectItem value="oldest">🕒 Terlama</SelectItem>
-									<SelectItem value="name">🔤 Nama (A-Z)</SelectItem>
-									<SelectItem value="paid_desc">💰 Total Bayar</SelectItem>
+									<SelectItem value="recent">Terbaru</SelectItem>
+									<SelectItem value="oldest">Terlama</SelectItem>
+									<SelectItem value="name">Nama (A-Z)</SelectItem>
+									<SelectItem value="paid_desc">Total Bayar</SelectItem>
 								</SelectContent>
 							</Select>
 						</div>
@@ -1225,18 +1235,18 @@ export function FinanceDashboard({ user, data = [] }: any) {
 					<div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 overflow-x-auto">
 						{[
 							{ key: "all", label: "Semua", count: totalStudents },
-							{ key: "aman", label: "🟢 Aman / Lunas", count: countAman },
+							{ key: "acc", label: "Sudah ACC", count: countAcc },
+							{ key: "aman", label: "Aman", count: countAman },
 							{
-								key: "perhatian",
-								label: "🟡 Sedang Proses",
+								key: "proses",
+								label: "Berproses",
+								count: countProses || countPerhatian,
+							},
+							{
+								key: "butuh_perhatian",
+								label: "Butuh Perhatian",
 								count: countPerhatian,
 							},
-							{
-								key: "tidak_aman",
-								label: "⛔ Menunggak",
-								count: countTidakAman,
-							},
-							{ key: "acc", label: "🛡️ ACC Finance", count: countAcc },
 						].map((tab) => (
 							<button
 								key={tab.key}
@@ -1268,31 +1278,31 @@ export function FinanceDashboard({ user, data = [] }: any) {
 						<Table>
 							<TableHeader className="bg-slate-50 sticky top-0 z-10">
 								<TableRow className="border-slate-200">
-									<TableHead className="py-3 px-4 font-bold text-slate-700 text-xs uppercase tracking-wider">
-										Nama Mahasiswa
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[180px]">
+										Nama Mahasiswa & NIM
 									</TableHead>
-									<TableHead className="py-3 px-3 font-bold text-slate-700 text-xs text-center w-24 uppercase tracking-wider">
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
 										Angkatan
 									</TableHead>
-									<TableHead className="py-3 px-3 font-bold text-slate-700 text-xs text-center w-28 uppercase tracking-wider">
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-32">
 										Tahun Ajaran
 									</TableHead>
-									<TableHead className="py-3 px-3 font-bold text-slate-700 text-xs uppercase tracking-wider">
-										Program Studi & Peminatan
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[160px]">
+										Peminatan
 									</TableHead>
-									<TableHead className="py-3 px-3 font-bold text-slate-700 text-xs w-36 uppercase tracking-wider">
-										No. HP/WhatsApp
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[140px]">
+										No. WhatsApp
 									</TableHead>
-									<TableHead className="py-3 px-3 font-bold text-slate-700 text-xs text-right w-36 uppercase tracking-wider">
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right w-36">
 										Total Pembayaran
 									</TableHead>
-									<TableHead className="py-3 px-3 font-bold text-slate-700 text-xs text-center w-32 uppercase tracking-wider">
-										Status Pembayaran
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
+										Progress (6)
 									</TableHead>
-									<TableHead className="py-3 px-3 font-bold text-slate-700 text-xs text-center w-36 uppercase tracking-wider">
-										Progres
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
+										Status Finance
 									</TableHead>
-									<TableHead className="py-3 px-4 font-bold text-slate-700 text-xs text-right pr-6 w-24 uppercase tracking-wider">
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-right pr-6 w-24">
 										Aksi
 									</TableHead>
 								</TableRow>
@@ -1301,84 +1311,93 @@ export function FinanceDashboard({ user, data = [] }: any) {
 								{paginatedData.map((s: any, idx: number) => {
 									const { items, completed, total, isDone } =
 										getFinanceChecklist(s.finance);
-									const unpaidItems = items.filter((it) => !it.done);
 									const totalPaid = calculateTotalPaidStudent(s);
-									const financeStatus = s.finance?.status || "PERLU_PERHATIAN";
-									const isAmanOrLunas =
-										financeStatus === "AMAN" || unpaidItems.length === 0;
 									const waUrl = formatWhatsAppUrl(s.student?.phone);
 
 									return (
 										<TableRow
 											key={s.student.id}
-											className={`border-slate-100 hover:bg-blue-50/40 transition-colors ${
-												idx % 2 === 1 ? "bg-slate-50/40" : "bg-white"
-											}`}
+											className="border-slate-100 hover:bg-blue-50/40 transition-colors"
 										>
-											{/* 1. Nama Mahasiswa */}
-											<TableCell className="px-4 py-3">
+											{/* 1. Nama & NIM */}
+											<TableCell>
 												<div className="font-bold text-slate-900 text-sm">
 													{s.student.name}
 												</div>
-												{s.student.nim ? (
-													<div className="font-mono text-[11px] text-slate-400 font-semibold mt-0.5">
-														{s.student.nim}
-													</div>
-												) : (
-													<div className="text-[11px] text-slate-400 italic mt-0.5">
-														Belum ada NIM
-													</div>
-												)}
+												<div className="flex items-center gap-1.5 mt-0.5">
+													<span className="font-mono text-xs font-semibold text-slate-500">
+														{s.student.nim || "Belum ada NIM"}
+													</span>
+													{s.student.nickname && (
+														<span className="text-[11px] text-slate-400">
+															({s.student.nickname})
+														</span>
+													)}
+												</div>
 											</TableCell>
 
-											{/* 2. Angkatan (Angka saja) */}
-											<TableCell className="px-3 py-3 text-center">
+											{/* 2. Angkatan */}
+											<TableCell className="text-center">
 												<Badge
 													variant="outline"
-													className="text-xs px-2.5 py-0.5 font-semibold text-slate-700 border-slate-200 bg-slate-100/80 font-mono"
+													className="text-xs font-bold text-slate-700 bg-slate-50 border-slate-200 px-2 py-0.5"
 												>
-													{s.student.cohort || "-"}
+													{s.student.cohort
+														? `Angkatan ${s.student.cohort}`
+														: "-"}
 												</Badge>
 											</TableCell>
 
 											{/* 3. Tahun Ajaran */}
-											<TableCell className="px-3 py-3 text-center font-medium text-xs text-slate-600 font-mono">
-												{s.student.academicYear || "-"}
+											<TableCell className="text-center font-medium text-xs text-slate-700">
+												{s.student.academicYear ||
+													(s.student.cohort &&
+													!Number.isNaN(Number(s.student.cohort))
+														? `${2010 + Number(s.student.cohort)}/${2011 + Number(s.student.cohort)}`
+														: s.student.period || (
+																<span className="text-slate-400 italic">-</span>
+															))}
 											</TableCell>
 
-											{/* 4. Program Studi & Peminatan (dengan Bendera) */}
-											<TableCell className="px-3 py-3">
-												<div className="font-semibold text-slate-800 text-xs mb-1">
-													{s.student.program || "-"}
-												</div>
+											{/* 4. Peminatan */}
+											<TableCell>
 												<PeminatanBadge
 													subProgram={s.student.subProgram}
 													program={s.student.program}
 													destinationCountry={s.student.destinationCountry}
-													size="xs"
 												/>
 											</TableCell>
 
-											{/* 5. No. HP/WhatsApp */}
-											<TableCell className="px-3 py-3 text-xs font-mono">
-												{s.student.phone ? (
-													<a
-														href={`https://wa.me/${s.student.phone.replace(/[^0-9]/g, "")}`}
-														target="_blank"
-														rel="noreferrer"
-														className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-600 font-medium transition-colors group/wa"
-														title="Buka WhatsApp"
-													>
-														<Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0 group-hover/wa:scale-110 transition-transform" />
-														<span>{s.student.phone}</span>
-													</a>
+											{/* 5. No. WhatsApp */}
+											<TableCell>
+												{s.student?.phone ? (
+													waUrl ? (
+														<a
+															href={waUrl}
+															target="_blank"
+															rel="noopener noreferrer"
+															className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 hover:text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-md transition-colors group"
+															title="Chat WhatsApp"
+														>
+															<MessageCircle className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
+															<span className="font-mono">
+																{s.student.phone}
+															</span>
+														</a>
+													) : (
+														<span className="text-xs font-mono text-slate-700">
+															{s.student.phone}
+														</span>
+													)
 												) : (
-													<span className="text-slate-400 italic">-</span>
+													<span className="text-slate-400 text-xs italic">
+														-
+													</span>
 												)}
 											</TableCell>
 
-											{/* 6. Total Pembayaran yang Diinput */}
-											<TableCell className="px-3 py-3 text-right">
+											{/* 6. Total Pembayaran */}
+											<TableCell className="text-right">
 												<div className="font-bold text-xs text-slate-900 font-mono">
 													{formatRupiah(totalPaid)}
 												</div>
@@ -1389,81 +1408,8 @@ export function FinanceDashboard({ user, data = [] }: any) {
 												</div>
 											</TableCell>
 
-											{/* 7. Status Pembayaran (Tooltip Khusus Item Belum Lunas / Tidak Muncul jika Lunas) */}
-											<TableCell className="px-3 py-3 text-center">
-												{isAmanOrLunas ? (
-													/* Jika sudah Aman/Lunas: Tooltip TIDAK muncul */
-													<div className="inline-flex flex-col items-center">
-														<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px] font-bold">
-															🟢 Aman (Lunas)
-														</Badge>
-														{s.finance?.isAcc && (
-															<div className="text-[10px] font-bold text-emerald-600 mt-1 flex items-center justify-center gap-0.5">
-																<Check className="w-3 h-3" /> ACC Finance
-															</div>
-														)}
-													</div>
-												) : (
-													/* Jika Menunggak / Belum Lunas: Menampilkan Tooltip Khusus Item Menunggak */
-													<TooltipProvider>
-														<Tooltip>
-															<TooltipTrigger className="inline-flex flex-col items-center cursor-pointer group/status">
-																{financeStatus === "PERLU_PERHATIAN" ? (
-																	<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[11px] font-bold transition-all group-hover/status:scale-105 group-hover/status:shadow-2xs">
-																		🟡 Sedang Proses
-																	</Badge>
-																) : (
-																	<Badge className="bg-rose-50 text-rose-700 border-rose-200 text-[11px] font-bold transition-all group-hover/status:scale-105 group-hover/status:shadow-2xs">
-																		⛔ Menunggak
-																	</Badge>
-																)}
-																{s.finance?.isAcc && (
-																	<div className="text-[10px] font-bold text-emerald-600 mt-1 flex items-center justify-center gap-0.5">
-																		<Check className="w-3 h-3" /> ACC Finance
-																	</div>
-																)}
-															</TooltipTrigger>
-															<TooltipContent className="w-68 p-3 bg-slate-950 text-white rounded-xl shadow-2xl border border-rose-950/80 text-xs flex flex-col space-y-2 z-50">
-																<div className="flex items-center justify-between border-b border-slate-800 pb-1.5 w-full">
-																	<div className="flex items-center gap-1.5">
-																		<div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-																		<span className="font-bold text-rose-200 text-xs">
-																			Pos Belum Lunas:
-																		</span>
-																	</div>
-																	<span className="text-[10px] font-mono text-rose-400 font-bold bg-rose-950/80 border border-rose-800/60 px-1.5 py-0.5 rounded">
-																		{unpaidItems.length} Pos
-																	</span>
-																</div>
-
-																<div className="flex flex-col space-y-1.5 w-full pt-0.5">
-																	{unpaidItems.map((it) => (
-																		<div
-																			key={it.name}
-																			className="flex items-center justify-between text-[11px] bg-rose-950/30 border border-rose-900/40 rounded-lg px-2.5 py-1"
-																		>
-																			<span className="text-slate-200 font-medium">
-																				{it.name}
-																			</span>
-																			<span className="font-bold text-rose-400 text-[10px]">
-																				✕ Belum Lunas
-																			</span>
-																		</div>
-																	))}
-																</div>
-
-																<p className="text-[10px] text-slate-400 italic pt-0.5 border-t border-slate-900">
-																	Klik &ldquo;Periksa&rdquo; untuk kelola
-																	pembayaran.
-																</p>
-															</TooltipContent>
-														</Tooltip>
-													</TooltipProvider>
-												)}
-											</TableCell>
-
-											{/* 8. Progres (Checklist Tooltip) */}
-											<TableCell className="px-3 py-3 text-center">
+											{/* 7. Progress Checklist with Tooltip */}
+											<TableCell className="text-center">
 												<TooltipProvider>
 													<Tooltip>
 														<TooltipTrigger className="w-full">
@@ -1472,8 +1418,17 @@ export function FinanceDashboard({ user, data = [] }: any) {
 																	<span>
 																		{completed}/{total} Item
 																	</span>
+																	<span
+																		className={
+																			isDone
+																				? "text-emerald-600"
+																				: "text-slate-500"
+																		}
+																	>
+																		{Math.round((completed / total) * 100)}%
+																	</span>
 																</div>
-																<div className="w-full h-2 bg-slate-200/70 rounded-full overflow-hidden border border-slate-200">
+																<div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
 																	<div
 																		className={`h-full rounded-full transition-all duration-300 ${
 																			isDone
@@ -1492,7 +1447,7 @@ export function FinanceDashboard({ user, data = [] }: any) {
 														<TooltipContent className="w-64 p-3.5 bg-slate-950 text-white rounded-xl shadow-2xl border border-slate-800 text-xs flex flex-col space-y-2 z-50">
 															<div className="flex items-center justify-between border-b border-slate-800 pb-1.5 w-full">
 																<span className="font-bold text-slate-100 text-xs">
-																	Checklist Keuangan:
+																	Checklist Keuangan (6):
 																</span>
 																<span className="text-[11px] font-mono text-emerald-400 font-bold">
 																	{completed}/{total} Lunas
@@ -1504,7 +1459,7 @@ export function FinanceDashboard({ user, data = [] }: any) {
 																		key={it.name}
 																		className="flex items-center justify-between text-[11px] w-full"
 																	>
-																		<span className="text-slate-300 font-medium">
+																		<span className="text-slate-300 font-medium truncate max-w-[150px]">
 																			{it.name}
 																		</span>
 																		<span
@@ -1524,21 +1479,45 @@ export function FinanceDashboard({ user, data = [] }: any) {
 												</TooltipProvider>
 											</TableCell>
 
-											{/* 9. Aksi */}
-											<TableCell className="px-4 py-3 text-right pr-6">
-												<Button
+											{/* 8. Status Finance */}
+											<TableCell className="text-center">
+												<PanelStatusBadge
+													status={s.finance?.status}
+													isAcc={s.finance?.isAcc}
+													completed={completed}
+													total={total}
 													size="sm"
-													variant="outline"
-													onClick={() =>
-														router.push(
-															`/dashboard/students/${s.student.id}?context=finance`,
-														)
-													}
-													className="h-8 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1 px-2.5 shadow-2xs"
-												>
-													<Eye className="w-3.5 h-3.5" />
-													Periksa
-												</Button>
+												/>
+											</TableCell>
+
+											{/* 9. Aksi */}
+											<TableCell className="text-right pr-6">
+												<div className="flex items-center justify-end gap-1.5">
+													<Link
+														href={`/dashboard/students/${s.student.id}/profile`}
+													>
+														<Button
+															size="sm"
+															variant="outline"
+															className="h-8 text-xs border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 gap-1 font-medium"
+														>
+															<User className="w-3.5 h-3.5 text-slate-500" />
+															Lihat
+														</Button>
+													</Link>
+													<Link
+														href={`/dashboard/students/${s.student.id}?tab=finance`}
+													>
+														<Button
+															size="sm"
+															variant="outline"
+															className="h-8 text-xs border-blue-200 text-[#0517B0] hover:bg-blue-50 hover:border-blue-300 gap-1 font-bold shadow-2xs"
+														>
+															<Eye className="w-3.5 h-3.5" />
+															Periksa
+														</Button>
+													</Link>
+												</div>
 											</TableCell>
 										</TableRow>
 									);

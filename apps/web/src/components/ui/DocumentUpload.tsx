@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { API_URL } from "@/lib/eden";
 import { useAuthStore } from "@/store";
+import { formatDeviceDateTime } from "@/utils/format";
 
 interface DocumentUploadProps {
 	studentId: number;
@@ -197,15 +198,7 @@ export function DocumentUpload({
 							</p>
 							<span className="text-[10px] text-slate-400">
 								Diunggah{" "}
-								{doc.uploadedAt
-									? new Date(doc.uploadedAt.replace("Z", "")).toLocaleString(
-											"id-ID",
-											{
-												dateStyle: "medium",
-												timeStyle: "short",
-											},
-										)
-									: "-"}
+								{doc.uploadedAt ? formatDeviceDateTime(doc.uploadedAt) : "-"}
 								{index === 0 && (
 									<span className="ml-2 text-emerald-600 font-medium">
 										(Terbaru)

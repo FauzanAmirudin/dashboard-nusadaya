@@ -296,11 +296,9 @@ export function TabDokumen({
 											<SelectValue placeholder="Pilih Hasil" />
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="lulus">🟢 Lulus</SelectItem>
-											<SelectItem value="menunggu">🟡 Menunggu</SelectItem>
-											<SelectItem value="tidak_lulus">
-												🔴 Tidak Lulus
-											</SelectItem>
+											<SelectItem value="lulus">Lulus</SelectItem>
+											<SelectItem value="menunggu">Menunggu</SelectItem>
+											<SelectItem value="tidak_lulus">Tidak Lulus</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>
@@ -771,10 +769,8 @@ export function TabDokumen({
 											<SelectValue placeholder="Pilih Hasil" />
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="fit">🟢 FIT (Layak)</SelectItem>
-											<SelectItem value="unfit">
-												🔴 UNFIT (Tidak Layak)
-											</SelectItem>
+											<SelectItem value="fit">FIT (Layak)</SelectItem>
+											<SelectItem value="unfit">UNFIT (Tidak Layak)</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>
@@ -888,14 +884,12 @@ export function TabDokumen({
 										</SelectTrigger>
 										<SelectContent>
 											<SelectItem value="approved">
-												🟢 Disetujui (Approved)
+												Disetujui (Approved)
 											</SelectItem>
 											<SelectItem value="process">
-												🟡 Proses (Under Review)
+												Proses (Under Review)
 											</SelectItem>
-											<SelectItem value="reject">
-												🔴 Ditolak (Rejected)
-											</SelectItem>
+											<SelectItem value="reject">Ditolak (Rejected)</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>

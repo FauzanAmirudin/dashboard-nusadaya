@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db, ensureDatabaseSchema } from "./db";
 import { users } from "./db/schema";
+import { checkRateLimit } from "./lib/rate-limiter";
 import { backupModule } from "./modules/backup";
 import { exportModule } from "./modules/export";
 // Modul Storage Baru
@@ -51,9 +52,44 @@ const app = new Elysia()
 			},
 		}),
 	)
-	// CATATAN: Endpoint /uploads/* lama dihapus.
-	// File sekarang diakses via GET /files/:id/download (streaming, auth-protected)
-	.use(cors({ origin: true, credentials: true }))
+	// Standard Security Headers
+	.onRequest(({ set, request }) => {
+		set.headers["X-Content-Type-Options"] = "nosniff";
+		set.headers["X-XSS-Protection"] = "1; mode=block";
+		set.headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+
+		// Untuk pratinjau dokumen / PDF di iframe dari frontend (localhost:3000, dll.)
+		// X-Frame-Options: SAMEORIGIN memblokir iframe lintas-port (3000 vs 3001)
+		// Kita gunakan CSP frame-ancestors untuk mengizinkan embedding dari frontend
+		const isFileOrViewer =
+			request.url.includes("/files/") ||
+			request.url.includes("/documents") ||
+			request.url.includes("/invoice") ||
+			request.url.includes("/file-view") ||
+			request.url.includes("/download") ||
+			request.url.includes("/preview");
+
+		if (isFileOrViewer) {
+			const allowedOrigins = process.env.ALLOWED_ORIGINS
+				? process.env.ALLOWED_ORIGINS.split(",")
+						.map((s) => s.trim())
+						.join(" ")
+				: "http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001";
+			set.headers["Content-Security-Policy"] =
+				`frame-ancestors 'self' ${allowedOrigins}`;
+		} else {
+			set.headers["X-Frame-Options"] = "SAMEORIGIN";
+		}
+	})
+	// CORS Configuration
+	.use(
+		cors({
+			origin: process.env.ALLOWED_ORIGINS
+				? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim())
+				: true,
+			credentials: true,
+		}),
+	)
 	// JWT and cookie must be used before derive
 	.use(elysiaJwt({ name: "jwt", secret: JWT_SECRET }))
 	.use(cookie())
@@ -113,7 +149,23 @@ const app = new Elysia()
 		app
 			.post(
 				"/login",
-				async ({ body, jwt, cookie: { auth }, set }) => {
+				async ({ body, jwt, cookie: { auth }, request, set }) => {
+					const ip =
+						request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+						"127.0.0.1";
+					const rl = await checkRateLimit(ip, {
+						maxRequests: 10,
+						windowSeconds: 60,
+						keyPrefix: "rl:login",
+					});
+					if (!rl.allowed) {
+						set.status = 429;
+						return {
+							success: false,
+							message: `Terlalu banyak percobaan login. Coba lagi dalam ${rl.resetInSeconds} detik.`,
+						};
+					}
+
 					const { username, password } = body;
 
 					const user = await db.query.users.findFirst({
@@ -479,14 +531,24 @@ app.listen(process.env.PORT || 3001, async () => {
 	// 2. Inisialisasi direktori storage
 	await fileService.ensureDirectories();
 
-	// 3. Jalankan background maintenance non-blocking
+	// 3. Jalankan background workers non-blocking
 	setTimeout(() => {
 		// File Worker (cleanup lokal setiap 1 jam)
 		startFileWorker();
 
-		// Scheduled Worker (cron jobs)
+		// Backup Worker (proses backup queue & DB fallback)
+		startBackupWorker();
+
+		// Export Worker (proses export ZIP)
+		startExportWorker();
+
+		// PDF Worker (proses generate dokumen)
+		startPdfWorker();
+
+		// Scheduled Worker (cron jobs: daily midnight backup, retention)
 		startScheduledWorker();
-	}, 2000);
+	}, 1500);
 });
 
+export { app };
 export type App = typeof app;

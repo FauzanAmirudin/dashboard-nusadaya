@@ -3,6 +3,7 @@
 import { CheckCircle, DollarSign, Eye, FileText, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { formatRupiah } from "@/utils/format";
 
 interface TabRegistrasiAwalProps {
@@ -92,18 +93,11 @@ export function TabRegistrasiAwal({
 						<FileText className="w-4 h-4 text-indigo-600" />
 						Checklist Berkas & ACC PMB (Registrasi Awal)
 					</CardTitle>
-					{crmState?.pmb?.isAcc ? (
-						<Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs font-bold">
-							🟢 ACC PMB: {crmState?.pmb?.accBy?.fullName || "Admin PMB"}
-						</Badge>
-					) : (
-						<Badge
-							variant="outline"
-							className="text-slate-500 border-slate-300 text-xs"
-						>
-							🟡 Menunggu ACC PMB
-						</Badge>
-					)}
+					<PanelStatusBadge
+						isAcc={crmState?.pmb?.isAcc}
+						status={crmState?.pmb?.status}
+						size="sm"
+					/>
 				</CardHeader>
 				<CardContent className="p-5 space-y-4">
 					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">

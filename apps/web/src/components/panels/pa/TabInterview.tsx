@@ -137,11 +137,9 @@ export function TabInterview({
 											<SelectValue placeholder="Hasil" />
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="Menunggu">⏳ Menunggu</SelectItem>
-											<SelectItem value="Lulus">✅ Lulus</SelectItem>
-											<SelectItem value="Tidak Lulus">
-												❌ Tidak Lulus
-											</SelectItem>
+											<SelectItem value="Menunggu">Menunggu</SelectItem>
+											<SelectItem value="Lulus">Lulus</SelectItem>
+											<SelectItem value="Tidak Lulus">Tidak Lulus</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>

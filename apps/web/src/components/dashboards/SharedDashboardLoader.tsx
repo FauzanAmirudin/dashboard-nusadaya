@@ -1,19 +1,64 @@
 "use client";
 
 import { RefreshCw, ShieldAlert } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AkademikDashboard } from "@/components/dashboards/AkademikDashboard";
-import { CrmDashboard } from "@/components/dashboards/CrmDashboard";
-import { EvaluasiFinalisasiDashboard } from "@/components/dashboards/EvaluasiFinalisasiDashboard";
-import { FinanceDashboard } from "@/components/dashboards/FinanceDashboard";
-import { MagangDashboard } from "@/components/dashboards/MagangDashboard";
-import { PaDashboard } from "@/components/dashboards/PaDashboard";
-import { PmbDashboard } from "@/components/dashboards/PmbDashboard";
 import { Button } from "@/components/ui/button";
+import { StudentsTableSkeleton } from "@/components/ui/StudentsTableSkeleton";
 import { useStudentsList } from "@/hooks/useStudentsList";
 import { hasRole, useAuthStore } from "@/store";
+
+const AkademikDashboard = dynamic(
+	() =>
+		import("@/components/dashboards/AkademikDashboard").then(
+			(mod) => mod.AkademikDashboard,
+		),
+	{ loading: () => <StudentsTableSkeleton rows={8} /> },
+);
+const CrmDashboard = dynamic(
+	() =>
+		import("@/components/dashboards/CrmDashboard").then(
+			(mod) => mod.CrmDashboard,
+		),
+	{ loading: () => <StudentsTableSkeleton rows={8} /> },
+);
+const EvaluasiFinalisasiDashboard = dynamic(
+	() =>
+		import("@/components/dashboards/EvaluasiFinalisasiDashboard").then(
+			(mod) => mod.EvaluasiFinalisasiDashboard,
+		),
+	{ loading: () => <StudentsTableSkeleton rows={8} /> },
+);
+const FinanceDashboard = dynamic(
+	() =>
+		import("@/components/dashboards/FinanceDashboard").then(
+			(mod) => mod.FinanceDashboard,
+		),
+	{ loading: () => <StudentsTableSkeleton rows={8} /> },
+);
+const MagangDashboard = dynamic(
+	() =>
+		import("@/components/dashboards/MagangDashboard").then(
+			(mod) => mod.MagangDashboard,
+		),
+	{ loading: () => <StudentsTableSkeleton rows={8} /> },
+);
+const PaDashboard = dynamic(
+	() =>
+		import("@/components/dashboards/PaDashboard").then(
+			(mod) => mod.PaDashboard,
+		),
+	{ loading: () => <StudentsTableSkeleton rows={8} /> },
+);
+const PmbDashboard = dynamic(
+	() =>
+		import("@/components/dashboards/PmbDashboard").then(
+			(mod) => mod.PmbDashboard,
+		),
+	{ loading: () => <StudentsTableSkeleton rows={8} /> },
+);
 
 const MODULE_ROLES: Record<string, string[]> = {
 	pmb: ["superadmin", "pmb"],
@@ -65,11 +110,12 @@ export function SharedDashboardLoader({
 
 	if (!hasHydrated || isLoading)
 		return (
-			<div className="flex flex-col justify-center items-center h-80 gap-3 text-slate-500">
-				<RefreshCw className="w-8 h-8 animate-spin text-[#0517B0]" />
-				<p className="text-sm font-semibold">
-					Memuat data Panel {module.toUpperCase()}...
-				</p>
+			<div className="space-y-6">
+				<div className="space-y-1">
+					<div className="h-8 w-64 bg-slate-200 rounded animate-pulse" />
+					<div className="h-4 w-96 bg-slate-100 rounded animate-pulse" />
+				</div>
+				<StudentsTableSkeleton rows={8} />
 			</div>
 		);
 
