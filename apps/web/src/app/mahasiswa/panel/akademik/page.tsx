@@ -10,6 +10,7 @@ import {
 	Clock,
 	FileText,
 	GraduationCap,
+	MapPin,
 	Percent,
 	RefreshCw,
 	ShieldCheck,
@@ -356,7 +357,7 @@ export default function AcademicPanelMahasiswa() {
 					{data?.taiwanCohort && (
 						<div className="pt-6 border-t border-slate-100 space-y-4">
 							<div className="flex items-center gap-2">
-								<Map className="w-5 h-5 text-rose-600" />
+								<MapPin className="w-5 h-5 text-rose-600" />
 								<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
 									Kelengkapan Persyaratan Keberangkatan Taiwan
 								</h3>
