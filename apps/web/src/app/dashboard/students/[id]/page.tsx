@@ -684,245 +684,261 @@ function StudentDetailContent() {
 			</div>
 
 			{/* ─── HEADER DETAIL MAHASISWA (COMPACT & MODERN EXECUTIVE CARD) ─── */}
-			<div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-4 sm:p-5 space-y-3.5">
-				<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-					{/* Left: Profile Summary */}
-					<div className="flex items-start gap-3.5">
-						<Avatar className="w-13 h-13 border-2 border-blue-100 shadow-2xs shrink-0 rounded-full">
-							{s.profilePhotoUrl ? (
-								<img
-									src={
-										s.profilePhotoUrl.startsWith("http")
-											? s.profilePhotoUrl
-											: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}${s.profilePhotoUrl}`
-									}
-									alt={s.name}
-									className="w-full h-full object-cover rounded-full"
-								/>
-							) : (
-								<AvatarFallback className="bg-linear-to-br from-[#0517B0] to-blue-600 text-white text-base font-black flex items-center justify-center">
-									{getInitials(s.name)}
-								</AvatarFallback>
-							)}
-						</Avatar>
+			<div
+				className="relative rounded-2xl p-[3px] transition-all duration-500 select-none mb-6"
+				style={{
+					background:
+						"linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(226, 232, 240, 0.7) 100%)",
+					boxShadow:
+						"8px 8px 20px rgba(163, 177, 198, 0.45), -8px -8px 20px rgba(255, 255, 255, 0.95), 0 1px 3px rgba(0, 0, 0, 0.03)",
+				}}
+			>
+				<div
+					className="rounded-[calc(1rem-2px)] p-4 sm:p-5 space-y-3.5 relative overflow-hidden"
+					style={{
+						backgroundColor: "#f4f7fb",
+						boxShadow: "inset 0 1px 1px rgba(255, 255, 255, 0.95)",
+					}}
+				>
+					<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+						{/* Left: Profile Summary */}
+						<div className="flex items-start gap-3.5">
+							<Avatar className="w-13 h-13 border-2 border-blue-100 shadow-2xs shrink-0 rounded-full">
+								{s.profilePhotoUrl ? (
+									<img
+										src={
+											s.profilePhotoUrl.startsWith("http")
+												? s.profilePhotoUrl
+												: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}${s.profilePhotoUrl}`
+										}
+										alt={s.name}
+										className="w-full h-full object-cover rounded-full"
+									/>
+								) : (
+									<AvatarFallback className="bg-linear-to-br from-[#0517B0] to-blue-600 text-white text-base font-black flex items-center justify-center">
+										{getInitials(s.name)}
+									</AvatarFallback>
+								)}
+							</Avatar>
 
-						<div className="space-y-1">
-							<div className="flex flex-wrap items-center gap-2">
-								<h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-									{s.name}
-								</h1>
-								{s.studentStatus && (
-									<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold px-2 py-0.5">
-										● {s.studentStatus}
+							<div className="space-y-1">
+								<div className="flex flex-wrap items-center gap-2">
+									<h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+										{s.name}
+									</h1>
+									{s.studentStatus && (
+										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold px-2 py-0.5">
+											● {s.studentStatus}
+										</Badge>
+									)}
+									<Badge
+										variant="outline"
+										className="text-xs px-2 py-0.5 font-semibold text-slate-700 border-slate-200 bg-slate-100/80 font-mono"
+									>
+										Angkatan {s.cohort || "-"}
 									</Badge>
-								)}
-								<Badge
-									variant="outline"
-									className="text-xs px-2 py-0.5 font-semibold text-slate-700 border-slate-200 bg-slate-100/80 font-mono"
-								>
-									Angkatan {s.cohort || "-"}
-								</Badge>
-								{s.overallStatus && (
-									<PanelStatusBadge status={s.overallStatus} size="sm" />
-								)}
-							</div>
-							{/* Essential Metadata Strip */}
-							<div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-600 pt-0.5">
-								<span className="font-mono bg-slate-100 px-2 py-0.5 rounded-md text-slate-700 font-semibold border border-slate-200/60 text-[11px]">
-									NIM: {s.nim || "Belum ada NIM"}
-								</span>
-
-								<div className="flex items-center gap-1.5 font-semibold text-slate-800">
-									<GraduationCap className="w-3.5 h-3.5 text-[#0517B0]" />
-									<span>{s.program || "-"}</span>
-									{s.subProgram && (
-										<span className="inline-flex items-center gap-1.5 text-slate-700 font-semibold bg-slate-100/90 border border-slate-200 px-2 py-0.5 rounded-md text-[11px] shadow-2xs">
-											{flagUrl ? (
-												<img
-													src={flagUrl}
-													alt={s.subProgram}
-													className="w-4 h-3 object-cover rounded-xs shadow-2xs inline-block"
-												/>
-											) : (
-												<Globe className="w-3.5 h-3.5 text-slate-500" />
-											)}
-											<span>{s.subProgram}</span>
-										</span>
+									{s.overallStatus && (
+										<PanelStatusBadge status={s.overallStatus} size="sm" />
 									)}
 								</div>
-
-								{s.destinationCountry && (
-									<div className="flex items-center gap-1.5 font-medium text-slate-600 bg-blue-50/60 border border-blue-100 px-2 py-0.5 rounded-md">
-										{flagUrl && (
-											<img
-												src={flagUrl}
-												alt={s.destinationCountry}
-												className="w-4 h-3 object-cover rounded-xs shadow-2xs"
-											/>
-										)}
-										<span>Tujuan:</span>
-										<span className="font-semibold text-[#0517B0]">
-											{s.destinationCountry}
-										</span>
-										{s.period && (
-											<span className="text-slate-400">({s.period})</span>
-										)}
-									</div>
-								)}
-
-								{s.phone && (
-									<a
-										href={`https://wa.me/${s.phone.replace(/[^0-9]/g, "")}`}
-										target="_blank"
-										rel="noreferrer"
-										className="inline-flex items-center gap-1 text-slate-700 hover:text-emerald-600 font-medium transition-colors"
-										title="Buka WhatsApp"
-									>
-										<Phone className="w-3.5 h-3.5 text-emerald-600" />
-										<span className="font-mono text-xs">{s.phone}</span>
-									</a>
-								)}
-
-								{/* Dosen Pembimbing Akademik (PA) */}
-								<div
-									className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-medium shadow-2xs ${
-										s.pa?.fullName
-											? "bg-amber-50/90 text-amber-900 border-amber-200"
-											: "bg-slate-100/80 text-slate-500 border-slate-200/70"
-									}`}
-									title={
-										s.pa?.fullName
-											? `Dosen Pembimbing Akademik: ${s.pa.fullName}`
-											: "Dosen PA Belum Ditentukan"
-									}
-								>
-									<div
-										className={`w-3.5 h-3.5 rounded-full text-white font-bold text-[8px] flex items-center justify-center shrink-0 ${
-											s.pa?.fullName ? "bg-amber-600" : "bg-slate-400"
-										}`}
-									>
-										PA
-									</div>
-									<span className="text-slate-500 font-normal">PA:</span>
-									<span className="font-semibold text-slate-800 truncate max-w-[140px] sm:max-w-[200px]">
-										{s.pa?.fullName || "Belum Ditentukan"}
+								{/* Essential Metadata Strip */}
+								<div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-600 pt-0.5">
+									<span className="font-mono bg-slate-100 px-2 py-0.5 rounded-md text-slate-700 font-semibold border border-slate-200/60 text-[11px]">
+										NIM: {s.nim || "Belum ada NIM"}
 									</span>
+
+									<div className="flex items-center gap-1.5 font-semibold text-slate-800">
+										<GraduationCap className="w-3.5 h-3.5 text-[#0517B0]" />
+										<span>{s.program || "-"}</span>
+										{s.subProgram && (
+											<span className="inline-flex items-center gap-1.5 text-slate-700 font-semibold bg-slate-100/90 border border-slate-200 px-2 py-0.5 rounded-md text-[11px] shadow-2xs">
+												{flagUrl ? (
+													<img
+														src={flagUrl}
+														alt={s.subProgram}
+														className="w-4 h-3 object-cover rounded-xs shadow-2xs inline-block"
+													/>
+												) : (
+													<Globe className="w-3.5 h-3.5 text-slate-500" />
+												)}
+												<span>{s.subProgram}</span>
+											</span>
+										)}
+									</div>
+
+									{s.destinationCountry && (
+										<div className="flex items-center gap-1.5 font-medium text-slate-600 bg-blue-50/60 border border-blue-100 px-2 py-0.5 rounded-md">
+											{flagUrl && (
+												<img
+													src={flagUrl}
+													alt={s.destinationCountry}
+													className="w-4 h-3 object-cover rounded-xs shadow-2xs"
+												/>
+											)}
+											<span>Tujuan:</span>
+											<span className="font-semibold text-[#0517B0]">
+												{s.destinationCountry}
+											</span>
+											{s.period && (
+												<span className="text-slate-400">({s.period})</span>
+											)}
+										</div>
+									)}
+
+									{s.phone && (
+										<a
+											href={`https://wa.me/${s.phone.replace(/[^0-9]/g, "")}`}
+											target="_blank"
+											rel="noreferrer"
+											className="inline-flex items-center gap-1 text-slate-700 hover:text-emerald-600 font-medium transition-colors"
+											title="Buka WhatsApp"
+										>
+											<Phone className="w-3.5 h-3.5 text-emerald-600" />
+											<span className="font-mono text-xs">{s.phone}</span>
+										</a>
+									)}
+
+									{/* Dosen Pembimbing Akademik (PA) */}
+									<div
+										className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-medium shadow-2xs ${
+											s.pa?.fullName
+												? "bg-amber-50/90 text-amber-900 border-amber-200"
+												: "bg-slate-100/80 text-slate-500 border-slate-200/70"
+										}`}
+										title={
+											s.pa?.fullName
+												? `Dosen Pembimbing Akademik: ${s.pa.fullName}`
+												: "Dosen PA Belum Ditentukan"
+										}
+									>
+										<div
+											className={`w-3.5 h-3.5 rounded-full text-white font-bold text-[8px] flex items-center justify-center shrink-0 ${
+												s.pa?.fullName ? "bg-amber-600" : "bg-slate-400"
+											}`}
+										>
+											PA
+										</div>
+										<span className="text-slate-500 font-normal">PA:</span>
+										<span className="font-semibold text-slate-800 truncate max-w-[140px] sm:max-w-[200px]">
+											{s.pa?.fullName || "Belum Ditentukan"}
+										</span>
+									</div>
 								</div>
 							</div>
 						</div>
+
+						{/* Right: Progress Overview */}
+						<div className="shrink-0 w-full lg:w-auto">
+							<StudentProgress
+								studentId={s.id}
+								updateTrigger={updateTrigger}
+								userRole={user?.role}
+							/>
+						</div>
 					</div>
 
-					{/* Right: Progress Overview */}
-					<div className="shrink-0 w-full lg:w-auto">
-						<StudentProgress
-							studentId={s.id}
-							updateTrigger={updateTrigger}
-							userRole={user?.role}
-						/>
+					{/* Collapsible Biodata Toggle */}
+					<div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+						<button
+							type="button"
+							onClick={() => setShowFullBiodata(!showFullBiodata)}
+							className="text-xs font-semibold text-[#0517B0] hover:text-blue-800 flex items-center gap-1.5 transition-colors cursor-pointer"
+						>
+							<FileText className="w-3.5 h-3.5" />
+							<span>
+								{showFullBiodata
+									? "Sembunyikan Biodata Lengkap"
+									: "Lihat Biodata Lengkap (NIK, Alamat, Orang Tua)"}
+							</span>
+							{showFullBiodata ? (
+								<ChevronUp className="w-3.5 h-3.5" />
+							) : (
+								<ChevronDown className="w-3.5 h-3.5" />
+							)}
+						</button>
 					</div>
+
+					{/* Collapsible Biodata Content */}
+					{showFullBiodata && (
+						<div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200/80 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs animate-in fade-in duration-200">
+							<div>
+								<span className="text-slate-400 font-medium block text-[11px]">
+									NIK / NISN
+								</span>
+								<span className="font-semibold text-slate-800">
+									{s.nik || "-"} / {s.nisn || "-"}
+								</span>
+							</div>
+							<div>
+								<span className="text-slate-400 font-medium block text-[11px]">
+									Tempat, Tanggal Lahir
+								</span>
+								<span className="font-semibold text-slate-800">
+									{s.birthPlace || "-"},{" "}
+									{s.birthDate
+										? new Date(s.birthDate).toLocaleDateString("id-ID")
+										: "-"}
+								</span>
+							</div>
+							<div>
+								<span className="text-slate-400 font-medium block text-[11px]">
+									Jenis Kelamin
+								</span>
+								<span className="font-semibold text-slate-800">
+									{s.gender || "-"}
+								</span>
+							</div>
+							<div>
+								<span className="text-slate-400 font-medium block text-[11px]">
+									Asal Sekolah
+								</span>
+								<span className="font-semibold text-slate-800">
+									{s.schoolOrigin || "-"}
+								</span>
+							</div>
+							<div className="col-span-2 md:col-span-4">
+								<span className="text-slate-400 font-medium block text-[11px]">
+									Alamat Lengkap
+								</span>
+								<span className="font-medium text-slate-700">
+									{formatAddress(s)}
+								</span>
+							</div>
+							<div>
+								<span className="text-slate-400 font-medium block text-[11px]">
+									Nama Orang Tua / Wali
+								</span>
+								<span className="font-semibold text-slate-800">
+									{primaryParent?.name || "-"}
+								</span>
+							</div>
+							<div>
+								<span className="text-slate-400 font-medium block text-[11px]">
+									Pekerjaan / Penghasilan
+								</span>
+								<span className="font-semibold text-slate-800">
+									{primaryParent?.job || "-"} / {primaryParent?.income || "-"}
+								</span>
+							</div>
+							<div>
+								<span className="text-slate-400 font-medium block text-[11px]">
+									No. HP Orang Tua
+								</span>
+								<span className="font-semibold text-slate-800 font-mono">
+									{primaryParent?.phone || "-"}
+								</span>
+							</div>
+							<div className="col-span-2 md:col-span-4 pt-1 border-t border-slate-200/60 flex items-center gap-2">
+								<span className="text-slate-400 font-medium text-[11px]">
+									Dosen Pembimbing Akademik (PA):
+								</span>
+								<span className="font-semibold text-slate-800">
+									{s.pa?.fullName || "Belum Ditentukan"}
+								</span>
+							</div>
+						</div>
+					)}
 				</div>
-
-				{/* Collapsible Biodata Toggle */}
-				<div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-					<button
-						type="button"
-						onClick={() => setShowFullBiodata(!showFullBiodata)}
-						className="text-xs font-semibold text-[#0517B0] hover:text-blue-800 flex items-center gap-1.5 transition-colors cursor-pointer"
-					>
-						<FileText className="w-3.5 h-3.5" />
-						<span>
-							{showFullBiodata
-								? "Sembunyikan Biodata Lengkap"
-								: "Lihat Biodata Lengkap (NIK, Alamat, Orang Tua)"}
-						</span>
-						{showFullBiodata ? (
-							<ChevronUp className="w-3.5 h-3.5" />
-						) : (
-							<ChevronDown className="w-3.5 h-3.5" />
-						)}
-					</button>
-				</div>
-
-				{/* Collapsible Biodata Content */}
-				{showFullBiodata && (
-					<div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200/80 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs animate-in fade-in duration-200">
-						<div>
-							<span className="text-slate-400 font-medium block text-[11px]">
-								NIK / NISN
-							</span>
-							<span className="font-semibold text-slate-800">
-								{s.nik || "-"} / {s.nisn || "-"}
-							</span>
-						</div>
-						<div>
-							<span className="text-slate-400 font-medium block text-[11px]">
-								Tempat, Tanggal Lahir
-							</span>
-							<span className="font-semibold text-slate-800">
-								{s.birthPlace || "-"},{" "}
-								{s.birthDate
-									? new Date(s.birthDate).toLocaleDateString("id-ID")
-									: "-"}
-							</span>
-						</div>
-						<div>
-							<span className="text-slate-400 font-medium block text-[11px]">
-								Jenis Kelamin
-							</span>
-							<span className="font-semibold text-slate-800">
-								{s.gender || "-"}
-							</span>
-						</div>
-						<div>
-							<span className="text-slate-400 font-medium block text-[11px]">
-								Asal Sekolah
-							</span>
-							<span className="font-semibold text-slate-800">
-								{s.schoolOrigin || "-"}
-							</span>
-						</div>
-						<div className="col-span-2 md:col-span-4">
-							<span className="text-slate-400 font-medium block text-[11px]">
-								Alamat Lengkap
-							</span>
-							<span className="font-medium text-slate-700">
-								{formatAddress(s)}
-							</span>
-						</div>
-						<div>
-							<span className="text-slate-400 font-medium block text-[11px]">
-								Nama Orang Tua / Wali
-							</span>
-							<span className="font-semibold text-slate-800">
-								{primaryParent?.name || "-"}
-							</span>
-						</div>
-						<div>
-							<span className="text-slate-400 font-medium block text-[11px]">
-								Pekerjaan / Penghasilan
-							</span>
-							<span className="font-semibold text-slate-800">
-								{primaryParent?.job || "-"} / {primaryParent?.income || "-"}
-							</span>
-						</div>
-						<div>
-							<span className="text-slate-400 font-medium block text-[11px]">
-								No. HP Orang Tua
-							</span>
-							<span className="font-semibold text-slate-800 font-mono">
-								{primaryParent?.phone || "-"}
-							</span>
-						</div>
-						<div className="col-span-2 md:col-span-4 pt-1 border-t border-slate-200/60 flex items-center gap-2">
-							<span className="text-slate-400 font-medium text-[11px]">
-								Dosen Pembimbing Akademik (PA):
-							</span>
-							<span className="font-semibold text-slate-800">
-								{s.pa?.fullName || "Belum Ditentukan"}
-							</span>
-						</div>
-					</div>
-				)}
 			</div>
 
 			{/* ─── DIVISION TABS NAVIGATION (SEGMENTED PILLS) ─── */}

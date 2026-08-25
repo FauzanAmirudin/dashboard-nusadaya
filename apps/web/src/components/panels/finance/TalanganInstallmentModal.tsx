@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { API_URL } from "@/lib/eden";
+import { filterNumeric, preventNonNumericKey } from "@/utils/form-validators";
 import { formatRupiah } from "@/utils/format";
 
 interface TalanganInstallmentModalProps {
@@ -83,14 +84,19 @@ export function TalanganInstallmentModal({
 							Nominal Pembayaran (Rp) <span className="text-rose-500">*</span>
 						</Label>
 						<Input
-							type="number"
-							min={0}
-							onKeyDown={preventMinus}
+							type="text"
+							inputMode="numeric"
+							maxLength={9}
+							onKeyDown={preventNonNumericKey}
 							value={form.nominalPaid}
 							onChange={(e) =>
 								setForm((prev) => ({
 									...prev,
-									nominalPaid: e.target.value,
+									nominalPaid: filterNumeric(
+										e.target.value,
+										9,
+										"Nominal pembayaran maksimal 9 digit",
+									),
 								}))
 							}
 							placeholder="0"

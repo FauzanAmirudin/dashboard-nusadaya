@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NeumorphicStatCard } from "@/components/ui/NeumorphicStatCard";
 import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { Progress } from "@/components/ui/progress";
@@ -165,9 +166,14 @@ export function CrmDashboard({
 				done: Boolean(crm?.isMonitoringIndustry || crm?.studentMonitoring),
 			},
 			{ name: "Kendali Vocab/Bahasa", done: Boolean(crm?.isVocabComplete) },
-			{ name: "Surat Izin Belajar", done: Boolean(crm?.hasStudyPermit) },
 			{ name: "Presensi Praktik ODS", done: Boolean(crm?.practiceAttendance) },
+			{ name: "Laporan ODS", done: Boolean(crm?.isOdsReport) },
 			{ name: "Dokumentasi ODS", done: Boolean(crm?.odsDocumentation) },
+			{ name: "Laporan Pra-Magang", done: Boolean(crm?.isPrammagangReport) },
+			{
+				name: "Dokumentasi Pra-Magang",
+				done: Boolean(crm?.isPrammagangDocumentation),
+			},
 		];
 		const completed = items.filter((i) => i.done).length;
 		return {
@@ -192,15 +198,19 @@ export function CrmDashboard({
 					s.student?.program ||
 					"-",
 				"No. WhatsApp": s.student?.phone || "-",
-				"Progress Checklist": `${checklist.completed}/6 Item (${Math.round((checklist.completed / 6) * 100)}%)`,
+				"Progress Checklist": `${checklist.completed}/8 Item (${Math.round((checklist.completed / 8) * 100)}%)`,
 				"Monitoring Ortu": s.crm?.isMonitoringParent ? "Selesai" : "Belum",
 				"Monitoring Industri": s.crm?.isMonitoringIndustry
 					? "Selesai"
 					: "Belum",
 				"Kendali Vocab": s.crm?.isVocabComplete ? "Selesai" : "Belum",
-				"Surat Izin Belajar": s.crm?.hasStudyPermit ? "Ada" : "Tidak",
 				"Presensi Praktik": s.crm?.practiceAttendance ? "Selesai" : "Belum",
+				"Laporan ODS": s.crm?.isOdsReport ? "Selesai" : "Belum",
 				"Dokumentasi ODS": s.crm?.odsDocumentation ? "Selesai" : "Belum",
+				"Laporan Pra-Magang": s.crm?.isPrammagangReport ? "Selesai" : "Belum",
+				"Dokumentasi Pra-Magang": s.crm?.isPrammagangDocumentation
+					? "Selesai"
+					: "Belum",
 				"Status CRM": s.crm?.isAcc
 					? "Sudah ACC"
 					: s.crm?.status === "AMAN"
@@ -252,97 +262,42 @@ export function CrmDashboard({
 
 			{/* KPI Summary Cards */}
 			<div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
-					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-blue-50 text-[#0517B0] mt-0.5">
-							<Users className="h-5 w-5" />
-						</div>
-						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								Total Mahasiswa
-							</p>
-							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{totalStudents}
-							</p>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-sky-500">
-					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-sky-50 text-sky-600 mt-0.5">
-							<ShieldCheck className="h-5 w-5" />
-						</div>
-						<div>
-							<p className="text-sky-700 text-xs font-bold">ACC Divisi CRM</p>
-							<p className="text-2xl font-black text-sky-900 mt-0.5">
-								{countAcc}
-							</p>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
-					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 mt-0.5">
-							<CheckCircle className="h-5 w-5" />
-						</div>
-						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								Status Aman
-							</p>
-							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countAman}
-							</p>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-amber-500">
-					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-amber-50 text-amber-600 mt-0.5">
-							<Clock className="h-5 w-5" />
-						</div>
-						<div>
-							<p className="text-slate-500 text-xs font-semibold">Berproses</p>
-							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countProses}
-							</p>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-rose-500">
-					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-rose-50 text-rose-600 mt-0.5">
-							<XCircle className="h-5 w-5" />
-						</div>
-						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								Butuh Perhatian
-							</p>
-							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countPerhatian}
-							</p>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-indigo-600">
-					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 mt-0.5">
-							<HeartHandshake className="h-5 w-5" />
-						</div>
-						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								Presensi Praktik OK
-							</p>
-							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countPracticeOk}
-							</p>
-						</div>
-					</CardContent>
-				</Card>
+				<NeumorphicStatCard
+					label="Total Mahasiswa"
+					value={totalStudents}
+					icon={<Users className="h-5 w-5" />}
+					color="blue"
+				/>
+				<NeumorphicStatCard
+					label="ACC Divisi CRM"
+					value={countAcc}
+					icon={<ShieldCheck className="h-5 w-5" />}
+					color="sky"
+				/>
+				<NeumorphicStatCard
+					label="Status Aman"
+					value={countAman}
+					icon={<CheckCircle className="h-5 w-5" />}
+					color="green"
+				/>
+				<NeumorphicStatCard
+					label="Berproses"
+					value={countProses}
+					icon={<Clock className="h-5 w-5" />}
+					color="amber"
+				/>
+				<NeumorphicStatCard
+					label="Butuh Perhatian"
+					value={countPerhatian}
+					icon={<XCircle className="h-5 w-5" />}
+					color="rose"
+				/>
+				<NeumorphicStatCard
+					label="Presensi Praktik OK"
+					value={countPracticeOk}
+					icon={<HeartHandshake className="h-5 w-5" />}
+					color="indigo"
+				/>
 			</div>
 
 			{/* Main Monitoring Table */}
@@ -444,7 +399,7 @@ export function CrmDashboard({
 										No. WhatsApp
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
-										Progress (6)
+										Progress (8)
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
 										Status CRM
@@ -582,7 +537,7 @@ export function CrmDashboard({
 														<TooltipContent className="w-64 p-3.5 bg-slate-950 text-white rounded-xl shadow-2xl border border-slate-800 text-xs flex flex-col space-y-2 z-50">
 															<div className="flex items-center justify-between border-b border-slate-800 pb-1.5 w-full">
 																<span className="font-bold text-slate-100 text-xs">
-																	Indikator CRM (6):
+																	Indikator CRM (8):
 																</span>
 																<span className="text-[11px] font-mono text-emerald-400 font-bold">
 																	{completed}/{total} Selesai

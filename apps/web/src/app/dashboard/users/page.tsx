@@ -56,6 +56,12 @@ import {
 import { API_URL, api, getToken } from "@/lib/eden";
 import { cn } from "@/lib/utils";
 import { hasRole, useAuthStore } from "@/store";
+import {
+	filterAlphaNumeric,
+	filterPhone,
+	isValidEmail,
+	preventNonPhoneKey,
+} from "@/utils/form-validators";
 
 type UserData = {
 	id: number;
@@ -240,6 +246,21 @@ export default function UsersManagementPage() {
 			return;
 		}
 
+		if (formData.username.length < 3) {
+			toast.error("Username minimal 3 karakter");
+			return;
+		}
+
+		if (formData.email && !isValidEmail(formData.email)) {
+			toast.error("Format email tidak valid (contoh: user@example.com)");
+			return;
+		}
+
+		if (formData.phone && formData.phone.length < 8) {
+			toast.error("Nomor WhatsApp minimal 8 digit");
+			return;
+		}
+
 		if (formData.password !== formData.confirmPassword) {
 			toast.error("Password tidak cocok");
 			return;
@@ -289,6 +310,21 @@ export default function UsersManagementPage() {
 
 		if (effectiveRoles.length === 0) {
 			toast.error("Pilih minimal satu peran / role");
+			return;
+		}
+
+		if (formData.username.length < 3) {
+			toast.error("Username minimal 3 karakter");
+			return;
+		}
+
+		if (formData.email && !isValidEmail(formData.email)) {
+			toast.error("Format email tidak valid (contoh: user@example.com)");
+			return;
+		}
+
+		if (formData.phone && formData.phone.length < 8) {
+			toast.error("Nomor WhatsApp minimal 8 digit");
 			return;
 		}
 
@@ -655,7 +691,15 @@ export default function UsersManagementPage() {
 									placeholder="Cth: budi123"
 									value={formData.username}
 									onChange={(e) =>
-										setFormData({ ...formData, username: e.target.value })
+										setFormData({
+											...formData,
+											username: filterAlphaNumeric(
+												e.target.value,
+												30,
+												true,
+												"Username hanya boleh berisi huruf, angka, dan underscore",
+											),
+										})
 									}
 								/>
 							</div>
@@ -677,8 +721,12 @@ export default function UsersManagementPage() {
 									placeholder="081234567890"
 									className="border-2 border-slate-200"
 									value={formData.phone}
+									onKeyDown={preventNonPhoneKey}
 									onChange={(e) =>
-										setFormData({ ...formData, phone: e.target.value })
+										setFormData({
+											...formData,
+											phone: filterPhone(e.target.value, 15),
+										})
 									}
 								/>
 							</div>

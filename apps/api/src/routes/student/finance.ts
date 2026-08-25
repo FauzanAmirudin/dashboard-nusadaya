@@ -41,6 +41,15 @@ import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
 import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 
+async function invalidateFinanceCaches(studentId: number) {
+	await Promise.all([
+		cacheDel(`cache:student:${studentId}`),
+		cacheInvalidatePattern("cache:students:*"),
+		cacheInvalidatePattern("cache:mahasiswa:*"),
+		cacheInvalidatePattern("cache:dashboard:*"),
+	]);
+}
+
 export const financeRoutes = new Elysia()
 	.get("/:id/finance", async ({ params }) => {
 		const id = Number(params.id);
@@ -156,7 +165,7 @@ export const financeRoutes = new Elysia()
 
 			const merged = { ...(current || {}), ...cleanUpdates };
 
-			// Hitung checklist keuangan dari field aktual (mendukung kedua metode pembayaran)
+			// Hitung checklist keuangan dari 6 field aktual (mendukung kedua metode pembayaran)
 			let checked = 0;
 			const isTalangan = merged.metodePembayaran === "dana_talangan";
 
@@ -175,16 +184,18 @@ export const financeRoutes = new Elysia()
 					: merged.mandiriKeberangkatanStatus
 			)
 				checked++;
+			if (merged.toeicStatus) checked++;
+			if (merged.pasporStatus) checked++;
 
 			let status: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
 				"BUTUH_PERHATIAN";
 			if (merged.isAcc) status = "ACC";
-			else if (checked === 4) status = "AMAN";
-			else if ((checked / 4) * 100 > 30) status = "PROSES";
+			else if (checked === 6) status = "AMAN";
+			else if (checked > 0) status = "PROSES";
 
 			cleanUpdates.status = status;
 
-			if (merged.isAcc && checked < 4) {
+			if (merged.isAcc && checked < 6) {
 				cleanUpdates.isAcc = false;
 				cleanUpdates.accAt = null;
 				cleanUpdates.accBy = null;
@@ -202,11 +213,7 @@ export const financeRoutes = new Elysia()
 					.where(eq(financeData.studentId, id));
 			}
 
-			await Promise.all([
-				cacheDel(`cache:student:${id}`),
-				cacheInvalidatePattern("cache:students:list:*"),
-				cacheInvalidatePattern(`cache:mahasiswa:*`),
-			]);
+			await invalidateFinanceCaches(id);
 
 			return { success: true };
 		},
@@ -226,17 +233,34 @@ export const financeRoutes = new Elysia()
 		const currentFinance = await db.query.financeData.findFirst({
 			where: eq(financeData.studentId, id),
 		});
+
+		const isTalangan = currentFinance?.metodePembayaran === "dana_talangan";
+		const isSemesterDone = isTalangan
+			? Boolean(
+					currentFinance?.t1SemesterStatus ||
+						currentFinance?.mandiriSemesterStatus,
+				)
+			: Boolean(currentFinance?.mandiriSemesterStatus);
+		const isInterviewDone = isTalangan
+			? Boolean(currentFinance?.t1InterviewStatus)
+			: Boolean(currentFinance?.mandiriInterviewStatus);
+		const isKeberangkatanDone = isTalangan
+			? Boolean(currentFinance?.t2KeberangkatanStatus)
+			: Boolean(currentFinance?.mandiriKeberangkatanStatus);
+
 		if (
 			!currentFinance?.registrasiStatus ||
-			(!currentFinance?.mandiriSemesterStatus &&
-				!currentFinance?.t1SemesterStatus) ||
+			!isSemesterDone ||
+			!isInterviewDone ||
+			!isKeberangkatanDone ||
 			!currentFinance?.toeicStatus ||
 			!currentFinance?.pasporStatus
 		) {
 			set.status = 400;
 			return {
 				success: false,
-				message: "Semua tagihan harus lunas / tidak ada tunggakan sebelum ACC.",
+				message:
+					"Semua checklist keuangan (6 item) harus lengkap dan lunas sebelum ACC.",
 			};
 		}
 
@@ -250,11 +274,7 @@ export const financeRoutes = new Elysia()
 			})
 			.where(eq(financeData.studentId, id));
 
-		await Promise.all([
-			cacheDel(`cache:student:${id}`),
-			cacheInvalidatePattern("cache:students:list:*"),
-			cacheInvalidatePattern(`cache:mahasiswa:*`),
-		]);
+		await invalidateFinanceCaches(id);
 
 		return { success: true };
 	})
@@ -293,13 +313,11 @@ export const financeRoutes = new Elysia()
 					: currentFinance.mandiriKeberangkatanStatus
 			)
 				checked++;
+			if (currentFinance.toeicStatus) checked++;
+			if (currentFinance.pasporStatus) checked++;
 		}
 		const fallbackStatus =
-			checked === 4
-				? "AMAN"
-				: (checked / 4) * 100 > 30
-					? "PROSES"
-					: "BUTUH_PERHATIAN";
+			checked === 6 ? "AMAN" : checked > 0 ? "PROSES" : "BUTUH_PERHATIAN";
 
 		await db
 			.update(financeData)
@@ -311,11 +329,7 @@ export const financeRoutes = new Elysia()
 			})
 			.where(eq(financeData.studentId, id));
 
-		await Promise.all([
-			cacheDel(`cache:student:${id}`),
-			cacheInvalidatePattern("cache:students:list:*"),
-			cacheInvalidatePattern(`cache:mahasiswa:*`),
-		]);
+		await invalidateFinanceCaches(id);
 
 		return { success: true };
 	})
@@ -503,11 +517,7 @@ export const financeRoutes = new Elysia()
 				.where(eq(financeSemesters.id, semesterId));
 
 			const studentId = Number(params.id);
-			await Promise.all([
-				cacheDel(`cache:student:${studentId}`),
-				cacheInvalidatePattern("cache:students:list:*"),
-				cacheInvalidatePattern(`cache:mahasiswa:*`),
-			]);
+			await invalidateFinanceCaches(studentId);
 
 			return { success: true };
 		},
@@ -590,11 +600,7 @@ export const financeRoutes = new Elysia()
 				}
 			}
 
-			await Promise.all([
-				cacheDel(`cache:student:${studentId}`),
-				cacheInvalidatePattern("cache:students:list:*"),
-				cacheInvalidatePattern(`cache:mahasiswa:*`),
-			]);
+			await invalidateFinanceCaches(studentId);
 
 			return { success: true, remainingAmount };
 		},
@@ -662,11 +668,7 @@ export const financeRoutes = new Elysia()
 				.where(eq(financeSemesters.id, semesterId));
 
 			const studentId = Number(params.id);
-			await Promise.all([
-				cacheDel(`cache:student:${studentId}`),
-				cacheInvalidatePattern("cache:students:list:*"),
-				cacheInvalidatePattern(`cache:mahasiswa:*`),
-			]);
+			await invalidateFinanceCaches(studentId);
 
 			return { success: true };
 		},
@@ -759,11 +761,7 @@ export const financeRoutes = new Elysia()
 			}
 
 			const studentId = Number(params.id);
-			await Promise.all([
-				cacheDel(`cache:student:${studentId}`),
-				cacheInvalidatePattern("cache:students:list:*"),
-				cacheInvalidatePattern(`cache:mahasiswa:*`),
-			]);
+			await invalidateFinanceCaches(studentId);
 
 			return { success: true };
 		},
@@ -832,11 +830,7 @@ export const financeRoutes = new Elysia()
 			}
 
 			const studentId = Number(params.id);
-			await Promise.all([
-				cacheDel(`cache:student:${studentId}`),
-				cacheInvalidatePattern("cache:students:list:*"),
-				cacheInvalidatePattern(`cache:mahasiswa:*`),
-			]);
+			await invalidateFinanceCaches(studentId);
 
 			return { success: true };
 		},
@@ -886,11 +880,7 @@ export const financeRoutes = new Elysia()
 				})
 				.returning();
 
-			await Promise.all([
-				cacheDel(`cache:student:${studentId}`),
-				cacheInvalidatePattern("cache:students:list:*"),
-				cacheInvalidatePattern(`cache:mahasiswa:*`),
-			]);
+			await invalidateFinanceCaches(studentId);
 
 			return { success: true, data: inserted };
 		},
@@ -931,11 +921,7 @@ export const financeRoutes = new Elysia()
 				.where(eq(financeTalanganInstallments.id, installmentId));
 
 			const studentId = Number(params.id);
-			await Promise.all([
-				cacheDel(`cache:student:${studentId}`),
-				cacheInvalidatePattern("cache:students:list:*"),
-				cacheInvalidatePattern(`cache:mahasiswa:*`),
-			]);
+			await invalidateFinanceCaches(studentId);
 
 			return { success: true };
 		},
@@ -964,11 +950,7 @@ export const financeRoutes = new Elysia()
 				.where(eq(financeTalanganInstallments.id, installmentId));
 
 			const studentId = Number(params.id);
-			await Promise.all([
-				cacheDel(`cache:student:${studentId}`),
-				cacheInvalidatePattern("cache:students:list:*"),
-				cacheInvalidatePattern(`cache:mahasiswa:*`),
-			]);
+			await invalidateFinanceCaches(studentId);
 
 			return { success: true };
 		},

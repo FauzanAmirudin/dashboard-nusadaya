@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { AccPanelStatusCard } from "@/components/ui/AccPanelStatusCard";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -26,7 +27,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PanelHeader } from "@/components/ui/PanelHeader";
 import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -379,55 +381,51 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 
 	return (
 		<div className="space-y-6">
-			{/* Header */}
-			<div className="border-b border-slate-200 pb-4 mb-6">
-				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-					<div>
-						<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
-							<HeartHandshake className="w-5 h-5 text-[#0517B0]" /> PA —
-							Pendamping Akademik
-							<span className="ml-2 text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
-								Progres: {totalProgressItems}/4 Item ({completedChecklistCount}
-								/3 Checklist • {totalVocab} Kosakata • {totalSentence} Kalimat)
-							</span>
-						</CardTitle>
-						<p className="text-sm text-slate-500 mt-1">
-							Dikelola oleh: Admin PA & Pendamping Akademik
-						</p>
-					</div>
-					<div className="flex items-center gap-3">
-						{isSuperadmin && !isPa && (
-							<Badge
-								variant="outline"
-								className="text-slate-400 border-slate-300"
-							>
-								Mode Lihat Saja
-							</Badge>
-						)}
-						<PanelStatusBadge
-							isAcc={paData?.isAcc}
-							completed={totalProgressItems}
-							total={4}
-							size="lg"
-						/>
-					</div>
-				</div>
-				<div className="mt-4 flex items-center gap-4">
-					<span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
+			<PanelHeader
+				icon={<HeartHandshake className="w-5 h-5 text-[#0517B0]" />}
+				title="PA — Pendamping Akademik"
+				subtitle="Dikelola oleh: Admin PA & Pendamping Akademik"
+				progressTag={
+					<span className="text-xs font-bold text-slate-700 bg-slate-200/70 px-2.5 py-0.5 rounded-full border border-slate-300/40">
+						Progres: {totalProgressItems}/4 Item ({completedChecklistCount}/3
+						Checklist • {totalVocab} Kosakata • {totalSentence} Kalimat)
+					</span>
+				}
+				actions={
+					isSuperadmin && !isPa ? (
+						<Badge
+							variant="outline"
+							className="text-slate-400 border-slate-300"
+						>
+							Mode Lihat Saja
+						</Badge>
+					) : undefined
+				}
+				badge={
+					<PanelStatusBadge
+						isAcc={paData?.isAcc}
+						completed={totalProgressItems}
+						total={4}
+						size="lg"
+					/>
+				}
+			>
+				<div className="flex items-center gap-4">
+					<span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
 						Total Progress:
 					</span>
 					<Progress
 						value={totalChecklistProgress}
-						className="h-2 flex-1"
+						className="h-2 flex-1 bg-slate-200/60"
 						indicatorClassName={
-							totalChecklistProgress === 100 ? "bg-emerald-500" : "bg-blue-500"
+							totalChecklistProgress === 100 ? "bg-emerald-500" : "bg-blue-600"
 						}
 					/>
-					<span className="text-sm font-bold text-slate-700">
+					<span className="text-xs font-bold text-slate-700">
 						{totalChecklistProgress}%
 					</span>
 				</div>
-			</div>
+			</PanelHeader>
 
 			{/* Tabs Container */}
 			<Tabs
@@ -551,153 +549,27 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 			</Tabs>
 
 			{/* Status ACC Panel Card (Persistent across all tabs) */}
-			<Card
-				className={`border shadow-sm overflow-hidden mt-6 ${
-					paData?.isAcc
-						? "bg-slate-50 border-slate-200"
-						: "bg-blue-50/50 border-blue-200"
-				}`}
-			>
-				<CardContent className="p-0">
-					<div className="flex flex-col sm:flex-row items-center justify-between p-6">
-						<div className="flex items-center gap-4 mb-4 sm:mb-0">
-							{paData?.isAcc ? (
-								<>
-									<div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-										<CheckCircle className="w-6 h-6 text-emerald-600" />
-									</div>
-									<div>
-										<h4 className="text-slate-800 font-bold text-lg">
-											Disetujui (ACC PA) oleh {paData.accBy?.fullName || "PA"}
-										</h4>
-										<p className="text-sm text-slate-600 mt-0.5">
-											Pada {formatDeviceDateTime(paData.accAt)}
-										</p>
-									</div>
-								</>
-							) : (
-								<>
-									<div
-										className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
-											isAllChecksDone
-												? "bg-blue-100 text-[#0517B0]"
-												: "bg-amber-100 text-amber-600"
-										}`}
-									>
-										{isAllChecksDone ? (
-											<CheckCircle2 className="w-6 h-6 text-[#0517B0]" />
-										) : (
-											<Clock className="w-6 h-6 text-amber-600" />
-										)}
-									</div>
-									<div>
-										<h4 className="text-slate-900 font-bold text-lg">
-											{!isAllChecksDone
-												? `Menunggu ACC PA (${3 - completedCount} item belum selesai)`
-												: "ACC Panel Pendamping Akademik (PA)"}
-										</h4>
-										<p className="text-sm text-slate-600 max-w-md mt-0.5">
-											{!isAllChecksDone
-												? "Selesaikan semua checklist pendampingan (Akademik, Vocab, Konseling) sebelum memberikan ACC."
-												: "Seluruh progres pendampingan mahasiswa telah selesai. Anda dapat memberikan persetujuan ACC resmi sekarang."}
-										</p>
-									</div>
-								</>
-							)}
-						</div>
-
-						{isPa && paData?.isAcc && (
-							<AlertDialog>
-								<AlertDialogTrigger
-									render={
-										<Button
-											variant="outline"
-											className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 shrink-0 font-semibold text-xs h-9 cursor-pointer"
-											disabled={isSaving}
-										>
-											{isSaving ? "Membatalkan..." : "Batalkan ACC PA"}
-										</Button>
-									}
-								/>
-								<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
-									<AlertDialogHeader>
-										<AlertDialogTitle>
-											Konfirmasi Pembatalan ACC PA
-										</AlertDialogTitle>
-										<AlertDialogDescription className="text-slate-500 text-xs sm:text-sm">
-											Apakah Anda yakin ingin membatalkan status ACC untuk panel
-											Pendamping Akademik ini? Status mahasiswa akan kembali ke
-											tahap proses.
-										</AlertDialogDescription>
-									</AlertDialogHeader>
-									<div className="flex justify-end gap-3 mt-4">
-										<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50">
-											Batal
-										</AlertDialogCancel>
-										<AlertDialogAction
-											onClick={handleCancelAcc}
-											className="bg-rose-600 hover:bg-rose-700 text-white"
-										>
-											Ya, Batalkan ACC
-										</AlertDialogAction>
-									</div>
-								</AlertDialogContent>
-							</AlertDialog>
-						)}
-
-						{isPa && !paData?.isAcc && (
-							<TooltipProvider>
-								<Tooltip>
-									<TooltipTrigger render={<span className="inline-block" />}>
-										<span>
-											<AlertDialog>
-												<AlertDialogTrigger
-													render={
-														<Button
-															disabled={!isAllChecksDone || isSaving}
-															className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold text-xs h-9 min-w-[130px] disabled:opacity-50 disabled:cursor-not-allowed shadow-xs cursor-pointer"
-														>
-															{isSaving ? "Menyimpan..." : "Berikan ACC PA"}
-														</Button>
-													}
-												/>
-												<AlertDialogContent className="bg-white border-slate-200">
-													<AlertDialogHeader>
-														<AlertDialogTitle>
-															Konfirmasi ACC PA
-														</AlertDialogTitle>
-														<AlertDialogDescription className="text-slate-600 text-xs sm:text-sm">
-															Apakah Anda yakin ingin memberikan ACC? Ini akan
-															menandakan kelulusan pendampingan akademik dan
-															mengunci evaluasi PA mahasiswa ini.
-														</AlertDialogDescription>
-													</AlertDialogHeader>
-													<div className="flex justify-end gap-3 mt-4">
-														<AlertDialogCancel>Batal</AlertDialogCancel>
-														<AlertDialogAction
-															onClick={handleAcc}
-															className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold"
-														>
-															Ya, Berikan ACC
-														</AlertDialogAction>
-													</div>
-												</AlertDialogContent>
-											</AlertDialog>
-										</span>
-									</TooltipTrigger>
-									{!isAllChecksDone && (
-										<TooltipContent>
-											<p className="text-xs">
-												Selesaikan 3/3 checklist pendampingan sebelum ACC
-											</p>
-										</TooltipContent>
-									)}
-								</Tooltip>
-							</TooltipProvider>
-						)}
-					</div>
-				</CardContent>
-			</Card>
+			<AccPanelStatusCard
+				isAcc={Boolean(paData?.isAcc)}
+				accByUser={paData?.accBy?.fullName || "PA"}
+				accAt={paData?.accAt}
+				isReadyForAcc={isAllChecksDone}
+				title="ACC Panel PA"
+				pendingTitle={
+					!isAllChecksDone
+						? `Menunggu ACC PA (${3 - completedCount} item belum selesai)`
+						: "ACC Panel Pendamping Akademik (PA)"
+				}
+				pendingDescription="Selesaikan semua checklist pendampingan (Akademik, Vocab, Konseling) sebelum memberikan ACC."
+				readyDescription="Seluruh progres pendampingan mahasiswa telah selesai. Anda dapat memberikan persetujuan ACC resmi sekarang."
+				canEdit={isPa}
+				isSaving={isSaving}
+				onAcc={handleAcc}
+				onCancelAcc={handleCancelAcc}
+				cancelDialogTitle="Konfirmasi Pembatalan ACC PA"
+				cancelDialogDescription="Apakah Anda yakin ingin membatalkan status ACC untuk panel Pendamping Akademik ini? Status mahasiswa akan kembali ke tahap proses."
+				disabledReason="Selesaikan 3/3 checklist pendampingan sebelum ACC"
+			/>
 		</div>
 	);
 }

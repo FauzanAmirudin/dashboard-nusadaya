@@ -26,6 +26,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NeumorphicStatCard } from "@/components/ui/NeumorphicStatCard";
 import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { api } from "@/lib/eden";
 import { cn } from "@/lib/utils";
@@ -150,53 +151,24 @@ export function DosenDashboard({ user }: DosenDashboardProps) {
 
 			{/* KPI Summary Cards */}
 			<div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
-					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-blue-50 text-[#0517B0] mt-0.5">
-							<BookOpen className="h-5 w-5" />
-						</div>
-						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								Mata Kuliah Diampu
-							</p>
-							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{courses.length}
-							</p>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-indigo-600">
-					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 mt-0.5">
-							<Layers className="h-5 w-5" />
-						</div>
-						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								Kelas Teori
-							</p>
-							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{totalTeori} Kelas
-							</p>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
-					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 mt-0.5">
-							<CheckCircle2 className="h-5 w-5" />
-						</div>
-						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								Kelas Praktik
-							</p>
-							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{totalPraktik} Kelas
-							</p>
-						</div>
-					</CardContent>
-				</Card>
+				<NeumorphicStatCard
+					label="Mata Kuliah Diampu"
+					value={courses.length}
+					icon={<BookOpen className="h-5 w-5" />}
+					color="blue"
+				/>
+				<NeumorphicStatCard
+					label="Kelas Teori"
+					value={`${totalTeori} Kelas`}
+					icon={<Layers className="h-5 w-5" />}
+					color="indigo"
+				/>
+				<NeumorphicStatCard
+					label="Kelas Praktik"
+					value={`${totalPraktik} Kelas`}
+					icon={<CheckCircle2 className="h-5 w-5" />}
+					color="green"
+				/>
 			</div>
 
 			{/* Course List Section */}

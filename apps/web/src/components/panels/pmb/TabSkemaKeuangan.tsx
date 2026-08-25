@@ -2,6 +2,7 @@
 
 import {
 	Activity,
+	AlertCircle,
 	Building,
 	CheckCircle2,
 	CreditCard,
@@ -45,6 +46,7 @@ export function TabSkemaKeuangan({
 }: TabSkemaKeuanganProps) {
 	const [isSaving, setIsSaving] = useState(false);
 	const [isEditing, setIsEditing] = useState(false);
+	const [inputWarning, setInputWarning] = useState<string | null>(null);
 
 	const initialTotalBiaya =
 		pmbData?.paymentPlan?.totalBiaya && pmbData.paymentPlan.totalBiaya > 0
@@ -95,8 +97,64 @@ export function TabSkemaKeuangan({
 		};
 	}, [studentId]);
 
+	const handleTotalBiayaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const rawValue = e.target.value;
+		// Hanya ambil digit angka 0-9
+		const digitsOnly = rawValue.replace(/[^0-9]/g, "");
+
+		if (digitsOnly.length > 9) {
+			toast.warning("Maksimal 9 digit angka (maks. Rp 999.999.999)");
+			setInputWarning("Input dibatasi maksimal 9 digit (maks. Rp 999.999.999)");
+			const trimmed = digitsOnly.slice(0, 9);
+			setTotalBiaya(Number(trimmed) || 0);
+			return;
+		}
+
+		if (rawValue !== digitsOnly && /[^0-9]/.test(rawValue)) {
+			toast.warning("Hanya angka (bilangan bulat) yang diperbolehkan");
+			setInputWarning("Hanya menerima input angka bilangan bulat (integer)");
+		} else {
+			setInputWarning(null);
+		}
+
+		if (digitsOnly === "") {
+			setTotalBiaya(0);
+		} else {
+			setTotalBiaya(parseInt(digitsOnly, 10) || 0);
+		}
+	};
+
+	const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+		if (
+			e.key === "-" ||
+			e.key === "+" ||
+			e.key === "e" ||
+			e.key === "E" ||
+			e.key === "." ||
+			e.key === ","
+		) {
+			e.preventDefault();
+			toast.warning(
+				"Hanya angka (integer) tanpa titik/koma/minus yang diperbolehkan",
+			);
+			setInputWarning(
+				"Hanya angka bilangan bulat tanpa minus, titik, atau koma",
+			);
+		}
+	};
+
 	const handleSaveTotalBiaya = async () => {
 		if (!canEdit) return;
+		if (!Number.isInteger(Number(totalBiaya)) || totalBiaya < 0) {
+			toast.error(
+				"Total Biaya Pendidikan harus berupa bilangan bulat (integer)",
+			);
+			return;
+		}
+		if (totalBiaya > 999_999_999) {
+			toast.error("Total Biaya Pendidikan maksimal 9 digit (Rp 999.999.999)");
+			return;
+		}
 		setIsSaving(true);
 		try {
 			const res = await fetch(
@@ -108,7 +166,7 @@ export function TabSkemaKeuangan({
 						"Content-Type": "application/json",
 					},
 					body: JSON.stringify({
-						totalBiaya: Math.max(0, Number(totalBiaya) || 0),
+						totalBiaya: Math.max(0, Math.floor(Number(totalBiaya)) || 0),
 					}),
 				},
 			);
@@ -117,10 +175,12 @@ export function TabSkemaKeuangan({
 					"Total Biaya Pendidikan berhasil disimpan & terhubung ke Finance",
 				);
 				setIsEditing(false);
+				setInputWarning(null);
 				fetchFinanceData();
 				onUpdate();
 			} else {
-				toast.error("Gagal menyimpan Total Biaya Pendidikan");
+				const json = await res.json().catch(() => null);
+				toast.error(json?.message || "Gagal menyimpan Total Biaya Pendidikan");
 			}
 		} catch (error) {
 			toast.error("Terjadi kesalahan jaringan");
@@ -131,6 +191,7 @@ export function TabSkemaKeuangan({
 
 	const handleCancelEdit = () => {
 		setTotalBiaya(initialTotalBiaya);
+		setInputWarning(null);
 		setIsEditing(false);
 	};
 
@@ -273,33 +334,38 @@ export function TabSkemaKeuangan({
 				<CardContent className="p-5 space-y-4">
 					<div className="max-w-xl p-4 bg-indigo-50/40 rounded-xl border border-indigo-100 space-y-3">
 						<div>
-							<Label className="text-xs font-bold text-indigo-950 block mb-1">
-								Total Biaya Pendidikan Keseluruhan (Rp) *
-							</Label>
+							<div className="flex items-center justify-between mb-1">
+								<Label className="text-xs font-bold text-indigo-950 block">
+									Total Biaya Pendidikan Keseluruhan (Rp) *
+								</Label>
+							</div>
 							<div className="relative">
 								<span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
 									Rp
 								</span>
 								<Input
-									type="number"
-									min={0}
+									type="text"
+									inputMode="numeric"
+									pattern="[0-9]*"
+									maxLength={9}
 									disabled={!isEditing || !canEdit}
 									value={totalBiaya === 0 || !totalBiaya ? "" : totalBiaya}
-									onKeyDown={(e) => {
-										if (e.key === "-" || e.key === "e" || e.key === "E")
-											e.preventDefault();
-									}}
-									onChange={(e) =>
-										setTotalBiaya(
-											e.target.value === ""
-												? 0
-												: Math.max(0, Number(e.target.value) || 0),
-										)
-									}
-									className="pl-9 font-bold text-base bg-white h-10 border-indigo-200 focus:border-indigo-500 disabled:bg-slate-100 disabled:text-slate-700"
+									onKeyDown={handleKeyDown}
+									onChange={handleTotalBiayaChange}
+									className={`pl-9 font-bold text-base bg-white h-10 border-indigo-200 focus:border-indigo-500 disabled:bg-slate-100 disabled:text-slate-700 ${
+										inputWarning ? "border-amber-400 ring-1 ring-amber-300" : ""
+									}`}
 									placeholder="Belum diinputkan (Contoh: 25000000)"
 								/>
 							</div>
+
+							{inputWarning && (
+								<div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200 mt-1.5 animate-in fade-in">
+									<AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+									<span>{inputWarning}</span>
+								</div>
+							)}
+
 							<span className="text-xs font-semibold text-indigo-700 mt-1.5 block">
 								Terbilang:{" "}
 								{totalBiaya > 0

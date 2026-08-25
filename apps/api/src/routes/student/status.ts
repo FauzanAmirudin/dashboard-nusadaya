@@ -72,6 +72,14 @@ export const statusRoutes = new Elysia().get(
 			.select()
 			.from(crmData)
 			.where(eq(crmData.studentId, id));
+		const crmDocs = await db
+			.select()
+			.from(crmDocuments)
+			.where(eq(crmDocuments.studentId, id));
+		const hasOdsReport = crmDocs.some((d) => d.documentKey === "ods_report");
+		const hasPrammagangReport = crmDocs.some(
+			(d) => d.documentKey === "pramagang_report",
+		);
 		const [finance] = await db
 			.select()
 			.from(financeData)
@@ -140,13 +148,19 @@ export const statusRoutes = new Elysia().get(
 		totalCompleted += pmbCompleted;
 		totalIndicators += 14;
 
-		// 2. CRM
+		// 2. CRM (8 Items Total)
 		const crmItems = [
-			{ prop: crm?.odsActive, name: "ODS Aktif" },
-			{ prop: crm?.studentMonitoring, name: "Monitoring Mahasiswa" },
-			{ prop: crm?.parentFollowUp, name: "Follow Up Orang Tua" },
-			{ prop: crm?.practiceAttendance, name: "Update Kehadiran Praktik" },
-			{ prop: crm?.odsDocumentation, name: "Dokumentasi ODS" },
+			{ prop: Boolean(crm?.isMonitoringParent), name: "Monitoring Orang Tua" },
+			{ prop: Boolean(crm?.isMonitoringIndustry), name: "Monitoring Industri" },
+			{ prop: Boolean(crm?.isVocabComplete), name: "Kendali Vocab/Bahasa" },
+			{ prop: Boolean(crm?.practiceAttendance), name: "Presensi Praktik ODS" },
+			{ prop: Boolean(hasOdsReport), name: "Laporan ODS" },
+			{ prop: Boolean(crm?.odsDocumentation), name: "Dokumentasi ODS" },
+			{ prop: Boolean(hasPrammagangReport), name: "Laporan Pra-Magang" },
+			{
+				prop: Boolean(crm?.isPrammagangDocumentation),
+				name: "Dokumentasi Pra-Magang",
+			},
 		];
 		const crmCompleted = crmItems.filter((i) => i.prop).length;
 		crmItems
@@ -163,12 +177,12 @@ export const statusRoutes = new Elysia().get(
 			id: "crm",
 			name: "CRM",
 			completed: crmCompleted,
-			total: 5,
-			status: calculatePanelStatus(crmCompleted, 5, crm?.isAcc),
+			total: 8,
+			status: calculatePanelStatus(crmCompleted, 8, crm?.isAcc),
 			isAcc: Boolean(crm?.isAcc),
 		});
 		totalCompleted += crmCompleted;
-		totalIndicators += 5;
+		totalIndicators += 8;
 
 		// 3. Finance
 		const isTalangan = finance?.metodePembayaran === "dana_talangan";

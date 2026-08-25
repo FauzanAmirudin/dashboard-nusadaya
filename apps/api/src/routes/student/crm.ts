@@ -34,9 +34,19 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
 import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 import { fileService } from "../../modules/file/service/file.service";
+
+async function invalidateCrmCaches(studentId: number) {
+	await Promise.all([
+		cacheDel(`cache:student:${studentId}`),
+		cacheInvalidatePattern("cache:students:*"),
+		cacheInvalidatePattern("cache:mahasiswa:*"),
+		cacheInvalidatePattern("cache:dashboard:*"),
+	]);
+}
 
 export const crmRoutes = new Elysia()
 	.get("/:id/crm", async ({ params }) => {
@@ -47,6 +57,32 @@ export const crmRoutes = new Elysia()
 				accBy: { columns: { fullName: true } },
 			},
 		});
+
+		// Check real physical existence of uploaded documents
+		const docs = await db.query.crmDocuments.findMany({
+			where: eq(crmDocuments.studentId, id),
+		});
+		const hasOdsReport = docs.some((d) => d.documentKey === "ods_report");
+		const hasPrammagangReport = docs.some(
+			(d) => d.documentKey === "pramagang_report",
+		);
+
+		if (
+			crm &&
+			(crm.isOdsReport !== hasOdsReport ||
+				crm.isPrammagangReport !== hasPrammagangReport)
+		) {
+			await db
+				.update(crmData)
+				.set({
+					isOdsReport: hasOdsReport,
+					isPrammagangReport: hasPrammagangReport,
+					updatedAt: new Date(),
+				})
+				.where(eq(crmData.studentId, id));
+			crm.isOdsReport = hasOdsReport;
+			crm.isPrammagangReport = hasPrammagangReport;
+		}
 
 		const logs = await db.query.crmLogs.findMany({
 			where: eq(crmLogs.studentId, id),
@@ -165,21 +201,6 @@ export const crmRoutes = new Elysia()
 				where: eq(crmData.studentId, id),
 			});
 			if (updated) {
-				const odsProgressChecks = [false, false, false, false, false];
-				try {
-					if (updated.odsDetails) {
-						let parsed = updated.odsDetails;
-						if (typeof parsed === "string") parsed = JSON.parse(parsed);
-						if (Array.isArray(parsed)) {
-							parsed.forEach((ods: any, index: number) => {
-								if (index < 5 && ods.isDone) {
-									odsProgressChecks[index] = true;
-								}
-							});
-						}
-					}
-				} catch (e) {}
-
 				const crmChecks = [
 					updated.isMonitoringParent,
 					updated.isMonitoringIndustry,
@@ -189,11 +210,10 @@ export const crmRoutes = new Elysia()
 					updated.odsDocumentation,
 					updated.isPrammagangReport,
 					updated.isPrammagangDocumentation,
-					...odsProgressChecks,
 				];
 
-				const checkedCount = crmChecks.filter((c) => c === true).length;
-				const totalChecks = 13;
+				const checkedCount = crmChecks.filter(Boolean).length;
+				const totalChecks = 8;
 
 				let status: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
 					"BUTUH_PERHATIAN";
@@ -213,6 +233,8 @@ export const crmRoutes = new Elysia()
 					.set(extraUpdates)
 					.where(eq(crmData.studentId, id));
 			}
+
+			await invalidateCrmCaches(id);
 
 			return { success: true };
 		},
@@ -247,6 +269,24 @@ export const crmRoutes = new Elysia()
 				agreements: payload.agreements || [],
 				followUps: payload.followUps || [],
 			});
+
+			// Auto update parent/industry monitoring flag if appropriate
+			if (
+				payload.logType === "orang_tua_masalah" ||
+				payload.logType === "orang_tua_komunikasi"
+			) {
+				await db
+					.update(crmData)
+					.set({ isMonitoringParent: true, updatedAt: new Date() })
+					.where(eq(crmData.studentId, id));
+			} else if (payload.logType === "industri_masalah") {
+				await db
+					.update(crmData)
+					.set({ isMonitoringIndustry: true, updatedAt: new Date() })
+					.where(eq(crmData.studentId, id));
+			}
+
+			await invalidateCrmCaches(id);
 
 			return { success: true };
 		},
@@ -310,6 +350,8 @@ export const crmRoutes = new Elysia()
 			.delete(crmLogs)
 			.where(and(eq(crmLogs.id, logId), eq(crmLogs.studentId, id)));
 
+		await invalidateCrmCaches(id);
+
 		return { success: true };
 	})
 	.post("/:id/crm/acc", async (context) => {
@@ -351,6 +393,8 @@ export const crmRoutes = new Elysia()
 			})
 			.where(eq(crmData.studentId, id));
 
+		await invalidateCrmCaches(id);
+
 		return { success: true };
 	})
 	.delete("/:id/crm/acc", async (context) => {
@@ -367,18 +411,6 @@ export const crmRoutes = new Elysia()
 		});
 		let fallbackStatus: "AMAN" | "PROSES" | "BUTUH_PERHATIAN" = "PROSES";
 		if (currentCrm) {
-			const odsProgressChecks = [false, false, false, false, false];
-			try {
-				if (currentCrm.odsDetails) {
-					let parsed = currentCrm.odsDetails;
-					if (typeof parsed === "string") parsed = JSON.parse(parsed);
-					if (Array.isArray(parsed)) {
-						parsed.forEach((ods: any, index: number) => {
-							if (index < 5 && ods.isDone) odsProgressChecks[index] = true;
-						});
-					}
-				}
-			} catch (e) {}
 			const crmChecks = [
 				currentCrm.isMonitoringParent,
 				currentCrm.isMonitoringIndustry,
@@ -388,13 +420,12 @@ export const crmRoutes = new Elysia()
 				currentCrm.odsDocumentation,
 				currentCrm.isPrammagangReport,
 				currentCrm.isPrammagangDocumentation,
-				...odsProgressChecks,
 			];
 			const count = crmChecks.filter(Boolean).length;
 			fallbackStatus =
-				count === 13
+				count === 8
 					? "AMAN"
-					: (count / 13) * 100 > 30
+					: (count / 8) * 100 > 30
 						? "PROSES"
 						: "BUTUH_PERHATIAN";
 		}
@@ -408,6 +439,8 @@ export const crmRoutes = new Elysia()
 				status: fallbackStatus,
 			})
 			.where(eq(crmData.studentId, id));
+
+		await invalidateCrmCaches(id);
 
 		return { success: true };
 	})
@@ -521,6 +554,22 @@ export const crmRoutes = new Elysia()
 				uploadedBy: user.id,
 			});
 
+			// Auto check corresponding CRM flag
+			const flagMap: Record<string, string> = {
+				ods_report: "isOdsReport",
+				ods_documentation: "odsDocumentation",
+				pramagang_report: "isPrammagangReport",
+				pramagang_documentation: "isPrammagangDocumentation",
+			};
+			if (flagMap[documentKey]) {
+				await db
+					.update(crmData)
+					.set({ [flagMap[documentKey]]: true, updatedAt: new Date() })
+					.where(eq(crmData.studentId, id));
+			}
+
+			await invalidateCrmCaches(id);
+
 			return { success: true, message: "File berhasil diupload" };
 		},
 		{
@@ -562,10 +611,13 @@ export const crmRoutes = new Elysia()
 			return { success: false, message: "Forbidden" };
 		}
 
+		const id = Number(params.id);
 		await db
 			.update(crmDocuments)
 			.set({ isVerified: true, verifiedAt: new Date(), verifiedBy: user.id })
 			.where(eq(crmDocuments.id, Number(params.docId)));
+
+		await invalidateCrmCaches(id);
 
 		return { success: true };
 	})
@@ -578,6 +630,7 @@ export const crmRoutes = new Elysia()
 			return { success: false, message: "Forbidden" };
 		}
 
+		const id = Number(params.id);
 		const docId = Number(params.docId);
 
 		const doc = await db.query.crmDocuments.findFirst({
@@ -590,5 +643,30 @@ export const crmRoutes = new Elysia()
 		}
 
 		await db.delete(crmDocuments).where(eq(crmDocuments.id, docId));
+
+		// Check if any documents with the same documentKey remain for this student
+		const remainingDocs = await db.query.crmDocuments.findMany({
+			where: and(
+				eq(crmDocuments.studentId, id),
+				eq(crmDocuments.documentKey, doc.documentKey),
+			),
+		});
+
+		if (remainingDocs.length === 0) {
+			const flagMap: Record<string, string> = {
+				ods_report: "isOdsReport",
+				ods_documentation: "odsDocumentation",
+				pramagang_report: "isPrammagangReport",
+				pramagang_documentation: "isPrammagangDocumentation",
+			};
+			if (flagMap[doc.documentKey]) {
+				await db
+					.update(crmData)
+					.set({ [flagMap[doc.documentKey]]: false, updatedAt: new Date() })
+					.where(eq(crmData.studentId, id));
+			}
+		}
+
+		await invalidateCrmCaches(id);
 		return { success: true };
 	});

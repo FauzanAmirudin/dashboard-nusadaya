@@ -97,14 +97,14 @@ export default function CrmPanelMahasiswa() {
 		total > 0 ? Math.min((present / total) * 100, 100) : 0;
 
 	const completedCount = [
+		data?.isMonitoringParent,
+		data?.isMonitoringIndustry,
+		data?.isVocabComplete,
+		data?.practiceAttendance,
 		data?.isOdsReport,
 		data?.odsDocumentation,
 		data?.isPrammagangReport,
 		data?.isPrammagangDocumentation,
-		data?.isMonitoringParent,
-		data?.isMonitoringIndustry,
-		data?.isVocabComplete,
-		data?.hasStudyPermit,
 	].filter(Boolean).length;
 	const checklistPercentage = (completedCount / 8) * 100;
 
@@ -200,7 +200,7 @@ export default function CrmPanelMahasiswa() {
 							</div>
 							<div className="space-y-3">
 								<h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-									Monitoring & Legalitas
+									Monitoring, Hafalan & Presensi
 								</h4>
 								{renderChecklistItem(
 									"Monitoring Orang Tua (Telp / Visit)",
@@ -215,8 +215,8 @@ export default function CrmPanelMahasiswa() {
 									data?.isVocabComplete,
 								)}
 								{renderChecklistItem(
-									"Penerbitan Study Permit",
-									data?.hasStudyPermit,
+									"Presensi / Kehadiran Praktik ODS",
+									data?.practiceAttendance,
 								)}
 							</div>
 						</div>

@@ -255,26 +255,43 @@ function ScoreCard({
 									</Label>
 									<Input
 										id={`score-${studentId}`}
-										type="number"
-										min={0}
-										max={100}
+										type="text"
+										inputMode="numeric"
+										maxLength={3}
 										placeholder="Contoh: 85"
 										value={scoreInput}
 										className="w-36 h-9"
 										onKeyDown={(e) => {
-											if (e.key === "-" || e.key === "e" || e.key === "E")
+											if (
+												e.key === "-" ||
+												e.key === "+" ||
+												e.key === "e" ||
+												e.key === "E" ||
+												e.key === "." ||
+												e.key === ","
+											) {
 												e.preventDefault();
+												toast.warning(
+													"Hanya angka bulat 0 - 100 yang diperbolehkan",
+												);
+											}
 										}}
 										onChange={(e) => {
 											const raw = e.target.value;
-											if (raw === "") {
+											const digitsOnly = raw.replace(/[^0-9]/g, "");
+											if (raw !== digitsOnly && /[^0-9]/.test(raw)) {
+												toast.warning("Hanya angka bulat yang diperbolehkan");
+											}
+											if (digitsOnly === "") {
 												setScoreInput("");
+												return;
+											}
+											const num = parseInt(digitsOnly, 10);
+											if (num > 100) {
+												toast.warning("Nilai assessment maksimal adalah 100");
+												setScoreInput("100");
 											} else {
-												const clamped = Math.max(
-													0,
-													Math.min(100, Number(raw) || 0),
-												);
-												setScoreInput(String(clamped));
+												setScoreInput(String(num));
 											}
 										}}
 									/>

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { AccPanelStatusCard } from "@/components/ui/AccPanelStatusCard";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -30,6 +31,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PanelHeader } from "@/components/ui/PanelHeader";
 import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -370,41 +372,26 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 	return (
 		<TooltipProvider>
 			<div className="space-y-6">
-				{/* Top Panel Header */}
-				<div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
-					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-						<div>
-							<div className="flex items-center gap-2">
-								<div className="w-9 h-9 rounded-xl bg-blue-50 text-[#0517B0] flex items-center justify-center font-bold">
-									<Plane className="w-5 h-5" />
-								</div>
-								<div>
-									<h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-										Divisi Magang & Penempatan Luar Negeri
-										{data?.isAcc && (
-											<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-bold gap-1">
-												<CheckCircle2 className="w-3.5 h-3.5" /> ACC Disetujui
-											</Badge>
-										)}
-									</h2>
-									<p className="text-xs text-slate-500">
-										Monitoring berkas pra-paspor, legalitas visa, kontrak,
-										tiket, dan evaluasi kepulangan magang
-									</p>
-								</div>
-							</div>
-						</div>
-
-						<div className="flex items-center gap-2 shrink-0">
-							<PanelStatusBadge
-								isAcc={data?.isAcc}
-								completed={validatedCount}
-								total={totalCount}
-								size="lg"
-							/>
-						</div>
-					</div>
-
+				<PanelHeader
+					icon={<Plane className="w-5 h-5 text-[#0517B0]" />}
+					title="Divisi Magang & Penempatan Luar Negeri"
+					subtitle="Monitoring berkas pra-paspor, legalitas visa, kontrak, tiket, dan evaluasi kepulangan magang"
+					progressTag={
+						data?.isAcc && (
+							<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-bold gap-1">
+								<CheckCircle2 className="w-3.5 h-3.5" /> ACC Disetujui
+							</Badge>
+						)
+					}
+					badge={
+						<PanelStatusBadge
+							isAcc={data?.isAcc}
+							completed={validatedCount}
+							total={totalCount}
+							size="lg"
+						/>
+					}
+				>
 					{/* Progress bar */}
 					<div className="space-y-1.5">
 						<div className="flex justify-between text-xs text-slate-500 font-medium">
@@ -413,10 +400,10 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 						</div>
 						<Progress
 							value={progressPercent}
-							className="h-2 bg-slate-100 [&>div]:bg-[#0517B0]"
+							className="h-2 bg-slate-200/60 [&>div]:bg-[#0517B0]"
 						/>
 					</div>
-				</div>
+				</PanelHeader>
 
 				{/* TABS NAVIGATION */}
 				<Tabs defaultValue="dokumen" className="w-full">
@@ -540,157 +527,28 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 					</TabsContent>
 				</Tabs>
 
-				{/* Status ACC Panel Card */}
-				<Card
-					className={`border shadow-sm overflow-hidden ${
-						data?.isAcc
-							? "bg-emerald-50/50 border-emerald-200"
-							: "bg-slate-50 border-slate-200"
-					}`}
-				>
-					<CardContent className="p-5 sm:p-6">
-						<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-							<div className="flex items-center gap-3.5">
-								{data?.isAcc ? (
-									<div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-										<CheckCircle2 className="w-6 h-6" />
-									</div>
-								) : (
-									<div className="w-12 h-12 rounded-2xl bg-blue-100 text-[#0517B0] flex items-center justify-center shrink-0">
-										<ShieldCheck className="w-6 h-6" />
-									</div>
-								)}
-
-								<div>
-									{data?.isAcc ? (
-										<>
-											<h4 className="text-slate-900 font-bold text-base flex items-center gap-2">
-												Status ACC: Disetujui (ACC)
-												<Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px]">
-													Final
-												</Badge>
-											</h4>
-											<p className="text-xs text-slate-600 mt-0.5">
-												Disetujui oleh{" "}
-												<strong className="text-slate-800">
-													{data.accBy?.fullName || "Tim Magang"}
-												</strong>{" "}
-												pada {formatDeviceDateTime(data.accAt)}
-											</p>
-										</>
-									) : (
-										<>
-											<h4 className="text-slate-900 font-bold text-base">
-												Persetujuan Akhir Divisi Magang
-											</h4>
-											<p className="text-xs text-slate-600 mt-0.5 max-w-md">
-												{validatedCount < totalCount
-													? `Kelengkapan checklist: ${validatedCount}/${totalCount} selesai. Masih ada ${totalCount - validatedCount} item yang belum lengkap.`
-													: "Seluruh berkas magang telah lengkap. Silakan berikan persetujuan ACC."}
-											</p>
-										</>
-									)}
-								</div>
-							</div>
-
-							<div className="flex items-center gap-2 self-end sm:self-center">
-								{isMagang && data?.isAcc && (
-									<AlertDialog>
-										<AlertDialogTrigger
-											render={
-												<Button
-													variant="outline"
-													size="sm"
-													className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 text-xs font-semibold"
-													disabled={isSaving}
-												>
-													{isSaving ? "Membatalkan..." : "Batalkan ACC"}
-												</Button>
-											}
-										/>
-										<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
-											<AlertDialogTitle>
-												Konfirmasi Pembatalan ACC Magang
-											</AlertDialogTitle>
-											<AlertDialogDescription className="text-slate-500">
-												Apakah Anda yakin ingin membatalkan status ACC untuk
-												panel Tim Magang Internasional ini? Status mahasiswa
-												akan kembali ke tahap evaluasi berkas.
-											</AlertDialogDescription>
-											<div className="flex justify-end gap-3 mt-4">
-												<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50">
-													Batal
-												</AlertDialogCancel>
-												<AlertDialogAction
-													onClick={handleCancelAcc}
-													className="bg-rose-600 hover:bg-rose-700 text-white"
-												>
-													Ya, Batalkan ACC
-												</AlertDialogAction>
-											</div>
-										</AlertDialogContent>
-									</AlertDialog>
-								)}
-
-								{isMagang && !data?.isAcc && (
-									<Tooltip>
-										<TooltipTrigger render={<span className="inline-block" />}>
-											<span>
-												<AlertDialog>
-													<AlertDialogTrigger
-														render={
-															<Button
-																size="sm"
-																disabled={
-																	isSaving || validatedCount < totalCount
-																}
-																className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs font-semibold px-4 disabled:opacity-50 disabled:cursor-not-allowed"
-															>
-																{isSaving ? (
-																	<Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-																) : (
-																	<CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-																)}
-																Berikan ACC Magang
-															</Button>
-														}
-													/>
-													<AlertDialogContent className="bg-white border-slate-200">
-														<AlertDialogTitle>
-															Konfirmasi Persetujuan ACC Magang
-														</AlertDialogTitle>
-														<AlertDialogDescription className="text-slate-600">
-															Apakah Anda yakin ingin memberikan status ACC
-															Magang untuk mahasiswa ini? Tindakan ini akan
-															tercatat dalam log audit sistem.
-														</AlertDialogDescription>
-														<div className="flex justify-end gap-3 mt-4">
-															<AlertDialogCancel>Batal</AlertDialogCancel>
-															<AlertDialogAction
-																onClick={handleAcc}
-																className="bg-[#0517B0] hover:bg-blue-800 text-white"
-															>
-																Ya, Berikan ACC
-															</AlertDialogAction>
-														</div>
-													</AlertDialogContent>
-												</AlertDialog>
-											</span>
-										</TooltipTrigger>
-										{validatedCount < totalCount && (
-											<TooltipContent>
-												<p className="text-xs">
-													Selesaikan {totalCount - validatedCount} item
-													checklist terlebih dahulu
-												</p>
-											</TooltipContent>
-										)}
-									</Tooltip>
-								)}
-							</div>
-						</div>
-					</CardContent>
-				</Card>
+				{/* Bottom ACC Status Card */}
+				<AccPanelStatusCard
+					isAcc={Boolean(data?.isAcc)}
+					accByUser={data?.accBy?.fullName || "Tim Magang"}
+					accAt={data?.accAt}
+					isReadyForAcc={validatedCount >= totalCount}
+					title="ACC Divisi Magang"
+					pendingTitle={
+						validatedCount < totalCount
+							? `Menunggu Kelengkapan Berkas (${totalCount - validatedCount} item belum selesai)`
+							: "Persetujuan Akhir Divisi Magang"
+					}
+					pendingDescription={`Kelengkapan checklist: ${validatedCount}/${totalCount} selesai. Selesaikan semua berkas pra-paspor, dokumen, dan syarat kepulangan sebelum ACC.`}
+					readyDescription="Seluruh berkas magang telah lengkap dan tervalidasi. Silakan berikan persetujuan ACC resmi sekarang."
+					canEdit={isMagang}
+					isSaving={isSaving}
+					onAcc={handleAcc}
+					onCancelAcc={handleCancelAcc}
+					cancelDialogTitle="Konfirmasi Pembatalan ACC Magang"
+					cancelDialogDescription="Apakah Anda yakin ingin membatalkan status ACC untuk panel Tim Magang Internasional ini? Status mahasiswa akan kembali ke tahap evaluasi berkas."
+					disabledReason={`Selesaikan ${totalCount - validatedCount} item checklist terlebih dahulu sebelum ACC`}
+				/>
 			</div>
 		</TooltipProvider>
 	);

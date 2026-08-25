@@ -178,3 +178,15 @@ Jika Anda ikut mengembangkan project ini, pastikan sebelum melakukan _commit_ me
 ```bash
 bunx biome check --write --unsafe
 ```
+
+---
+
+## 📚 Dokumentasi Teknis & Catatan Perubahan
+
+Dokumentasi arsitektur, alur data bisnis, panduan modul, dan catatan rilis/optimasi terdokumentasi lengkap di direktori `docs/`:
+
+- [Dokumentasi Redesign Neumorphism (Soft UI), Sinkronisasi Real-Time CRM & Standardisasi Modul Finance (25 Agustus 2026)](docs/changelog_25-08-2026_neumorphism_redesign_crm_finance_sync.md)
+- [Dokumentasi Refactoring Modular Database, Optimasi Performa Menyeluruh (Fase 1–4), Caching Layer & Security Hardening (24 Agustus 2026)](docs/changelog_24-08-2026_refactor_and_optimization_fase1-4.md)
+- [Arsitektur & Struktur Sistem](docs/01-arsitektur-dan-struktur-sistem.md)
+- [Alur Data & Logika Bisnis 10 Divisi](docs/02-alur-data-dan-logika-bisnis.md)
+

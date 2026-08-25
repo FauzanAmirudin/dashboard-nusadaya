@@ -16,6 +16,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/eden";
+import { filterNumeric, preventNonNumericKey } from "@/utils/form-validators";
 
 interface TabDataTambahanProps {
 	studentId: number;
@@ -361,7 +362,16 @@ export function TabDataTambahan({
 							<Input
 								placeholder="Contoh: 202401001"
 								value={nim}
-								onChange={(e) => setNim(e.target.value)}
+								onKeyDown={preventNonNumericKey}
+								onChange={(e) =>
+									setNim(
+										filterNumeric(
+											e.target.value,
+											20,
+											"NIM hanya boleh berupa angka numerik",
+										),
+									)
+								}
 								disabled={!canEdit}
 								className="h-9 text-xs sm:text-sm font-mono bg-white border-slate-200"
 							/>

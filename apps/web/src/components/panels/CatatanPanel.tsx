@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PanelHeader } from "@/components/ui/PanelHeader";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -239,50 +240,48 @@ export function CatatanPanel({ studentId }: { studentId: number }) {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-				<div>
-					<h3 className="font-semibold text-slate-800 flex items-center gap-2">
-						<StickyNote className="w-5 h-5 text-[#0517B0]" /> Catatan Internal &
-						Pengecualian
-					</h3>
-					<p className="text-sm text-slate-500 mt-1">
-						{canWrite
-							? "Kelola catatan dan log pengecualian mahasiswa"
-							: "Anda hanya memiliki akses membaca catatan ini"}
-					</p>
-				</div>
-				<div className="flex items-center gap-3 w-full sm:w-auto">
-					<div className="flex items-center gap-2 w-full sm:w-auto">
-						<Filter className="w-4 h-4 text-slate-400 shrink-0" />
-						<Select
-							value={filterType}
-							onValueChange={(val) => setFilterType(val || "semua")}
-						>
-							<SelectTrigger className="w-full sm:w-[180px] bg-white">
-								<SelectValue placeholder="Semua Kategori" />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="semua">Semua Kategori</SelectItem>
-								{Object.entries(NOTE_TYPE_CONFIG).map(([key, conf]) => (
-									<SelectItem key={key} value={key}>
-										<conf.Icon className="w-3.5 h-3.5 mr-1.5 inline text-slate-500" />{" "}
-										{conf.label}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
+			<PanelHeader
+				icon={<StickyNote className="w-5 h-5 text-[#0517B0]" />}
+				title="Catatan Internal & Pengecualian"
+				subtitle={
+					canWrite
+						? "Kelola catatan dan log pengecualian mahasiswa"
+						: "Anda hanya memiliki akses membaca catatan ini"
+				}
+				actions={
+					<div className="flex items-center gap-2.5 w-full sm:w-auto">
+						<div className="flex items-center gap-2 w-full sm:w-auto">
+							<Filter className="w-4 h-4 text-slate-400 shrink-0" />
+							<Select
+								value={filterType}
+								onValueChange={(val) => setFilterType(val || "semua")}
+							>
+								<SelectTrigger className="w-full sm:w-[180px] bg-white">
+									<SelectValue placeholder="Semua Kategori" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="semua">Semua Kategori</SelectItem>
+									{Object.entries(NOTE_TYPE_CONFIG).map(([key, conf]) => (
+										<SelectItem key={key} value={key}>
+											<conf.Icon className="w-3.5 h-3.5 mr-1.5 inline text-slate-500" />{" "}
+											{conf.label}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+						{canWrite && (
+							<Button
+								onClick={handleOpenAdd}
+								className="bg-[#0517B0] hover:bg-[#04128A] text-white whitespace-nowrap shrink-0 font-medium"
+							>
+								<Plus className="w-4 h-4 mr-2" />
+								Catatan
+							</Button>
+						)}
 					</div>
-					{canWrite && (
-						<Button
-							onClick={handleOpenAdd}
-							className="bg-[#0517B0] hover:bg-[#04128A] text-white whitespace-nowrap shrink-0"
-						>
-							<Plus className="w-4 h-4 mr-2" />
-							Catatan
-						</Button>
-					)}
-				</div>
-			</div>
+				}
+			/>
 
 			<ScrollArea className="h-[600px] pr-4">
 				{notes.length === 0 ? (

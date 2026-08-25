@@ -553,6 +553,19 @@ export const pmbRoutes = new Elysia()
 			}
 
 			if (body.totalBiaya !== undefined) {
+				if (
+					!Number.isInteger(body.totalBiaya) ||
+					body.totalBiaya < 0 ||
+					body.totalBiaya > 999_999_999
+				) {
+					set.status = 400;
+					return {
+						success: false,
+						message:
+							"Total Biaya Pendidikan harus berupa bilangan bulat (integer) dan maksimal 9 digit (Rp 999.999.999)",
+					};
+				}
+
 				const existingFin = await db.query.financeData.findFirst({
 					where: eq(financeData.studentId, id),
 				});

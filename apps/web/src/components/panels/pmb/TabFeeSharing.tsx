@@ -54,6 +54,12 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { API_URL, getToken } from "@/lib/eden";
+import {
+	filterNumeric,
+	filterPhone,
+	preventNonNumericKey,
+	preventNonPhoneKey,
+} from "@/utils/form-validators";
 
 interface FeeShareRecipient {
 	id: number;
@@ -601,8 +607,12 @@ export function TabFeeSharing({
 							</Label>
 							<Input
 								value={recipientForm.noHp}
+								onKeyDown={preventNonPhoneKey}
 								onChange={(e) =>
-									setRecipientForm({ ...recipientForm, noHp: e.target.value })
+									setRecipientForm({
+										...recipientForm,
+										noHp: filterPhone(e.target.value, 15),
+									})
 								}
 								placeholder="Contoh: 08123456789"
 								className="mt-1 h-9 text-xs"
@@ -616,10 +626,15 @@ export function TabFeeSharing({
 								</Label>
 								<Input
 									value={recipientForm.noRekening}
+									onKeyDown={preventNonNumericKey}
 									onChange={(e) =>
 										setRecipientForm({
 											...recipientForm,
-											noRekening: e.target.value,
+											noRekening: filterNumeric(
+												e.target.value,
+												30,
+												"No. Rekening hanya boleh berisi angka",
+											),
 										})
 									}
 									placeholder="No. Rekening"

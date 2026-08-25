@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NeumorphicStatCard } from "@/components/ui/NeumorphicStatCard";
 import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { Progress } from "@/components/ui/progress";
@@ -743,43 +744,37 @@ export function FinanceDashboard({ user, data = [] }: any) {
 			label: "Total Mahasiswa",
 			value: totalStudents,
 			icon: Users,
-			iconBg: "bg-blue-50 text-[#0517B0]",
-			valueColor: "text-slate-900",
+			color: "blue" as const,
 		},
 		{
 			label: "Aman / Lunas",
 			value: countAman,
 			icon: CheckCircle,
-			iconBg: "bg-emerald-50 text-emerald-600",
-			valueColor: "text-emerald-700",
+			color: "emerald" as const,
 		},
 		{
 			label: "Sedang Proses",
 			value: countPerhatian,
 			icon: Clock,
-			iconBg: "bg-amber-50 text-amber-600",
-			valueColor: "text-amber-700",
+			color: "amber" as const,
 		},
 		{
 			label: "Menunggak",
 			value: countTidakAman,
 			icon: XCircle,
-			iconBg: "bg-rose-50 text-rose-600",
-			valueColor: "text-rose-700",
+			color: "rose" as const,
 		},
 		{
 			label: "ACC Finance",
 			value: countAcc,
 			icon: ShieldCheck,
-			iconBg: "bg-indigo-50 text-indigo-600",
-			valueColor: "text-indigo-700",
+			color: "indigo" as const,
 		},
 		{
 			label: "Lunas Registrasi",
 			value: countLunasRegistrasi,
 			icon: CreditCard,
-			iconBg: "bg-sky-50 text-sky-600",
-			valueColor: "text-slate-900",
+			color: "sky" as const,
 		},
 	];
 
@@ -853,30 +848,16 @@ export function FinanceDashboard({ user, data = [] }: any) {
 			</div>
 
 			{/* ─── 2. RINGKASAN STATUS MAHASISWA (COMPACT KPI CARDS) ─── */}
-			<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3">
-				{kpiCards.map((kpi) => {
-					const Icon = kpi.icon;
-					return (
-						<div
-							key={kpi.label}
-							className="bg-white border border-slate-200/90 rounded-xl p-3 sm:p-3.5 shadow-2xs hover:shadow-xs transition-all flex items-center justify-between"
-						>
-							<div>
-								<p className="text-slate-500 text-[11px] font-semibold flex items-center gap-1">
-									<span>{kpi.label}</span>
-								</p>
-								<p
-									className={`text-2xl font-black ${kpi.valueColor} mt-0.5 tracking-tight`}
-								>
-									{kpi.value}
-								</p>
-							</div>
-							<div className={`p-2 rounded-lg ${kpi.iconBg} shrink-0`}>
-								<Icon className="h-4 w-4" />
-							</div>
-						</div>
-					);
-				})}
+			<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+				{kpiCards.map((kpi) => (
+					<NeumorphicStatCard
+						key={kpi.label}
+						label={kpi.label}
+						value={kpi.value}
+						icon={kpi.icon}
+						color={kpi.color}
+					/>
+				))}
 			</div>
 
 			{/* ─── 3. KOMPONEN 2: PROYEKSI & REALISASI PENDAPATAN (CLEAN & SIMPLE WIDGET) ─── */}

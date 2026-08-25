@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { TabMataKuliah } from "@/components/panels/kehadiran/detail/TabMataKuliah";
+import { AccPanelStatusCard } from "@/components/ui/AccPanelStatusCard";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -34,6 +35,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PanelHeader } from "@/components/ui/PanelHeader";
 import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
@@ -395,38 +397,34 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 	return (
 		<div className="space-y-6">
 			<div>
-				<div className="border-b border-slate-200 pb-4 mb-6">
-					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-						<div>
-							<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
-								<GraduationCap className="w-5 h-5 text-[#0517B0]" /> Akademik —
-								Kepatuhan Akademik
-								<span className="ml-2 text-sm font-normal text-slate-500">
-									[{completedCount}/{checklist.length}]
-								</span>
-							</CardTitle>
-							<p className="text-sm text-slate-500 mt-1">
-								Dikelola oleh: Admin Akademik
-							</p>
-						</div>
-						<div className="flex items-center gap-3">
-							{isSuperadmin && !isAkademikAdmin && (
-								<Badge
-									variant="outline"
-									className="text-slate-400 border-slate-300"
-								>
-									Mode Lihat Saja
-								</Badge>
-							)}
-							<PanelStatusBadge
-								isAcc={acadState?.isAcc}
-								completed={completedCount}
-								total={checklist.length}
-								size="lg"
-							/>
-						</div>
-					</div>
-				</div>
+				<PanelHeader
+					icon={<GraduationCap className="w-5 h-5 text-[#0517B0]" />}
+					title="Akademik — Kepatuhan Akademik"
+					subtitle="Dikelola oleh: Admin Akademik"
+					progressTag={
+						<span className="text-xs font-bold text-slate-700 bg-slate-200/70 px-2.5 py-0.5 rounded-full border border-slate-300/40">
+							Progres: {completedCount}/{checklist.length}
+						</span>
+					}
+					actions={
+						isSuperadmin && !isAkademikAdmin ? (
+							<Badge
+								variant="outline"
+								className="text-slate-400 border-slate-300"
+							>
+								Mode Lihat Saja
+							</Badge>
+						) : undefined
+					}
+					badge={
+						<PanelStatusBadge
+							isAcc={acadState?.isAcc}
+							completed={completedCount}
+							total={checklist.length}
+							size="lg"
+						/>
+					}
+				/>
 
 				{/* TABS NAVIGATION */}
 				<div className="flex space-x-2 border-b border-slate-200 mb-6">
@@ -500,139 +498,27 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 				)}
 
 				{/* Status ACC Card (Persistent across all tabs) */}
-				<Card className="bg-slate-50 border-slate-200 shadow-sm overflow-hidden mt-6">
-					<CardContent className="p-0">
-						<div className="flex flex-col sm:flex-row items-center justify-between p-6">
-							<div className="flex flex-1 items-center gap-4 mb-4 sm:mb-0 w-full">
-								{acadState?.isAcc ? (
-									<div className="flex-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
-										<div className="flex items-center gap-4">
-											<div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-												<CheckCircle className="w-6 h-6 text-emerald-600" />
-											</div>
-											<div>
-												<h4 className="text-emerald-700 font-bold text-lg">
-													ACC Akademik Diberikan
-												</h4>
-												<p className="text-sm text-slate-600">
-													Oleh{" "}
-													<span className="font-semibold">
-														{acadState?.accBy?.fullName || "Admin Akademik"}
-													</span>{" "}
-													pada{" "}
-													{acadState?.accAt
-														? formatDeviceDateTime(acadState.accAt)
-														: "Waktu tidak diketahui"}
-												</p>
-											</div>
-										</div>
-										{(isAkademikAdmin || isSuperadmin) && (
-											<AlertDialog>
-												<AlertDialogTrigger
-													render={
-														<Button
-															variant="outline"
-															className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 shrink-0"
-															disabled={isSavingNotes}
-														>
-															{isSavingNotes
-																? "Membatalkan..."
-																: "Batalkan ACC"}
-														</Button>
-													}
-												/>
-												<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
-													<AlertDialogTitle>
-														Konfirmasi Pembatalan ACC Akademik
-													</AlertDialogTitle>
-													<AlertDialogDescription className="text-slate-500">
-														Apakah Anda yakin ingin membatalkan status ACC untuk
-														panel Akademik ini? Status mahasiswa akan kembali ke
-														tahap proses.
-													</AlertDialogDescription>
-													<div className="flex justify-end gap-3 mt-4">
-														<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50">
-															Batal
-														</AlertDialogCancel>
-														<AlertDialogAction
-															onClick={handleCancelAcc}
-															className="bg-rose-600 hover:bg-rose-700 text-white"
-														>
-															Ya, Batalkan ACC
-														</AlertDialogAction>
-													</div>
-												</AlertDialogContent>
-											</AlertDialog>
-										)}
-									</div>
-								) : (
-									<>
-										<div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center">
-											<Clock className="w-6 h-6 text-slate-500" />
-										</div>
-										<div>
-											<h4 className="text-slate-700 font-bold text-lg">
-												{isReadyForProcess
-													? "Menunggu ACC Akademik"
-													: `Menunggu ACC Akademik (${checklist.length - completedCount} item belum selesai)`}
-											</h4>
-											<p className="text-sm text-slate-500 max-w-md">
-												{isReadyForProcess
-													? "Status aman, siap untuk memberikan persetujuan."
-													: `Diharapkan semua persyaratan akademik terpenuhi sebelum memberikan ACC.`}
-											</p>
-										</div>
-									</>
-								)}
-							</div>
-
-							{canEdit && !acadState?.isAcc && (
-								<Tooltip>
-									<TooltipTrigger render={<span className="inline-block" />}>
-										<span>
-											<AlertDialog>
-												<AlertDialogTrigger
-													disabled={!isReadyForProcess}
-													className="w-full sm:w-auto bg-[#0517B0] hover:bg-blue-800 text-white font-bold px-8 py-2 rounded-md shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-												>
-													ACC Akademik →
-												</AlertDialogTrigger>
-												<AlertDialogContent>
-													<AlertDialogTitle>
-														Konfirmasi ACC Akademik
-													</AlertDialogTitle>
-													<AlertDialogDescription>
-														<span className="mt-2 text-slate-600 block">
-															Anda akan memberikan persetujuan final untuk
-															status akademik mahasiswa ini. Pastikan semua data
-															absensi dan kelulusan valid.
-														</span>
-													</AlertDialogDescription>
-													<div className="flex justify-end gap-3 mt-4">
-														<AlertDialogCancel className="border-slate-200">
-															Batal
-														</AlertDialogCancel>
-														<AlertDialogAction
-															onClick={handleAcc}
-															className="bg-[#0517B0] hover:bg-blue-800 text-white"
-														>
-															Ya, Lanjut ACC
-														</AlertDialogAction>
-													</div>
-												</AlertDialogContent>
-											</AlertDialog>
-										</span>
-									</TooltipTrigger>
-									{!isReadyForProcess && (
-										<TooltipContent>
-											Selesaikan semua persyaratan akademik terlebih dahulu
-										</TooltipContent>
-									)}
-								</Tooltip>
-							)}
-						</div>
-					</CardContent>
-				</Card>
+				<AccPanelStatusCard
+					isAcc={Boolean(acadState?.isAcc)}
+					accByUser={acadState?.accBy?.fullName || "Admin Akademik"}
+					accAt={acadState?.accAt}
+					isReadyForAcc={isReadyForProcess}
+					title="ACC Akademik"
+					pendingTitle={
+						isReadyForProcess
+							? "Menunggu ACC Akademik"
+							: `Menunggu ACC Akademik (${checklist.length - completedCount} item belum selesai)`
+					}
+					pendingDescription="Diharapkan semua persyaratan akademik dan kelengkapan nilai/absensi terpenuhi sebelum memberikan ACC."
+					readyDescription="Seluruh persyaratan akademik telah valid dan tuntas. Anda dapat memberikan persetujuan ACC resmi sekarang."
+					canEdit={canEdit}
+					isSaving={isSavingNotes}
+					onAcc={handleAcc}
+					onCancelAcc={handleCancelAcc}
+					cancelDialogTitle="Konfirmasi Pembatalan ACC Akademik"
+					cancelDialogDescription="Apakah Anda yakin ingin membatalkan status ACC untuk panel Akademik ini? Status mahasiswa akan kembali ke tahap proses."
+					disabledReason="Selesaikan semua persyaratan akademik terlebih dahulu sebelum ACC"
+				/>
 			</div>
 
 			<Dialog open={isDeleteDocOpen} onOpenChange={setIsDeleteDocOpen}>

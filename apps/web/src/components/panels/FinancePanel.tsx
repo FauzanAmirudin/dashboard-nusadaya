@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { AccPanelStatusCard } from "@/components/ui/AccPanelStatusCard";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -21,7 +22,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PanelHeader } from "@/components/ui/PanelHeader";
 import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -79,13 +81,45 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 		onUpdate();
 	};
 
-	const completedCount = [
-		finState?.registrasiStatus,
-		finState?.mandiriSemesterStatus || finState?.t1SemesterStatus,
-		finState?.toeicStatus,
-		finState?.pasporStatus,
-	].filter(Boolean).length;
-	const totalChecks = 4;
+	const isTalangan = finState?.metodePembayaran === "dana_talangan";
+	const isSemesterDone = isTalangan
+		? Boolean(finState?.t1SemesterStatus || finState?.mandiriSemesterStatus)
+		: Boolean(finState?.mandiriSemesterStatus);
+	const isInterviewDone = isTalangan
+		? Boolean(finState?.t1InterviewStatus)
+		: Boolean(finState?.mandiriInterviewStatus);
+	const isKeberangkatanDone = isTalangan
+		? Boolean(finState?.t2KeberangkatanStatus)
+		: Boolean(finState?.mandiriKeberangkatanStatus);
+
+	const financeChecklistItems = [
+		{
+			name: "Registrasi / Pendaftaran",
+			done: Boolean(finState?.registrasiStatus || finState?.registrationPaid),
+		},
+		{
+			name: isTalangan
+				? "Perkuliahan Semester (Talangan)"
+				: "Perkuliahan 6 Semester",
+			done: isSemesterDone,
+		},
+		{
+			name: isTalangan ? "Interview Magang (Tahap 1)" : "Interview Magang",
+			done: isInterviewDone,
+		},
+		{
+			name: isTalangan ? "Keberangkatan (Tahap 2)" : "Keberangkatan",
+			done: isKeberangkatanDone,
+		},
+		{
+			name: "Sertifikasi Bahasa (TOEIC)",
+			done: Boolean(finState?.toeicStatus),
+		},
+		{ name: "Paspor & Dokumen", done: Boolean(finState?.pasporStatus) },
+	];
+
+	const completedCount = financeChecklistItems.filter((i) => i.done).length;
+	const totalChecks = 6;
 	const isFinanceReady = completedCount === totalChecks;
 
 	const handleAcc = async () => {
@@ -139,38 +173,24 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 	return (
 		<TooltipProvider>
 			<div className="space-y-5">
-				{/* Panel Header */}
-				<div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-4 sm:p-5">
-					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-						<div className="flex items-center gap-3">
-							<div className="p-2.5 rounded-xl bg-blue-50 text-[#0517B0] border border-blue-100/80 shadow-2xs">
-								<Wallet className="w-5 h-5" />
-							</div>
-							<div>
-								<div className="flex items-center gap-2">
-									<CardTitle className="text-lg font-bold text-slate-900 tracking-tight">
-										Panel Keuangan Mahasiswa
-									</CardTitle>
-									<Badge className="bg-[#0517B0]/10 text-[#0517B0] border-[#0517B0]/20 text-[10px] font-bold px-2 py-0.5">
-										Divisi Finance
-									</Badge>
-								</div>
-								<p className="text-xs text-slate-500 mt-0.5">
-									Pengelolaan partisi biaya pendidikan, transaksi pembayaran,
-									fee sharing, dan anggaran.
-								</p>
-							</div>
-						</div>
-						<div className="flex items-center gap-2">
-							<PanelStatusBadge
-								isAcc={finState?.isAcc}
-								completed={completedCount}
-								total={totalChecks}
-								size="lg"
-							/>
-						</div>
-					</div>
-				</div>
+				<PanelHeader
+					icon={<Wallet className="w-5 h-5 text-[#0517B0]" />}
+					title="Panel Keuangan Mahasiswa"
+					subtitle="Pengelolaan partisi biaya pendidikan, transaksi pembayaran, fee sharing, dan anggaran."
+					progressTag={
+						<Badge className="bg-[#0517B0]/10 text-[#0517B0] border-[#0517B0]/20 text-[10px] font-bold px-2 py-0.5">
+							Divisi Finance
+						</Badge>
+					}
+					badge={
+						<PanelStatusBadge
+							isAcc={finState?.isAcc}
+							completed={completedCount}
+							total={totalChecks}
+							size="lg"
+						/>
+					}
+				/>
 
 				<Tabs defaultValue="keuangan" className="w-full space-y-4">
 					<TabsList className="w-full grid grid-cols-3 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 h-10">
@@ -215,158 +235,27 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 				</Tabs>
 
 				{/* Status ACC Panel Finance Card (Persistent across all tabs) */}
-				<Card
-					className={`border shadow-sm overflow-hidden ${
-						finState?.isAcc
-							? "bg-slate-50 border-slate-200"
-							: "bg-blue-50/50 border-blue-200"
-					}`}
-				>
-					<CardContent className="p-0">
-						<div className="flex flex-col sm:flex-row items-center justify-between p-6">
-							<div className="flex items-center gap-4 mb-4 sm:mb-0">
-								{finState?.isAcc ? (
-									<>
-										<div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-											<CheckCircle className="w-6 h-6 text-emerald-600" />
-										</div>
-										<div>
-											<h4 className="text-slate-900 font-bold text-base sm:text-lg">
-												Disetujui (ACC Keuangan) oleh{" "}
-												{finState.accBy?.fullName || "Admin Finance"}
-											</h4>
-											<p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-												Pada {formatDeviceDateTime(finState.accAt)}
-											</p>
-										</div>
-									</>
-								) : (
-									<>
-										<div
-											className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
-												isFinanceReady
-													? "bg-blue-100 text-[#0517B0]"
-													: "bg-amber-100 text-amber-600"
-											}`}
-										>
-											{isFinanceReady ? (
-												<CheckCircle2 className="w-6 h-6 text-[#0517B0]" />
-											) : (
-												<Clock className="w-6 h-6 text-amber-600" />
-											)}
-										</div>
-										<div>
-											<h4 className="text-slate-900 font-bold text-base sm:text-lg">
-												{!isFinanceReady
-													? "Menunggu Pelunasan Tagihan Wajib"
-													: "ACC Panel Keuangan (Finance)"}
-											</h4>
-											<p className="text-xs sm:text-sm text-slate-600 max-w-lg mt-0.5">
-												{!isFinanceReady
-													? "Seluruh tagihan pokok (Registrasi, Semester, TOEIC, Paspor) harus lunas atau tidak ada tunggakan sebelum ACC."
-													: "Seluruh tagihan pokok mahasiswa telah lunas dan diverifikasi. Anda dapat memberikan persetujuan ACC resmi sekarang."}
-											</p>
-										</div>
-									</>
-								)}
-							</div>
-
-							{canEdit && finState?.isAcc && (
-								<AlertDialog>
-									<AlertDialogTrigger
-										render={
-											<Button
-												variant="outline"
-												className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 shrink-0 font-semibold text-xs h-9 cursor-pointer"
-												disabled={isAccSaving}
-											>
-												{isAccSaving
-													? "Membatalkan..."
-													: "Batalkan ACC Finance"}
-											</Button>
-										}
-									/>
-									<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
-										<AlertDialogHeader>
-											<AlertDialogTitle>
-												Konfirmasi Pembatalan ACC Keuangan
-											</AlertDialogTitle>
-											<AlertDialogDescription className="text-slate-500 text-xs sm:text-sm">
-												Apakah Anda yakin ingin membatalkan status ACC untuk
-												panel Keuangan mahasiswa ini? Status Keuangan akan
-												kembali ke tahap berproses.
-											</AlertDialogDescription>
-										</AlertDialogHeader>
-										<div className="flex justify-end gap-3 mt-4">
-											<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50">
-												Batal
-											</AlertDialogCancel>
-											<AlertDialogAction
-												onClick={handleCancelAcc}
-												className="bg-rose-600 hover:bg-rose-700 text-white"
-											>
-												Ya, Batalkan ACC
-											</AlertDialogAction>
-										</div>
-									</AlertDialogContent>
-								</AlertDialog>
-							)}
-
-							{canEdit && !finState?.isAcc && (
-								<Tooltip>
-									<TooltipTrigger render={<span className="inline-block" />}>
-										<span>
-											<AlertDialog>
-												<AlertDialogTrigger
-													render={
-														<Button
-															disabled={!isFinanceReady || isAccSaving}
-															className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold text-xs h-9 min-w-[130px] disabled:opacity-50 disabled:cursor-not-allowed shadow-xs cursor-pointer"
-														>
-															{isAccSaving
-																? "Menyimpan..."
-																: "Berikan ACC Finance"}
-														</Button>
-													}
-												/>
-												<AlertDialogContent className="bg-white border-slate-200">
-													<AlertDialogHeader>
-														<AlertDialogTitle>
-															Konfirmasi ACC Panel Keuangan
-														</AlertDialogTitle>
-														<AlertDialogDescription className="text-slate-600 text-xs sm:text-sm">
-															Apakah Anda yakin ingin memberikan persetujuan
-															(ACC) untuk Panel Keuangan mahasiswa ini? Ini
-															menandakan bahwa seluruh tagihan wajib dan
-															pembayaran pendidikan telah diselesaikan.
-														</AlertDialogDescription>
-													</AlertDialogHeader>
-													<div className="flex justify-end gap-3 mt-4">
-														<AlertDialogCancel>Batal</AlertDialogCancel>
-														<AlertDialogAction
-															onClick={handleAcc}
-															className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold"
-														>
-															Ya, Berikan ACC Finance
-														</AlertDialogAction>
-													</div>
-												</AlertDialogContent>
-											</AlertDialog>
-										</span>
-									</TooltipTrigger>
-									{!isFinanceReady && (
-										<TooltipContent>
-											<p className="text-xs">
-												Tagihan Registrasi, Semester, TOEIC, dan Paspor harus
-												lunas sebelum ACC
-											</p>
-										</TooltipContent>
-									)}
-								</Tooltip>
-							)}
-						</div>
-					</CardContent>
-				</Card>
+				<AccPanelStatusCard
+					isAcc={Boolean(finState?.isAcc)}
+					accByUser={finState?.accBy?.fullName || "Admin Finance"}
+					accAt={finState?.accAt}
+					isReadyForAcc={isFinanceReady}
+					title="ACC Panel Keuangan"
+					pendingTitle={
+						!isFinanceReady
+							? "Menunggu Pelunasan Tagihan Wajib (6 Item)"
+							: "ACC Panel Keuangan (Finance)"
+					}
+					pendingDescription="Seluruh tagihan pokok (Registrasi, Semester, Interview, Keberangkatan, TOEIC, Paspor) harus lunas atau tidak ada tunggakan sebelum ACC."
+					readyDescription="Seluruh tagihan pokok (6 item) mahasiswa telah lunas dan diverifikasi. Anda dapat memberikan persetujuan ACC resmi sekarang."
+					canEdit={canEdit}
+					isSaving={isAccSaving}
+					onAcc={handleAcc}
+					onCancelAcc={handleCancelAcc}
+					cancelDialogTitle="Konfirmasi Pembatalan ACC Keuangan"
+					cancelDialogDescription="Apakah Anda yakin ingin membatalkan status ACC untuk panel Keuangan mahasiswa ini? Status Keuangan akan kembali ke tahap berproses."
+					disabledReason="Semua tagihan (Registrasi, Semester, Interview, Keberangkatan, TOEIC, dan Paspor) harus lunas sebelum ACC"
+				/>
 			</div>
 		</TooltipProvider>
 	);

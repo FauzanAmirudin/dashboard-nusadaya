@@ -3,9 +3,12 @@
 import {
 	Building2,
 	Calendar,
+	CheckCircle2,
+	Clock,
 	FileText,
 	Image as ImageIcon,
 	Loader2,
+	ShieldCheck,
 	Trash2,
 	Users,
 } from "lucide-react";
@@ -22,6 +25,7 @@ import {
 	AlertDialogTitle,
 	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -58,6 +62,29 @@ export function TabMonitoring({
 	onUpdate,
 }: TabMonitoringProps) {
 	const logs = crmState?.logs || [];
+	const crm = crmState?.crm;
+
+	const handleToggleStatus = async (
+		field: "isMonitoringParent" | "isMonitoringIndustry",
+		value: boolean,
+	) => {
+		if (!canEdit) return;
+		try {
+			const { error } = await api.students[studentId.toString()].crm.patch({
+				[field]: value,
+			});
+			if (error) throw new Error("Gagal mengubah status monitoring");
+			toast.success(
+				value
+					? "Status monitoring ditandai selesai"
+					: "Status monitoring dibatalkan",
+			);
+			fetchCrmData();
+			onUpdate();
+		} catch (e) {
+			toast.error("Terjadi kesalahan saat mengubah status monitoring");
+		}
+	};
 
 	return (
 		<div className="space-y-6">
@@ -68,16 +95,93 @@ export function TabMonitoring({
 						className="data-[state=active]:bg-white data-[state=active]:text-slate-800 data-[state=active]:shadow-sm rounded-md py-2 transition-all flex items-center justify-center gap-2 font-bold"
 					>
 						<Users className="w-4 h-4" /> Monitoring Orang Tua
+						{crm?.isMonitoringParent ? (
+							<span className="w-2 h-2 rounded-full bg-emerald-500" />
+						) : (
+							<span className="w-2 h-2 rounded-full bg-slate-300" />
+						)}
 					</TabsTrigger>
 					<TabsTrigger
 						value="industri"
 						className="data-[state=active]:bg-white data-[state=active]:text-slate-800 data-[state=active]:shadow-sm rounded-md py-2 transition-all flex items-center justify-center gap-2 font-bold"
 					>
 						<Building2 className="w-4 h-4" /> Monitoring Industri
+						{crm?.isMonitoringIndustry ? (
+							<span className="w-2 h-2 rounded-full bg-emerald-500" />
+						) : (
+							<span className="w-2 h-2 rounded-full bg-slate-300" />
+						)}
 					</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="orang-tua" className="space-y-6">
+					{/* Status Checklist Banner Orang Tua */}
+					<Card className="border border-slate-200 shadow-2xs bg-white overflow-hidden">
+						<CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+							<div className="flex items-center gap-3">
+								<div
+									className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+										crm?.isMonitoringParent
+											? "bg-emerald-100 text-emerald-700"
+											: "bg-amber-100 text-amber-700"
+									}`}
+								>
+									{crm?.isMonitoringParent ? (
+										<CheckCircle2 className="w-5 h-5" />
+									) : (
+										<Clock className="w-5 h-5" />
+									)}
+								</div>
+								<div>
+									<div className="flex items-center gap-2">
+										<h4 className="font-bold text-slate-800 text-sm">
+											Indikator: Monitoring Orang Tua
+										</h4>
+										{crm?.isMonitoringParent ? (
+											<Badge className="bg-emerald-100 text-emerald-800 border-0 text-xs font-semibold">
+												Selesai (Terpenuhi)
+											</Badge>
+										) : (
+											<Badge
+												variant="outline"
+												className="text-amber-700 bg-amber-50 border-amber-200 text-xs font-medium"
+											>
+												Belum Terpenuhi
+											</Badge>
+										)}
+									</div>
+									<p className="text-xs text-slate-500 mt-0.5">
+										{crm?.isMonitoringParent
+											? "Monitoring orang tua telah selesai dan tercatat di sistem."
+											: "Catat komunikasi / masalah orang tua atau tandai selesai."}
+									</p>
+								</div>
+							</div>
+
+							{canEdit && (
+								<Button
+									size="sm"
+									variant={crm?.isMonitoringParent ? "outline" : "default"}
+									onClick={() =>
+										handleToggleStatus(
+											"isMonitoringParent",
+											!crm?.isMonitoringParent,
+										)
+									}
+									className={
+										crm?.isMonitoringParent
+											? "border-slate-300 text-slate-700 hover:bg-slate-50 text-xs"
+											: "bg-[#0517B0] hover:bg-blue-800 text-white text-xs font-bold"
+									}
+								>
+									{crm?.isMonitoringParent
+										? "Batalkan Status Selesai"
+										: "Tandai Monitoring Selesai"}
+								</Button>
+							)}
+						</CardContent>
+					</Card>
+
 					<MonitoringForm
 						title="Catatan Orang Tua"
 						studentId={studentId}
@@ -99,6 +203,73 @@ export function TabMonitoring({
 				</TabsContent>
 
 				<TabsContent value="industri" className="space-y-6">
+					{/* Status Checklist Banner Industri */}
+					<Card className="border border-slate-200 shadow-2xs bg-white overflow-hidden">
+						<CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+							<div className="flex items-center gap-3">
+								<div
+									className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+										crm?.isMonitoringIndustry
+											? "bg-emerald-100 text-emerald-700"
+											: "bg-amber-100 text-amber-700"
+									}`}
+								>
+									{crm?.isMonitoringIndustry ? (
+										<CheckCircle2 className="w-5 h-5" />
+									) : (
+										<Clock className="w-5 h-5" />
+									)}
+								</div>
+								<div>
+									<div className="flex items-center gap-2">
+										<h4 className="font-bold text-slate-800 text-sm">
+											Indikator: Monitoring Industri
+										</h4>
+										{crm?.isMonitoringIndustry ? (
+											<Badge className="bg-emerald-100 text-emerald-800 border-0 text-xs font-semibold">
+												Selesai (Terpenuhi)
+											</Badge>
+										) : (
+											<Badge
+												variant="outline"
+												className="text-amber-700 bg-amber-50 border-amber-200 text-xs font-medium"
+											>
+												Belum Terpenuhi
+											</Badge>
+										)}
+									</div>
+									<p className="text-xs text-slate-500 mt-0.5">
+										{crm?.isMonitoringIndustry
+											? "Monitoring industri telah selesai dan tercatat di sistem."
+											: "Catat komunikasi / kunjungan industri atau tandai selesai."}
+									</p>
+								</div>
+							</div>
+
+							{canEdit && (
+								<Button
+									size="sm"
+									variant={crm?.isMonitoringIndustry ? "outline" : "default"}
+									onClick={() =>
+										handleToggleStatus(
+											"isMonitoringIndustry",
+											!crm?.isMonitoringIndustry,
+										)
+									}
+									className={
+										crm?.isMonitoringIndustry
+											? "border-slate-300 text-slate-700 hover:bg-slate-50 text-xs"
+											: "bg-[#0517B0] hover:bg-blue-800 text-white text-xs font-bold"
+									}
+								>
+									{crm?.isMonitoringIndustry
+										? "Batalkan Status Selesai"
+										: "Tandai Monitoring Selesai"}
+								</Button>
+							)}
+						</CardContent>
+					</Card>
+
 					<MonitoringForm
 						title="Catatan Industri"
 						studentId={studentId}

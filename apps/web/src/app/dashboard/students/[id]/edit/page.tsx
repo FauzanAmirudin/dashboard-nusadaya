@@ -24,6 +24,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
+import {
+	filterNumeric,
+	filterPhone,
+	isValidEmail,
+	preventNonNumericKey,
+	preventNonPhoneKey,
+} from "@/utils/form-validators";
 
 const TABS = [
 	"Keterangan Mahasiswa",
@@ -366,6 +373,16 @@ export default function EditStudentPage() {
 				);
 				return false;
 			}
+			if (!isValidEmail(formData.email)) {
+				toast.error(
+					"Format Email mahasiswa tidak valid (contoh: nama@email.com)",
+				);
+				return false;
+			}
+			if (formData.phone.length < 8) {
+				toast.error("Nomor HP / WhatsApp minimal 8 digit");
+				return false;
+			}
 		} else if (index === 1) {
 			const reqKeys: (keyof typeof formData)[] = [
 				"schoolOrigin",
@@ -378,6 +395,18 @@ export default function EditStudentPage() {
 			];
 			if (!checkEmpty(reqKeys)) {
 				toast.error("Mohon lengkapi seluruh field di Keterangan Pendidikan");
+				return false;
+			}
+			const grad = Number(formData.graduationYear);
+			if (Number.isNaN(grad) || grad < 1970 || grad > 2035) {
+				toast.error(
+					"Tahun lulus harus berupa 4 digit tahun yang valid (1970 - 2035)",
+				);
+				return false;
+			}
+			const cNum = Number(formData.cohort);
+			if (Number.isNaN(cNum) || cNum < 1 || cNum > 99) {
+				toast.error("Angkatan harus berupa angka 1 - 99");
 				return false;
 			}
 		} else if (index === 2) {
@@ -397,6 +426,16 @@ export default function EditStudentPage() {
 				toast.error("Mohon lengkapi seluruh field di Keterangan Kesehatan");
 				return false;
 			}
+			const h = Number(formData.height);
+			if (Number.isNaN(h) || h < 50 || h > 250) {
+				toast.error("Tinggi badan harus dalam rentang 50 - 250 cm");
+				return false;
+			}
+			const w = Number(formData.weight);
+			if (Number.isNaN(w) || w < 20 || w > 250) {
+				toast.error("Berat badan harus dalam rentang 20 - 250 kg");
+				return false;
+			}
 		} else if (index === 3) {
 			const reqKeys: (keyof typeof formData)[] = [
 				"ayahName",
@@ -412,6 +451,14 @@ export default function EditStudentPage() {
 			];
 			if (!checkEmpty(reqKeys)) {
 				toast.error("Mohon lengkapi seluruh field data Ayah");
+				return false;
+			}
+			if (formData.ayahEmail && !isValidEmail(formData.ayahEmail)) {
+				toast.error("Format Email Ayah tidak valid");
+				return false;
+			}
+			if (formData.ayahPhone && formData.ayahPhone.length < 8) {
+				toast.error("Nomor HP Ayah minimal 8 digit");
 				return false;
 			}
 		} else if (index === 4) {
@@ -431,6 +478,14 @@ export default function EditStudentPage() {
 				toast.error("Mohon lengkapi seluruh field data Ibu");
 				return false;
 			}
+			if (formData.ibuEmail && !isValidEmail(formData.ibuEmail)) {
+				toast.error("Format Email Ibu tidak valid");
+				return false;
+			}
+			if (formData.ibuPhone && formData.ibuPhone.length < 8) {
+				toast.error("Nomor HP Ibu minimal 8 digit");
+				return false;
+			}
 		} else if (index === 5) {
 			const reqKeys: (keyof typeof formData)[] = [
 				"waliName",
@@ -446,6 +501,14 @@ export default function EditStudentPage() {
 			];
 			if (!checkEmpty(reqKeys)) {
 				toast.error("Mohon lengkapi seluruh field data Wali");
+				return false;
+			}
+			if (formData.waliEmail && !isValidEmail(formData.waliEmail)) {
+				toast.error("Format Email Wali tidak valid");
+				return false;
+			}
+			if (formData.waliPhone && formData.waliPhone.length < 8) {
+				toast.error("Nomor HP Wali minimal 8 digit");
 				return false;
 			}
 		}
@@ -808,7 +871,17 @@ export default function EditStudentPage() {
 								<Input
 									placeholder="Nomor Induk"
 									value={formData.nim}
-									onChange={(e) => updateData("nim", e.target.value)}
+									onKeyDown={preventNonNumericKey}
+									onChange={(e) =>
+										updateData(
+											"nim",
+											filterNumeric(
+												e.target.value,
+												20,
+												"NIM hanya boleh berisi angka",
+											),
+										)
+									}
 								/>
 								<p className="text-xs text-slate-400">
 									NIM ini juga akan menjadi username login mahasiswa. Jika
@@ -948,7 +1021,10 @@ export default function EditStudentPage() {
 									type="tel"
 									placeholder="0812xxxx"
 									value={formData.phone}
-									onChange={(e) => updateData("phone", e.target.value)}
+									onKeyDown={preventNonPhoneKey}
+									onChange={(e) =>
+										updateData("phone", filterPhone(e.target.value, 15))
+									}
 								/>
 							</div>
 							<div className="space-y-2">
@@ -991,7 +1067,17 @@ export default function EditStudentPage() {
 								<Input
 									placeholder="001"
 									value={formData.addressRt}
-									onChange={(e) => updateData("addressRt", e.target.value)}
+									onKeyDown={preventNonNumericKey}
+									onChange={(e) =>
+										updateData(
+											"addressRt",
+											filterNumeric(
+												e.target.value,
+												5,
+												"RT hanya boleh berupa angka",
+											),
+										)
+									}
 								/>
 							</div>
 							<div className="space-y-2">
@@ -1001,7 +1087,17 @@ export default function EditStudentPage() {
 								<Input
 									placeholder="002"
 									value={formData.addressRw}
-									onChange={(e) => updateData("addressRw", e.target.value)}
+									onKeyDown={preventNonNumericKey}
+									onChange={(e) =>
+										updateData(
+											"addressRw",
+											filterNumeric(
+												e.target.value,
+												5,
+												"RW hanya boleh berupa angka",
+											),
+										)
+									}
 								/>
 							</div>
 							<div className="space-y-2">
@@ -1179,11 +1275,15 @@ export default function EditStudentPage() {
 								</Label>
 								<Input
 									required
-									type="number"
 									placeholder="Contoh: 15 atau 16"
 									value={formData.cohort}
+									onKeyDown={preventNonNumericKey}
 									onChange={(e) => {
-										const val = e.target.value;
+										const val = filterNumeric(
+											e.target.value,
+											2,
+											"Angkatan berupa angka 1-99",
+										);
 										const cNum = parseInt(val, 10);
 										if (!Number.isNaN(cNum) && cNum >= 1 && cNum <= 99) {
 											const startYear = 2010 + cNum;
@@ -1255,10 +1355,19 @@ export default function EditStudentPage() {
 									Tahun Lulus <span className="text-red-500">*</span>
 								</Label>
 								<Input
-									type="number"
 									placeholder="2023"
 									value={formData.graduationYear}
-									onChange={(e) => updateData("graduationYear", e.target.value)}
+									onKeyDown={preventNonNumericKey}
+									onChange={(e) =>
+										updateData(
+											"graduationYear",
+											filterNumeric(
+												e.target.value,
+												4,
+												"Tahun lulus harus berupa 4 digit angka",
+											),
+										)
+									}
 								/>
 							</div>
 							<div className="space-y-2 md:col-span-2">
@@ -1343,10 +1452,19 @@ export default function EditStudentPage() {
 									Tinggi Badan (cm) <span className="text-red-500">*</span>
 								</Label>
 								<Input
-									type="number"
 									placeholder="170"
 									value={formData.height}
-									onChange={(e) => updateData("height", e.target.value)}
+									onKeyDown={preventNonNumericKey}
+									onChange={(e) =>
+										updateData(
+											"height",
+											filterNumeric(
+												e.target.value,
+												3,
+												"Tinggi badan berupa angka (cm)",
+											),
+										)
+									}
 								/>
 							</div>
 							<div className="space-y-2">
@@ -1354,10 +1472,19 @@ export default function EditStudentPage() {
 									Berat Badan (kg) <span className="text-red-500">*</span>
 								</Label>
 								<Input
-									type="number"
 									placeholder="60"
 									value={formData.weight}
-									onChange={(e) => updateData("weight", e.target.value)}
+									onKeyDown={preventNonNumericKey}
+									onChange={(e) =>
+										updateData(
+											"weight",
+											filterNumeric(
+												e.target.value,
+												3,
+												"Berat badan berupa angka (kg)",
+											),
+										)
+									}
 								/>
 							</div>
 							<div className="space-y-2">
@@ -1521,7 +1648,10 @@ export default function EditStudentPage() {
 									type="tel"
 									placeholder="0812xxxx"
 									value={formData.ayahPhone}
-									onChange={(e) => updateData("ayahPhone", e.target.value)}
+									onKeyDown={preventNonPhoneKey}
+									onChange={(e) =>
+										updateData("ayahPhone", filterPhone(e.target.value, 15))
+									}
 								/>
 							</div>
 							<div className="space-y-2">
@@ -1684,7 +1814,10 @@ export default function EditStudentPage() {
 									type="tel"
 									placeholder="0812xxxx"
 									value={formData.ibuPhone}
-									onChange={(e) => updateData("ibuPhone", e.target.value)}
+									onKeyDown={preventNonPhoneKey}
+									onChange={(e) =>
+										updateData("ibuPhone", filterPhone(e.target.value, 15))
+									}
 								/>
 							</div>
 							<div className="space-y-2">
@@ -1874,7 +2007,10 @@ export default function EditStudentPage() {
 									required
 									placeholder="0812xxxx"
 									value={formData.waliPhone}
-									onChange={(e) => updateData("waliPhone", e.target.value)}
+									onKeyDown={preventNonPhoneKey}
+									onChange={(e) =>
+										updateData("waliPhone", filterPhone(e.target.value, 15))
+									}
 								/>
 							</div>
 							<div className="space-y-2">

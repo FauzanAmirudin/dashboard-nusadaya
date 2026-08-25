@@ -24,6 +24,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
+import { filterPhone, preventNonPhoneKey } from "@/utils/form-validators";
 
 export default function MahasiswaProfil() {
 	const { user, isAuthenticated, hasHydrated } = useAuthStore();
@@ -77,6 +78,14 @@ export default function MahasiswaProfil() {
 	};
 
 	const handleSave = async () => {
+		if (phone && phone.length < 8) {
+			toast.error("Nomor telepon mahasiswa minimal 8 digit");
+			return;
+		}
+		if (parentPhone && parentPhone.length < 8) {
+			toast.error("Nomor telepon orang tua minimal 8 digit");
+			return;
+		}
 		setIsSubmitting(true);
 		try {
 			const res = await api.mahasiswa.profil.patch({
@@ -304,7 +313,8 @@ export default function MahasiswaProfil() {
 								<Label>Nomor Telepon / WhatsApp Aktif</Label>
 								<Input
 									value={phone}
-									onChange={(e) => setPhone(e.target.value)}
+									onKeyDown={preventNonPhoneKey}
+									onChange={(e) => setPhone(filterPhone(e.target.value, 15))}
 									placeholder="Contoh: 081234567890"
 								/>
 							</div>
@@ -337,7 +347,10 @@ export default function MahasiswaProfil() {
 								<Label>Nomor Telepon Orang Tua</Label>
 								<Input
 									value={parentPhone}
-									onChange={(e) => setParentPhone(e.target.value)}
+									onKeyDown={preventNonPhoneKey}
+									onChange={(e) =>
+										setParentPhone(filterPhone(e.target.value, 15))
+									}
 									placeholder="Nomor kontak orang tua darurat"
 								/>
 							</div>

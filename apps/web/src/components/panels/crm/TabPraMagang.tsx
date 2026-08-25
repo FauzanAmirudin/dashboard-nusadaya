@@ -1,8 +1,16 @@
 "use client";
 
-import { Calendar, FileText, Link as LinkIcon, Loader2 } from "lucide-react";
+import {
+	Calendar,
+	CheckCircle2,
+	Clock,
+	FileText,
+	Link as LinkIcon,
+	Loader2,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DocumentUpload } from "@/components/ui/DocumentUpload";
@@ -28,6 +36,14 @@ export function TabPraMagang({
 	const crm = crmState?.crm;
 	const [isLoading, setIsLoading] = useState(false);
 	const [isEditing, setIsEditing] = useState(false);
+	const [praMagangDocsCount, setPraMagangDocsCount] = useState<number | null>(
+		null,
+	);
+
+	const isReportActuallyUploaded =
+		praMagangDocsCount !== null
+			? praMagangDocsCount > 0
+			: Boolean(crm?.isPrammagangReport);
 
 	// Form state
 	const [startDate, setStartDate] = useState(crm?.pramagangStartDate || "");
@@ -38,11 +54,15 @@ export function TabPraMagang({
 	const handleSave = async () => {
 		setIsLoading(true);
 		try {
+			const hasDoc =
+				Boolean(videoLink && videoLink.trim().length > 0) ||
+				Boolean(startDate && industry);
 			const { error } = await api.students[studentId.toString()].crm.patch({
 				pramagangStartDate: startDate,
 				pramagangEndDate: endDate,
 				pramagangIndustry: industry,
 				pramagangVideoLink: videoLink,
+				isPrammagangDocumentation: hasDoc,
 			});
 
 			if (error) throw new Error("Gagal menyimpan data Pra Magang");
@@ -55,6 +75,26 @@ export function TabPraMagang({
 			toast.error("Terjadi kesalahan saat menyimpan data");
 		} finally {
 			setIsLoading(false);
+		}
+	};
+
+	const handleToggleDoc = async (value: boolean) => {
+		if (!canEdit) return;
+		try {
+			const { error } = await api.students[studentId.toString()].crm.patch({
+				isPrammagangDocumentation: value,
+			});
+			if (error)
+				throw new Error("Gagal mengubah status dokumentasi Pra-Magang");
+			toast.success(
+				value
+					? "Dokumentasi Pra-Magang ditandai selesai"
+					: "Dokumentasi Pra-Magang dibatalkan",
+			);
+			fetchCrmData();
+			onUpdate();
+		} catch (e) {
+			toast.error("Terjadi kesalahan sistem");
 		}
 	};
 
@@ -74,6 +114,68 @@ export function TabPraMagang({
 
 	return (
 		<div className="space-y-6">
+			{/* Status Checklist Banner Pra-Magang */}
+			<Card className="border border-slate-200 shadow-2xs bg-white overflow-hidden">
+				<CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+					<div className="flex items-center gap-3">
+						<div
+							className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+								crm?.isPrammagangDocumentation
+									? "bg-emerald-100 text-emerald-700"
+									: "bg-amber-100 text-amber-700"
+							}`}
+						>
+							{crm?.isPrammagangDocumentation ? (
+								<CheckCircle2 className="w-5 h-5" />
+							) : (
+								<Clock className="w-5 h-5" />
+							)}
+						</div>
+						<div>
+							<div className="flex items-center gap-2">
+								<h4 className="font-bold text-slate-800 text-sm">
+									Indikator: Dokumentasi Pra-Magang
+								</h4>
+								{crm?.isPrammagangDocumentation ? (
+									<Badge className="bg-emerald-100 text-emerald-800 border-0 text-xs font-semibold">
+										Selesai (Terpenuhi)
+									</Badge>
+								) : (
+									<Badge
+										variant="outline"
+										className="text-amber-700 bg-amber-50 border-amber-200 text-xs font-medium"
+									>
+										Belum Terpenuhi
+									</Badge>
+								)}
+							</div>
+							<p className="text-xs text-slate-500 mt-0.5">
+								{crm?.isPrammagangDocumentation
+									? "Data penempatan dan dokumentasi video telah tercatat."
+									: "Lengkapi data industri, periode, tautan video atau tandai selesai."}
+							</p>
+						</div>
+					</div>
+
+					{canEdit && (
+						<Button
+							size="sm"
+							variant={crm?.isPrammagangDocumentation ? "outline" : "default"}
+							onClick={() => handleToggleDoc(!crm?.isPrammagangDocumentation)}
+							className={
+								crm?.isPrammagangDocumentation
+									? "border-slate-300 text-slate-700 hover:bg-slate-50 text-xs"
+									: "bg-[#0517B0] hover:bg-blue-800 text-white text-xs font-bold"
+							}
+						>
+							{crm?.isPrammagangDocumentation
+								? "Batalkan Status Selesai"
+								: "Tandai Dokumentasi Selesai"}
+						</Button>
+					)}
+				</CardContent>
+			</Card>
+
 			<Card className="border border-slate-200 shadow-sm overflow-hidden">
 				<div className="bg-slate-50 border-b border-slate-200 p-4 flex justify-between items-center">
 					<h3 className="font-bold text-slate-800 text-lg">
@@ -228,25 +330,58 @@ export function TabPraMagang({
 			</Card>
 
 			{/* Upload Dokumen Section */}
-			<Card className="border border-slate-200 shadow-sm overflow-hidden">
-				<div className="bg-slate-50 border-b border-slate-200 p-4">
-					<h3 className="font-bold text-slate-800 flex items-center gap-2">
-						<FileText className="w-5 h-5 text-[#0517B0]" /> Unggah Dokumen
-						Laporan
-					</h3>
+			<Card className="border border-slate-200 shadow-sm overflow-hidden border-l-4 border-l-indigo-600">
+				<div className="bg-slate-50 border-b border-slate-200 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+					<div>
+						<h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+							<FileText className="w-4 h-4 text-indigo-600" /> Unggah Dokumen
+							Laporan Akhir Pra Magang
+						</h3>
+						<p className="text-[11px] text-slate-500 mt-0.5">
+							Dokumen laporan akhir Pra Magang yang telah disetujui resmi (PDF)
+						</p>
+					</div>
+
+					<Badge
+						className={`text-xs font-bold px-2.5 py-0.5 ${
+							isReportActuallyUploaded
+								? "bg-emerald-50 text-emerald-700 border-emerald-200"
+								: "bg-amber-50 text-amber-700 border-amber-200"
+						}`}
+					>
+						{isReportActuallyUploaded
+							? "✓ Terunggah (Lengkap)"
+							: "Belum Diunggah"}
+					</Badge>
 				</div>
-				<CardContent className="p-6">
+				<CardContent className="p-4 sm:p-5">
 					<div className="flex flex-col w-full">
-						<p className="text-sm text-slate-600 mb-4">
-							Silakan unggah dokumen laporan akhir Pra Magang yang telah
-							disetujui.
+						<p className="text-xs text-slate-600 mb-3 leading-relaxed">
+							Dokumen ini merupakan salah satu syarat kelengkapan indikator
+							progress CRM (1/8 poin). Jika berkas dihapus, status progress akan
+							otomatis berkurang.
 						</p>
 						<DocumentUpload
 							studentId={studentId}
 							panel="crm"
 							documentKey="pramagang_report"
 							canEdit={canEdit}
+							onDocumentsLoaded={(docs) => {
+								setPraMagangDocsCount(docs.length);
+								if (docs.length === 0 && crm?.isPrammagangReport) {
+									api.students[studentId.toString()].crm
+										.patch({ isPrammagangReport: false })
+										.then(() => {
+											fetchCrmData();
+											onUpdate();
+										});
+								}
+							}}
 							onUploadSuccess={handleUploadSuccess}
+							onDeleteSuccess={() => {
+								fetchCrmData();
+								onUpdate();
+							}}
 						/>
 					</div>
 				</CardContent>

@@ -39,6 +39,9 @@ interface DocumentUploadProps {
 	courseId?: number;
 	canEdit: boolean;
 	onUploadSuccess?: () => void;
+	onDeleteSuccess?: () => void;
+	onUpdate?: () => void;
+	onDocumentsLoaded?: (documents: any[]) => void;
 	hideLabel?: boolean;
 }
 
@@ -49,6 +52,9 @@ export function DocumentUpload({
 	courseId,
 	canEdit,
 	onUploadSuccess,
+	onDeleteSuccess,
+	onUpdate,
+	onDocumentsLoaded,
 	hideLabel = false,
 }: DocumentUploadProps) {
 	const { token } = useAuthStore();
@@ -84,6 +90,7 @@ export function DocumentUpload({
 							new Date(a.uploadedAt).getTime(),
 					);
 					setDocuments(docs);
+					if (onDocumentsLoaded) onDocumentsLoaded(docs);
 				}
 			}
 		} catch (error) {
@@ -138,6 +145,7 @@ export function DocumentUpload({
 				toast.success("Dokumen berhasil diunggah");
 				fetchDocuments();
 				if (onUploadSuccess) onUploadSuccess();
+				if (onUpdate) onUpdate();
 			} else {
 				toast.error(data.message || "Gagal mengunggah dokumen");
 			}
@@ -168,7 +176,11 @@ export function DocumentUpload({
 			const data = await res.json();
 			if (data.success) {
 				toast.success("Dokumen dihapus");
-				setDocuments((prev) => prev.filter((d) => d.id !== docId));
+				const updatedDocs = documents.filter((d) => d.id !== docId);
+				setDocuments(updatedDocs);
+				if (onDocumentsLoaded) onDocumentsLoaded(updatedDocs);
+				if (onDeleteSuccess) onDeleteSuccess();
+				if (onUpdate) onUpdate();
 			} else {
 				toast.error(data.message || "Gagal menghapus");
 			}

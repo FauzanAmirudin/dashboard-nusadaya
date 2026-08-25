@@ -12,7 +12,7 @@ import { TabODS } from "@/components/panels/kehadiran/detail/TabODS";
 import { TabPiket } from "@/components/panels/kehadiran/detail/TabPiket";
 import { TabPramagang } from "@/components/panels/kehadiran/detail/TabPramagang";
 import { Badge } from "@/components/ui/badge";
-import { CardTitle } from "@/components/ui/card";
+import { PanelHeader } from "@/components/ui/PanelHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface KehadiranPanelProps {
@@ -22,22 +22,11 @@ interface KehadiranPanelProps {
 export function KehadiranPanel({ studentId }: KehadiranPanelProps) {
 	return (
 		<div className="space-y-6">
-			<div>
-				<div className="border-b border-slate-200 pb-4 mb-6">
-					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-						<div>
-							<CardTitle className="text-slate-800 text-lg flex items-center gap-2">
-								<CalendarDays className="w-5 h-5 text-[#0517B0]" /> Kehadiran —
-								Absensi Sesi & Acara
-							</CardTitle>
-							<p className="text-sm text-slate-500 mt-1">
-								Dikelola oleh: Akademik
-							</p>
-						</div>
-						<div className="flex items-center gap-3"></div>
-					</div>
-				</div>
-			</div>
+			<PanelHeader
+				icon={<CalendarDays className="w-5 h-5 text-[#0517B0]" />}
+				title="Kehadiran — Absensi Sesi & Acara"
+				subtitle="Dikelola oleh: Akademik"
+			/>
 
 			<Tabs defaultValue="mata-kuliah" className="w-full">
 				<TabsList className="mb-6 grid w-full grid-cols-4 bg-slate-100 p-1 rounded-lg">

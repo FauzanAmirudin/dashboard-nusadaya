@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NeumorphicStatCard } from "@/components/ui/NeumorphicStatCard";
 import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { Progress } from "@/components/ui/progress";
@@ -314,97 +315,42 @@ export function PaDashboard({ user: propUser, data = [] }: any) {
 
 			{/* KPI Summary Cards */}
 			<div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
-					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-blue-50 text-[#0517B0] mt-0.5">
-							<Users className="h-5 w-5" />
-						</div>
-						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								Total Mahasiswa
-							</p>
-							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{totalStudents}
-							</p>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-sky-500">
-					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-sky-50 text-sky-600 mt-0.5">
-							<ShieldCheck className="h-5 w-5" />
-						</div>
-						<div>
-							<p className="text-sky-700 text-xs font-bold">ACC Pembimbing</p>
-							<p className="text-2xl font-black text-sky-900 mt-0.5">
-								{countAcc}
-							</p>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
-					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 mt-0.5">
-							<CheckCircle className="h-5 w-5" />
-						</div>
-						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								Status Aman
-							</p>
-							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countAman}
-							</p>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-amber-500">
-					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-amber-50 text-amber-600 mt-0.5">
-							<Clock className="h-5 w-5" />
-						</div>
-						<div>
-							<p className="text-slate-500 text-xs font-semibold">Berproses</p>
-							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countProses}
-							</p>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-rose-500">
-					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-rose-50 text-rose-600 mt-0.5">
-							<XCircle className="h-5 w-5" />
-						</div>
-						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								Butuh Perhatian
-							</p>
-							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countPerhatian}
-							</p>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-indigo-600">
-					<CardContent className="p-4 flex items-start gap-3">
-						<div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 mt-0.5">
-							<UserCheck className="h-5 w-5" />
-						</div>
-						<div>
-							<p className="text-slate-500 text-xs font-semibold">
-								Konseling Selesai
-							</p>
-							<p className="text-2xl font-black text-slate-900 mt-0.5">
-								{countKonselingSelesai}
-							</p>
-						</div>
-					</CardContent>
-				</Card>
+				<NeumorphicStatCard
+					label="Total Mahasiswa"
+					value={totalStudents}
+					icon={<Users className="h-5 w-5" />}
+					color="blue"
+				/>
+				<NeumorphicStatCard
+					label="ACC Pembimbing"
+					value={countAcc}
+					icon={<ShieldCheck className="h-5 w-5" />}
+					color="sky"
+				/>
+				<NeumorphicStatCard
+					label="Status Aman"
+					value={countAman}
+					icon={<CheckCircle className="h-5 w-5" />}
+					color="green"
+				/>
+				<NeumorphicStatCard
+					label="Berproses"
+					value={countProses}
+					icon={<Clock className="h-5 w-5" />}
+					color="amber"
+				/>
+				<NeumorphicStatCard
+					label="Butuh Perhatian"
+					value={countPerhatian}
+					icon={<XCircle className="h-5 w-5" />}
+					color="rose"
+				/>
+				<NeumorphicStatCard
+					label="Konseling Selesai"
+					value={countKonselingSelesai}
+					icon={<UserCheck className="h-5 w-5" />}
+					color="indigo"
+				/>
 			</div>
 
 			{/* Main Monitoring Table */}
