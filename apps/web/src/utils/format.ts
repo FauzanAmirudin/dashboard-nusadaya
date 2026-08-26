@@ -59,3 +59,14 @@ export const formatDeviceDateTime = (
 		return date.toLocaleString("id-ID", defaultOptions);
 	}
 };
+
+export const formatDate = (date: string | Date | null | undefined) => {
+	if (!date) return "-";
+	const d = new Date(date);
+	if (isNaN(d.getTime())) return "-";
+	return new Intl.DateTimeFormat("id-ID", {
+		day: "numeric",
+		month: "short",
+		year: "numeric",
+	}).format(d);
+};

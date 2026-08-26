@@ -16,6 +16,7 @@ import {
 	Plane,
 	Settings,
 	ShieldCheck,
+	Sparkles,
 	UserCog,
 	Users,
 	Wallet,
@@ -92,8 +93,21 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 	{
 		icon: Wallet,
 		label: "Panel Finance",
-		href: "/dashboard/finance",
 		roles: ["superadmin", "finance"],
+		subItems: [
+			{
+				label: "Monitoring Mahasiswa",
+				href: "/dashboard/finance",
+				roles: ["superadmin", "finance"],
+				icon: Wallet,
+			},
+			{
+				label: "Anggaran Praktik",
+				href: "/dashboard/finance/anggaran-praktik",
+				roles: ["superadmin", "finance"],
+				icon: Wallet,
+			},
+		],
 	},
 	{
 		icon: GraduationCap,
@@ -119,12 +133,6 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 				icon: CalendarDays,
 			},
 			{
-				label: "Manajemen Kehadiran",
-				href: "/dashboard/kehadiran",
-				roles: ["superadmin", "akademik"],
-				icon: ClipboardCheck,
-			},
-			{
 				label: "Manajemen Mata Kuliah",
 				href: "/dashboard/mata-kuliah",
 				roles: ["superadmin", "akademik", "dosen"],
@@ -135,6 +143,18 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 				href: "/dashboard/mata-kuliah/rekap",
 				roles: ["superadmin", "akademik", "dosen"],
 				icon: CheckSquare,
+			},
+			{
+				label: "Manajemen Kehadiran",
+				href: "/dashboard/kehadiran",
+				roles: ["superadmin", "akademik"],
+				icon: ClipboardCheck,
+			},
+			{
+				label: "Kehadiran Piket",
+				href: "/dashboard/kehadiran-piket",
+				roles: ["superadmin", "akademik"],
+				icon: Sparkles,
 			},
 			{
 				label: "Manajemen PA",
@@ -408,6 +428,21 @@ function checkItemActive(
 
 	if (href === "/dashboard") {
 		return pathname === "/dashboard";
+	}
+
+	if (href === "/dashboard/finance") {
+		return (
+			pathname === "/dashboard/finance" ||
+			(pathname.startsWith("/dashboard/finance/") &&
+				!pathname.startsWith("/dashboard/finance/anggaran-praktik"))
+		);
+	}
+
+	if (href === "/dashboard/finance/anggaran-praktik") {
+		return (
+			pathname === "/dashboard/finance/anggaran-praktik" ||
+			pathname.startsWith("/dashboard/finance/anggaran-praktik/")
+		);
 	}
 
 	if (href === "/dashboard/mata-kuliah") {

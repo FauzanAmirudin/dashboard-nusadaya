@@ -140,7 +140,32 @@ const app = new Elysia()
 				};
 			}
 		}
+		// 4. Default: unauthenticated
 		return { user: null };
+	})
+	.onError(({ code, error, set }) => {
+		console.error(`[API Error] ${code}:`, error);
+		if (code === "NOT_FOUND") {
+			set.status = 404;
+			return { success: false, message: "Resource tidak ditemukan" };
+		}
+		if (code === "VALIDATION") {
+			set.status = 400;
+			return {
+				success: false,
+				message: (error as any)?.message || "Data input tidak valid",
+			};
+		}
+		if (code === "PARSE") {
+			set.status = 400;
+			return { success: false, message: "Gagal memproses body request" };
+		}
+		set.status = (error as any)?.status || 500;
+		return {
+			success: false,
+			message:
+				(error as any)?.message || "Terjadi kesalahan internal pada server",
+		};
 	})
 	.get("/", () => "Nusadaya API is running")
 

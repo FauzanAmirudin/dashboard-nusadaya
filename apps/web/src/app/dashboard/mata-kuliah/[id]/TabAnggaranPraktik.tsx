@@ -84,6 +84,9 @@ interface BudgetRequest {
 	totalNominal: number;
 	status: string; // "menunggu" | "disetujui" | "ditolak"
 	catatanFinance?: string | null;
+	buktiPencairanUrl?: string | null;
+	buktiPencairanFileName?: string | null;
+	tanggalPencairan?: string | null;
 	createdAt: string;
 }
 
@@ -314,7 +317,14 @@ export function TabAnggaranPraktik({
 				body: JSON.stringify(payload),
 			});
 
-			const json = await res.json();
+			let json: any = {};
+			try {
+				const text = await res.text();
+				json = JSON.parse(text);
+			} catch {
+				json = { success: false, message: "Respon server tidak valid" };
+			}
+
 			if (res.ok && json.success) {
 				toast.success(
 					editingRequestId
@@ -701,6 +711,38 @@ export function TabAnggaranPraktik({
 											</span>
 										</div>
 									</div>
+
+									{/* Info Bukti Pencairan Finance (Jika Disetujui) */}
+									{req.status === "disetujui" && (
+										<div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+											<div className="flex items-center gap-2 text-xs text-emerald-800 font-medium">
+												<CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+												<span>
+													{req.buktiPencairanUrl
+														? "Anggaran telah dicairkan oleh Finance. Berkas bukti transfer/pencairan tersedia."
+														: "Anggaran telah disetujui oleh Finance dan siap dicairkan."}
+												</span>
+											</div>
+											{req.buktiPencairanUrl && (
+												<Button
+													size="sm"
+													variant="outline"
+													onClick={() => {
+														const url = req.buktiPencairanUrl?.startsWith(
+															"http",
+														)
+															? req.buktiPencairanUrl
+															: `${API_URL}${req.buktiPencairanUrl}`;
+														window.open(url, "_blank");
+													}}
+													className="text-xs h-7.5 gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-100 font-semibold shrink-0"
+												>
+													<ExternalLink className="w-3.5 h-3.5" />
+													Lihat Bukti Pencairan
+												</Button>
+											)}
+										</div>
+									)}
 
 									{/* Catatan Revisi Finance & Action Revisi */}
 									{req.status === "ditolak" && (

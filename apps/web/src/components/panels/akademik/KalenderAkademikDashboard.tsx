@@ -1,17 +1,25 @@
 "use client";
 
 import {
+	AlertCircle,
 	ArrowLeft,
+	BookOpen,
+	Building2,
+	CalendarDays,
 	Calendar as CalendarIcon,
+	CheckCircle2,
+	Clock,
 	Download,
 	Eye,
 	FileText,
+	GraduationCap,
 	Loader2,
 	Pencil,
 	Plus,
-	RotateCcw,
 	Search,
+	Sparkles,
 	Trash2,
+	X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -31,6 +39,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
@@ -54,6 +63,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/eden";
+import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store";
 
 const DEFAULT_18_PERIODS = [
@@ -112,14 +122,7 @@ export function KalenderAkademikDashboard() {
 	const [selectedId, setSelectedId] = useState<number | null>(null);
 
 	return (
-		<div className="container mx-auto py-6 space-y-6">
-			<div className="flex items-center justify-between">
-				<h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-					<CalendarIcon className="w-8 h-8 text-primary" />
-					Kalender Akademik
-				</h1>
-			</div>
-
+		<div className="space-y-6">
 			{view === "list" && (
 				<ListCalendarView
 					canEdit={canEdit}
@@ -153,7 +156,7 @@ export function KalenderAkademikDashboard() {
 }
 
 // -------------------------------------------------------------
-// 1. LIST VIEW (Daftar Kalender Akademik tanpa Status & Filter Status)
+// 1. LIST VIEW (Daftar Kalender Akademik)
 // -------------------------------------------------------------
 function ListCalendarView({
 	canEdit,
@@ -168,7 +171,7 @@ function ListCalendarView({
 	const [isLoading, setIsLoading] = useState(true);
 	const [deleteCalendarId, setDeleteCalendarId] = useState<number | null>(null);
 
-	// Search & Filters State (Tanpa Status Filter)
+	// Search & Filters State
 	const [searchQuery, setSearchQuery] = useState("");
 	const [cohortFilter, setCohortFilter] = useState("all");
 
@@ -211,179 +214,310 @@ function ListCalendarView({
 	};
 
 	// Available Cohort Options for Filter
-	const availableCohorts = ["16", "15", "14", "13", "12", "11", "10"];
+	const availableCohorts = Array.from(
+		new Set(calendars.map((c) => c.cohort?.toString()).filter(Boolean)),
+	).sort((a, b) => Number(b) - Number(a));
 
 	// Filtered Calendars List
 	const filteredCalendars = calendars.filter((c) => {
 		const matchesSearch =
 			!searchQuery ||
-			c.academicYear.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			c.cohort.toString().includes(searchQuery);
+			c.academicYear?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+			c.cohort?.toString().includes(searchQuery);
 
 		const matchesCohort =
-			cohortFilter === "all" ||
-			c.cohort.toString() === cohortFilter ||
-			(Number(cohortFilter) >= 2000 &&
-				c.cohort === Number(cohortFilter) - 2010);
+			cohortFilter === "all" || c.cohort?.toString() === cohortFilter;
 
 		return matchesSearch && matchesCohort;
 	});
 
 	if (isLoading) {
 		return (
-			<div className="flex justify-center p-12">
-				<Loader2 className="w-8 h-8 animate-spin text-primary" />
+			<div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
+				<Loader2 className="w-8 h-8 animate-spin text-[#0517B0]" />
+				<span className="text-xs font-medium text-slate-500">
+					Memuat daftar kalender akademik...
+				</span>
 			</div>
 		);
 	}
 
 	return (
-		<>
-			<Card>
-				<CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-					<CardTitle>Daftar Kalender Akademik</CardTitle>
-					{canEdit && (
-						<Button onClick={onCreateNew}>
-							<Plus className="w-4 h-4 mr-2" />
-							Buat Kalender Baru
-						</Button>
-					)}
-				</CardHeader>
-				<CardContent className="space-y-4">
-					{/* Search & Filter Bar */}
-					<div className="flex flex-col sm:flex-row items-center gap-3 bg-slate-50 p-3 rounded-lg border">
-						{/* Search Input */}
-						<div className="relative flex-1 w-full">
-							<Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-							<Input
-								placeholder="Cari Tahun Ajaran atau Angkatan..."
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-								className="pl-9 bg-white"
-							/>
-						</div>
-
-						{/* Filter Cohort / Angkatan */}
-						<div className="w-full sm:w-[200px]">
-							<Select
-								value={cohortFilter}
-								onValueChange={(val) => setCohortFilter(val || "all")}
+		<div className="space-y-6">
+			{/* Executive Header Banner */}
+			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
+				<div className="flex items-center gap-3.5">
+					<div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#0517B0] to-blue-600 text-white flex items-center justify-center shadow-2xs ring-4 ring-blue-50 shrink-0">
+						<CalendarDays className="w-5 h-5" />
+					</div>
+					<div>
+						<div className="flex items-center gap-2.5">
+							<h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+								Kalender Akademik
+							</h1>
+							<Badge
+								variant="secondary"
+								className="bg-blue-50 text-[#0517B0] text-[11px] font-semibold px-2 py-0.5 rounded-full border border-blue-200/60"
 							>
-								<SelectTrigger className="bg-white">
-									<SelectValue>
-										{cohortFilter === "all"
-											? "Semua Angkatan"
-											: `Angkatan ${cohortFilter}`}
-									</SelectValue>
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="all">Semua Angkatan</SelectItem>
-									{availableCohorts.map((cohort) => (
-										<SelectItem key={cohort} value={cohort}>
-											Angkatan {cohort}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+								Panel Akademik
+							</Badge>
 						</div>
+						<p className="text-xs text-slate-500 mt-0.5">
+							Master jadwal perkuliahan, rentang 18 minggu, UTS, UAS, dan agenda
+							akademik
+						</p>
+					</div>
+				</div>
 
-						{(searchQuery.trim() !== "" || cohortFilter !== "all") && (
+				{canEdit && (
+					<Button
+						onClick={onCreateNew}
+						className="h-9 text-xs text-white bg-[#0517B0] hover:bg-[#0517B0]/90 font-semibold shadow-2xs gap-1.5 shrink-0"
+					>
+						<Plus className="w-4 h-4" />
+						<span>Buat Kalender Baru</span>
+					</Button>
+				)}
+			</div>
+
+			{/* Top 3 KPI Summary Cards */}
+			<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+				<div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+					<div className="flex items-center gap-3">
+						<div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0517B0] flex items-center justify-center shrink-0">
+							<CalendarIcon className="w-5 h-5" />
+						</div>
+						<div>
+							<span className="text-xs font-medium text-slate-500 block">
+								Total Kalender Terdaftar
+							</span>
+							<span className="text-base font-bold text-slate-800">
+								{calendars.length} Tahun Ajaran
+							</span>
+						</div>
+					</div>
+				</div>
+
+				<div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+					<div className="flex items-center gap-3">
+						<div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+							<GraduationCap className="w-5 h-5" />
+						</div>
+						<div>
+							<span className="text-xs font-medium text-slate-500 block">
+								Angkatan Terdata
+							</span>
+							<span className="text-base font-bold text-slate-800">
+								{availableCohorts.length > 0
+									? `${availableCohorts.length} Angkatan Aktif`
+									: "Belum Ada"}
+							</span>
+						</div>
+					</div>
+				</div>
+
+				<div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+					<div className="flex items-center gap-3">
+						<div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+							<Sparkles className="w-5 h-5" />
+						</div>
+						<div>
+							<span className="text-xs font-medium text-slate-500 block">
+								Standar Semester
+							</span>
+							<span className="text-base font-bold text-slate-800">
+								18 Minggu Akademik
+							</span>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			{/* Main Content Card: Search & Table */}
+			<div className="bg-white border border-slate-200/90 rounded-2xl shadow-2xs overflow-hidden">
+				{/* Smart Toolbar */}
+				<div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+					<div className="relative flex-1 w-full">
+						<Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+						<Input
+							placeholder="Cari Tahun Ajaran atau Angkatan..."
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							className="pl-9 pr-8 h-9 text-xs bg-slate-50/50 border-slate-200"
+						/>
+						{searchQuery && (
+							<button
+								type="button"
+								onClick={() => setSearchQuery("")}
+								className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+							>
+								<X className="w-3.5 h-3.5" />
+							</button>
+						)}
+					</div>
+
+					<div className="w-full sm:w-56 shrink-0 flex items-center gap-2">
+						<Select
+							value={cohortFilter}
+							onValueChange={(val) => setCohortFilter(val || "all")}
+						>
+							<SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200 w-full">
+								<SelectValue placeholder="Semua Angkatan" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">Semua Angkatan</SelectItem>
+								{availableCohorts.map((cohort) => (
+									<SelectItem key={cohort} value={cohort}>
+										Angkatan {cohort}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+
+						{(searchQuery || cohortFilter !== "all") && (
 							<Button
-								variant="outline"
+								variant="ghost"
 								size="sm"
 								onClick={() => {
 									setSearchQuery("");
 									setCohortFilter("all");
 								}}
-								className="h-10 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors"
+								className="h-9 text-xs text-slate-500 hover:text-slate-800 shrink-0 px-2"
 							>
-								<RotateCcw className="w-3.5 h-3.5 text-slate-500" />
 								Reset
 							</Button>
 						)}
 					</div>
+				</div>
 
-					{/* Calendars Table (Tanpa Kolom Status) */}
-					{filteredCalendars.length === 0 ? (
-						<div className="text-center py-12 text-slate-500">
+				{/* Table Data */}
+				{filteredCalendars.length === 0 ? (
+					<div className="text-center py-16 text-slate-400">
+						<CalendarIcon className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+						<h3 className="text-sm font-bold text-slate-700">
 							{calendars.length === 0
-								? "Belum ada data kalender akademik. Silakan buat kalender baru."
-								: "Tidak ada kalender akademik yang sesuai dengan filter pencarian."}
-						</div>
-					) : (
+								? "Belum ada kalender akademik terdaftar"
+								: "Tidak ada kalender yang sesuai dengan filter"}
+						</h3>
+						<p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+							{calendars.length === 0
+								? "Silakan buat master kalender akademik baru untuk mengelola agenda semester."
+								: "Coba ubah kata kunci pencarian atau reset filter angkatan."}
+						</p>
+					</div>
+				) : (
+					<div className="overflow-x-auto">
 						<Table>
 							<TableHeader>
-								<TableRow>
-									<TableHead>Tahun Ajaran</TableHead>
-									<TableHead>Angkatan</TableHead>
-									<TableHead>Periode Tanggal</TableHead>
-									<TableHead className="text-right">Aksi</TableHead>
+								<TableRow className="bg-slate-50/60 hover:bg-slate-50/60 border-slate-100">
+									<TableHead className="text-xs font-bold text-slate-600 uppercase tracking-wider py-3.5 pl-5">
+										Tahun Ajaran
+									</TableHead>
+									<TableHead className="text-xs font-bold text-slate-600 uppercase tracking-wider py-3.5">
+										Angkatan
+									</TableHead>
+									<TableHead className="text-xs font-bold text-slate-600 uppercase tracking-wider py-3.5">
+										Rentang Tanggal
+									</TableHead>
+									<TableHead className="text-xs font-bold text-slate-600 uppercase tracking-wider py-3.5 text-right pr-5">
+										Aksi
+									</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
 								{filteredCalendars.map((c) => (
-									<TableRow key={c.id}>
-										<TableCell className="font-semibold text-slate-900">
-											TA {c.academicYear}
+									<TableRow
+										key={c.id}
+										className="hover:bg-slate-50/60 border-slate-100 transition-colors"
+									>
+										<TableCell className="py-3.5 pl-5">
+											<div className="flex items-center gap-3">
+												<div className="w-9 h-9 rounded-xl bg-blue-50 text-[#0517B0] flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+													TA
+												</div>
+												<span className="font-bold text-slate-900 text-sm">
+													{c.academicYear}
+												</span>
+											</div>
 										</TableCell>
-										<TableCell>Angkatan {c.cohort}</TableCell>
-										<TableCell>
-											{formatDateIndonesian(c.startDate)} s.d.{" "}
-											{formatDateIndonesian(c.endDate)}
-										</TableCell>
-										<TableCell className="text-right space-x-2">
-											<Button
+										<TableCell className="py-3.5">
+											<Badge
 												variant="outline"
-												size="sm"
-												onClick={() => onViewDetail(c.id)}
+												className="bg-slate-50 text-slate-700 font-mono text-xs border-slate-200 px-2.5 py-0.5"
 											>
-												<Eye className="w-4 h-4 mr-1" /> Detail
-											</Button>
-											{canEdit && (
+												Angkatan {c.cohort}
+											</Badge>
+										</TableCell>
+										<TableCell className="py-3.5">
+											<div className="flex items-center gap-1.5 text-xs text-slate-600">
+												<CalendarIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+												<span>
+													{formatDateIndonesian(c.startDate)} s.d.{" "}
+													{formatDateIndonesian(c.endDate)}
+												</span>
+											</div>
+										</TableCell>
+										<TableCell className="py-3.5 text-right pr-5">
+											<div className="flex items-center justify-end gap-1.5">
 												<Button
-													variant="destructive"
+													variant="outline"
 													size="sm"
-													onClick={() => setDeleteCalendarId(c.id)}
+													onClick={() => onViewDetail(c.id)}
+													className="h-8 text-xs text-[#0517B0] border-blue-200 hover:bg-blue-50 font-semibold gap-1"
 												>
-													<Trash2 className="w-4 h-4" />
+													<Eye className="w-3.5 h-3.5" />
+													<span>Detail</span>
 												</Button>
-											)}
+												{canEdit && (
+													<Button
+														variant="ghost"
+														size="icon"
+														onClick={() => setDeleteCalendarId(c.id)}
+														className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
+													>
+														<Trash2 className="w-3.5 h-3.5" />
+													</Button>
+												)}
+											</div>
 										</TableCell>
 									</TableRow>
 								))}
 							</TableBody>
 						</Table>
-					)}
-				</CardContent>
-			</Card>
+					</div>
+				)}
+			</div>
 
 			{/* Confirm Delete Calendar AlertDialog */}
 			<AlertDialog
 				open={deleteCalendarId !== null}
 				onOpenChange={(open) => !open && setDeleteCalendarId(null)}
 			>
-				<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
+				<AlertDialogContent className="bg-white border-slate-200/90 rounded-2xl p-6 text-slate-800">
 					<AlertDialogHeader>
-						<AlertDialogTitle>Hapus Kalender Akademik</AlertDialogTitle>
-						<AlertDialogDescription className="text-slate-500">
-							Apakah Anda yakin ingin menghapus kalender akademik ini? Semua
-							data periode dan kegiatan terkait akan ikut terhapus.
+						<AlertDialogTitle className="text-base font-bold text-slate-900">
+							Hapus Master Kalender Akademik
+						</AlertDialogTitle>
+						<AlertDialogDescription className="text-xs text-slate-500">
+							Apakah Anda yakin ingin menghapus kalender akademik ini? Seluruh
+							data periode 18 minggu dan kegiatan tambahan terkait akan ikut
+							terhapus permanen.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel className="border-slate-200 hover:bg-slate-50 text-slate-600">
+					<AlertDialogFooter className="gap-2 pt-2">
+						<AlertDialogCancel className="h-9 text-xs border-slate-200 hover:bg-slate-50 text-slate-600">
 							Batal
 						</AlertDialogCancel>
 						<AlertDialogAction
 							onClick={handleDeleteConfirm}
-							className="bg-red-600 hover:bg-red-700 text-white"
+							className="h-9 text-xs bg-rose-600 hover:bg-rose-700 text-white font-semibold"
 						>
-							Hapus
+							Hapus Kalender
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
-		</>
+		</div>
 	);
 }
 
@@ -412,7 +546,7 @@ function CreateCalendarView({
 			!form.startDate ||
 			!form.endDate
 		) {
-			toast.error("Mohon lengkapi semua field");
+			toast.error("Mohon lengkapi seluruh kolom isian");
 			return;
 		}
 
@@ -438,70 +572,118 @@ function CreateCalendarView({
 	};
 
 	return (
-		<Card>
-			<CardHeader>
-				<div className="flex items-center gap-4">
-					<Button variant="ghost" size="icon" onClick={onBack}>
-						<ArrowLeft className="w-4 h-4" />
-					</Button>
-					<CardTitle>Buat Kalender Akademik Baru</CardTitle>
-				</div>
-			</CardHeader>
-			<CardContent className="space-y-4 max-w-lg">
-				<div className="space-y-2">
-					<Label>Tahun Ajaran</Label>
-					<Input
-						placeholder="Misal: 2024/2025"
-						value={form.academicYear}
-						onChange={(e) => setForm({ ...form, academicYear: e.target.value })}
-					/>
-				</div>
-				<div className="space-y-2">
-					<Label>Angkatan</Label>
-					<Input
-						type="number"
-						placeholder="Misal: 2025"
-						value={form.cohort || ""}
-						onChange={(e) => setForm({ ...form, cohort: e.target.value })}
-					/>
-				</div>
-				<div className="grid grid-cols-2 gap-4">
-					<div className="space-y-2">
-						<Label>Tanggal Mulai</Label>
-						<Input
-							type="date"
-							value={form.startDate}
-							onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-						/>
+		<div className="space-y-6">
+			{/* Header Navigation */}
+			<div className="flex items-center gap-3">
+				<Button
+					variant="outline"
+					size="sm"
+					onClick={onBack}
+					className="h-8.5 text-xs text-slate-600 bg-white border-slate-200/90 shadow-2xs gap-1.5"
+				>
+					<ArrowLeft className="w-3.5 h-3.5" />
+					<span>Kembali ke Daftar</span>
+				</Button>
+			</div>
+
+			{/* Form Card */}
+			<div className="bg-white border border-slate-200/90 rounded-2xl shadow-2xs p-6 sm:p-8 max-w-2xl">
+				<div className="flex items-center gap-3 pb-5 border-b border-slate-100 mb-6">
+					<div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0517B0] flex items-center justify-center shrink-0 shadow-2xs">
+						<CalendarDays className="w-5 h-5" />
 					</div>
-					<div className="space-y-2">
-						<Label>Tanggal Selesai</Label>
-						<Input
-							type="date"
-							value={form.endDate}
-							onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-						/>
+					<div>
+						<h2 className="text-base font-bold text-slate-900 tracking-tight">
+							Buat Kalender Akademik Baru
+						</h2>
+						<p className="text-xs text-slate-500">
+							Tentukan tahun ajaran, angkatan, dan rentang tanggal pelaksanaan
+							semester
+						</p>
 					</div>
 				</div>
 
-				<div className="pt-4 flex justify-end gap-2">
-					<Button variant="outline" onClick={onBack}>
-						Batal
-					</Button>
-					<Button onClick={handleSave} disabled={isSaving}>
-						{isSaving ? (
-							<Loader2 className="w-4 h-4 mr-2 animate-spin" />
-						) : null}
-						Simpan Kalender
-					</Button>
+				<div className="space-y-4">
+					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div className="space-y-1.5">
+							<Label className="text-xs font-medium text-slate-700">
+								Tahun Ajaran <span className="text-rose-500">*</span>
+							</Label>
+							<Input
+								placeholder="Contoh: 2024/2025"
+								value={form.academicYear}
+								onChange={(e) =>
+									setForm({ ...form, academicYear: e.target.value })
+								}
+								className="h-9 text-xs bg-white"
+							/>
+						</div>
+						<div className="space-y-1.5">
+							<Label className="text-xs font-medium text-slate-700">
+								Angkatan <span className="text-rose-500">*</span>
+							</Label>
+							<Input
+								type="number"
+								placeholder="Contoh: 16"
+								value={form.cohort || ""}
+								onChange={(e) => setForm({ ...form, cohort: e.target.value })}
+								className="h-9 text-xs bg-white"
+							/>
+						</div>
+					</div>
+
+					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div className="space-y-1.5">
+							<Label className="text-xs font-medium text-slate-700">
+								Tanggal Mulai <span className="text-rose-500">*</span>
+							</Label>
+							<Input
+								type="date"
+								value={form.startDate}
+								onChange={(e) =>
+									setForm({ ...form, startDate: e.target.value })
+								}
+								className="h-9 text-xs bg-white"
+							/>
+						</div>
+						<div className="space-y-1.5">
+							<Label className="text-xs font-medium text-slate-700">
+								Tanggal Selesai <span className="text-rose-500">*</span>
+							</Label>
+							<Input
+								type="date"
+								value={form.endDate}
+								onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+								className="h-9 text-xs bg-white"
+							/>
+						</div>
+					</div>
+
+					<div className="pt-4 flex justify-end gap-2 border-t border-slate-100">
+						<Button variant="outline" onClick={onBack} className="h-9 text-xs">
+							Batal
+						</Button>
+						<Button
+							onClick={handleSave}
+							disabled={isSaving}
+							className="h-9 text-xs text-white bg-[#0517B0] hover:bg-[#0517B0]/90 font-semibold shadow-2xs gap-1.5"
+						>
+							{isSaving ? (
+								<Loader2 className="w-3.5 h-3.5 animate-spin" />
+							) : (
+								<Plus className="w-3.5 h-3.5" />
+							)}
+							<span>Simpan Master Kalender</span>
+						</Button>
+					</div>
 				</div>
-			</CardContent>
-		</Card>
+			</div>
+		</div>
 	);
 }
 
 // -------------------------------------------------------------
-// 3. DETAIL VIEW (With Export PDF Feature, Tanpa Display Status)
+// 3. DETAIL VIEW (With Export PDF Feature)
 // -------------------------------------------------------------
 function DetailCalendarView({
 	calendarId,
@@ -616,13 +798,33 @@ function DetailCalendarView({
 
 	if (isLoading) {
 		return (
-			<div className="flex justify-center items-center p-24">
-				<Loader2 className="w-8 h-8 animate-spin text-primary" />
+			<div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
+				<Loader2 className="w-8 h-8 animate-spin text-[#0517B0]" />
+				<span className="text-xs font-medium text-slate-500">
+					Memuat rincian kalender akademik...
+				</span>
 			</div>
 		);
 	}
 
-	if (!calendar) return <div>Kalender tidak ditemukan</div>;
+	if (!calendar) {
+		return (
+			<div className="bg-white border border-slate-200/90 rounded-2xl p-12 text-center shadow-2xs">
+				<CalendarIcon className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+				<h3 className="text-sm font-bold text-slate-700">
+					Kalender tidak ditemukan
+				</h3>
+				<Button
+					variant="outline"
+					size="sm"
+					onClick={onBack}
+					className="mt-4 h-8.5 text-xs"
+				>
+					Kembali ke Daftar
+				</Button>
+			</div>
+		);
+	}
 
 	// Build guaranteed 18 periods
 	const existingPeriodsMap = new Map();
@@ -646,211 +848,256 @@ function DetailCalendarView({
 
 	return (
 		<div className="space-y-6">
-			{/* Top Header Card with Back Button & Export PDF */}
-			<Card>
-				<CardHeader>
-					<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-						<div className="flex items-center gap-4">
-							<Button variant="ghost" size="icon" onClick={onBack}>
-								<ArrowLeft className="w-5 h-5" />
-							</Button>
-							<div>
-								<CardTitle className="text-xl font-bold">
-									Detail Kalender Akademik: TA {calendar.academicYear} (Angkatan{" "}
-									{calendar.cohort})
-								</CardTitle>
-								<p className="text-xs text-slate-500 mt-1">
-									Struktur 18 minggu & kegiatan akademik
-								</p>
-							</div>
-						</div>
-
-						{/* EXPORT PDF BUTTON */}
+			{/* Top Executive Header Card with Back Action & Export PDF */}
+			<div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
+				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+					<div className="flex items-center gap-3.5">
 						<Button
 							variant="outline"
-							onClick={handleExportPDF}
-							disabled={isExporting}
-							className="gap-2 border-primary/30 hover:bg-primary/5 text-primary self-start sm:self-auto"
+							size="icon"
+							onClick={onBack}
+							className="h-9 w-9 text-slate-600 bg-white border-slate-200/90 rounded-xl hover:bg-slate-50 shadow-2xs shrink-0"
 						>
-							{isExporting ? (
-								<Loader2 className="w-4 h-4 animate-spin" />
-							) : (
-								<Download className="w-4 h-4" />
-							)}
-							Export PDF
+							<ArrowLeft className="w-4 h-4" />
 						</Button>
-					</div>
-				</CardHeader>
-				<CardContent>
-					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm pt-2 border-t">
 						<div>
-							<span className="text-slate-500 text-xs block mb-1">
-								Tahun Ajaran & Angkatan
-							</span>
-							<span className="font-semibold text-slate-900">
-								TA {calendar.academicYear} (Angkatan {calendar.cohort})
-							</span>
-						</div>
-						<div>
-							<span className="text-slate-500 text-xs block mb-1">
-								Rentang Tanggal Kalender
-							</span>
-							<span className="font-medium text-slate-800">
-								{formatDateIndonesian(calendar.startDate)} s.d.{" "}
-								{formatDateIndonesian(calendar.endDate)}
-							</span>
+							<div className="flex items-center gap-2.5 flex-wrap">
+								<h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+									TA {calendar.academicYear} — Angkatan {calendar.cohort}
+								</h1>
+								<Badge
+									variant="secondary"
+									className="bg-blue-50 text-[#0517B0] text-[11px] font-semibold px-2 py-0.5 rounded-full border border-blue-200/60"
+								>
+									Master Kalender
+								</Badge>
+							</div>
+							<p className="text-xs text-slate-500 mt-0.5">
+								Struktur 18 minggu perkuliahan & agenda acara akademik
+							</p>
 						</div>
 					</div>
-				</CardContent>
-			</Card>
+
+					{/* EXPORT PDF BUTTON */}
+					<Button
+						variant="outline"
+						onClick={handleExportPDF}
+						disabled={isExporting}
+						className="h-9 text-xs text-[#0517B0] border-blue-200 hover:bg-blue-50 font-semibold gap-1.5 shadow-2xs self-start sm:self-auto"
+					>
+						{isExporting ? (
+							<Loader2 className="w-3.5 h-3.5 animate-spin" />
+						) : (
+							<Download className="w-3.5 h-3.5" />
+						)}
+						<span>Export PDF</span>
+					</Button>
+				</div>
+
+				{/* Metadata Chips Bar */}
+				<div className="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-4 text-xs">
+					<div className="flex items-center gap-1.5">
+						<CalendarDays className="w-3.5 h-3.5 text-[#0517B0]" />
+						<span className="text-slate-500 font-medium">
+							Periode Kalender:
+						</span>
+						<span className="font-semibold text-slate-800">
+							{formatDateIndonesian(calendar.startDate)} s.d.{" "}
+							{formatDateIndonesian(calendar.endDate)}
+						</span>
+					</div>
+					<div className="flex items-center gap-1.5">
+						<BookOpen className="w-3.5 h-3.5 text-[#0517B0]" />
+						<span className="text-slate-500 font-medium">Pertemuan:</span>
+						<span className="font-semibold text-slate-800">
+							18 Sesi (PKKMB, BC, 14 Kuliah, UTS, UAS)
+						</span>
+					</div>
+				</div>
+			</div>
 
 			{/* 2-Column Grid Layout */}
 			<div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 				{/* LEFT COLUMN: 18-WEEK TIMELINE */}
-				<Card>
-					<CardHeader className="border-b bg-slate-50/50">
-						<CardTitle className="text-lg font-bold flex items-center justify-between">
-							<span>Struktur 18 Minggu Akademik</span>
-							<Badge variant="outline" className="font-normal text-xs bg-white">
-								18 Pertemuan Standard
-							</Badge>
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="pt-6">
-						<div className="space-y-3 max-h-[700px] overflow-y-auto pr-2">
-							{displayedPeriods.map((p: any, idx: number) => {
-								const isUtsUas =
-									p.periodType === "uts" || p.periodType === "uas";
-								const isClass =
-									p.periodType === "beginning_class" ||
-									p.periodType === "pkkmb";
+				<div className="bg-white border border-slate-200/90 rounded-2xl shadow-2xs overflow-hidden flex flex-col">
+					<div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+						<div className="flex items-center gap-2">
+							<CalendarDays className="w-4 h-4 text-[#0517B0]" />
+							<h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+								Struktur 18 Minggu Perkuliahan
+							</h3>
+						</div>
+						<Badge
+							variant="outline"
+							className="text-[10px] font-semibold bg-slate-50 text-slate-600 border-slate-200"
+						>
+							18 Sesi Standard
+						</Badge>
+					</div>
 
-								return (
-									<div
-										key={p.id || `default-${idx}`}
-										className={`p-4 border rounded-xl flex flex-col gap-2 relative transition-all ${
-											isUtsUas
-												? "border-amber-300 bg-amber-50/40"
-												: isClass
-													? "border-blue-300 bg-blue-50/30"
-													: "border-slate-200 bg-white hover:border-slate-400"
-										}`}
-									>
-										<div className="flex justify-between items-start">
-											<div>
-												<div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+					<div className="p-4 sm:p-5 space-y-3 overflow-y-auto max-h-[750px]">
+						{displayedPeriods.map((p: any, idx: number) => {
+							const isUtsUas = p.periodType === "uts" || p.periodType === "uas";
+							const isClass =
+								p.periodType === "beginning_class" || p.periodType === "pkkmb";
+
+							return (
+								<div
+									key={p.id || `default-${idx}`}
+									className={cn(
+										"p-4 rounded-xl border transition-all space-y-2",
+										isUtsUas
+											? "bg-amber-50/40 border-amber-200/80 shadow-2xs"
+											: isClass
+												? "bg-blue-50/30 border-blue-200/80 shadow-2xs"
+												: "bg-white border-slate-200/80 shadow-2xs hover:border-slate-300",
+									)}
+								>
+									<div className="flex justify-between items-start gap-2">
+										<div className="space-y-0.5">
+											<div className="flex items-center gap-2">
+												<span className="w-5 h-5 rounded-md bg-slate-100 text-slate-700 flex items-center justify-center text-[10px] font-bold">
+													#{idx + 1}
+												</span>
+												<h4 className="font-bold text-slate-900 text-xs sm:text-sm">
 													{p.title}
-												</div>
-												<div className="text-xs text-slate-500 mt-1 font-medium">
+												</h4>
+											</div>
+											<div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium pl-7">
+												<Clock className="w-3 h-3 text-slate-400 shrink-0" />
+												<span>
 													{p.startDate === p.endDate
 														? formatDateIndonesian(p.startDate)
 														: `${formatDateIndonesian(p.startDate)} s.d. ${formatDateIndonesian(p.endDate)}`}
-												</div>
+												</span>
 											</div>
-											<Badge
-												variant={isUtsUas ? "default" : "outline"}
-												className={
-													isUtsUas
-														? "bg-amber-600 hover:bg-amber-600"
-														: "bg-white"
-												}
-											>
-												{p.periodType.replace("_", " ").toUpperCase()}
-											</Badge>
 										</div>
 
-										{p.description ? (
-											<div className="text-xs bg-slate-50 p-2.5 rounded-lg text-slate-700 border border-slate-200/60 mt-1">
-												<span className="font-semibold text-slate-500 block mb-0.5">
-													Custom Deskripsi:
-												</span>
-												{p.description}
-											</div>
-										) : (
-											<div className="text-xs text-slate-400 italic">
-												Belum ada deskripsi khusus
-											</div>
-										)}
+										<Badge
+											variant={isUtsUas ? "default" : "outline"}
+											className={cn(
+												"text-[10px] font-semibold uppercase px-2 py-0.5 rounded-md",
+												isUtsUas
+													? "bg-amber-600 hover:bg-amber-600 text-white"
+													: isClass
+														? "bg-blue-50 text-[#0517B0] border-blue-200"
+														: "bg-slate-50 text-slate-600 border-slate-200",
+											)}
+										>
+											{p.periodType.replace("_", " ")}
+										</Badge>
+									</div>
 
-										{canEdit && (
+									{p.description ? (
+										<div className="text-xs bg-white/80 p-2.5 rounded-lg text-slate-700 border border-slate-200/60 mt-1">
+											<span className="font-semibold text-slate-500 text-[10px] uppercase block mb-0.5">
+												Catatan / Keterangan:
+											</span>
+											{p.description}
+										</div>
+									) : (
+										<p className="text-[11px] text-slate-400 italic pl-7">
+											Belum ada deskripsi khusus
+										</p>
+									)}
+
+									{canEdit && (
+										<div className="flex justify-end pt-1">
 											<Button
 												size="sm"
-												variant="outline"
-												className="mt-2 self-end text-xs flex items-center gap-1.5 bg-white shadow-xs"
+												variant="ghost"
+												className="h-7 text-xs text-[#0517B0] hover:bg-blue-50 font-semibold gap-1"
 												onClick={() => setEditPeriod(p)}
 											>
-												<Pencil className="w-3.5 h-3.5 text-primary" /> Edit
-												Deskripsi & Tanggal
+												<Pencil className="w-3 h-3" />
+												<span>Edit Tanggal & Catatan</span>
 											</Button>
-										)}
-									</div>
-								);
-							})}
-						</div>
-					</CardContent>
-				</Card>
+										</div>
+									)}
+								</div>
+							);
+						})}
+					</div>
+				</div>
 
 				{/* RIGHT COLUMN: KEGIATAN & ACARA TAMBAHAN */}
-				<Card>
-					<CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between">
+				<div className="bg-white border border-slate-200/90 rounded-2xl shadow-2xs overflow-hidden flex flex-col">
+					<div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
 						<div>
-							<CardTitle className="text-lg font-bold">
-								Kegiatan & Acara Tambahan
-							</CardTitle>
-							<p className="text-xs text-slate-500 mt-0.5">
-								Event khusus diluar jadwal rutin 18 minggu
+							<div className="flex items-center gap-2">
+								<Sparkles className="w-4 h-4 text-[#0517B0]" />
+								<h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+									Kegiatan & Acara Tambahan
+								</h3>
+							</div>
+							<p className="text-[11px] text-slate-500 mt-0.5">
+								Agenda khusus di luar jadwal perkuliahan 18 minggu
 							</p>
 						</div>
+
 						{canEdit && (
-							<Button size="sm" onClick={() => setIsEventModalOpen(true)}>
-								<Plus className="w-4 h-4 mr-1" /> Tambah Kegiatan
+							<Button
+								size="sm"
+								onClick={() => setIsEventModalOpen(true)}
+								className="h-8 text-xs text-white bg-[#0517B0] hover:bg-[#0517B0]/90 font-semibold gap-1 shadow-2xs"
+							>
+								<Plus className="w-3.5 h-3.5" />
+								<span>Tambah Acara</span>
 							</Button>
 						)}
-					</CardHeader>
-					<CardContent className="pt-6">
+					</div>
+
+					<div className="p-4 sm:p-5 flex-1 overflow-y-auto max-h-[750px]">
 						{calendar.events?.length === 0 ? (
-							<div className="text-sm text-slate-500 text-center py-16 border border-dashed rounded-xl bg-slate-50/50">
-								Belum ada kegiatan / acara tambahan untuk kalender ini.
+							<div className="text-center py-16 text-slate-400 bg-slate-50/60 rounded-xl border border-slate-200/80">
+								<CalendarIcon className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+								<p className="text-xs font-medium text-slate-500">
+									Belum ada kegiatan atau acara tambahan yang dijadwalkan.
+								</p>
 							</div>
 						) : (
 							<div className="space-y-3">
 								{calendar.events?.map((e: any) => (
 									<div
 										key={e.id}
-										className="p-4 border rounded-xl flex justify-between items-start hover:border-slate-400 bg-white transition-colors"
+										className="p-4 border border-slate-200/80 rounded-xl bg-white shadow-2xs hover:border-slate-300 transition-colors flex justify-between items-start gap-3"
 									>
-										<div>
-											<div className="font-semibold text-slate-900 text-sm">
+										<div className="space-y-1 flex-1 min-w-0">
+											<h4 className="font-bold text-slate-900 text-xs sm:text-sm truncate">
 												{e.title}
-											</div>
-											<div className="text-xs text-slate-500 mt-1">
-												{formatDateIndonesian(e.startDate)}{" "}
-												{e.endDate && e.endDate !== e.startDate
-													? `s.d. ${formatDateIndonesian(e.endDate)}`
-													: ""}
+											</h4>
+											<div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+												<Clock className="w-3 h-3 text-slate-400 shrink-0" />
+												<span>
+													{formatDateIndonesian(e.startDate)}{" "}
+													{e.endDate && e.endDate !== e.startDate
+														? `s.d. ${formatDateIndonesian(e.endDate)}`
+														: ""}
+												</span>
 											</div>
 											{e.description && (
-												<div className="text-xs mt-2 text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+												<p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100 mt-2">
 													{e.description}
-												</div>
+												</p>
 											)}
 										</div>
+
 										{canEdit && (
 											<Button
 												size="icon"
 												variant="ghost"
-												className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8 w-8"
+												className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 h-8 w-8 rounded-lg shrink-0"
 												onClick={() => setDeleteEventId(e.id)}
 											>
-												<Trash2 className="w-4 h-4" />
+												<Trash2 className="w-3.5 h-3.5" />
 											</Button>
 										)}
 									</div>
 								))}
 							</div>
 						)}
-					</CardContent>
-				</Card>
+					</div>
+				</div>
 			</div>
 
 			{/* HIDDEN PRINT/EXPORT TEMPLATE FOR PDF */}
@@ -868,7 +1115,7 @@ function DetailCalendarView({
 				<div
 					style={{
 						textAlign: "center",
-						borderBottom: "2px solid #0f172a",
+						borderBottom: "2px solid #0517B0",
 						paddingBottom: "16px",
 						marginBottom: "20px",
 					}}
@@ -877,7 +1124,7 @@ function DetailCalendarView({
 						style={{
 							fontSize: "14px",
 							fontWeight: "bold",
-							color: "#64748b",
+							color: "#0517B0",
 							textTransform: "uppercase",
 							letterSpacing: "1px",
 							margin: 0,
@@ -915,11 +1162,11 @@ function DetailCalendarView({
 				<div style={{ marginBottom: "24px" }}>
 					<h3
 						style={{
-							fontSize: "14px",
+							fontSize: "13px",
 							fontWeight: "bold",
 							color: "#0f172a",
 							marginBottom: "10px",
-							borderLeft: "4px solid #0284c7",
+							borderLeft: "4px solid #0517B0",
 							paddingLeft: "8px",
 						}}
 					>
@@ -936,7 +1183,7 @@ function DetailCalendarView({
 						<thead>
 							<tr
 								style={{
-									background: "#f1f5f9",
+									background: "#f8fafc",
 									textAlign: "left",
 									color: "#475569",
 								}}
@@ -1059,12 +1306,12 @@ function DetailCalendarView({
 					</table>
 				</div>
 
-				{/* Section 2: Additional Events (Only rendered if events exist) */}
+				{/* Section 2: Additional Events */}
 				{calendar.events && calendar.events.length > 0 && (
 					<div style={{ marginTop: "24px" }}>
 						<h3
 							style={{
-								fontSize: "14px",
+								fontSize: "13px",
 								fontWeight: "bold",
 								color: "#0f172a",
 								marginBottom: "10px",
@@ -1085,7 +1332,7 @@ function DetailCalendarView({
 							<thead>
 								<tr
 									style={{
-										background: "#f1f5f9",
+										background: "#f8fafc",
 										textAlign: "left",
 										color: "#475569",
 									}}
@@ -1234,22 +1481,24 @@ function DetailCalendarView({
 				open={deleteEventId !== null}
 				onOpenChange={(open) => !open && setDeleteEventId(null)}
 			>
-				<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
+				<AlertDialogContent className="bg-white border-slate-200/90 rounded-2xl p-6 text-slate-800">
 					<AlertDialogHeader>
-						<AlertDialogTitle>Hapus Kegiatan</AlertDialogTitle>
-						<AlertDialogDescription className="text-slate-500">
+						<AlertDialogTitle className="text-base font-bold text-slate-900">
+							Hapus Kegiatan / Acara
+						</AlertDialogTitle>
+						<AlertDialogDescription className="text-xs text-slate-500">
 							Apakah Anda yakin ingin menghapus kegiatan / acara tambahan ini?
 						</AlertDialogDescription>
 					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel className="border-slate-200 hover:bg-slate-50 text-slate-600">
+					<AlertDialogFooter className="gap-2 pt-2">
+						<AlertDialogCancel className="h-9 text-xs border-slate-200 hover:bg-slate-50 text-slate-600">
 							Batal
 						</AlertDialogCancel>
 						<AlertDialogAction
 							onClick={handleDeleteEventConfirm}
-							className="bg-red-600 hover:bg-red-700 text-white"
+							className="h-9 text-xs bg-rose-600 hover:bg-rose-700 text-white font-semibold"
 						>
-							Hapus
+							Hapus Kegiatan
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
@@ -1283,7 +1532,6 @@ function EditPeriodDialog({
 		setIsSaving(true);
 		try {
 			if (period.id) {
-				// Update existing saved period
 				const { error } = await api["academic-calendars"][
 					calendarId.toString()
 				].periods[period.id.toString()].patch({
@@ -1298,7 +1546,6 @@ function EditPeriodDialog({
 					toast.error("Gagal memperbarui periode");
 				}
 			} else {
-				// Insert new period into DB
 				const { error } = await api["academic-calendars"][
 					calendarId.toString()
 				].periods.post({
@@ -1325,50 +1572,74 @@ function EditPeriodDialog({
 
 	return (
 		<Dialog open={true} onOpenChange={(open) => !open && onClose()}>
-			<DialogContent>
+			<DialogContent className="sm:max-w-md rounded-2xl p-6">
 				<DialogHeader>
-					<DialogTitle>Edit: {period.title}</DialogTitle>
+					<DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+						<Pencil className="w-4 h-4 text-[#0517B0]" />
+						<span>Edit Periode: {period.title}</span>
+					</DialogTitle>
+					<DialogDescription className="text-xs text-slate-500">
+						Atur rentang tanggal dan catatan deskripsi khusus untuk minggu ini
+					</DialogDescription>
 				</DialogHeader>
-				<div className="space-y-4 py-4">
-					<div className="grid grid-cols-2 gap-4">
-						<div className="space-y-2">
-							<Label>Tanggal Mulai</Label>
+				<div className="space-y-3.5 py-2">
+					<div className="grid grid-cols-2 gap-3">
+						<div className="space-y-1.5">
+							<Label className="text-xs font-medium text-slate-700">
+								Tanggal Mulai
+							</Label>
 							<Input
 								type="date"
+								className="h-9 text-xs bg-white"
 								value={form.startDate}
 								onChange={(e) =>
 									setForm({ ...form, startDate: e.target.value })
 								}
 							/>
 						</div>
-						<div className="space-y-2">
-							<Label>Tanggal Selesai</Label>
+						<div className="space-y-1.5">
+							<Label className="text-xs font-medium text-slate-700">
+								Tanggal Selesai
+							</Label>
 							<Input
 								type="date"
+								className="h-9 text-xs bg-white"
 								value={form.endDate}
 								onChange={(e) => setForm({ ...form, endDate: e.target.value })}
 							/>
 						</div>
 					</div>
-					<div className="space-y-2">
-						<Label>Custom Deskripsi</Label>
+					<div className="space-y-1.5">
+						<Label className="text-xs font-medium text-slate-700">
+							Catatan Deskripsi Khusus (Opsional)
+						</Label>
 						<Textarea
-							placeholder="Masukkan detail khusus tentang minggu/pertemuan ini"
+							placeholder="Masukkan detail khusus tentang agenda minggu ini..."
 							value={form.description}
 							onChange={(e) =>
 								setForm({ ...form, description: e.target.value })
 							}
 							rows={3}
+							className="text-xs bg-white resize-none"
 						/>
 					</div>
 				</div>
-				<DialogFooter>
-					<Button variant="outline" onClick={onClose} disabled={isSaving}>
+				<DialogFooter className="gap-2 pt-2">
+					<Button
+						variant="outline"
+						onClick={onClose}
+						disabled={isSaving}
+						className="h-9 text-xs"
+					>
 						Batal
 					</Button>
-					<Button onClick={handleSave} disabled={isSaving}>
+					<Button
+						onClick={handleSave}
+						disabled={isSaving}
+						className="h-9 text-xs text-white bg-[#0517B0] hover:bg-[#0517B0]/90 font-semibold shadow-2xs"
+					>
 						{isSaving ? (
-							<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+							<Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
 						) : null}
 						Simpan Penyesuaian
 					</Button>
@@ -1429,60 +1700,89 @@ function CreateEventDialog({
 
 	return (
 		<Dialog open={true} onOpenChange={(open) => !open && onClose()}>
-			<DialogContent>
+			<DialogContent className="sm:max-w-md rounded-2xl p-6">
 				<DialogHeader>
-					<DialogTitle>Tambah Kegiatan / Acara Tambahan</DialogTitle>
+					<DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+						<Sparkles className="w-4 h-4 text-[#0517B0]" />
+						<span>Tambah Kegiatan & Acara Tambahan</span>
+					</DialogTitle>
+					<DialogDescription className="text-xs text-slate-500">
+						Tambahkan agenda seminar, workshop, atau acara khusus kampus
+					</DialogDescription>
 				</DialogHeader>
-				<div className="space-y-4 py-4">
-					<div className="space-y-2">
-						<Label>Judul Acara</Label>
+				<div className="space-y-3.5 py-2">
+					<div className="space-y-1.5">
+						<Label className="text-xs font-medium text-slate-700">
+							Judul Acara / Kegiatan <span className="text-rose-500">*</span>
+						</Label>
 						<Input
-							placeholder="Misal: Seminar Nasional / Workshop"
+							placeholder="Contoh: Seminar Nasional / Workshop Industri"
 							value={form.title}
 							onChange={(e) => setForm({ ...form, title: e.target.value })}
+							className="h-9 text-xs bg-white"
 						/>
 					</div>
-					<div className="space-y-2">
-						<Label>Deskripsi Lengkap</Label>
-						<Textarea
-							placeholder="Detail acara, tempat, dsb."
-							value={form.description}
-							onChange={(e) =>
-								setForm({ ...form, description: e.target.value })
-							}
-							rows={3}
-						/>
-					</div>
-					<div className="grid grid-cols-2 gap-4">
-						<div className="space-y-2">
-							<Label>Tanggal Mulai</Label>
+					<div className="grid grid-cols-2 gap-3">
+						<div className="space-y-1.5">
+							<Label className="text-xs font-medium text-slate-700">
+								Tanggal Mulai <span className="text-rose-500">*</span>
+							</Label>
 							<Input
 								type="date"
 								value={form.startDate}
 								onChange={(e) =>
 									setForm({ ...form, startDate: e.target.value })
 								}
+								className="h-9 text-xs bg-white"
 							/>
 						</div>
-						<div className="space-y-2">
-							<Label>s.d. Tanggal (Opsional)</Label>
+						<div className="space-y-1.5">
+							<Label className="text-xs font-medium text-slate-700">
+								Tanggal Selesai (Opsional)
+							</Label>
 							<Input
 								type="date"
 								value={form.endDate}
 								onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+								className="h-9 text-xs bg-white"
 							/>
 						</div>
 					</div>
+					<div className="space-y-1.5">
+						<Label className="text-xs font-medium text-slate-700">
+							Deskripsi & Lokasi (Opsional)
+						</Label>
+						<Textarea
+							placeholder="Detail acara, tempat pelaksanaan, atau pemateri..."
+							value={form.description}
+							onChange={(e) =>
+								setForm({ ...form, description: e.target.value })
+							}
+							rows={3}
+							className="text-xs bg-white resize-none"
+						/>
+					</div>
 				</div>
-				<DialogFooter>
-					<Button variant="outline" onClick={onClose} disabled={isSaving}>
+				<DialogFooter className="gap-2 pt-2">
+					<Button
+						variant="outline"
+						onClick={onClose}
+						disabled={isSaving}
+						className="h-9 text-xs"
+					>
 						Batal
 					</Button>
-					<Button onClick={handleSave} disabled={isSaving}>
+					<Button
+						onClick={handleSave}
+						disabled={isSaving}
+						className="h-9 text-xs text-white bg-[#0517B0] hover:bg-[#0517B0]/90 font-semibold shadow-2xs gap-1.5"
+					>
 						{isSaving ? (
-							<Loader2 className="w-4 h-4 mr-2 animate-spin" />
-						) : null}
-						Simpan Kegiatan
+							<Loader2 className="w-3.5 h-3.5 animate-spin" />
+						) : (
+							<Plus className="w-3.5 h-3.5" />
+						)}
+						<span>Simpan Kegiatan</span>
 					</Button>
 				</DialogFooter>
 			</DialogContent>
