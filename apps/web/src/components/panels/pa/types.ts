@@ -19,6 +19,9 @@ export interface HafalanSession {
 	languageCustom: string | null;
 	vocabCount: number;
 	sentenceCount: number;
+	vocabList?: string[];
+	sentenceList?: string[];
+	notes?: string | null;
 	createdAt: string;
 	updatedAt?: string;
 	createdByUser?: { fullName: string; username: string } | null;
@@ -29,6 +32,9 @@ export interface HafalanFormState {
 	languageCustom: string;
 	vocabCount: number | string;
 	sentenceCount: number | string;
+	vocabList?: string[];
+	sentenceList?: string[];
+	notes?: string;
 	date?: string;
 }
 

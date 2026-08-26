@@ -1,6 +1,9 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { eq } from "drizzle-orm";
 import { monotonicFactory } from "ulidx";
+import { db } from "../../../db";
+import { students, users } from "../../../db/schema";
 import { LocalStorageProvider } from "../providers/local.provider";
 import type { StorageProvider } from "../providers/storage.interface";
 import type { FileRecord } from "../repository/file.repository";
@@ -104,10 +107,42 @@ export class FileService {
 		// 6. Pindahkan ke permanent storage
 		await this.provider.move(tempPath, storagePath);
 
+		// Validasi referensi foreign keys secara aman untuk mencegah query failure
+		let validUploadedBy: number | null = null;
+		if (uploadedBy && typeof uploadedBy === "number") {
+			try {
+				const userExists = await db.query.users.findFirst({
+					where: eq(users.id, uploadedBy),
+					columns: { id: true },
+				});
+				if (userExists) {
+					validUploadedBy = userExists.id;
+				}
+			} catch {}
+		}
+
+		let validStudentId: number | null = null;
+		if (
+			studentId &&
+			typeof studentId === "number" &&
+			!isNaN(studentId) &&
+			studentId > 0
+		) {
+			try {
+				const studentExists = await db.query.students.findFirst({
+					where: eq(students.id, studentId),
+					columns: { id: true },
+				});
+				if (studentExists) {
+					validStudentId = studentExists.id;
+				}
+			} catch {}
+		}
+
 		// 7. Insert metadata ke PostgreSQL
 		await fileRepository.createFile({
 			id: fileId,
-			studentId: studentId ?? null,
+			studentId: validStudentId,
 			category,
 			storageDisk: "local",
 			storagePath,
@@ -118,7 +153,7 @@ export class FileService {
 			size,
 			checksum,
 			visibility,
-			uploadedBy: uploadedBy ?? null,
+			uploadedBy: validUploadedBy,
 			panel: panel ?? null,
 			documentKey: documentKey ?? null,
 		});

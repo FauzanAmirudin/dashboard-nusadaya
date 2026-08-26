@@ -19,6 +19,7 @@ import {
 	TrendingUp,
 	User,
 	Users,
+	UtensilsCrossed,
 	Wallet,
 	XCircle,
 } from "lucide-react";
@@ -798,14 +799,9 @@ export function FinanceDashboard({ user, data = [] }: any) {
 							<Wallet className="w-5 h-5" />
 						</div>
 						<div>
-							<div className="flex items-center gap-2">
-								<h1 className="text-xl font-bold text-slate-900 tracking-tight">
-									Dashboard Finance
-								</h1>
-								<Badge className="bg-[#0517B0]/10 text-[#0517B0] border-[#0517B0]/20 text-[10px] font-bold px-2 py-0.5">
-									OneData Control Center
-								</Badge>
-							</div>
+							<h1 className="text-xl font-bold text-slate-900 tracking-tight">
+								Dashboard Finance
+							</h1>
 							<p className="text-slate-500 text-xs mt-0.5">
 								Pusat kendali transaksi uang masuk dan monitoring kepatuhan
 								pembayaran mahasiswa.
@@ -834,6 +830,17 @@ export function FinanceDashboard({ user, data = [] }: any) {
 								))}
 							</SelectContent>
 						</Select>
+
+						<Link href="/dashboard/finance/anggaran-praktik">
+							<Button
+								variant="outline"
+								size="sm"
+								className="border-slate-200 text-slate-700 hover:bg-blue-50 hover:text-[#0517B0] hover:border-blue-200 text-xs gap-1.5 h-8.5 font-semibold shadow-2xs rounded-lg transition-all"
+							>
+								<UtensilsCrossed className="w-3.5 h-3.5 text-slate-500" />
+								Anggaran Praktik
+							</Button>
+						</Link>
 
 						<Button
 							variant="outline"

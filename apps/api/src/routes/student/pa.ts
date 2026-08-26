@@ -332,16 +332,44 @@ export const paRoutes = new Elysia()
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
-			const { language, languageCustom, vocabCount, sentenceCount, date } =
-				body as any;
+			const {
+				language,
+				languageCustom,
+				vocabCount,
+				sentenceCount,
+				vocabList,
+				sentenceList,
+				notes,
+				date,
+			} = body as any;
+
+			const cleanVocabList = Array.isArray(vocabList)
+				? vocabList.map((v: any) => String(v).trim()).filter(Boolean)
+				: [];
+			const cleanSentenceList = Array.isArray(sentenceList)
+				? sentenceList.map((s: any) => String(s).trim()).filter(Boolean)
+				: [];
+
+			const finalVocabCount =
+				vocabCount !== undefined && vocabCount !== null
+					? Number(vocabCount) || 0
+					: cleanVocabList.length;
+			const finalSentenceCount =
+				sentenceCount !== undefined && sentenceCount !== null
+					? Number(sentenceCount) || 0
+					: cleanSentenceList.length;
+
 			const inserted = await db
 				.insert(paHafalanSessions)
 				.values({
 					studentId: id,
-					language,
+					language: language || "Bahasa Asing",
 					languageCustom: languageCustom ?? null,
-					vocabCount: vocabCount ?? 0,
-					sentenceCount: sentenceCount ?? 0,
+					vocabCount: finalVocabCount,
+					sentenceCount: finalSentenceCount,
+					vocabList: cleanVocabList,
+					sentenceList: cleanSentenceList,
+					notes: notes ? String(notes).trim() : null,
 					createdAt: date ? new Date(date) : new Date(),
 					createdBy: user.id,
 				})
@@ -350,10 +378,13 @@ export const paRoutes = new Elysia()
 		},
 		{
 			body: t.Object({
-				language: t.String(),
+				language: t.Optional(t.String()),
 				languageCustom: t.Optional(t.Nullable(t.String())),
 				vocabCount: t.Optional(t.Number()),
 				sentenceCount: t.Optional(t.Number()),
+				vocabList: t.Optional(t.Array(t.String())),
+				sentenceList: t.Optional(t.Array(t.String())),
+				notes: t.Optional(t.Nullable(t.String())),
 				date: t.Optional(t.String()),
 			}),
 		},
@@ -368,18 +399,52 @@ export const paRoutes = new Elysia()
 				return { success: false, message: "Forbidden" };
 			}
 			const logId = Number(params.logId);
-			const { language, languageCustom, vocabCount, sentenceCount, date } =
-				body as any;
-			const updateData: any = {
+			const {
 				language,
-				languageCustom: languageCustom ?? null,
+				languageCustom,
 				vocabCount,
 				sentenceCount,
+				vocabList,
+				sentenceList,
+				notes,
+				date,
+			} = body as any;
+
+			const updateData: any = {
 				updatedAt: new Date(),
 			};
+
+			if (language !== undefined) {
+				updateData.language = language;
+			}
+			if (languageCustom !== undefined) {
+				updateData.languageCustom = languageCustom
+					? languageCustom.trim()
+					: null;
+			}
+			if (vocabCount !== undefined) {
+				updateData.vocabCount = Number(vocabCount) || 0;
+			}
+			if (sentenceCount !== undefined) {
+				updateData.sentenceCount = Number(sentenceCount) || 0;
+			}
+			if (vocabList !== undefined) {
+				updateData.vocabList = Array.isArray(vocabList)
+					? vocabList.map((v: any) => String(v).trim()).filter(Boolean)
+					: [];
+			}
+			if (sentenceList !== undefined) {
+				updateData.sentenceList = Array.isArray(sentenceList)
+					? sentenceList.map((s: any) => String(s).trim()).filter(Boolean)
+					: [];
+			}
+			if (notes !== undefined) {
+				updateData.notes = notes ? String(notes).trim() : null;
+			}
 			if (date) {
 				updateData.createdAt = new Date(date);
 			}
+
 			await db
 				.update(paHafalanSessions)
 				.set(updateData)
@@ -388,10 +453,13 @@ export const paRoutes = new Elysia()
 		},
 		{
 			body: t.Object({
-				language: t.String(),
+				language: t.Optional(t.String()),
 				languageCustom: t.Optional(t.Nullable(t.String())),
-				vocabCount: t.Number(),
-				sentenceCount: t.Number(),
+				vocabCount: t.Optional(t.Number()),
+				sentenceCount: t.Optional(t.Number()),
+				vocabList: t.Optional(t.Array(t.String())),
+				sentenceList: t.Optional(t.Array(t.String())),
+				notes: t.Optional(t.Nullable(t.String())),
 				date: t.Optional(t.String()),
 			}),
 		},

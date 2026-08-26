@@ -1,48 +1,43 @@
 "use client";
 
-import { Edit2, Loader2, Plus, Save, X } from "lucide-react";
+import {
+	Building2,
+	Calendar,
+	CheckCircle2,
+	Clock,
+	FileText,
+	Info,
+	Loader2,
+	Sparkles,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { api } from "@/lib/eden";
-import { useAuthStore } from "@/store";
+import { cn } from "@/lib/utils";
 
 export function TabODS({ studentId }: { studentId: number }) {
 	const [records, setRecords] = useState<any[]>([]);
+	const [crmData, setCrmData] = useState<any | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
-	const { user } = useAuthStore();
-	const canEdit = user?.role === "superadmin" || user?.role === "akademik";
-
-	const [isAdding, setIsAdding] = useState(false);
-	const [editingRecord, setEditingRecord] = useState<number | null>(null);
-
-	const [form, setForm] = useState({ date: "", status: "hadir", notes: "" });
-	const [isSaving, setIsSaving] = useState(false);
 
 	const fetchData = async () => {
 		setIsLoading(true);
 		try {
-			const res = await (api as any).attendance.mahasiswa[studentId].ods.get();
-			if (res.data?.success) {
-				setRecords(res.data.data);
+			const [odsRes, crmRes] = await Promise.all([
+				(api as any).attendance.mahasiswa[studentId].ods.get(),
+				api.students[studentId.toString()].crm.get(),
+			]);
+
+			if (odsRes.data?.success) {
+				setRecords(odsRes.data.data);
+			}
+			if (crmRes.data?.success && (crmRes.data.data as any)?.crm) {
+				setCrmData((crmRes.data.data as any).crm);
 			}
 		} catch (error) {
-			toast.error("Terjadi kesalahan koneksi");
+			console.error("Failed to fetch ODS data:", error);
+			toast.error("Terjadi kesalahan mengambil data ODS");
 		} finally {
 			setIsLoading(false);
 		}
@@ -52,117 +47,172 @@ export function TabODS({ studentId }: { studentId: number }) {
 		fetchData();
 	}, [studentId]);
 
-	const handleAddClick = () => {
-		const today = new Date().toISOString().split("T")[0];
-		setForm({ date: today, status: "hadir", notes: "" });
-		setIsAdding(true);
-	};
-
-	const handleEditClick = (record: any) => {
-		setForm({
-			date: record.date.split("T")[0],
-			status: record.status,
-			notes: record.notes || "",
-		});
-		setEditingRecord(record.id);
-	};
-
-	const handleSubmit = async () => {
-		if (!form.date || !form.status) {
-			toast.error("Tanggal dan status harus diisi");
-			return;
-		}
-
-		setIsSaving(true);
-		try {
-			let res;
-			if (editingRecord) {
-				res = await (api as any).attendance.mahasiswa[studentId].ods[
-					editingRecord
-				].patch(form);
-			} else {
-				res = await (api as any).attendance.mahasiswa[studentId].ods.post(form);
-			}
-
-			if (res.data?.success) {
-				toast.success(
-					editingRecord ? "Berhasil diperbarui" : "Berhasil ditambahkan",
-				);
-				setIsAdding(false);
-				setEditingRecord(null);
-				fetchData();
-			} else {
-				toast.error("Gagal menyimpan data");
-			}
-		} catch (error) {
-			toast.error("Terjadi kesalahan sistem");
-		} finally {
-			setIsSaving(false);
-		}
-	};
-
 	if (isLoading) {
 		return (
-			<div className="flex justify-center p-8">
-				<Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+			<div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
+				<Loader2 className="w-6 h-6 animate-spin text-[#0517B0]" />
+				<span className="text-xs font-medium text-slate-500">
+					Memuat data One Day Service...
+				</span>
 			</div>
 		);
 	}
 
+	let odsList: any[] = [];
+	try {
+		let parsed = crmData?.odsDetails;
+		if (typeof parsed === "string") parsed = JSON.parse(parsed);
+		if (Array.isArray(parsed)) odsList = parsed;
+	} catch (e) {}
+
+	const completedOdsCount = odsList.filter((item) => !!item.isDone).length;
+
 	return (
-		<div className="space-y-4">
-			<div className="flex justify-between items-center bg-blue-50 p-4 rounded-lg border border-blue-100">
-				<div>
-					<h3 className="font-semibold text-blue-900">
-						Orientasi Dasar Studi (ODS)
-					</h3>
-					<p className="text-sm text-blue-700">
-						Data kehadiran ODS diinput oleh Akademik
-					</p>
+		<div className="space-y-6">
+			{/* Top Header Banner */}
+			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs gap-4">
+				<div className="flex items-center gap-3">
+					<div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0517B0] flex items-center justify-center shrink-0">
+						<Sparkles className="w-5 h-5" />
+					</div>
+					<div>
+						<div className="flex items-center gap-2">
+							<h3 className="font-bold text-slate-900 text-sm sm:text-base">
+								One Day Service (ODS)
+							</h3>
+							<Badge
+								variant="outline"
+								className="bg-blue-50/70 text-[#0517B0] border-blue-200/80 text-[10px] font-semibold"
+							>
+								Divisi CRM
+							</Badge>
+						</div>
+						<p className="text-xs text-slate-500 mt-0.5">
+							{completedOdsCount} dari 5 Sesi ODS Telah Selesai Dijalani
+						</p>
+					</div>
 				</div>
-				{canEdit && (
-					<Button
-						onClick={handleAddClick}
-						size="sm"
-						className="bg-blue-600 hover:bg-blue-700 text-white"
-					>
-						<Plus className="w-4 h-4 mr-2" />
-						Input Kehadiran ODS
-					</Button>
-				)}
+
+				<Badge
+					className={cn(
+						"text-xs font-semibold px-3 py-1 rounded-xl shadow-2xs",
+						crmData?.isOdsReport
+							? "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
+							: "bg-slate-100 text-slate-600 border border-slate-200",
+					)}
+				>
+					{crmData?.isOdsReport
+						? "✓ Laporan Terverifikasi CRM"
+						: "Laporan Belum Selesai"}
+				</Badge>
 			</div>
 
-			{records.length === 0 ? (
-				<div className="text-center py-8 text-slate-500 border rounded-lg border-dashed">
-					Belum ada riwayat ODS terinput.
+			{/* 5 Tahap Pelaksanaan ODS */}
+			<div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
+				<div className="flex items-center justify-between">
+					<h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+						5 Tahap Pelaksanaan One Day Service
+					</h4>
+					<span className="text-xs font-semibold text-slate-500">
+						Progress: {completedOdsCount}/5 Selesai
+					</span>
 				</div>
-			) : (
-				<div className="space-y-2">
-					{records.map((r: any) => (
-						<div
-							key={r.id}
-							className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-3 rounded-lg border border-slate-200 gap-3"
-						>
-							<div>
-								<div className="font-medium text-slate-800">
-									{new Date(r.date).toLocaleDateString("id-ID", {
-										weekday: "long",
-										year: "numeric",
-										month: "long",
-										day: "numeric",
-									})}
-								</div>
-								<div className="text-xs text-slate-500">
-									Diinput oleh: {r.recorder?.fullName || "-"}
-								</div>
-								{r.notes && (
-									<div className="text-sm text-slate-600 mt-1 italic">
-										Catatan: {r.notes}
-									</div>
-								)}
-							</div>
 
-							<div className="flex items-center gap-3 w-full sm:w-auto">
+				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+					{[1, 2, 3, 4, 5].map((num, idx) => {
+						const item = odsList[idx] || {};
+						const isDone = !!item.isDone;
+						return (
+							<div
+								key={num}
+								className={cn(
+									"p-3.5 rounded-xl border text-xs space-y-2 transition-all shadow-2xs",
+									isDone
+										? "bg-emerald-50/50 border-emerald-200/80"
+										: "bg-slate-50/70 border-slate-200/80",
+								)}
+							>
+								<div className="flex justify-between items-center">
+									<span className="font-bold text-slate-800 text-xs">
+										ODS #{num}
+									</span>
+									{isDone ? (
+										<Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0 h-4 font-semibold">
+											✓ Selesai
+										</Badge>
+									) : (
+										<Badge
+											variant="outline"
+											className="bg-white text-slate-400 text-[10px] px-1.5 py-0 h-4 border-slate-200"
+										>
+											Belum
+										</Badge>
+									)}
+								</div>
+
+								<div className="space-y-1">
+									<div className="flex items-center gap-1.5 text-slate-700 min-w-0">
+										<Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+										<span
+											className="font-medium text-xs truncate"
+											title={item.industry || "Tempat belum diisi"}
+										>
+											{item.industry || "Belum ditentukan"}
+										</span>
+									</div>
+									<div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+										<Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+										<span>{item.date || "-"}</span>
+									</div>
+								</div>
+							</div>
+						);
+					})}
+				</div>
+			</div>
+
+			{/* Riwayat Absensi ODS */}
+			<div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
+				<div className="flex items-center gap-2">
+					<Clock className="w-4 h-4 text-[#0517B0]" />
+					<h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+						Riwayat Catatan Presensi ODS ({records.length} Sesi Terdata)
+					</h4>
+				</div>
+
+				{records.length === 0 ? (
+					<div className="text-center py-10 text-slate-400 bg-slate-50/60 rounded-xl border border-slate-200/80">
+						<Calendar className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+						<p className="text-xs font-medium text-slate-500">
+							Belum ada riwayat presensi ODS yang diinput melalui Panel CRM.
+						</p>
+					</div>
+				) : (
+					<div className="grid grid-cols-1 gap-2.5">
+						{records.map((r: any) => (
+							<div
+								key={r.id}
+								className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors gap-3"
+							>
+								<div className="space-y-1">
+									<div className="font-bold text-slate-800 text-xs">
+										{new Date(r.date).toLocaleDateString("id-ID", {
+											weekday: "long",
+											year: "numeric",
+											month: "short",
+											day: "numeric",
+										})}
+									</div>
+									<p className="text-[11px] text-slate-500">
+										Diinput oleh: {r.recorder?.fullName || "Divisi CRM"}
+									</p>
+									{r.notes && (
+										<p className="text-xs text-slate-600 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 italic">
+											Catatan: {r.notes}
+										</p>
+									)}
+								</div>
+
 								<Badge
 									variant={
 										r.status === "hadir"
@@ -171,96 +221,23 @@ export function TabODS({ studentId }: { studentId: number }) {
 												? "secondary"
 												: "destructive"
 									}
-									className={r.status === "hadir" ? "bg-emerald-500" : ""}
+									className={cn(
+										"text-[10px] font-semibold px-2.5 py-0.5 rounded-md",
+										r.status === "hadir" &&
+											"bg-emerald-50 text-emerald-700 border border-emerald-200/80",
+										(r.status === "izin" || r.status === "sakit") &&
+											"bg-amber-50 text-amber-800 border border-amber-200/80",
+										r.status === "alpa" &&
+											"bg-rose-50 text-rose-700 border border-rose-200/80",
+									)}
 								>
-									{r.status.toUpperCase()}
+									{(r.status || "HADIR").toUpperCase()}
 								</Badge>
-								{canEdit && (
-									<Button
-										variant="ghost"
-										size="icon"
-										onClick={() => handleEditClick(r)}
-									>
-										<Edit2 className="w-4 h-4 text-slate-500" />
-									</Button>
-								)}
 							</div>
-						</div>
-					))}
-				</div>
-			)}
-
-			<Dialog
-				open={isAdding || editingRecord !== null}
-				onOpenChange={(o) => {
-					if (!o) {
-						setIsAdding(false);
-						setEditingRecord(null);
-					}
-				}}
-			>
-				<DialogContent className="max-w-sm">
-					<DialogHeader>
-						<DialogTitle>
-							{editingRecord ? "Edit Kehadiran ODS" : "Input Kehadiran ODS"}
-						</DialogTitle>
-					</DialogHeader>
-					<div className="space-y-4 py-4">
-						<div>
-							<label className="text-sm font-medium mb-1 block">
-								Tanggal ODS
-							</label>
-							<Input
-								type="date"
-								value={form.date}
-								onChange={(e) => setForm({ ...form, date: e.target.value })}
-							/>
-						</div>
-						<div>
-							<label className="text-sm font-medium mb-1 block">Status</label>
-							<Select
-								value={form.status || ""}
-								onValueChange={(v) => setForm({ ...form, status: v || "" })}
-							>
-								<SelectTrigger>
-									<SelectValue placeholder="Pilih status" />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="hadir">Hadir</SelectItem>
-									<SelectItem value="izin">Izin</SelectItem>
-									<SelectItem value="sakit">Sakit</SelectItem>
-									<SelectItem value="alpha">Alpha</SelectItem>
-								</SelectContent>
-							</Select>
-						</div>
-						<div>
-							<label className="text-sm font-medium mb-1 block">
-								Catatan (Opsional)
-							</label>
-							<Input
-								placeholder="Alasan izin dll..."
-								value={form.notes || ""}
-								onChange={(e) => setForm({ ...form, notes: e.target.value })}
-							/>
-						</div>
+						))}
 					</div>
-					<div className="flex justify-end gap-2">
-						<Button
-							variant="outline"
-							onClick={() => {
-								setIsAdding(false);
-								setEditingRecord(null);
-							}}
-						>
-							Batal
-						</Button>
-						<Button onClick={handleSubmit} disabled={isSaving}>
-							{isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-							Simpan
-						</Button>
-					</div>
-				</DialogContent>
-			</Dialog>
+				)}
+			</div>
 		</div>
 	);
 }

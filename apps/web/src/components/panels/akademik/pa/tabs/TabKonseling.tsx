@@ -2,16 +2,24 @@
 
 import {
 	AlertTriangle,
+	Building2,
+	Calendar,
 	CheckCircle,
 	ChevronDown,
 	ChevronUp,
 	Clock,
+	FileText,
+	Globe,
+	GraduationCap,
+	HeartHandshake,
 	Loader2,
 	MessageCircle,
 	MessageSquare,
 	Plus,
 	Save,
+	Sparkles,
 	Trash2,
+	User,
 	Users,
 	X,
 } from "lucide-react";
@@ -109,85 +117,124 @@ function formatDate(dateStr: string): string {
 
 const CONDITION_CONFIG: Record<
 	string,
-	{ label: string; className: string; icon: React.ElementType }
+	{
+		label: string;
+		className: string;
+		dotClass: string;
+		icon: React.ElementType;
+	}
 > = {
 	Stabil: {
 		label: "Stabil",
-		className: "bg-emerald-100 text-emerald-700 border-emerald-200",
+		className:
+			"bg-emerald-50 text-emerald-700 border-emerald-200/80 font-semibold",
+		dotClass: "bg-emerald-500",
 		icon: CheckCircle,
 	},
 	"Perlu Perhatian": {
 		label: "Perlu Perhatian",
-		className: "bg-amber-100 text-amber-700 border-amber-200",
+		className: "bg-amber-50 text-amber-800 border-amber-200/80 font-semibold",
+		dotClass: "bg-amber-500",
 		icon: AlertTriangle,
 	},
 	Kritis: {
 		label: "Kritis",
-		className: "bg-rose-100 text-rose-700 border-rose-200",
+		className: "bg-rose-50 text-rose-700 border-rose-200/80 font-semibold",
+		dotClass: "bg-rose-500",
 		icon: AlertTriangle,
 	},
 };
 
-const RESULT_CONFIG: Record<string, string> = {
-	Lulus: "bg-emerald-100 text-emerald-700 border-emerald-200",
-	"Tidak Lulus": "bg-rose-100 text-rose-700 border-rose-200",
-	Menunggu: "bg-amber-100 text-amber-700 border-amber-200",
+const RESULT_CONFIG: Record<string, { label: string; className: string }> = {
+	Lulus: {
+		label: "Lulus",
+		className:
+			"bg-emerald-50 text-emerald-700 border-emerald-200/80 font-semibold",
+	},
+	"Tidak Lulus": {
+		label: "Tidak Lulus",
+		className: "bg-rose-50 text-rose-700 border-rose-200/80 font-semibold",
+	},
+	Menunggu: {
+		label: "Menunggu",
+		className: "bg-amber-50 text-amber-800 border-amber-200/80 font-semibold",
+	},
 };
 
 // ── Sub-component: Section Container ─────────────────────────────────────────
 
 function SectionCard({
 	title,
+	subtitle,
 	icon: Icon,
-	accentColor,
-	count,
+	accentColor = "#0517B0",
+	count = 0,
 	children,
-	defaultOpen = false,
+	defaultOpen = true,
 }: {
 	title: string;
+	subtitle?: string;
 	icon: React.ElementType;
-	accentColor: string;
-	count: number;
+	accentColor?: string;
+	count?: number;
 	children: React.ReactNode;
 	defaultOpen?: boolean;
 }) {
 	const [open, setOpen] = useState(defaultOpen);
 
 	return (
-		<Card className="bg-white border-slate-200 shadow-sm">
+		<Card className="bg-white border border-slate-200/90 shadow-2xs rounded-2xl overflow-hidden transition-all">
 			<button
 				type="button"
 				onClick={() => setOpen((o) => !o)}
-				className="w-full text-left"
+				className="w-full text-left p-4 sm:p-5 flex items-center justify-between hover:bg-slate-50/60 transition-colors border-b border-slate-100"
 			>
-				<CardHeader className="pb-3 border-b border-slate-100">
-					<div className="flex items-center justify-between">
-						<CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-							<span
-								className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
-								style={{ backgroundColor: `${accentColor}20` }}
-							>
-								<Icon className="w-3.5 h-3.5" style={{ color: accentColor }} />
-							</span>
-							{title}
+				<div className="flex items-center gap-3">
+					<div
+						className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-2xs"
+						style={{
+							backgroundColor: `${accentColor}12`,
+							color: accentColor,
+						}}
+					>
+						<Icon className="w-5 h-5" />
+					</div>
+					<div>
+						<div className="flex items-center gap-2.5">
+							<h3 className="text-sm sm:text-base font-bold text-slate-800">
+								{title}
+							</h3>
 							{count > 0 && (
-								<span
-									className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white"
-									style={{ backgroundColor: accentColor }}
+								<Badge
+									variant="secondary"
+									className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+									style={{
+										backgroundColor: `${accentColor}15`,
+										color: accentColor,
+									}}
 								>
-									{count}
-								</span>
+									{count} Catatan
+								</Badge>
 							)}
-						</CardTitle>
-						{open ? (
-							<ChevronUp className="w-4 h-4 text-slate-400" />
-						) : (
-							<ChevronDown className="w-4 h-4 text-slate-400" />
+						</div>
+						{subtitle && (
+							<p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
 						)}
 					</div>
-				</CardHeader>
+				</div>
+				<div className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+					{open ? (
+						<ChevronUp className="w-4 h-4" />
+					) : (
+						<ChevronDown className="w-4 h-4" />
+					)}
+				</div>
 			</button>
-			{open && <CardContent className="p-5">{children}</CardContent>}
+			{open && (
+				<CardContent className="p-4 sm:p-6 bg-slate-50/30">
+					{children}
+				</CardContent>
+			)}
 		</Card>
 	);
 }
@@ -277,190 +324,197 @@ function CounselingSection({
 		}
 	};
 
-	const condCfg = CONDITION_CONFIG[formCondition] ?? CONDITION_CONFIG.Stabil;
-
 	return (
-		<div className="space-y-4">
-			<div className="flex items-center justify-between">
-				<h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+		<div className="space-y-4 bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs">
+			{/* Section Header */}
+			<div className="flex items-center justify-between pb-2 border-b border-slate-100">
+				<div className="flex items-center gap-2">
 					<Icon className="w-4 h-4" style={{ color: accentColor }} />
-					{title}
-					{logs.length > 0 && (
-						<span
-							className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white"
-							style={{ backgroundColor: accentColor }}
-						>
-							{logs.length}
-						</span>
-					)}
-				</h4>
-			</div>
-			<div className="space-y-4">
-				{/* Add form */}
-				{canEdit && showForm && (
-					<div
-						className="rounded-xl border p-4 space-y-3"
+					<h4 className="text-xs sm:text-sm font-bold text-slate-800">
+						{title}
+					</h4>
+					<Badge
+						variant="secondary"
+						className="text-[10px] font-semibold px-2 py-0.2 rounded-full"
 						style={{
-							borderColor: `${accentColor}40`,
-							backgroundColor: `${accentColor}08`,
+							backgroundColor: `${accentColor}12`,
+							color: accentColor,
 						}}
 					>
-						<p className="text-xs font-semibold text-slate-600">
-							Tambah Sesi Baru
-						</p>
-						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-							<div className="space-y-1.5">
-								<Label className="text-xs font-medium text-slate-600">
-									Tanggal
-								</Label>
-								<Input
-									type="date"
-									value={formDate}
-									onChange={(e) => setFormDate(e.target.value)}
-									className="h-9 text-sm"
-								/>
-							</div>
-							<div className="space-y-1.5">
-								<Label className="text-xs font-medium text-slate-600">
-									Kondisi
-								</Label>
-								<Select
-									value={formCondition}
-									onValueChange={(v) => setFormCondition(v ?? "Stabil")}
-								>
-									<SelectTrigger className="h-9 text-sm">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="Stabil">Stabil</SelectItem>
-										<SelectItem value="Perlu Perhatian">
-											Perlu Perhatian
-										</SelectItem>
-										<SelectItem value="Kritis">Kritis</SelectItem>
-									</SelectContent>
-								</Select>
-							</div>
-						</div>
-						<div className="space-y-1.5">
-							<Label className="text-xs font-medium text-slate-600">
-								Catatan
-							</Label>
-							<Textarea
-								placeholder="Catatan hasil sesi konseling..."
-								value={formNotes}
-								onChange={(e) => setFormNotes(e.target.value)}
-								rows={3}
-								className="resize-none text-sm"
-							/>
-						</div>
-						<div className="flex justify-between items-center gap-2">
-							<Badge className={`${condCfg.className} border text-xs`}>
-								{condCfg.label}
-							</Badge>
-							<div className="flex gap-2">
-								<Button
-									size="sm"
-									variant="outline"
-									onClick={() => {
-										setShowForm(false);
-										setFormNotes("");
-									}}
-									className="h-8 text-xs gap-1"
-								>
-									<X className="w-3.5 h-3.5" />
-									Batal
-								</Button>
-								<Button
-									size="sm"
-									onClick={handleAdd}
-									disabled={isSaving}
-									className="h-8 text-xs gap-1.5 text-white"
-									style={{ backgroundColor: accentColor }}
-								>
-									{isSaving ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin" />
-									) : (
-										<Save className="w-3.5 h-3.5" />
-									)}
-									Simpan
-								</Button>
-							</div>
-						</div>
-					</div>
-				)}
-
-				{/* List */}
-				{logs.length === 0 && !showForm ? (
-					<div className="text-center py-6 text-slate-400">
-						<MessageCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-						<p className="text-sm">Belum ada sesi {title.toLowerCase()}</p>
-					</div>
-				) : (
-					<div className="space-y-2">
-						{logs.map((log) => {
-							const cfg =
-								CONDITION_CONFIG[log.condition] ?? CONDITION_CONFIG.Stabil;
-							const CondIcon = cfg.icon;
-							return (
-								<div
-									key={log.id}
-									className="flex items-start gap-3 p-3.5 rounded-lg border border-slate-100 bg-slate-50/60 hover:bg-white hover:border-slate-200 hover:shadow-sm transition-all duration-150 group"
-								>
-									<CondIcon
-										className={`w-4 h-4 shrink-0 mt-0.5 ${log.condition === "Stabil" ? "text-emerald-500" : log.condition === "Kritis" ? "text-rose-500" : "text-amber-500"}`}
-									/>
-									<div className="flex-1 min-w-0">
-										<div className="flex items-start justify-between gap-2">
-											<div>
-												<div className="flex items-center gap-2 flex-wrap">
-													<span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-														<Clock className="w-3 h-3" />
-														{formatDate(log.date)}
-													</span>
-													<Badge
-														className={`${cfg.className} border text-[10px] px-1.5 py-0`}
-													>
-														{cfg.label}
-													</Badge>
-												</div>
-												<p className="text-sm text-slate-700 mt-1.5 leading-relaxed">
-													{log.notes}
-												</p>
-											</div>
-											{canEdit && (
-												<button
-													type="button"
-													onClick={() => handleDelete(log.id)}
-													disabled={deletingId === log.id}
-													className="shrink-0 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-all disabled:opacity-50"
-												>
-													{deletingId === log.id ? (
-														<Loader2 className="w-3.5 h-3.5 animate-spin" />
-													) : (
-														<Trash2 className="w-3.5 h-3.5" />
-													)}
-												</button>
-											)}
-										</div>
-									</div>
-								</div>
-							);
-						})}
-					</div>
-				)}
-
-				{/* Add button at bottom */}
+						{logs.length}
+					</Badge>
+				</div>
 				{canEdit && !showForm && (
-					<button
-						type="button"
+					<Button
+						size="sm"
+						variant="outline"
 						onClick={() => setShowForm(true)}
-						className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-slate-200 rounded-lg text-xs text-slate-400 hover:border-slate-300 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+						className="h-7 text-xs px-2.5 gap-1 border-slate-200 hover:bg-slate-50"
 					>
 						<Plus className="w-3.5 h-3.5" />
-						Tambah Sesi
-					</button>
+						<span>Tambah Sesi</span>
+					</Button>
 				)}
 			</div>
+
+			{/* Add Form */}
+			{canEdit && showForm && (
+				<div
+					className="rounded-xl border p-4 space-y-3.5 animate-in fade-in-50 duration-150"
+					style={{
+						borderColor: `${accentColor}30`,
+						backgroundColor: `${accentColor}06`,
+					}}
+				>
+					<div className="flex items-center justify-between">
+						<p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+							<Sparkles
+								className="w-3.5 h-3.5"
+								style={{ color: accentColor }}
+							/>
+							Input Sesi Konseling Baru
+						</p>
+					</div>
+
+					<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+						<div className="space-y-1">
+							<Label className="text-xs font-medium text-slate-700">
+								Tanggal Konseling *
+							</Label>
+							<Input
+								type="date"
+								value={formDate}
+								onChange={(e) => setFormDate(e.target.value)}
+								className="h-9 text-xs bg-white"
+							/>
+						</div>
+						<div className="space-y-1">
+							<Label className="text-xs font-medium text-slate-700">
+								Kondisi Mahasiswa *
+							</Label>
+							<Select
+								value={formCondition}
+								onValueChange={(v) => setFormCondition(v ?? "Stabil")}
+							>
+								<SelectTrigger className="h-9 text-xs bg-white">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="Stabil">🟢 Stabil</SelectItem>
+									<SelectItem value="Perlu Perhatian">
+										🟡 Perlu Perhatian
+									</SelectItem>
+									<SelectItem value="Kritis">🔴 Kritis</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+					</div>
+
+					<div className="space-y-1">
+						<Label className="text-xs font-medium text-slate-700">
+							Catatan Hasil Konseling *
+						</Label>
+						<Textarea
+							placeholder="Tuliskan poin hasil konseling, arahan, dan komitmen mahasiswa..."
+							value={formNotes}
+							onChange={(e) => setFormNotes(e.target.value)}
+							rows={3}
+							className="resize-none text-xs bg-white"
+						/>
+					</div>
+
+					<div className="flex justify-end items-center gap-2 pt-1">
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={() => {
+								setShowForm(false);
+								setFormNotes("");
+							}}
+							className="h-8 text-xs gap-1"
+						>
+							<X className="w-3.5 h-3.5" />
+							Batal
+						</Button>
+						<Button
+							size="sm"
+							onClick={handleAdd}
+							disabled={isSaving || !formNotes.trim()}
+							className="h-8 text-xs gap-1.5 text-white shadow-2xs font-semibold"
+							style={{ backgroundColor: accentColor }}
+						>
+							{isSaving ? (
+								<Loader2 className="w-3.5 h-3.5 animate-spin" />
+							) : (
+								<Save className="w-3.5 h-3.5" />
+							)}
+							Simpan Sesi
+						</Button>
+					</div>
+				</div>
+			)}
+
+			{/* Log List */}
+			{logs.length === 0 && !showForm ? (
+				<div className="text-center py-8 text-slate-400">
+					<MessageCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+					<p className="text-xs font-medium text-slate-500">
+						Belum ada riwayat {title.toLowerCase()}
+					</p>
+				</div>
+			) : (
+				<div className="space-y-2.5">
+					{logs.map((log) => {
+						const cfg =
+							CONDITION_CONFIG[log.condition] ?? CONDITION_CONFIG.Stabil;
+						return (
+							<div
+								key={log.id}
+								className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/40 hover:bg-white hover:border-slate-300 hover:shadow-2xs transition-all duration-150 group"
+							>
+								<div className="flex items-start justify-between gap-2">
+									<div className="space-y-1.5 flex-1 min-w-0">
+										<div className="flex items-center gap-2 flex-wrap">
+											<span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+												<Clock className="w-3 h-3 text-slate-400" />
+												{formatDate(log.date)}
+											</span>
+											<Badge
+												variant="outline"
+												className={`${cfg.className} text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1`}
+											>
+												<span
+													className={`w-1.5 h-1.5 rounded-full ${cfg.dotClass}`}
+												/>
+												<span>{cfg.label}</span>
+											</Badge>
+										</div>
+										<p className="text-xs text-slate-700 leading-relaxed">
+											{log.notes}
+										</p>
+									</div>
+
+									{canEdit && (
+										<button
+											type="button"
+											onClick={() => handleDelete(log.id)}
+											disabled={deletingId === log.id}
+											className="shrink-0 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-rose-50 text-slate-300 hover:text-rose-600 transition-all disabled:opacity-50"
+											title="Hapus sesi"
+										>
+											{deletingId === log.id ? (
+												<Loader2 className="w-3.5 h-3.5 animate-spin" />
+											) : (
+												<Trash2 className="w-3.5 h-3.5" />
+											)}
+										</button>
+									)}
+								</div>
+							</div>
+						);
+					})}
+				</div>
+			)}
 		</div>
 	);
 }
@@ -493,9 +547,11 @@ function TripartiteSection({
 	const [isSaving, setIsSaving] = useState(false);
 	const [deletingId, setDeletingId] = useState<number | null>(null);
 
+	const accentColor = filterType === "orang-tua" ? "#0517B0" : "#d97706";
+
 	const handleAdd = async () => {
 		if (!formData.summary.trim()) {
-			toast.error("Topik/ringkasan tidak boleh kosong");
+			toast.error("Topik / ringkasan komunikasi tidak boleh kosong");
 			return;
 		}
 		setIsSaving(true);
@@ -518,7 +574,7 @@ function TripartiteSection({
 				},
 			);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			toast.success("Log berhasil ditambahkan");
+			toast.success("Log tripartit berhasil ditambahkan");
 			setShowForm(false);
 			setFormData((prev) => ({
 				...prev,
@@ -528,7 +584,7 @@ function TripartiteSection({
 			}));
 			onRefresh();
 		} catch {
-			toast.error("Gagal menyimpan log");
+			toast.error("Gagal menyimpan log tripartit");
 		} finally {
 			setIsSaving(false);
 		}
@@ -554,223 +610,239 @@ function TripartiteSection({
 		}
 	};
 
-	const accentColor = filterType === "orang-tua" ? "#0517B0" : "#d97706";
-
 	return (
-		<div className="space-y-4">
-			<div className="flex items-center justify-between">
-				<h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+		<div className="space-y-4 bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs">
+			<div className="flex items-center justify-between pb-2 border-b border-slate-100">
+				<div className="flex items-center gap-2">
 					<Users className="w-4 h-4" style={{ color: accentColor }} />
-					{sectionLabel}
-					{logs.length > 0 && (
-						<span
-							className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white"
-							style={{ backgroundColor: accentColor }}
-						>
-							{logs.length}
-						</span>
-					)}
-				</h4>
-			</div>
-			<div className="space-y-4">
-				{canEdit && showForm && (
-					<div
-						className="rounded-xl border p-4 space-y-3"
+					<h4 className="text-xs sm:text-sm font-bold text-slate-800">
+						{sectionLabel}
+					</h4>
+					<Badge
+						variant="secondary"
+						className="text-[10px] font-semibold px-2 py-0.2 rounded-full"
 						style={{
-							borderColor: `${accentColor}40`,
-							backgroundColor: `${accentColor}08`,
+							backgroundColor: `${accentColor}12`,
+							color: accentColor,
 						}}
 					>
-						<p className="text-xs font-semibold text-slate-600">Tambah Log</p>
-						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-							{filterType === "lapangan" && (
-								<div className="space-y-1.5">
-									<Label className="text-xs font-medium text-slate-600">
-										Jenis Kontak
-									</Label>
-									<Select
-										value={formData.contactType}
-										onValueChange={(v) =>
-											setFormData((p) => ({
-												...p,
-												contactType: v ?? "Mitra PJTKI",
-											}))
-										}
-									>
-										<SelectTrigger className="h-9 text-sm">
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="Mitra PJTKI">Mitra PJTKI</SelectItem>
-											<SelectItem value="Koordinator Lapangan">
-												Koordinator Lapangan
-											</SelectItem>
-										</SelectContent>
-									</Select>
-								</div>
-							)}
-							<div className="space-y-1.5">
-								<Label className="text-xs font-medium text-slate-600">
-									Nama Kontak
-								</Label>
-								<Input
-									placeholder="Nama..."
-									value={formData.contactName}
-									onChange={(e) =>
-										setFormData((p) => ({
-											...p,
-											contactName: e.target.value,
-										}))
-									}
-									className="h-9 text-sm"
-								/>
-							</div>
-							<div className="space-y-1.5">
-								<Label className="text-xs font-medium text-slate-600">
-									Tanggal
-								</Label>
-								<Input
-									type="date"
-									value={formData.contactDate}
-									onChange={(e) =>
-										setFormData((p) => ({
-											...p,
-											contactDate: e.target.value,
-										}))
-									}
-									className="h-9 text-sm"
-								/>
-							</div>
-						</div>
-						<div className="space-y-1.5">
-							<Label className="text-xs font-medium text-slate-600">
-								Topik / Ringkasan
-							</Label>
-							<Textarea
-								placeholder="Ringkasan komunikasi..."
-								value={formData.summary}
-								onChange={(e) =>
-									setFormData((p) => ({
-										...p,
-										summary: e.target.value,
-									}))
-								}
-								rows={3}
-								className="resize-none text-sm"
-							/>
-						</div>
-						<div className="space-y-1.5">
-							<Label className="text-xs font-medium text-slate-600">
-								Hasil (opsional)
-							</Label>
-							<Input
-								placeholder="Hasil/tindak lanjut..."
-								value={formData.result}
-								onChange={(e) =>
-									setFormData((p) => ({
-										...p,
-										result: e.target.value,
-									}))
-								}
-								className="h-9 text-sm"
-							/>
-						</div>
-						<div className="flex justify-end gap-2">
-							<Button
-								size="sm"
-								variant="outline"
-								onClick={() => setShowForm(false)}
-								className="h-8 text-xs gap-1"
-							>
-								<X className="w-3.5 h-3.5" />
-								Batal
-							</Button>
-							<Button
-								size="sm"
-								onClick={handleAdd}
-								disabled={isSaving}
-								className="h-8 text-xs gap-1.5 text-white"
-								style={{ backgroundColor: accentColor }}
-							>
-								{isSaving ? (
-									<Loader2 className="w-3.5 h-3.5 animate-spin" />
-								) : (
-									<Save className="w-3.5 h-3.5" />
-								)}
-								Simpan
-							</Button>
-						</div>
-					</div>
-				)}
-
-				{logs.length === 0 && !showForm ? (
-					<div className="text-center py-6 text-slate-400">
-						<Users className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-						<p className="text-sm">Belum ada log komunikasi</p>
-					</div>
-				) : (
-					<div className="space-y-2">
-						{logs.map((log) => (
-							<div
-								key={log.id}
-								className="p-3.5 rounded-lg border border-slate-100 bg-slate-50/60 hover:bg-white hover:border-slate-200 hover:shadow-sm transition-all duration-150 group"
-							>
-								<div className="flex items-start justify-between gap-2">
-									<div className="flex-1 min-w-0">
-										<div className="flex flex-wrap items-center gap-2 mb-1.5">
-											<Badge className="bg-slate-100 text-slate-600 border-slate-200 border text-[10px]">
-												{log.contactType}
-											</Badge>
-											{log.contactName && (
-												<span className="text-xs text-slate-500 font-medium">
-													{log.contactName}
-												</span>
-											)}
-											<span className="text-xs text-slate-400 flex items-center gap-1">
-												<Clock className="w-3 h-3" />
-												{formatDate(log.contactDate)}
-											</span>
-										</div>
-										<p className="text-sm text-slate-700 leading-relaxed">
-											{log.summary}
-										</p>
-										{log.result && (
-											<p className="text-xs text-slate-500 mt-1">
-												<span className="font-medium">Hasil:</span> {log.result}
-											</p>
-										)}
-									</div>
-									{canEdit && (
-										<button
-											type="button"
-											onClick={() => handleDelete(log.id)}
-											disabled={deletingId === log.id}
-											className="shrink-0 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-all disabled:opacity-50"
-										>
-											{deletingId === log.id ? (
-												<Loader2 className="w-3.5 h-3.5 animate-spin" />
-											) : (
-												<Trash2 className="w-3.5 h-3.5" />
-											)}
-										</button>
-									)}
-								</div>
-							</div>
-						))}
-					</div>
-				)}
-
+						{logs.length}
+					</Badge>
+				</div>
 				{canEdit && !showForm && (
-					<button
-						type="button"
+					<Button
+						size="sm"
+						variant="outline"
 						onClick={() => setShowForm(true)}
-						className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-slate-200 rounded-lg text-xs text-slate-400 hover:border-slate-300 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+						className="h-7 text-xs px-2.5 gap-1 border-slate-200 hover:bg-slate-50"
 					>
 						<Plus className="w-3.5 h-3.5" />
-						Tambah Log
-					</button>
+						<span>Tambah Log</span>
+					</Button>
 				)}
 			</div>
+
+			{/* Form */}
+			{canEdit && showForm && (
+				<div
+					className="rounded-xl border p-4 space-y-3.5 animate-in fade-in-50 duration-150"
+					style={{
+						borderColor: `${accentColor}30`,
+						backgroundColor: `${accentColor}06`,
+					}}
+				>
+					<p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+						<Sparkles className="w-3.5 h-3.5" style={{ color: accentColor }} />
+						Input Log Komunikasi Tripartit
+					</p>
+
+					<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+						{filterType === "lapangan" && (
+							<div className="space-y-1 sm:col-span-2">
+								<Label className="text-xs font-medium text-slate-700">
+									Jenis Pihak Kontak *
+								</Label>
+								<Select
+									value={formData.contactType}
+									onValueChange={(v) =>
+										setFormData((p) => ({
+											...p,
+											contactType: v ?? "Mitra PJTKI",
+										}))
+									}
+								>
+									<SelectTrigger className="h-9 text-xs bg-white">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="Mitra PJTKI">Mitra PJTKI</SelectItem>
+										<SelectItem value="Koordinator Lapangan">
+											Koordinator Lapangan
+										</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+						)}
+						<div className="space-y-1">
+							<Label className="text-xs font-medium text-slate-700">
+								Nama Kontak / Wali *
+							</Label>
+							<Input
+								placeholder="Contoh: Bpk. Bambang..."
+								value={formData.contactName}
+								onChange={(e) =>
+									setFormData((p) => ({
+										...p,
+										contactName: e.target.value,
+									}))
+								}
+								className="h-9 text-xs bg-white"
+							/>
+						</div>
+						<div className="space-y-1">
+							<Label className="text-xs font-medium text-slate-700">
+								Tanggal Komunikasi *
+							</Label>
+							<Input
+								type="date"
+								value={formData.contactDate}
+								onChange={(e) =>
+									setFormData((p) => ({
+										...p,
+										contactDate: e.target.value,
+									}))
+								}
+								className="h-9 text-xs bg-white"
+							/>
+						</div>
+					</div>
+
+					<div className="space-y-1">
+						<Label className="text-xs font-medium text-slate-700">
+							Topik / Ringkasan Pembicaraan *
+						</Label>
+						<Textarea
+							placeholder="Ringkasan hasil komunikasi..."
+							value={formData.summary}
+							onChange={(e) =>
+								setFormData((p) => ({
+									...p,
+									summary: e.target.value,
+								}))
+							}
+							rows={3}
+							className="resize-none text-xs bg-white"
+						/>
+					</div>
+
+					<div className="space-y-1">
+						<Label className="text-xs font-medium text-slate-700">
+							Hasil / Kesepakatan (Opsional)
+						</Label>
+						<Input
+							placeholder="Hasil atau tindak lanjut..."
+							value={formData.result}
+							onChange={(e) =>
+								setFormData((p) => ({
+									...p,
+									result: e.target.value,
+								}))
+							}
+							className="h-9 text-xs bg-white"
+						/>
+					</div>
+
+					<div className="flex justify-end gap-2 pt-1">
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={() => setShowForm(false)}
+							className="h-8 text-xs gap-1"
+						>
+							<X className="w-3.5 h-3.5" />
+							Batal
+						</Button>
+						<Button
+							size="sm"
+							onClick={handleAdd}
+							disabled={isSaving || !formData.summary.trim()}
+							className="h-8 text-xs gap-1.5 text-white shadow-2xs font-semibold"
+							style={{ backgroundColor: accentColor }}
+						>
+							{isSaving ? (
+								<Loader2 className="w-3.5 h-3.5 animate-spin" />
+							) : (
+								<Save className="w-3.5 h-3.5" />
+							)}
+							Simpan Log
+						</Button>
+					</div>
+				</div>
+			)}
+
+			{/* Logs */}
+			{logs.length === 0 && !showForm ? (
+				<div className="text-center py-8 text-slate-400">
+					<Users className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+					<p className="text-xs font-medium text-slate-500">
+						Belum ada log komunikasi {sectionLabel.toLowerCase()}
+					</p>
+				</div>
+			) : (
+				<div className="space-y-2.5">
+					{logs.map((log) => (
+						<div
+							key={log.id}
+							className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/40 hover:bg-white hover:border-slate-300 hover:shadow-2xs transition-all duration-150 group"
+						>
+							<div className="flex items-start justify-between gap-2">
+								<div className="space-y-1 flex-1 min-w-0">
+									<div className="flex flex-wrap items-center gap-2">
+										<Badge
+											variant="outline"
+											className="bg-white text-slate-700 border-slate-200 text-[10px] font-semibold"
+										>
+											{log.contactType}
+										</Badge>
+										{log.contactName && (
+											<span className="text-xs font-bold text-slate-800">
+												{log.contactName}
+											</span>
+										)}
+										<span className="text-xs text-slate-400 flex items-center gap-1">
+											<Clock className="w-3 h-3" />
+											{formatDate(log.contactDate)}
+										</span>
+									</div>
+									<p className="text-xs text-slate-700 leading-relaxed">
+										{log.summary}
+									</p>
+									{log.result && (
+										<div className="text-[11px] text-emerald-800 bg-emerald-50/70 border border-emerald-200/60 rounded-md p-1.5 font-medium">
+											<span className="font-bold">Hasil:</span> {log.result}
+										</div>
+									)}
+								</div>
+								{canEdit && (
+									<button
+										type="button"
+										onClick={() => handleDelete(log.id)}
+										disabled={deletingId === log.id}
+										className="shrink-0 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-rose-50 text-slate-300 hover:text-rose-600 transition-all disabled:opacity-50"
+										title="Hapus log"
+									>
+										{deletingId === log.id ? (
+											<Loader2 className="w-3.5 h-3.5 animate-spin" />
+										) : (
+											<Trash2 className="w-3.5 h-3.5" />
+										)}
+									</button>
+								)}
+							</div>
+						</div>
+					))}
+				</div>
+			)}
 		</div>
 	);
 }
@@ -821,7 +893,7 @@ function InterviewSection({
 				}),
 			});
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			toast.success("Log interview ditambahkan");
+			toast.success("Log interview berhasil disimpan");
 			setShowForm(false);
 			setFormData((p) => ({
 				...p,
@@ -859,16 +931,45 @@ function InterviewSection({
 	};
 
 	return (
-		<div className="space-y-4">
+		<div className="space-y-4 bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs">
+			<div className="flex items-center justify-between pb-2 border-b border-slate-100">
+				<div className="flex items-center gap-2">
+					<Building2 className="w-4 h-4 text-[#0517B0]" />
+					<h4 className="text-xs sm:text-sm font-bold text-slate-800">
+						Pendampingan Interview Magang
+					</h4>
+					<Badge
+						variant="secondary"
+						className="bg-blue-50 text-[#0517B0] text-[10px] font-semibold px-2 py-0.2 rounded-full"
+					>
+						{logs.length}
+					</Badge>
+				</div>
+				{canEdit && !showForm && (
+					<Button
+						size="sm"
+						variant="outline"
+						onClick={() => setShowForm(true)}
+						className="h-7 text-xs px-2.5 gap-1 border-slate-200 hover:bg-slate-50"
+					>
+						<Plus className="w-3.5 h-3.5" />
+						<span>Tambah Log Interview</span>
+					</Button>
+				)}
+			</div>
+
+			{/* Form */}
 			{canEdit && showForm && (
-				<div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 space-y-3">
-					<p className="text-xs font-semibold text-slate-600">
-						Tambah Log Interview
+				<div className="rounded-xl border border-blue-200/80 bg-blue-50/30 p-4 space-y-3.5 animate-in fade-in-50 duration-150">
+					<p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+						<Sparkles className="w-3.5 h-3.5 text-[#0517B0]" />
+						Input Log Pendampingan Interview
 					</p>
+
 					<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-						<div className="space-y-1.5">
-							<Label className="text-xs font-medium text-slate-600">
-								Tanggal Interview
+						<div className="space-y-1">
+							<Label className="text-xs font-medium text-slate-700">
+								Tanggal Interview *
 							</Label>
 							<Input
 								type="date"
@@ -879,15 +980,15 @@ function InterviewSection({
 										interviewDate: e.target.value,
 									}))
 								}
-								className="h-9 text-sm"
+								className="h-9 text-xs bg-white"
 							/>
 						</div>
-						<div className="space-y-1.5">
-							<Label className="text-xs font-medium text-slate-600">
-								Nama Perusahaan
+						<div className="space-y-1">
+							<Label className="text-xs font-medium text-slate-700">
+								Nama Perusahaan *
 							</Label>
 							<Input
-								placeholder="Nama perusahaan..."
+								placeholder="Contoh: Hilton Hotel..."
 								value={formData.companyName}
 								onChange={(e) =>
 									setFormData((p) => ({
@@ -895,15 +996,15 @@ function InterviewSection({
 										companyName: e.target.value,
 									}))
 								}
-								className="h-9 text-sm"
+								className="h-9 text-xs bg-white"
 							/>
 						</div>
-						<div className="space-y-1.5">
-							<Label className="text-xs font-medium text-slate-600">
-								Negara (opsional)
+						<div className="space-y-1">
+							<Label className="text-xs font-medium text-slate-700">
+								Negara Tujuan (Opsional)
 							</Label>
 							<Input
-								placeholder="Negara tujuan..."
+								placeholder="Contoh: Jepang, Malaysia..."
 								value={formData.country}
 								onChange={(e) =>
 									setFormData((p) => ({
@@ -911,12 +1012,12 @@ function InterviewSection({
 										country: e.target.value,
 									}))
 								}
-								className="h-9 text-sm"
+								className="h-9 text-xs bg-white"
 							/>
 						</div>
-						<div className="space-y-1.5">
-							<Label className="text-xs font-medium text-slate-600">
-								Hasil
+						<div className="space-y-1">
+							<Label className="text-xs font-medium text-slate-700">
+								Hasil Interview *
 							</Label>
 							<Select
 								value={formData.result}
@@ -924,32 +1025,34 @@ function InterviewSection({
 									setFormData((p) => ({ ...p, result: v ?? "Menunggu" }))
 								}
 							>
-								<SelectTrigger className="h-9 text-sm">
+								<SelectTrigger className="h-9 text-xs bg-white">
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									<SelectItem value="Menunggu">Menunggu</SelectItem>
-									<SelectItem value="Lulus">Lulus</SelectItem>
-									<SelectItem value="Tidak Lulus">Tidak Lulus</SelectItem>
+									<SelectItem value="Menunggu">🟡 Menunggu</SelectItem>
+									<SelectItem value="Lulus">🟢 Lulus</SelectItem>
+									<SelectItem value="Tidak Lulus">🔴 Tidak Lulus</SelectItem>
 								</SelectContent>
 							</Select>
 						</div>
 					</div>
-					<div className="space-y-1.5">
-						<Label className="text-xs font-medium text-slate-600">
-							Catatan (opsional)
+
+					<div className="space-y-1">
+						<Label className="text-xs font-medium text-slate-700">
+							Catatan Pendampingan (Opsional)
 						</Label>
 						<Textarea
-							placeholder="Catatan hasil pendampingan..."
+							placeholder="Catatan evaluasi jalannya interview..."
 							value={formData.notes}
 							onChange={(e) =>
 								setFormData((p) => ({ ...p, notes: e.target.value }))
 							}
 							rows={2}
-							className="resize-none text-sm"
+							className="resize-none text-xs bg-white"
 						/>
 					</div>
-					<div className="flex justify-end gap-2">
+
+					<div className="flex justify-end gap-2 pt-1">
 						<Button
 							size="sm"
 							variant="outline"
@@ -962,88 +1065,85 @@ function InterviewSection({
 						<Button
 							size="sm"
 							onClick={handleAdd}
-							disabled={isSaving}
-							className="h-8 text-xs gap-1.5 bg-violet-600 hover:bg-violet-700 text-white"
+							disabled={isSaving || !formData.companyName.trim()}
+							className="h-8 text-xs gap-1.5 text-white bg-[#0517B0] hover:bg-[#0517B0]/90 shadow-2xs font-semibold"
 						>
 							{isSaving ? (
 								<Loader2 className="w-3.5 h-3.5 animate-spin" />
 							) : (
 								<Save className="w-3.5 h-3.5" />
 							)}
-							Simpan
+							Simpan Interview
 						</Button>
 					</div>
 				</div>
 			)}
 
+			{/* Logs */}
 			{logs.length === 0 && !showForm ? (
-				<div className="text-center py-6 text-slate-400">
-					<MessageSquare className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-					<p className="text-sm">Belum ada log pendampingan interview</p>
+				<div className="text-center py-8 text-slate-400">
+					<Building2 className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+					<p className="text-xs font-medium text-slate-500">
+						Belum ada riwayat pendampingan interview
+					</p>
 				</div>
 			) : (
-				<div className="space-y-2">
-					{logs.map((log) => (
-						<div
-							key={log.id}
-							className="p-3.5 rounded-lg border border-slate-100 bg-slate-50/60 hover:bg-white hover:border-slate-200 hover:shadow-sm transition-all duration-150 group"
-						>
-							<div className="flex items-start justify-between gap-2">
-								<div className="flex-1 min-w-0">
-									<div className="flex flex-wrap items-center gap-2 mb-1.5">
-										<span className="text-sm font-semibold text-slate-800">
-											{log.companyName}
-										</span>
-										{log.country && (
-											<span className="text-xs text-slate-500">
-												· {log.country}
+				<div className="space-y-2.5">
+					{logs.map((log) => {
+						const resCfg = RESULT_CONFIG[log.result] ?? RESULT_CONFIG.Menunggu;
+						return (
+							<div
+								key={log.id}
+								className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/40 hover:bg-white hover:border-slate-300 hover:shadow-2xs transition-all duration-150 group"
+							>
+								<div className="flex items-start justify-between gap-2">
+									<div className="space-y-1 flex-1 min-w-0">
+										<div className="flex flex-wrap items-center gap-2">
+											<span className="text-xs font-bold text-slate-900">
+												{log.companyName}
 											</span>
+											{log.country && (
+												<span className="text-xs text-slate-500 font-medium">
+													· {log.country}
+												</span>
+											)}
+											<span className="text-xs text-slate-400 flex items-center gap-1">
+												<Clock className="w-3 h-3" />
+												{formatDate(log.interviewDate)}
+											</span>
+											<Badge
+												variant="outline"
+												className={`${resCfg.className} text-[10px] px-2 py-0.5 rounded-md`}
+											>
+												{resCfg.label}
+											</Badge>
+										</div>
+										{log.notes && (
+											<p className="text-xs text-slate-600 leading-relaxed">
+												{log.notes}
+											</p>
 										)}
-										<span className="text-xs text-slate-400 flex items-center gap-1">
-											<Clock className="w-3 h-3" />
-											{formatDate(log.interviewDate)}
-										</span>
-										<Badge
-											className={`${RESULT_CONFIG[log.result] ?? "bg-slate-100 text-slate-600 border-slate-200"} border text-[10px] px-1.5 py-0`}
-										>
-											{log.result}
-										</Badge>
 									</div>
-									{log.notes && (
-										<p className="text-sm text-slate-600 leading-relaxed">
-											{log.notes}
-										</p>
+									{canEdit && (
+										<button
+											type="button"
+											onClick={() => handleDelete(log.id)}
+											disabled={deletingId === log.id}
+											className="shrink-0 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-rose-50 text-slate-300 hover:text-rose-600 transition-all disabled:opacity-50"
+											title="Hapus log"
+										>
+											{deletingId === log.id ? (
+												<Loader2 className="w-3.5 h-3.5 animate-spin" />
+											) : (
+												<Trash2 className="w-3.5 h-3.5" />
+											)}
+										</button>
 									)}
 								</div>
-								{canEdit && (
-									<button
-										type="button"
-										onClick={() => handleDelete(log.id)}
-										disabled={deletingId === log.id}
-										className="shrink-0 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-all disabled:opacity-50"
-									>
-										{deletingId === log.id ? (
-											<Loader2 className="w-3.5 h-3.5 animate-spin" />
-										) : (
-											<Trash2 className="w-3.5 h-3.5" />
-										)}
-									</button>
-								)}
 							</div>
-						</div>
-					))}
+						);
+					})}
 				</div>
-			)}
-
-			{canEdit && !showForm && (
-				<button
-					type="button"
-					onClick={() => setShowForm(true)}
-					className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-slate-200 rounded-lg text-xs text-slate-400 hover:border-slate-300 hover:text-slate-600 hover:bg-slate-50 transition-colors"
-				>
-					<Plus className="w-3.5 h-3.5" />
-					Tambah Log Interview
-				</button>
 			)}
 		</div>
 	);
@@ -1130,130 +1230,143 @@ function StudentNotesSection({
 
 	return (
 		<>
-			<div className="space-y-4">
-				<div className="flex items-center justify-between">
-					<h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-						<AlertTriangle className="w-4 h-4" style={{ color: accentColor }} />
-						{title}
-						{notes.length > 0 && (
-							<span
-								className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white"
-								style={{ backgroundColor: accentColor }}
-							>
-								{notes.length}
-							</span>
-						)}
-					</h4>
-				</div>
-				<div className="space-y-4">
-					{canEdit && showForm && (
-						<div
-							className="rounded-xl border p-4 space-y-3"
+			<div className="space-y-4 bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs">
+				<div className="flex items-center justify-between pb-2 border-b border-slate-100">
+					<div className="flex items-center gap-2">
+						<FileText className="w-4 h-4" style={{ color: accentColor }} />
+						<h4 className="text-xs sm:text-sm font-bold text-slate-800">
+							{title}
+						</h4>
+						<Badge
+							variant="secondary"
+							className="text-[10px] font-semibold px-2 py-0.2 rounded-full"
 							style={{
-								borderColor: `${accentColor}40`,
-								backgroundColor: `${accentColor}08`,
+								backgroundColor: `${accentColor}12`,
+								color: accentColor,
 							}}
 						>
-							<Textarea
-								placeholder={`Isi catatan ${title.toLowerCase()}...`}
-								value={formContent}
-								onChange={(e) => setFormContent(e.target.value)}
-								rows={3}
-								className="resize-none text-sm"
-								autoFocus
-							/>
-							<div className="flex justify-between items-center">
-								<span className="text-[11px] text-slate-400">
-									{formContent.length} karakter
-								</span>
-								<div className="flex gap-2">
-									<Button
-										size="sm"
-										variant="outline"
-										onClick={() => {
-											setShowForm(false);
-											setFormContent("");
-										}}
-										className="h-8 text-xs gap-1"
-									>
-										<X className="w-3.5 h-3.5" />
-										Batal
-									</Button>
-									<Button
-										size="sm"
-										onClick={handleAdd}
-										disabled={isSaving || !formContent.trim()}
-										className="h-8 text-xs gap-1.5 text-white"
-										style={{ backgroundColor: accentColor }}
-									>
-										{isSaving ? (
-											<Loader2 className="w-3.5 h-3.5 animate-spin" />
-										) : (
-											<Save className="w-3.5 h-3.5" />
-										)}
-										Simpan
-									</Button>
-								</div>
-							</div>
-						</div>
-					)}
-
-					{notes.length === 0 && !showForm ? (
-						<div className="text-center py-6 text-slate-400">
-							<MessageCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-							<p className="text-sm">Belum ada catatan</p>
-						</div>
-					) : (
-						<div className="space-y-2">
-							{notes.map((note) => (
-								<div
-									key={note.id}
-									className="group relative p-3.5 pl-5 rounded-lg border border-slate-100 bg-slate-50/60 hover:bg-white hover:border-slate-200 hover:shadow-sm transition-all duration-150"
-								>
-									<div
-										className="absolute left-3 top-3 bottom-3 w-0.5 rounded-full"
-										style={{ backgroundColor: accentColor }}
-									/>
-									<div className="flex items-start justify-between gap-2">
-										<div className="flex-1 min-w-0">
-											<p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-												{note.content}
-											</p>
-											<p className="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1">
-												<Clock className="w-3 h-3" />
-												{formatDate(note.createdAt)}
-											</p>
-										</div>
-										{canEdit && (
-											<button
-												type="button"
-												onClick={() => {
-													setPendingDeleteId(note.id);
-													setShowDeleteDialog(true);
-												}}
-												disabled={deletingId === note.id}
-												className="shrink-0 p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-all disabled:opacity-50"
-											>
-												<Trash2 className="w-3.5 h-3.5" />
-											</button>
-										)}
-									</div>
-								</div>
-							))}
-						</div>
-					)}
-
+							{notes.length}
+						</Badge>
+					</div>
 					{canEdit && !showForm && (
-						<button
-							type="button"
+						<Button
+							size="sm"
+							variant="outline"
 							onClick={() => setShowForm(true)}
-							className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-slate-200 rounded-lg text-xs text-slate-400 hover:border-slate-300 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+							className="h-7 text-xs px-2.5 gap-1 border-slate-200 hover:bg-slate-50"
 						>
 							<Plus className="w-3.5 h-3.5" />
-							Tambah Catatan
-						</button>
+							<span>Tambah Catatan</span>
+						</Button>
 					)}
 				</div>
+
+				{/* Form */}
+				{canEdit && showForm && (
+					<div
+						className="rounded-xl border p-4 space-y-3.5 animate-in fade-in-50 duration-150"
+						style={{
+							borderColor: `${accentColor}30`,
+							backgroundColor: `${accentColor}06`,
+						}}
+					>
+						<p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+							<Sparkles
+								className="w-3.5 h-3.5"
+								style={{ color: accentColor }}
+							/>
+							Input {title}
+						</p>
+
+						<Textarea
+							placeholder={`Tuliskan isi ${title.toLowerCase()}...`}
+							value={formContent}
+							onChange={(e) => setFormContent(e.target.value)}
+							rows={3}
+							className="resize-none text-xs bg-white"
+							autoFocus
+						/>
+
+						<div className="flex justify-between items-center pt-1">
+							<span className="text-[11px] text-slate-400">
+								{formContent.length} karakter
+							</span>
+							<div className="flex gap-2">
+								<Button
+									size="sm"
+									variant="outline"
+									onClick={() => {
+										setShowForm(false);
+										setFormContent("");
+									}}
+									className="h-8 text-xs gap-1"
+								>
+									<X className="w-3.5 h-3.5" />
+									Batal
+								</Button>
+								<Button
+									size="sm"
+									onClick={handleAdd}
+									disabled={isSaving || !formContent.trim()}
+									className="h-8 text-xs gap-1.5 text-white shadow-2xs font-semibold"
+									style={{ backgroundColor: accentColor }}
+								>
+									{isSaving ? (
+										<Loader2 className="w-3.5 h-3.5 animate-spin" />
+									) : (
+										<Save className="w-3.5 h-3.5" />
+									)}
+									Simpan Catatan
+								</Button>
+							</div>
+						</div>
+					</div>
+				)}
+
+				{/* List */}
+				{notes.length === 0 && !showForm ? (
+					<div className="text-center py-8 text-slate-400">
+						<FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+						<p className="text-xs font-medium text-slate-500">
+							Belum ada {title.toLowerCase()}
+						</p>
+					</div>
+				) : (
+					<div className="space-y-2.5">
+						{notes.map((note) => (
+							<div
+								key={note.id}
+								className="group relative p-3.5 pl-4 rounded-xl border border-slate-200/80 bg-slate-50/40 hover:bg-white hover:border-slate-300 hover:shadow-2xs transition-all duration-150"
+							>
+								<div className="flex items-start justify-between gap-2">
+									<div className="space-y-1 flex-1 min-w-0">
+										<p className="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap">
+											{note.content}
+										</p>
+										<p className="text-[10px] text-slate-400 flex items-center gap-1">
+											<Clock className="w-3 h-3" />
+											{formatDate(note.createdAt)}
+										</p>
+									</div>
+									{canEdit && (
+										<button
+											type="button"
+											onClick={() => {
+												setPendingDeleteId(note.id);
+												setShowDeleteDialog(true);
+											}}
+											disabled={deletingId === note.id}
+											className="shrink-0 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-rose-50 text-slate-300 hover:text-rose-600 transition-all disabled:opacity-50"
+											title="Hapus catatan"
+										>
+											<Trash2 className="w-3.5 h-3.5" />
+										</button>
+									)}
+								</div>
+							</div>
+						))}
+					</div>
+				)}
 			</div>
 
 			<AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -1272,7 +1385,7 @@ function StudentNotesSection({
 							className="bg-rose-600 hover:bg-rose-700 text-white"
 						>
 							{deletingId && (
-								<Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+								<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
 							)}
 							Hapus
 						</AlertDialogAction>
@@ -1312,15 +1425,16 @@ export function TabKonseling({ studentId, canEdit }: Props) {
 	}, [studentId]);
 
 	useEffect(() => {
-		// eslint-disable-next-line react-hooks/set-state-in-effect
 		fetchData();
 	}, [fetchData]);
 
 	if (isLoading) {
 		return (
-			<div className="flex items-center justify-center py-16 gap-2 text-slate-400">
-				<Loader2 className="w-5 h-5 animate-spin" />
-				<span className="text-sm">Memuat data konseling...</span>
+			<div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
+				<Loader2 className="w-7 h-7 animate-spin text-[#0517B0]" />
+				<span className="text-xs font-medium text-slate-500">
+					Memuat data konseling & catatan...
+				</span>
 			</div>
 		);
 	}
@@ -1350,121 +1464,111 @@ export function TabKonseling({ studentId, canEdit }: Props) {
 		<div className="space-y-6">
 			{/* 1. Konseling Section */}
 			<SectionCard
-				title="Konseling"
+				title="Konseling & Bimbingan Psikologis"
+				subtitle="Catatan sesi konseling berkala dan pemantauan kondisi mental mahasiswa"
 				icon={MessageCircle}
 				accentColor="#0517B0"
 				count={konselingLogs.length + konselingMentalLogs.length}
 				defaultOpen
 			>
-				<div className="flex flex-col space-y-4">
-					<div className="p-4 border border-slate-200 rounded-xl bg-white">
-						<CounselingSection
-							studentId={studentId}
-							type="konseling"
-							title="Sesi Konseling"
-							icon={MessageCircle}
-							accentColor="#0517B0"
-							logs={konselingLogs}
-							canEdit={canEdit}
-							onRefresh={fetchData}
-						/>
-					</div>
-					<div className="p-4 border border-slate-200 rounded-xl bg-white">
-						<CounselingSection
-							studentId={studentId}
-							type="konseling_mental"
-							title="Konseling Mental"
-							icon={MessageCircle}
-							accentColor="#7c3aed"
-							logs={konselingMentalLogs}
-							canEdit={canEdit}
-							onRefresh={fetchData}
-						/>
-					</div>
-				</div>
-			</SectionCard>
-
-			{/* 2. Konseling Tripartit Section */}
-			<SectionCard
-				title="Konseling Tripartit"
-				icon={Users}
-				accentColor="#7c3aed"
-				count={tripartiteOrangTua.length + tripartiteLapangan.length}
-				defaultOpen
-			>
-				<div className="flex flex-col space-y-4">
-					<div className="p-4 border border-slate-200 rounded-xl bg-white">
-						<TripartiteSection
-							studentId={studentId}
-							sectionLabel="Orang Tua"
-							filterType="orang-tua"
-							logs={tripartiteOrangTua}
-							canEdit={canEdit}
-							onRefresh={fetchData}
-						/>
-					</div>
-					<div className="p-4 border border-slate-200 rounded-xl bg-white">
-						<TripartiteSection
-							studentId={studentId}
-							sectionLabel="Pihak Lapangan"
-							filterType="lapangan"
-							logs={tripartiteLapangan}
-							canEdit={canEdit}
-							onRefresh={fetchData}
-						/>
-					</div>
-				</div>
-			</SectionCard>
-
-			{/* 3. Log Pendampingan Interview Section */}
-			<SectionCard
-				title="Log Pendampingan Interview"
-				icon={MessageSquare}
-				accentColor="#0517B0"
-				count={paData.interviewLogs.length}
-				defaultOpen
-			>
-				<div className="p-4 border border-slate-200 rounded-xl bg-white mt-2">
-					<InterviewSection
+				<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+					<CounselingSection
 						studentId={studentId}
-						logs={paData.interviewLogs}
+						type="konseling"
+						title="Sesi Konseling Akademik & Perkembangan"
+						icon={MessageCircle}
+						accentColor="#0517B0"
+						logs={konselingLogs}
+						canEdit={canEdit}
+						onRefresh={fetchData}
+					/>
+					<CounselingSection
+						studentId={studentId}
+						type="konseling_mental"
+						title="Konseling Kesiapan Mental & Emosional"
+						icon={HeartHandshake}
+						accentColor="#7c3aed"
+						logs={konselingMentalLogs}
 						canEdit={canEdit}
 						onRefresh={fetchData}
 					/>
 				</div>
 			</SectionCard>
 
-			{/* 4. Catatan Section */}
+			{/* 2. Konseling Tripartit Section */}
 			<SectionCard
-				title="Catatan"
-				icon={AlertTriangle}
-				accentColor="#f59e0b"
+				title="Komunikasi & Konseling Tripartit"
+				subtitle="Koordinasi intensif antara kampus, orang tua/wali, dan koordinator lapangan"
+				icon={Users}
+				accentColor="#7c3aed"
+				count={tripartiteOrangTua.length + tripartiteLapangan.length}
+				defaultOpen
+			>
+				<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+					<TripartiteSection
+						studentId={studentId}
+						sectionLabel="Komunikasi Orang Tua / Wali"
+						filterType="orang-tua"
+						logs={tripartiteOrangTua}
+						canEdit={canEdit}
+						onRefresh={fetchData}
+					/>
+					<TripartiteSection
+						studentId={studentId}
+						sectionLabel="Koordinasi Pihak Lapangan / Mitra"
+						filterType="lapangan"
+						logs={tripartiteLapangan}
+						canEdit={canEdit}
+						onRefresh={fetchData}
+					/>
+				</div>
+			</SectionCard>
+
+			{/* 3. Log Pendampingan Interview Section */}
+			<SectionCard
+				title="Pendampingan Interview Magang Luar Negeri"
+				subtitle="Riwayat wawancara kerja, proses seleksi mitra luar negeri, dan hasil pendampingan"
+				icon={Building2}
+				accentColor="#0517B0"
+				count={paData.interviewLogs.length}
+				defaultOpen
+			>
+				<InterviewSection
+					studentId={studentId}
+					logs={paData.interviewLogs}
+					canEdit={canEdit}
+					onRefresh={fetchData}
+				/>
+			</SectionCard>
+
+			{/* 4. Catatan Kedisiplinan & Internal */}
+			<SectionCard
+				title="Catatan Kedisiplinan & Evaluasi Khusus"
+				subtitle="Catatan perilaku kedisiplinan dan catatan internal tim pembimbing"
+				icon={FileText}
+				accentColor="#d97706"
 				count={kedisiplinanNotes.length + internalNotes.length}
 				defaultOpen
 			>
-				<div className="flex flex-col space-y-4">
-					<div className="p-4 border border-slate-200 rounded-xl bg-white">
-						<StudentNotesSection
-							studentId={studentId}
-							noteType="kedisiplinan"
-							title="Catatan Kedisiplinan Mahasiswa"
-							accentColor="#f59e0b"
-							notes={kedisiplinanNotes}
-							canEdit={canEdit}
-							onRefresh={fetchData}
-						/>
-					</div>
-					<div className="p-4 border border-slate-200 rounded-xl bg-white">
-						<StudentNotesSection
-							studentId={studentId}
-							noteType="internal"
-							title="Catatan Internal"
-							accentColor="#64748b"
-							notes={internalNotes}
-							canEdit={canEdit}
-							onRefresh={fetchData}
-						/>
-					</div>
+				<div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+					<StudentNotesSection
+						studentId={studentId}
+						noteType="kedisiplinan"
+						title="Catatan Kedisiplinan Mahasiswa"
+						accentColor="#d97706"
+						notes={kedisiplinanNotes}
+						canEdit={canEdit}
+						onRefresh={fetchData}
+					/>
+					<StudentNotesSection
+						studentId={studentId}
+						noteType="internal"
+						title="Catatan Evaluasi Internal"
+						accentColor="#475569"
+						notes={internalNotes}
+						canEdit={canEdit}
+						onRefresh={fetchData}
+					/>
 				</div>
 			</SectionCard>
 		</div>

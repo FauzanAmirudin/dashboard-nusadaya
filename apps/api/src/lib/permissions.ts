@@ -1,3 +1,7 @@
+import { eq } from "drizzle-orm";
+import { db } from "../db";
+import { users } from "../db/schema";
+
 export type AuthUser = {
 	id: number;
 	username: string;
@@ -21,4 +25,27 @@ export function hasRole(user: AuthUser, ...requiredRoles: string[]): boolean {
 		return true;
 	}
 	return requiredRoles.some((r) => userRoles.includes(r));
+}
+
+export async function getValidUserId(user: AuthUser): Promise<number | null> {
+	if (!user) return null;
+	if (user.id && typeof user.id === "number") {
+		try {
+			const u = await db.query.users.findFirst({
+				where: eq(users.id, user.id),
+				columns: { id: true },
+			});
+			if (u) return u.id;
+		} catch {}
+	}
+	if (user.username) {
+		try {
+			const uByName = await db.query.users.findFirst({
+				where: eq(users.username, user.username),
+				columns: { id: true },
+			});
+			if (uByName) return uByName.id;
+		} catch {}
+	}
+	return null;
 }
