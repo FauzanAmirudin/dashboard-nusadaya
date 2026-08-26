@@ -67,6 +67,7 @@ export interface DashboardSummaryData {
 export function useDashboardSummary(params?: {
 	cohort?: string;
 	archived?: boolean;
+	enabled?: boolean;
 }) {
 	const cohort =
 		params?.cohort && params.cohort !== "all" ? params.cohort : undefined;
@@ -86,6 +87,7 @@ export function useDashboardSummary(params?: {
 			if (res.error) throw new Error("Gagal memuat ringkasan dashboard");
 			return res.data?.data as DashboardSummaryData;
 		},
+		enabled: params?.enabled !== undefined ? params.enabled : true,
 		staleTime: 30 * 1000,
 		refetchInterval: 30 * 1000,
 	});

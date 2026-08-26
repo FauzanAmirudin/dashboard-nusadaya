@@ -5,6 +5,7 @@ import {
 	Download,
 	GraduationCap,
 	Loader2,
+	RotateCcw,
 	Search,
 	Users,
 } from "lucide-react";
@@ -147,14 +148,27 @@ export function PAListView() {
 						<CardTitle className="text-sm font-semibold text-slate-700">
 							Daftar PA ({filtered.length})
 						</CardTitle>
-						<div className="relative sm:ml-auto">
-							<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-							<Input
-								placeholder="Cari nama PA..."
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-								className="pl-9 h-9 w-64 text-sm"
-							/>
+						<div className="flex items-center gap-2 sm:ml-auto">
+							<div className="relative">
+								<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+								<Input
+									placeholder="Cari nama PA..."
+									value={searchQuery}
+									onChange={(e) => setSearchQuery(e.target.value)}
+									className="pl-9 h-9 w-64 text-sm"
+								/>
+							</div>
+							{searchQuery.trim() !== "" && (
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => setSearchQuery("")}
+									className="h-9 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors"
+								>
+									<RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+									Reset
+								</Button>
+							)}
 						</div>
 					</div>
 				</CardHeader>

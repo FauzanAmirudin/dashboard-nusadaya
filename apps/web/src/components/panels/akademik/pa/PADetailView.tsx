@@ -5,6 +5,7 @@ import {
 	ChevronRight,
 	Download,
 	Loader2,
+	RotateCcw,
 	Search,
 	Users,
 } from "lucide-react";
@@ -208,6 +209,20 @@ export function PADetailView({ paId }: Props) {
 									className="pl-9 h-9 w-52 text-sm"
 								/>
 							</div>
+							{(searchQuery.trim() !== "" || cohortFilter !== "all") && (
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => {
+										setSearchQuery("");
+										setCohortFilter("all");
+									}}
+									className="h-9 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors"
+								>
+									<RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+									Reset
+								</Button>
+							)}
 						</div>
 					</div>
 				</CardHeader>

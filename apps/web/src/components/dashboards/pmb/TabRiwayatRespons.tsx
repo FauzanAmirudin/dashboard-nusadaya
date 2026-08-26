@@ -1,9 +1,10 @@
 "use client";
 
-import { Eye, Search } from "lucide-react";
+import { Eye, RotateCcw, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
@@ -134,6 +135,23 @@ export function TabRiwayatRespons() {
 							onChange={(e) => setSearchQuery(e.target.value)}
 						/>
 					</div>
+					{(searchQuery.trim() !== "" ||
+						filterMonth !== "ALL" ||
+						filterYear !== "ALL") && (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => {
+								setSearchQuery("");
+								setFilterMonth("ALL");
+								setFilterYear("ALL");
+							}}
+							className="h-9 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors"
+						>
+							<RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+							Reset
+						</Button>
+					)}
 				</div>
 			</div>
 

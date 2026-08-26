@@ -19,6 +19,7 @@ import {
 	Plane,
 	Printer,
 	RefreshCw,
+	RotateCcw,
 	Search,
 	ShieldAlert,
 	ShieldCheck,
@@ -1008,6 +1009,27 @@ export function EvaluasiFinalisasiDashboard({
 										</SelectContent>
 									</Select>
 								</>
+							)}
+
+							{/* Reset Button Inline */}
+							{(searchQuery.trim() !== "" ||
+								selectedCohort !== "all" ||
+								selectedStatusFilter !== "all" ||
+								selectedDecisionFilter !== "all") && (
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => {
+										setSearchQuery("");
+										setSelectedCohort("all");
+										setSelectedStatusFilter("all");
+										setSelectedDecisionFilter("all");
+									}}
+									className="h-9 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors"
+								>
+									<RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+									Reset
+								</Button>
 							)}
 						</div>
 					</div>

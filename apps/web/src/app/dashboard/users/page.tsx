@@ -7,6 +7,7 @@ import {
 	Info,
 	Loader2,
 	Plus,
+	RotateCcw,
 	Search,
 	Shield,
 	Square,
@@ -458,12 +459,12 @@ export default function UsersManagementPage() {
 						<CardTitle className="text-lg text-slate-700">
 							Daftar Pengguna
 						</CardTitle>
-						<div className="flex gap-2 w-full sm:w-auto">
+						<div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
 							<div className="relative w-full sm:w-64">
 								<Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
 								<Input
 									placeholder="Cari nama/username..."
-									className="pl-9 bg-white"
+									className="pl-9 bg-white h-9 text-xs"
 									value={searchQuery}
 									onChange={(e) => setSearchQuery(e.target.value)}
 								/>
@@ -472,8 +473,12 @@ export default function UsersManagementPage() {
 								value={selectedRole}
 								onValueChange={(val) => setSelectedRole(val || "all")}
 							>
-								<SelectTrigger className="w-[180px] bg-white">
-									<SelectValue placeholder="Semua Peran" />
+								<SelectTrigger className="w-[180px] bg-white h-9 text-xs">
+									<SelectValue placeholder="Semua Peran">
+										{selectedRole === "all"
+											? "Semua Peran"
+											: ROLE_LABELS[selectedRole] || selectedRole}
+									</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
 									<SelectItem value="all">Semua Peran</SelectItem>
@@ -484,6 +489,20 @@ export default function UsersManagementPage() {
 									))}
 								</SelectContent>
 							</Select>
+							{(searchQuery.trim() !== "" || selectedRole !== "all") && (
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => {
+										setSearchQuery("");
+										setSelectedRole("all");
+									}}
+									className="h-9 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors"
+								>
+									<RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+									Reset
+								</Button>
+							)}
 						</div>
 					</div>
 				</CardHeader>

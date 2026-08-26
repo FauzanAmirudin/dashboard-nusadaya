@@ -9,6 +9,7 @@ import {
 	Loader2,
 	Pencil,
 	Plus,
+	RotateCcw,
 	Search,
 	Trash2,
 } from "lucide-react";
@@ -285,6 +286,21 @@ function ListCalendarView({
 								</SelectContent>
 							</Select>
 						</div>
+
+						{(searchQuery.trim() !== "" || cohortFilter !== "all") && (
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => {
+									setSearchQuery("");
+									setCohortFilter("all");
+								}}
+								className="h-10 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors"
+							>
+								<RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+								Reset
+							</Button>
+						)}
 					</div>
 
 					{/* Calendars Table (Tanpa Kolom Status) */}

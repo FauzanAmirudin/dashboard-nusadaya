@@ -1,6 +1,12 @@
 "use client";
 
-import { ClipboardCheck, Download, Loader2, Search } from "lucide-react";
+import {
+	ClipboardCheck,
+	Download,
+	Loader2,
+	RotateCcw,
+	Search,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -222,6 +228,20 @@ export function KehadiranDashboard() {
 							onChange={(e) => setSearchQuery(e.target.value)}
 						/>
 					</div>
+					{(searchQuery.trim() !== "" || cohortFilter !== "all") && (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => {
+								setSearchQuery("");
+								setCohortFilter("all");
+							}}
+							className="h-10 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors shrink-0"
+						>
+							<RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+							Reset
+						</Button>
+					)}
 				</div>
 				<Button
 					variant="outline"

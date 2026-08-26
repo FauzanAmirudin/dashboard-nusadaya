@@ -11,6 +11,7 @@ import {
 	HelpCircle,
 	MessageCircle,
 	Phone,
+	RotateCcw,
 	Search,
 	ShieldCheck,
 	Sparkles,
@@ -1209,6 +1210,26 @@ export function FinanceDashboard({ user, data = [] }: any) {
 									<SelectItem value="paid_desc">Total Bayar</SelectItem>
 								</SelectContent>
 							</Select>
+
+							{(searchQuery.trim() !== "" ||
+								sortBy !== "recent" ||
+								selectedCohort !== "all" ||
+								selectedStatus !== "all") && (
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => {
+										setSearchQuery("");
+										setSortBy("recent");
+										setSelectedCohort("all");
+										setSelectedStatus("all");
+									}}
+									className="h-8.5 px-2.5 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium shadow-2xs rounded-lg transition-colors"
+								>
+									<RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+									Reset
+								</Button>
+							)}
 						</div>
 					</div>
 

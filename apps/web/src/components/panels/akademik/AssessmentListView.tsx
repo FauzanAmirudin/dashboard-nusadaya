@@ -6,6 +6,7 @@ import {
 	ClipboardList,
 	Clock,
 	Download,
+	RotateCcw,
 	Search,
 	Users,
 } from "lucide-react";
@@ -362,6 +363,26 @@ export function AssessmentListView() {
 							<SelectItem value="selesai">Selesai</SelectItem>
 						</SelectContent>
 					</Select>
+
+					{(search.trim() !== "" ||
+						programFilter !== "all" ||
+						cohortFilter !== "all" ||
+						statusFilter !== "all") && (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => {
+								setSearch("");
+								setProgramFilter("all");
+								setCohortFilter("all");
+								setStatusFilter("all");
+							}}
+							className="h-10 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors"
+						>
+							<RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+							Reset
+						</Button>
+					)}
 				</div>
 			</div>
 

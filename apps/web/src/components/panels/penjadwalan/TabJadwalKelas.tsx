@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -187,6 +187,20 @@ export function TabJadwalKelas({ canEdit }: { canEdit: boolean }) {
 								</SelectContent>
 							</Select>
 						</div>
+						{(cohortFilter !== "all" || dayFilter !== "all") && (
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => {
+									setCohortFilter("all");
+									setDayFilter("all");
+								}}
+								className="h-10 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors"
+							>
+								<RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+								Reset
+							</Button>
+						)}
 					</div>
 
 					{isLoading ? (

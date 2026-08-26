@@ -3,17 +3,17 @@
 import {
 	BookOpen,
 	CheckSquare,
-	Download,
 	Edit,
-	Eye,
+	GraduationCap,
 	Loader2,
 	Plus,
+	RotateCcw,
 	Search,
 	Settings,
 	Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
 	AlertDialog,
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import {
 	Select,
 	SelectContent,
@@ -52,48 +53,8 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { api } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
+import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store";
-
-function getPeminatanBadge(peminatan: string | null) {
-	if (!peminatan) return <span className="text-slate-400 text-xs">-</span>;
-
-	const lower = peminatan.toLowerCase();
-	let flagUrl = "https://flagcdn.com/w20/id.png";
-	let countryAlt = "ID";
-
-	if (lower.includes("malaysia")) {
-		flagUrl = "https://flagcdn.com/w20/my.png";
-		countryAlt = "MY";
-	} else if (lower.includes("taiwan")) {
-		flagUrl = "https://flagcdn.com/w20/tw.png";
-		countryAlt = "TW";
-	} else if (
-		lower.includes("timur tengah") ||
-		lower.includes("saudi") ||
-		lower.includes("barista")
-	) {
-		flagUrl = "https://flagcdn.com/w20/sa.png";
-		countryAlt = "SA";
-	} else if (lower.includes("jepang") || lower.includes("japan")) {
-		flagUrl = "https://flagcdn.com/w20/jp.png";
-		countryAlt = "JP";
-	} else if (lower.includes("indonesia") || lower.includes("reguler")) {
-		flagUrl = "https://flagcdn.com/w20/id.png";
-		countryAlt = "ID";
-	}
-
-	return (
-		<span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-50 border border-slate-200/80 text-slate-700 whitespace-nowrap shadow-2xs">
-			<img
-				src={flagUrl}
-				alt={countryAlt}
-				className="w-4 h-2.5 object-cover rounded-[1px] shadow-2xs"
-			/>
-			<span>{peminatan}</span>
-		</span>
-	);
-}
 
 type CourseData = {
 	id: number;
@@ -191,6 +152,18 @@ export default function MataKuliahPage() {
 		}
 	}, [hasHydrated, user, filterCohort, filterType, filterPeminatan]);
 
+	const availableCohorts = useMemo(() => {
+		const fromData = courses.map((c) => c.cohort).filter(Boolean);
+		const set = new Set([...fromData, 16, 15, 14, 13, 12, 11, 10]);
+		return Array.from(set).sort((a, b) => b - a);
+	}, [courses]);
+
+	const uniquePeminatan = useMemo(() => {
+		return Array.from(
+			new Set(courses.map((c) => c.peminatan).filter(Boolean)),
+		) as string[];
+	}, [courses]);
+
 	const handleSave = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!formData.code || !formData.name || !formData.cohort) {
@@ -275,179 +248,235 @@ export default function MataKuliahPage() {
 		setIsEditOpen(true);
 	};
 
-	const filteredCourses = courses.filter((c) => {
-		if (
-			user?.role === "dosen" &&
-			c.dosenId !== user.id &&
-			c.dosen?.id !== user.id
-		) {
-			return false;
-		}
-		if (!searchQuery) return true;
-		const query = searchQuery.toLowerCase();
-		return (
-			c.name.toLowerCase().includes(query) ||
-			c.code.toLowerCase().includes(query) ||
-			c.dosen?.fullName?.toLowerCase().includes(query)
-		);
-	});
+	const filteredCourses = useMemo(() => {
+		return courses.filter((c) => {
+			if (
+				user?.role === "dosen" &&
+				c.dosenId !== user.id &&
+				c.dosen?.id !== user.id
+			) {
+				return false;
+			}
+			if (!searchQuery) return true;
+			const query = searchQuery.toLowerCase();
+			return (
+				c.name.toLowerCase().includes(query) ||
+				c.code.toLowerCase().includes(query) ||
+				c.dosen?.fullName?.toLowerCase().includes(query) ||
+				(c.peminatan && c.peminatan.toLowerCase().includes(query))
+			);
+		});
+	}, [courses, searchQuery, user]);
 
-	// Get unique peminatan for filter
-	const uniquePeminatan = Array.from(
-		new Set(courses.map((c) => c.peminatan).filter(Boolean)),
-	);
+	const isFilterActive =
+		searchQuery.trim() !== "" ||
+		filterCohort !== "all" ||
+		filterType !== "all" ||
+		filterPeminatan !== "all";
 
-	const handleExport = () => {
-		if (filteredCourses.length === 0) return;
-		const exportData = filteredCourses.map((c) => ({
-			"Kode MK": c.code,
-			"Nama Mata Kuliah": c.name,
-			"Dosen Pengampu": c.dosen?.fullName || "-",
-			Peminatan: c.peminatan || "-",
-			Angkatan: c.cohort,
-			Jenis: c.type === "teori" ? "Teori" : "Praktik",
-		}));
-		exportToCSV(
-			exportData,
-			`Daftar_Mata_Kuliah_${new Date().toISOString().split("T")[0]}`,
-		);
+	const resetFilters = () => {
+		setSearchQuery("");
+		setFilterCohort("all");
+		setFilterType("all");
+		setFilterPeminatan("all");
 	};
 
 	if (!hasHydrated) return null;
 
 	return (
-		<div className="p-6 max-w-7xl mx-auto space-y-6">
-			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-				<div>
-					<h1 className="text-2xl font-bold flex items-center gap-2 text-slate-900">
-						<BookOpen className="h-6 w-6 text-blue-600" />
-						{user?.role === "dosen"
-							? "Mata Kuliah Yang Diampu"
-							: "Manajemen Mata Kuliah"}
-					</h1>
-					<p className="text-slate-500 text-sm mt-1">
-						{user?.role === "dosen"
-							? `Daftar mata kuliah aktif yang Anda ampu (${user.fullName || user.username}) beserta akses detail 16 pertemuan, absensi, dan penilaian`
-							: "Kelola master mata kuliah, penugasan dosen pengampu, dan jadwal perkuliahan"}
-					</p>
+		<div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
+			{/* Page Header */}
+			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-xs">
+				<div className="flex items-center gap-3">
+					<div className="p-2.5 bg-blue-50 text-[#0517B0] rounded-lg border border-blue-100">
+						<BookOpen className="w-6 h-6" />
+					</div>
+					<div>
+						<div className="flex items-center gap-2">
+							<h1 className="text-2xl font-bold text-slate-900">
+								{user?.role === "dosen"
+									? "Mata Kuliah Yang Diampu"
+									: "Manajemen Mata Kuliah"}
+							</h1>
+							<Badge className="bg-blue-50 text-[#0517B0] border-blue-200 text-xs">
+								{user?.role === "dosen" ? "Dosen" : "Akademik"}
+							</Badge>
+						</div>
+						<p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+							{user?.role === "dosen"
+								? `Daftar mata kuliah yang Anda ampu (${user.fullName || user.username}) beserta akses 16 pertemuan, presensi, dan rekap penilaian.`
+								: "Kelola master mata kuliah, penugasan dosen pengampu, angkatan, dan jadwal perkuliahan."}
+						</p>
+					</div>
 				</div>
-				<div className="flex gap-2">
-					<Button variant="outline" onClick={handleExport}>
-						<Download className="mr-2 h-4 w-4" /> Export Excel
-					</Button>
-					{(user?.role === "superadmin" || user?.role === "akademik") && (
+
+				{(user?.role === "superadmin" || user?.role === "akademik") && (
+					<div className="flex items-center gap-2.5">
 						<Button
+							size="sm"
 							onClick={() => {
 								setFormData(initialForm);
 								setIsAddOpen(true);
 							}}
+							className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold text-xs gap-1.5 h-9 shadow-xs"
 						>
-							<Plus className="mr-2 h-4 w-4" /> Tambah Mata Kuliah
+							<Plus className="w-3.5 h-3.5" />
+							Tambah Mata Kuliah
 						</Button>
-					)}
-				</div>
+					</div>
+				)}
 			</div>
 
-			<Card className="shadow-xs border-slate-200 overflow-hidden">
-				<CardHeader className="bg-slate-50/50 border-b border-slate-200 p-4">
-					<div className="flex flex-col md:flex-row gap-3 justify-between items-start md:items-center">
-						<div className="relative w-full md:w-80">
-							<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+			{/* Main Table Card */}
+			<Card className="bg-white border-slate-200 shadow-xs overflow-hidden rounded-xl">
+				<CardHeader className="border-b border-slate-200 bg-slate-50/70 p-4 sm:p-5 flex flex-col gap-4">
+					<div>
+						<CardTitle className="text-slate-900 text-base font-bold flex items-center gap-2">
+							<BookOpen className="w-4 h-4 text-[#0517B0]" />
+							Daftar Mata Kuliah
+						</CardTitle>
+						<p className="text-xs text-slate-500 mt-0.5">
+							Gunakan kolom pencarian dan filter di bawah untuk memfilter
+							berdasarkan angkatan, jenis, atau peminatan.
+						</p>
+					</div>
+
+					{/* Search & Filter Bar */}
+					<div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+						{/* Search Bar */}
+						<div className="relative flex-1 max-w-md">
+							<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
 							<Input
 								placeholder="Cari mata kuliah, kode, atau dosen..."
-								className="pl-9 bg-white h-9 text-sm"
+								className="pl-9 h-9 text-xs bg-white border-slate-200 w-full"
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
 							/>
 						</div>
-						<div className="flex flex-wrap gap-2 w-full md:w-auto">
+
+						{/* Dropdown Filters & Reset Button */}
+						<div className="flex flex-wrap items-center gap-2">
+							{/* Filter Angkatan */}
 							<Select
 								value={filterCohort}
-								onValueChange={(v) => setFilterCohort(v || "all")}
+								onValueChange={(val) => setFilterCohort(val || "all")}
 							>
-								<SelectTrigger className="w-full sm:w-[150px] bg-white h-9 text-sm">
-									<SelectValue placeholder="Semua Angkatan" />
+								<SelectTrigger className="w-full sm:w-[150px] bg-white h-9 text-xs border-slate-200">
+									<SelectValue placeholder="Angkatan">
+										{filterCohort === "all"
+											? "Semua Angkatan"
+											: `Angkatan ${filterCohort}`}
+									</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
-									<SelectItem value="all">Semua Angkatan</SelectItem>
-									{Array.from(
-										{ length: new Date().getFullYear() - 2022 + 2 },
-										(_, i) => new Date().getFullYear() + 1 - i,
-									).map((c) => (
-										<SelectItem key={c} value={c.toString()}>
-											Angkatan {c}
+									<SelectItem value="all" className="text-xs">
+										Semua Angkatan
+									</SelectItem>
+									{availableCohorts.map((cohort) => (
+										<SelectItem
+											key={cohort}
+											value={cohort.toString()}
+											className="text-xs"
+										>
+											Angkatan {cohort}
 										</SelectItem>
 									))}
 								</SelectContent>
 							</Select>
+
+							{/* Filter Jenis */}
 							<Select
 								value={filterType}
-								onValueChange={(v) => setFilterType(v || "all")}
+								onValueChange={(val) => setFilterType(val || "all")}
 							>
-								<SelectTrigger className="w-full sm:w-[130px] bg-white h-9 text-sm">
-									<SelectValue placeholder="Semua Jenis">
+								<SelectTrigger className="w-full sm:w-[135px] bg-white h-9 text-xs border-slate-200">
+									<SelectValue placeholder="Jenis MK">
 										{filterType === "all"
 											? "Semua Jenis"
 											: filterType === "teori"
-												? "Teori"
-												: "Praktik"}
+												? "Kelas Teori"
+												: "Kelas Praktik"}
 									</SelectValue>
 								</SelectTrigger>
 								<SelectContent>
-									<SelectItem value="all">Semua Jenis</SelectItem>
-									<SelectItem value="teori">Teori</SelectItem>
-									<SelectItem value="praktik">Praktik</SelectItem>
+									<SelectItem value="all" className="text-xs">
+										Semua Jenis
+									</SelectItem>
+									<SelectItem value="teori" className="text-xs">
+										Kelas Teori
+									</SelectItem>
+									<SelectItem value="praktik" className="text-xs">
+										Kelas Praktik
+									</SelectItem>
 								</SelectContent>
 							</Select>
+
+							{/* Filter Peminatan */}
 							{uniquePeminatan.length > 0 && (
 								<Select
 									value={filterPeminatan}
-									onValueChange={(v) => setFilterPeminatan(v || "all")}
+									onValueChange={(val) => setFilterPeminatan(val || "all")}
 								>
-									<SelectTrigger className="w-full sm:w-[170px] bg-white h-9 text-sm">
-										<SelectValue placeholder="Semua Peminatan">
+									<SelectTrigger className="w-full sm:w-[165px] bg-white h-9 text-xs border-slate-200">
+										<SelectValue placeholder="Peminatan">
 											{filterPeminatan === "all"
 												? "Semua Peminatan"
-												: filterPeminatan}
+												: `Peminatan: ${filterPeminatan}`}
 										</SelectValue>
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value="all">Semua Peminatan</SelectItem>
+										<SelectItem value="all" className="text-xs">
+											Semua Peminatan
+										</SelectItem>
 										{uniquePeminatan.map((p, i) => (
-											<SelectItem key={i} value={p as string}>
+											<SelectItem key={i} value={p} className="text-xs">
 												{p}
 											</SelectItem>
 										))}
 									</SelectContent>
 								</Select>
 							)}
+
+							{/* Reset Button Inline */}
+							{isFilterActive && (
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={resetFilters}
+									className="h-9 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors"
+								>
+									<RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+									Reset
+								</Button>
+							)}
 						</div>
 					</div>
 				</CardHeader>
+
 				<CardContent className="p-0">
 					<div className="overflow-x-auto min-w-full">
 						<Table className="w-full">
 							<TableHeader>
 								<TableRow className="bg-slate-50/80 hover:bg-slate-50/80 border-b border-slate-200">
-									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 w-28">
+									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 w-28 text-xs">
 										Kode
 									</TableHead>
-									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 min-w-[200px]">
+									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 min-w-[200px] text-xs">
 										Nama Mata Kuliah
 									</TableHead>
-									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 min-w-[170px]">
+									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 min-w-[170px] text-xs">
 										Dosen Pengampu
 									</TableHead>
-									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 min-w-[180px]">
+									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 min-w-[160px] text-xs">
 										Peminatan
 									</TableHead>
-									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 text-center w-28">
+									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 text-center w-28 text-xs">
 										Angkatan
 									</TableHead>
-									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 text-center w-24">
+									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 text-center w-24 text-xs">
 										Jenis
 									</TableHead>
-									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 text-right min-w-[130px]">
+									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 text-right min-w-[160px] text-xs">
 										Aksi
 									</TableHead>
 								</TableRow>
@@ -456,7 +485,7 @@ export default function MataKuliahPage() {
 								{isLoading ? (
 									<TableRow>
 										<TableCell colSpan={7} className="text-center py-12">
-											<Loader2 className="h-6 w-6 animate-spin mx-auto text-blue-600 mb-2" />
+											<Loader2 className="h-6 w-6 animate-spin mx-auto text-[#0517B0] mb-2" />
 											<p className="text-xs text-slate-400">
 												Memuat daftar mata kuliah...
 											</p>
@@ -469,63 +498,98 @@ export default function MataKuliahPage() {
 											className="text-center py-12 text-slate-500"
 										>
 											<BookOpen className="h-8 w-8 mx-auto text-slate-300 mb-2" />
-											<p className="font-medium text-slate-600">
+											<p className="font-medium text-slate-600 text-sm">
 												Tidak ada data mata kuliah
 											</p>
 											<p className="text-xs text-slate-400 mt-0.5">
-												Coba ubah filter atau kata kunci pencarian
+												{isFilterActive
+													? "Coba ubah filter atau kata kunci pencarian."
+													: "Belum ada mata kuliah yang terdaftar."}
 											</p>
+											{isFilterActive && (
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={resetFilters}
+													className="mt-3 text-xs"
+												>
+													Reset Filter
+												</Button>
+											)}
 										</TableCell>
 									</TableRow>
 								) : (
 									filteredCourses.map((c) => (
 										<TableRow
 											key={c.id}
-											className="hover:bg-slate-50/70 transition-colors"
+											className="hover:bg-slate-50/70 border-b border-slate-100 transition-colors"
 										>
-											<TableCell className="font-mono font-semibold text-slate-800 py-3 px-4 text-sm">
-												{c.code}
+											<TableCell className="py-3.5 px-4">
+												<span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+													{c.code}
+												</span>
 											</TableCell>
-											<TableCell className="font-medium text-slate-900 py-3 px-4 text-sm">
-												{c.name}
+											<TableCell className="py-3.5 px-4 font-bold text-slate-900 text-sm">
+												<Link
+													href={`/dashboard/mata-kuliah/${c.id}`}
+													className="hover:text-[#0517B0] hover:underline"
+												>
+													{c.name}
+												</Link>
 											</TableCell>
-											<TableCell className="text-slate-600 py-3 px-4 text-sm">
-												{c.dosen?.fullName || "-"}
+											<TableCell className="py-3.5 px-4 text-slate-700 text-xs">
+												<div className="flex items-center gap-1.5">
+													<GraduationCap className="w-3.5 h-3.5 text-[#0517B0] shrink-0" />
+													<span>{c.dosen?.fullName || "Belum Ditugaskan"}</span>
+												</div>
 											</TableCell>
-											<TableCell className="py-3 px-4">
-												{getPeminatanBadge(c.peminatan)}
+											<TableCell className="py-3.5 px-4">
+												{c.peminatan ? (
+													<PeminatanBadge subProgram={c.peminatan} size="sm" />
+												) : (
+													<span className="text-slate-400 text-xs">-</span>
+												)}
 											</TableCell>
-											<TableCell className="text-center py-3 px-4">
+											<TableCell className="text-center py-3.5 px-4">
 												<Badge
 													variant="outline"
-													className="bg-slate-100/70 border-slate-200 text-slate-700 font-medium text-xs"
+													className="bg-slate-50 border-slate-200 text-slate-700 font-bold text-xs px-2.5 py-0.5"
 												>
-													AK {c.cohort}
+													Angkatan {c.cohort}
 												</Badge>
 											</TableCell>
-											<TableCell className="text-center py-3 px-4">
+											<TableCell className="text-center py-3.5 px-4">
 												<Badge
-													variant={c.type === "teori" ? "secondary" : "default"}
-													className={
-														c.type === "teori"
-															? "bg-blue-50 text-blue-700 border-blue-200/60 hover:bg-blue-100 text-xs"
-															: "bg-emerald-50 text-emerald-700 border-emerald-200/60 hover:bg-emerald-100 text-xs"
-													}
+													className={cn(
+														"text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider",
+														c.type === "praktik"
+															? "bg-emerald-50 text-emerald-700 border-emerald-200"
+															: "bg-blue-50 text-blue-700 border-blue-200",
+													)}
 												>
-													{c.type === "teori" ? "Teori" : "Praktik"}
+													{c.type}
 												</Badge>
 											</TableCell>
-											<TableCell className="text-right py-3 px-4">
+											<TableCell className="text-right py-3.5 px-4">
 												<div className="flex items-center justify-end gap-1.5">
 													<Link href={`/dashboard/mata-kuliah/${c.id}`}>
 														<Button
-															variant="outline"
 															size="sm"
-															className="h-8 px-3 gap-1.5 font-medium text-blue-700 bg-blue-50/90 border-blue-200 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all shadow-2xs cursor-pointer"
+															className="h-8 px-2.5 gap-1.5 font-bold text-xs bg-[#0517B0] hover:bg-blue-800 text-white shadow-2xs"
 															title="Kelola Mata Kuliah & Sesi Pertemuan"
 														>
 															<Settings className="h-3.5 w-3.5" />
-															<span>Kelola</span>
+															<span>Sesi & Presensi</span>
+														</Button>
+													</Link>
+													<Link href={`/dashboard/mata-kuliah/rekap/${c.id}`}>
+														<Button
+															variant="outline"
+															size="sm"
+															className="h-8 px-2 text-[#0517B0] border-blue-200 hover:bg-blue-50 text-xs"
+															title="Rekap Nilai & Presensi"
+														>
+															<CheckSquare className="h-3.5 w-3.5" />
 														</Button>
 													</Link>
 													{(user?.role === "superadmin" ||
@@ -538,7 +602,7 @@ export default function MataKuliahPage() {
 																onClick={() => openEdit(c)}
 																title="Edit Data Mata Kuliah"
 															>
-																<Edit className="h-4 w-4" />
+																<Edit className="h-3.5 w-3.5" />
 															</Button>
 															<Button
 																variant="ghost"
@@ -550,7 +614,7 @@ export default function MataKuliahPage() {
 																}}
 																title="Hapus Mata Kuliah"
 															>
-																<Trash2 className="h-4 w-4" />
+																<Trash2 className="h-3.5 w-3.5" />
 															</Button>
 														</>
 													)}
@@ -562,6 +626,24 @@ export default function MataKuliahPage() {
 							</TableBody>
 						</Table>
 					</div>
+
+					{/* Summary Counter Footer */}
+					{!isLoading && filteredCourses.length > 0 && (
+						<div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+							<span>
+								Menampilkan{" "}
+								<strong className="text-slate-700">
+									{filteredCourses.length}
+								</strong>{" "}
+								dari{" "}
+								<strong className="text-slate-700">{courses.length}</strong>{" "}
+								mata kuliah
+							</span>
+							{isFilterActive && (
+								<span className="text-[#0517B0] font-medium">Filter aktif</span>
+							)}
+						</div>
+					)}
 				</CardContent>
 			</Card>
 
@@ -588,7 +670,7 @@ export default function MataKuliahPage() {
 								<Input
 									required
 									placeholder="Cth: MK-001"
-									className="border-2 border-slate-200"
+									className="border border-slate-200"
 									value={formData.code}
 									onChange={(e) =>
 										setFormData({ ...formData, code: e.target.value })
@@ -600,8 +682,8 @@ export default function MataKuliahPage() {
 								<Input
 									required
 									type="number"
-									placeholder="Cth: 13"
-									className="border-2 border-slate-200"
+									placeholder="Cth: 16"
+									className="border border-slate-200"
 									value={formData.cohort}
 									onChange={(e) =>
 										setFormData({ ...formData, cohort: e.target.value })
@@ -615,7 +697,7 @@ export default function MataKuliahPage() {
 							<Input
 								required
 								placeholder="Cth: Front Office Operation"
-								className="border-2 border-slate-200"
+								className="border border-slate-200"
 								value={formData.name}
 								onChange={(e) =>
 									setFormData({ ...formData, name: e.target.value })
@@ -632,7 +714,7 @@ export default function MataKuliahPage() {
 										setFormData({ ...formData, dosenId: val || "" })
 									}
 								>
-									<SelectTrigger className="border-2 border-slate-200">
+									<SelectTrigger className="border border-slate-200">
 										<SelectValue placeholder="Pilih Dosen" />
 									</SelectTrigger>
 									<SelectContent>
@@ -651,7 +733,7 @@ export default function MataKuliahPage() {
 								<Label>Peminatan (Opsional)</Label>
 								<Input
 									placeholder="Cth: F&B Service"
-									className="border-2 border-slate-200"
+									className="border border-slate-200"
 									value={formData.peminatan}
 									onChange={(e) =>
 										setFormData({ ...formData, peminatan: e.target.value })
@@ -666,7 +748,7 @@ export default function MataKuliahPage() {
 										setFormData({ ...formData, type: val || "teori" })
 									}
 								>
-									<SelectTrigger className="border-2 border-slate-200">
+									<SelectTrigger className="border border-slate-200">
 										<SelectValue placeholder="Pilih Jenis" />
 									</SelectTrigger>
 									<SelectContent>
@@ -688,7 +770,11 @@ export default function MataKuliahPage() {
 							>
 								Batal
 							</Button>
-							<Button type="submit" disabled={isSaving}>
+							<Button
+								type="submit"
+								disabled={isSaving}
+								className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold"
+							>
 								{isSaving ? (
 									<Loader2 className="h-4 w-4 animate-spin mr-2" />
 								) : null}
@@ -715,7 +801,7 @@ export default function MataKuliahPage() {
 						<AlertDialogAction
 							onClick={handleDelete}
 							disabled={isSaving}
-							className="bg-red-600 hover:bg-red-700"
+							className="bg-red-600 hover:bg-red-700 text-white"
 						>
 							{isSaving ? (
 								<Loader2 className="h-4 w-4 animate-spin mr-2" />

@@ -55,6 +55,7 @@ export interface UseStudentsListParams {
 	search?: string;
 	archived?: boolean;
 	all?: boolean;
+	enabled?: boolean;
 }
 
 export function useStudentsList(params: UseStudentsListParams = {}) {
@@ -66,6 +67,7 @@ export function useStudentsList(params: UseStudentsListParams = {}) {
 		search,
 		archived = false,
 		all = false,
+		enabled = true,
 	} = params;
 
 	const cleanCohort = cohort && cohort !== "all" ? cohort : undefined;
@@ -129,6 +131,7 @@ export function useStudentsList(params: UseStudentsListParams = {}) {
 				meta,
 			};
 		},
+		enabled,
 		placeholderData: keepPreviousData,
 		staleTime: 30 * 1000, // 30 seconds fresh data window
 		gcTime: 5 * 60 * 1000, // 5 minutes garbage collection

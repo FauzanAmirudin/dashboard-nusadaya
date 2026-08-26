@@ -4,6 +4,7 @@ import {
 	ArrowLeft,
 	CheckCircle,
 	Clock,
+	RotateCcw,
 	Search,
 	User,
 	XCircle,
@@ -222,14 +223,27 @@ export default function StudentsPage() {
 					<CardTitle className="text-slate-800">
 						Tabel Master Mahasiswa
 					</CardTitle>
-					<div className="flex items-center gap-2 w-full sm:w-auto relative">
-						<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-						<Input
-							placeholder="Cari NIM atau Nama..."
-							className="bg-white border-slate-200 text-slate-900 w-full sm:w-[250px] pl-9"
-							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
-						/>
+					<div className="flex items-center gap-2 w-full sm:w-auto">
+						<div className="relative w-full sm:w-[250px]">
+							<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+							<Input
+								placeholder="Cari NIM atau Nama..."
+								className="bg-white border-slate-200 text-slate-900 w-full pl-9 h-9 text-xs"
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+							/>
+						</div>
+						{searchQuery.trim() !== "" && (
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => setSearchQuery("")}
+								className="h-9 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors"
+							>
+								<RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+								Reset
+							</Button>
+						)}
 					</div>
 				</CardHeader>
 				<CardContent className="overflow-x-auto">

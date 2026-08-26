@@ -23,6 +23,7 @@ import {
 	PhoneCall,
 	Plane,
 	RefreshCw,
+	RotateCcw,
 	Search,
 	ShieldAlert,
 	ShieldCheck,
@@ -136,7 +137,7 @@ import { useDashboardSummary } from "@/hooks/useDashboardSummary";
 import { type StudentListItem, useStudentsList } from "@/hooks/useStudentsList";
 import { api } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
-import { hasRole, useAuthStore } from "@/store";
+import { getUserRoles, useAuthStore } from "@/store";
 
 const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
 
@@ -151,6 +152,28 @@ export default function DashboardPage() {
 	const [selectedStatus, setSelectedStatus] = useState<string>("all");
 	const [isExporting, setIsExporting] = useState(false);
 
+	const userRoles = getUserRoles(user);
+	const isExecutive = Boolean(
+		user &&
+			(user.role === "superadmin" ||
+				user.role === "director" ||
+				user.role === "direktur" ||
+				userRoles.includes("superadmin") ||
+				userRoles.includes("director") ||
+				userRoles.includes("direktur")),
+	);
+
+	const isFilterActive =
+		searchQuery.trim() !== "" ||
+		selectedCohort !== "all" ||
+		selectedStatus !== "all";
+
+	const resetFilters = () => {
+		setSearchQuery("");
+		setSelectedCohort("all");
+		setSelectedStatus("all");
+	};
+
 	// Reset page when filter changes
 	useEffect(() => {
 		setPage(1);
@@ -161,7 +184,10 @@ export default function DashboardPage() {
 		data: summary,
 		isLoading: isSummaryLoading,
 		refetch: refetchSummary,
-	} = useDashboardSummary({ cohort: selectedCohort });
+	} = useDashboardSummary({
+		cohort: selectedCohort,
+		enabled: isExecutive,
+	});
 
 	// Server-Side Paginated Students Query
 	const {
@@ -175,6 +201,7 @@ export default function DashboardPage() {
 		cohort: selectedCohort,
 		status: selectedStatus,
 		search: searchQuery,
+		enabled: isExecutive,
 	});
 
 	const students = studentsResult?.data || [];
@@ -199,11 +226,7 @@ export default function DashboardPage() {
 			router.push("/login");
 			return;
 		}
-
-		if (user?.role === "dosen") {
-			router.push("/dashboard/mata-kuliah");
-		}
-	}, [isAuthenticated, hasHydrated, router, user]);
+	}, [isAuthenticated, hasHydrated, router]);
 
 	// Helper for checking module ACCs & 4-category status
 	const getStudentAccDetails = (s: StudentListItem) => {
@@ -322,60 +345,36 @@ export default function DashboardPage() {
 		return null;
 	}
 
-	if (isSummaryLoading && isStudentsLoading) {
-		return (
-			<div className="flex flex-col justify-center items-center h-80 gap-3 text-slate-500">
-				<RefreshCw className="w-8 h-8 animate-spin text-[#0517B0]" />
-				<p className="text-sm font-semibold">
-					Memuat data monitoring real-time...
-				</p>
-			</div>
-		);
-	}
-
-	// Superadmin & Directors view the Master Executive Dashboard
-	if (
-		user?.role === "superadmin" ||
-		user?.role === "director" ||
-		user?.role === "direktur"
-	) {
-		// Proceed down to Superadmin Executive Dashboard
-	} else if (user?.role === "dosen") {
+	// 1. Superadmin & Directors view the Master Executive Dashboard
+	if (isExecutive) {
+		if (isSummaryLoading && isStudentsLoading) {
+			return (
+				<div className="flex flex-col justify-center items-center h-80 gap-3 text-slate-500">
+					<RefreshCw className="w-8 h-8 animate-spin text-[#0517B0]" />
+					<p className="text-sm font-semibold">
+						Memuat data monitoring real-time...
+					</p>
+				</div>
+			);
+		}
+		// Proceed down to render Superadmin Executive Dashboard
+	} else if (user?.role === "dosen" || userRoles.includes("dosen")) {
 		return <DosenDashboard user={user} />;
-	} else if (user?.role === "pmb") {
+	} else if (user?.role === "pmb" || userRoles.includes("pmb")) {
 		return <SharedDashboardLoader module="pmb" />;
-	} else if (user?.role === "crm") {
+	} else if (user?.role === "crm" || userRoles.includes("crm")) {
 		return <SharedDashboardLoader module="crm" />;
-	} else if (user?.role === "akademik") {
+	} else if (user?.role === "akademik" || userRoles.includes("akademik")) {
 		return <SharedDashboardLoader module="akademik" />;
-	} else if (user?.role === "pa") {
+	} else if (user?.role === "pa" || userRoles.includes("pa")) {
 		return <SharedDashboardLoader module="pa" />;
-	} else if (user?.role === "magang") {
+	} else if (user?.role === "magang" || userRoles.includes("magang")) {
 		return <SharedDashboardLoader module="magang" />;
-	} else if (user?.role === "finance") {
+	} else if (user?.role === "finance" || userRoles.includes("finance")) {
 		return <SharedDashboardLoader module="finance" />;
-	} else if (user?.role === "evaluator") {
+	} else if (user?.role === "evaluator" || userRoles.includes("evaluator")) {
 		return <SharedDashboardLoader module="evaluator" />;
-	} else if (hasRole(user, "pmb")) {
-		return <SharedDashboardLoader module="pmb" />;
-	} else if (hasRole(user, "crm")) {
-		return <SharedDashboardLoader module="crm" />;
-	} else if (hasRole(user, "akademik")) {
-		return <SharedDashboardLoader module="akademik" />;
-	} else if (hasRole(user, "pa")) {
-		return <SharedDashboardLoader module="pa" />;
-	} else if (hasRole(user, "magang")) {
-		return <SharedDashboardLoader module="magang" />;
-	} else if (hasRole(user, "finance")) {
-		return <SharedDashboardLoader module="finance" />;
-	} else if (hasRole(user, "evaluator")) {
-		return <SharedDashboardLoader module="evaluator" />;
-	} else if (hasRole(user, "dosen")) {
-		return <DosenDashboard user={user} />;
-	}
-
-	// Superadmin Guard: Non-superadmin should never reach the master dashboard
-	if (!hasRole(user, "superadmin")) {
+	} else {
 		return (
 			<div className="p-12 text-center text-slate-500">
 				<p className="text-base font-bold text-slate-700">
@@ -726,8 +725,12 @@ export default function DashboardPage() {
 							value={selectedCohort}
 							onValueChange={(val) => setSelectedCohort(val || "all")}
 						>
-							<SelectTrigger className="w-[125px] h-9 text-xs bg-white border-slate-200">
-								<SelectValue placeholder="Angkatan" />
+							<SelectTrigger className="w-[140px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Angkatan">
+									{selectedCohort === "all"
+										? "Semua Angkatan"
+										: `Angkatan ${selectedCohort}`}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Angkatan</SelectItem>
@@ -743,8 +746,16 @@ export default function DashboardPage() {
 							value={selectedStatus}
 							onValueChange={(val) => setSelectedStatus(val || "all")}
 						>
-							<SelectTrigger className="w-[135px] h-9 text-xs bg-white border-slate-200">
-								<SelectValue placeholder="Status Filter" />
+							<SelectTrigger className="w-[155px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Status Filter">
+									{selectedStatus === "all"
+										? "Semua Status"
+										: selectedStatus === "aman"
+											? "Status: Aman"
+											: selectedStatus === "perhatian"
+												? "Status: Perlu Perhatian"
+												: "Status: Tidak Aman"}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="all">Semua Status</SelectItem>
@@ -753,6 +764,19 @@ export default function DashboardPage() {
 								<SelectItem value="tidak_aman">Tidak Aman</SelectItem>
 							</SelectContent>
 						</Select>
+
+						{/* Reset Button Inline */}
+						{isFilterActive && (
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={resetFilters}
+								className="h-9 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors"
+							>
+								<RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+								Reset
+							</Button>
+						)}
 					</div>
 				</CardHeader>
 
