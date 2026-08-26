@@ -19,7 +19,7 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
 	Collapsible,
@@ -279,19 +279,18 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 									</Button>
 								)}
 
-								<CollapsibleTrigger asChild>
-									<Button
-										variant="ghost"
-										size="sm"
-										className="h-8 text-xs text-slate-600 hover:text-slate-900 font-semibold gap-1"
-									>
-										<span>{isExpanded ? "Tutup" : "Lihat Sesi"}</span>
-										{isExpanded ? (
-											<ChevronUp className="w-3.5 h-3.5" />
-										) : (
-											<ChevronDown className="w-3.5 h-3.5" />
-										)}
-									</Button>
+								<CollapsibleTrigger
+									className={cn(
+										buttonVariants({ variant: "ghost", size: "sm" }),
+										"h-8 text-xs text-slate-600 hover:text-slate-900 font-semibold gap-1 cursor-pointer",
+									)}
+								>
+									<span>{isExpanded ? "Tutup" : "Lihat Sesi"}</span>
+									{isExpanded ? (
+										<ChevronUp className="w-3.5 h-3.5" />
+									) : (
+										<ChevronDown className="w-3.5 h-3.5" />
+									)}
 								</CollapsibleTrigger>
 							</div>
 						</div>
