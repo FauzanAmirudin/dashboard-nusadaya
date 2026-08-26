@@ -18,10 +18,10 @@ Sistem Terpadu Validasi Mahasiswa untuk memantau, memvalidasi, dan mengelola pro
 ---
 
 ## 🚀 Status Layanan Lokal Saat Ini
-- **Backend API:** `http://localhost:3001` (Swagger docs: `http://localhost:3001/docs`)
-- **Frontend Web:** `http://localhost:3000`
-- **Database:** PostgreSQL aktif pada `localhost:5432` dengan database `nusadaya`
-- **Dev Server Process:** Berjalan otomatis via monorepo script `bun run dev` (melayani `apps/api` & `apps/web` secara bersamaan).
+- **Backend API:** ✅ Aktif (`http://localhost:3001`)
+- **Frontend Web:** ✅ Aktif (`http://localhost:3000`)
+- **Database:** ✅ PostgreSQL aktif pada `localhost:5432` dengan database `nusadaya`
+- **Dev Server Process:** Berjalan di latar belakang via `bun run dev`.
 
 ---
 
@@ -41,6 +41,17 @@ Semua akun demo di-seed dengan password: `password`
 ---
 
 ## 📝 Log Pengerjaan
+### [2026-08-26]
+- ✅ Memperbaiki dan merestrukturisasi urutan sub-navigasi menu **Akademik** pada Sidebar menjadi alur kerja logis & terkelompok (Overview & Validasi -> Kalender & Agenda -> Mata Kuliah & Nilai -> Monitoring Presensi & Piket -> Bimbingan PA):
+  1. **Panel Akademik** (`/dashboard/akademik`) — Pusat kontrol validasi & overview akademik mahasiswa.
+  2. **Kalender Akademik** (`/dashboard/kalender-akademik`) — Master agenda & timeline 18 minggu perkuliahan.
+  3. **Penjadwalan & Info** (`/dashboard/penjadwalan`) — Jadwal kelas, praktikum, piket, dan pengumuman akademik.
+  4. **Manajemen Mata Kuliah** (`/dashboard/mata-kuliah`) — Kurikulum, silabus, dan daftar mata kuliah.
+  5. **Rekap Nilai & Presensi** (`/dashboard/mata-kuliah/rekap`) — Rekapitulasi nilai dan presensi perkuliahan per MK.
+  6. **Manajemen Kehadiran** (`/dashboard/kehadiran`) — Monitoring kehadiran terpadu mahasiswa multi-aktivitas.
+  7. **Kehadiran Piket** (`/dashboard/kehadiran-piket`) — Presensi piket harian mahasiswa.
+  8. **Manajemen PA** (`/dashboard/akademik/pa`) — Monitoring bimbingan, konseling psikologis, dan setoran hafalan mahasiswa.
+
 ### [2026-08-17]
 - ✅ Mengidentifikasi konfigurasi lingkungan lokal macOS (Homebrew PostgreSQL 15 & Bun).
 - ✅ Menyalakan service PostgreSQL lokal dan melakukan inisialisasi skema database penuh (69 tabel) via Drizzle.
@@ -74,7 +85,99 @@ Semua akun demo di-seed dengan password: `password`
 - ✅ Menerapkan sistem Staged Documents (Upload Draft State) pada seluruh pos dokumen (Registrasi Awal, Interview Magang, Keberangkatan, Administrasi Talangan, Custom Fields): pemilihan/penggantian/penghapusan berkas hanya disimpan ke state draft lokal dan tidak langsung diunggah ke server sampai tombol "Simpan" pada Pembayaran Utama diklik (serta dibatalkan utuh jika tombol "Batal" diklik).
 - ✅ Mengintegrasikan dan menyatukan seluruh komponen Tahap 1 Dana Talangan ke dalam 1 Card terpadu: menampilkan Total Biaya Pinjaman Tahap 1 (Akumulasi Semester Ditalangi + Biaya Interview Magang) dengan rincian breakdown 2-kolom terstruktur dan upload berkas dokumen Tahap 1.
 - ✅ Menyelaraskan dan menyamakan layout visual antara Card Tahap 1 dan Card Tahap 2 secara simetris, modern, dan informatif.
-- ✅ Memperbaiki interaksi input form nominal (Biaya Administrasi Talangan, Item Tambahan, Rumah Juang, dan Custom Fields) agar angka `0` default otomatis hilang saat pengguna mulai mengetik nominal baru (menggunakan placeholder `0` dan sanitasi string kosong yang bersih tanpa angka 0 di depan).
+- ✅ Overhaul UI/UX Menyeluruh Halaman Penjadwalan & Pengumuman Serta Seluruh Sub-Tab & Detail Modal (`/dashboard/penjadwalan` & `/components/panels/penjadwalan/`):
+  - **Executive Header Banner (`PenjadwalanDashboard.tsx`):**
+    - Monogram icon box `CalendarDays` dengan gradien Royal Blue `#0517B0` ring-4, badge Panel Akademik, dan deskripsi ringkas yang elegan.
+    - Segmented Sub-tab Navigation dengan Lucide Icons (`BookOpen`, `Clock`, `CalendarDays`, `Megaphone`), active pill shadow-xs, dan transisi fluid fade-in.
+  - **Sub-Tab 1: Jadwal Kelas (`TabJadwalKelas.tsx`):**
+    - Toolbar terintegrasi dengan monogram `BookOpen`, counter badge, tombol CTA "+ Tambah Jadwal Kelas" (Royal Blue `#0517B0`), search bar terintegrasi tombol clear `✕`, filter dinamis angkatan & hari, dan tombol reset filter cepat.
+    - Tabel Master Jadwal Kelas berdesain modern dengan badge tematik hari perkuliahan, rentang waktu berikon jam, dosen dengan avatar inisial, badge angkatan monospace, badge ruangan elegan, dan tombol aksi edit/hapus.
+    - Dialog Modal Tambah/Edit Jadwal Kelas yang lapang dan terstruktur.
+  - **Sub-Tab 2: Jadwal Praktikum (`TabJadwalPraktikum.tsx`):**
+    - Toolbar modern berikon `FlaskConical`, counter badge, tombol CTA "+ Tambah Jadwal Praktikum", search bar interaktif, dan filter cerdas.
+    - Tabel Jadwal Praktikum dengan penanda hari tematik, alokasi waktu, nama praktikum berbobot, instruktur pengampu, badge laboratorium ungu lembut, dan aksi cepat.
+    - Dialog Modal Tambah/Edit Praktikum dengan panduan input yang bersih.
+  - **Sub-Tab 3: Jadwal Piket Mahasiswa (`TabJadwalPiket.tsx`):**
+    - Toolbar berikon `Users` dengan tombol CTA "+ Tambah Kelompok Piket", search bar, dan filter angkatan/hari.
+    - Tabel Kelompok Piket dengan rincian nama kelompok, badge angkatan, daftar tag chip anggota kelompok terdistribusi, area penugasan piket amber lembut, dan aksi cepat.
+    - Dialog Modal Input Kelompok Piket dengan smart search dropdown mahasiswa 5 baris berkemampuan scroll vertikal, proteksi lock mahasiswa yang sudah terjadwal di kelompok lain, dan chip anggota interaktif.
+  - **Sub-Tab 4: Pengumuman Akademik (`TabPengumuman.tsx`):**
+    - Toolbar berikon `Megaphone` dengan tombol CTA "+ Buat Pengumuman", search bar, dan filter sasaran angkatan.
+    - Tabel Pengumuman dengan tanggal publish rapi, judul & cuplikan ringkasan teks bersih (*stripped HTML*), badge target sasaran (Angkatan tertentu vs Semua Angkatan), info pembuat, tombol CTA "Baca" bernuansa lembut, dan aksi edit/hapus.
+    - Dialog Modal Detail Pembaca Pengumuman dengan layout typography modern dan metadata chips.
+    - Dialog Modal Buat/Edit Pengumuman dengan Tiptap Editor terintegrasi.
+- ✅ Overhaul UI/UX Menyeluruh Halaman Kalender Akademik & Detail Kalender (`/dashboard/kalender-akademik` & `KalenderAkademikDashboard.tsx`):
+  - **List View (Executive Master Banner & 3 KPI Metric Cards):**
+    - Header banner modern beraksen Royal Blue `#0517B0` ring-4, badge Panel Akademik, dan tombol aksi "+ Buat Kalender Baru".
+    - 3 Top KPI Cards (Total Kalender Terdaftar, Angkatan Terdata, dan Standar 18 Minggu Perkuliahan).
+    - Smart Toolbar dengan search bar terintegrasi tombol clear `✕`, filter dinamis angkatan, dan tombol reset cepat.
+    - Tabel Master Kalender ergonomis dengan monogram avatar `TA`, badge angkatan monospace, rentang tanggal rapi berikon kalender, tombol CTA `Detail →`, dan konfirmasi hapus modal modern.
+  - **Create View (Form Master Kalender):**
+    - Form card elegan (`rounded-2xl`, shadow-2xs) dengan navigasi kembali, input Tahun Ajaran, Angkatan, dan Date Range yang lapang.
+  - **Detail View (Struktur 18 Minggu Perkuliahan & Acara Tambahan):**
+    - Header banner eksekutif dengan metadata chips (Periode Kalender, Total Sesi 18 Minggu) dan tombol Export PDF berstatus loading.
+    - Layout 2-Kolom Simetris:
+      - **Kolom Kiri (18-Week Timeline):** Kartu timeline modern dengan monogram penomoran `#1` s/d `#18`, badge jenis agenda (PKKMB, Beginning Class, Perkuliahan, UTS, UAS), date range, deskripsi catatan khusus, dan tombol aksi edit penyesuaian.
+      - **Kolom Kanan (Kegiatan & Acara Tambahan):** Daftar kartu event khusus di luar 18 minggu dengan tombol aksi "+ Tambah Acara", tanggal pelaksanaan, deskripsi lengkap, dan aksi hapus.
+    - Dialog Modal Edit Periode dan Tambah Acara yang modern dan terstruktur.
+- ✅ Overhaul UI/UX Menyeluruh Tampilan Detail Kehadiran Mahasiswa & Seluruh Sub-Tab (`KehadiranPanel.tsx` & `/components/panels/kehadiran/detail/`):
+  - **Executive Header Banner (`KehadiranPanel.tsx`):**
+    - Judul modern dengan icon box `ClipboardCheck` bergradien Royal Blue `#0517B0` ring-4, badge Panel Akademik, dan deskripsi ringkas.
+    - Segmented Sub-tab Navigation dengan Lucide Icons (`GraduationCap`, `CalendarDays`, `Briefcase`, `Compass`), active pill shadow-xs, dan transisi fluid.
+  - **Sub-Tab 1: Mata Kuliah (`TabMataKuliah.tsx`):**
+    - Desain Kartu Mata Kuliah modern dengan monogram index, badge kode MK monospace, badge status terkunci, dan chip indikator presensi ber-dot indicator (🟢 *≥80%*, 🟡 *60-79%*, 🔴 *<60%*).
+    - Grid riwayat sesi perkuliahan responsif dengan badge status kehadiran (Hadir, Izin, Sakit, Alpa) dan modal/form koreksi manual presensi yang rapi.
+    - State kosong (*empty state*) berikon `GraduationCap` dengan tipografi informatif.
+  - **Sub-Tab 2: Piket Harian (`TabPiket.tsx`):**
+    - 3 Top KPI Cards (Kelompok Piket, Sesi Kehadiran Hadir/Total, dan Rasio Kepatuhan %).
+    - Section Jadwal Terdaftar dengan pill hari piket, info waktu & ruang, serta daftar anggota kelompok yang rapi.
+    - Riwayat Presensi Aktual Piket dengan tombol aksi "+ Catat Kehadiran" (Royal Blue `#0517B0`), status chips, dan dialog modal input absensi terstruktur.
+  - **Sub-Tab 3: One Day Service (`TabODS.tsx`):**
+    - Header banner dengan counter penyelesaian ODS (X/5 Selesai) dan badge verifikasi CRM.
+    - Visual 5-Tahap Pelaksanaan ODS dengan status kartu aktif, nama mitra industri, tanggal pelaksanaan, dan badge selesai.
+    - Riwayat catatan presensi ODS dengan informasi pencatat dan badge status.
+  - **Sub-Tab 4: Pra-Magang (`TabPramagang.tsx`):**
+    - Header banner integrasi CRM dan status laporan pra-magang.
+    - 3 Kartu Metadata Industri (Mitra Perusahaan, Masa Pra-Magang, dan Video Dokumentasi interaktif).
+    - Riwayat presensi pra-magang dengan informasi detail dan badge status.
+- ✅ Overhaul UI/UX Menyeluruh Halaman Manajemen Kehadiran (`/dashboard/kehadiran` & `KehadiranDashboard.tsx`):
+  - **Executive Header Banner:** Judul beraksen Royal Blue `#0517B0`, monogram logo dengan ring lembut, badge Panel Akademik, dan tombol aksi cepat Export Excel berstatus loading.
+  - **4 Top KPI Metric Cards:** Total Mahasiswa (dengan info angkatan), Rata-rata Presensi Perkuliahan (dengan mini progress bar hijau), Presensi Piket Harian (dengan progress bar amber), dan Mahasiswa Aktif ODS/Magang (sinkronisasi CRM).
+  - **Smart Toolbar & Filter Interaktif:** Dropdown filter angkatan dinamis (*"Semua Angkatan"*, *"Angkatan 16"*, dst.), search bar terintegrasi dengan tombol reset `✕` dan tombol Reset cepat, serta pill counter data real-time.
+  - **Tabel Data Mahasiswa yang Modern & Ergonomis:**
+    - Monogram Avatar inisial bergradien lembut untuk setiap mahasiswa.
+    - Kolom Mahasiswa dengan nama bold dan badge NIM monospace.
+    - Komponen `PeminatanBadge` lengkap dengan bendera negara.
+    - Dosen PA dengan indikator visual `UserCheck` atau pill *"Belum Ditentukan"*.
+    - Visual Progress Bar tingkat kehadiran kuliah per mahasiswa lengkap dengan persentase dan counter hadir (`X/16 Hadir`).
+    - Kolom Angkatan & Tahun Ajaran yang ringkas.
+    - Tombol CTA `Detail` dengan animasi panah mikro dan baris tabel yang dapat diklik langsung (*whole row clickable*).
+- ✅ Overhaul UI/UX Menyeluruh Tampilan Detail Mahasiswa Panel Akademik — Manajemen PA (`/dashboard/akademik/pa/[paId]/mahasiswa/[studentId]`):
+  - **Header & Profile Banner Eksekutif (`PAStudentDetailView.tsx`):**
+    - Navigasi breadcrumb halus (`← Kembali ke Daftar Mahasiswa / [Nama Mahasiswa]`).
+    - Hero Profile Card modern (`rounded-2xl`, soft border `border-slate-200/90`, dan shadow halus) dengan avatar inisial bergradien Royal Blue `#0517B0` ring 4px, judul nama bold, badge NIM monospace, `PeminatanBadge` dengan bendera negara, badge angkatan, dan indikator status aktif bimbingan.
+    - Main Segmented Tab Navigation dengan tab pills bersudut halus, active shadow-xs, dan ikon yang responsif.
+  - **Tab 1: Monitoring Kehadiran (`TabKehadiran.tsx`):**
+    - Sub-tab segmented pill bar dengan ikon representatif (*Mata Kuliah*, *Piket Harian*, *ODS*, *Pra-Magang*) dan transisi fade-in yang halus.
+  - **Tab 2: Konseling & Catatan (`TabKonseling.tsx`):**
+    - Menghilangkan nesting kartu bertumpuk (*card within card syndrome*) dan merombak 4 section utama (*Konseling & Bimbingan Psikologis*, *Komunikasi & Konseling Tripartit*, *Pendampingan Interview*, dan *Catatan Kedisiplinan/Internal*) menjadi 2-kolom grid yang lapang dan simetris.
+    - Menghilangkan box warna mentah pada form dan menggantinya dengan form input berfokus bersih, date picker, selector kondisi ber-emoji status, dan tombol simpan berbobot.
+    - Log riwayat berdesain timeline cards modern dengan badge kondisi ber-dot indicator (*Stabil*, *Perlu Perhatian*, *Kritis*), hasil interview (*Lulus*, *Tidak Lulus*, *Menunggu*), dan tombol aksi hapus dengan konfirmasi dialog.
+  - **Tab 3: Setoran Hafalan (`TabHafalan.tsx`):**
+    - Menyelaraskan 3 Top Metric Cards (*Total Sesi*, *Total Kosakata*, *Total Kalimat*) dengan rounded-2xl radii, ikon berlatar badge warna lembut, dan tipografi ringkas tanpa border tebal 4px.
+    - Main card header terintegrasi dengan tombol aksi "+ Tambah Hafalan" dan tabel riwayat interaktif dengan tag chips kata & kalimat serta pop-up preview rincian lengkap.
+- ✅ Redesain & Harmonisasi Tampilan Index Manajemen PA (`/dashboard/akademik/pa` & `PAListView.tsx`):
+  - Menyelaraskan 2 KPI cards utama (Total Dosen PA dan Total Mahasiswa Terdistribusi) dengan rounded-2xl modern radii dan soft border.
+  - Memperbarui tabel daftar Dosen PA dengan monogram avatar, username monospace, badge jumlah mahasiswa bimbingan, dan tombol aksi "Lihat Bimbingan".
+- ✅ Mengembalikan status edit normal pada pertemuan PKKMB dan Beginning Class di Manajemen Mata Kuliah (`/dashboard/mata-kuliah/[id]`) dan Rekap Presensi agar dapat disesuaikan fleksibel oleh dosen/akademik seperti pertemuan reguler lainnya.
+- ✅ Mengimplementasikan Fitur Catatan Tag Setoran Hafalan (Kosakata per Kata & Kalimat per Kalimat):
+  - Menambahkan kolom `vocab_list` (JSONB), `sentence_list` (JSONB), dan `notes` (TEXT) pada skema database PostgreSQL dan Drizzle ORM (`paHafalanSessions`).
+  - Memperbarui endpoint API `POST` & `PATCH /students/:id/pa/hafalan` untuk menyimpan dan memvalidasi daftar tag kata, kalimat, serta catatan evaluasi.
+  - Membangun antarmuka interaktif Input Tag pada Tab Setoran Hafalan (`TabHafalan.tsx` di panel Akademik dan PA):
+    - **Kosakata (Per Kata):** Input tag interaktif dengan pemisahan otomatis via tombol `Enter` / koma `,`, badge chip kata dengan tombol hapus `✕`, serta counter otomatis.
+    - **Kalimat (Per Kalimat):** Input tag kalimat berpenomoran otomatis (`#1`, `#2`, dst.) dengan pemisahan via `Enter`, chip kalimat lapang, dan tombol hapus `✕`.
+    - **Catatan Evaluasi:** Input catatan/keterangan tambahan untuk intonasi, kelancaran, atau catatan khusus pembimbing.
+    - **Tabel & Modal Peninjauan Detail:** Menampilkan preview tag langsung pada baris tabel riwayat serta modal pop-up rincian lengkap untuk melihat seluruh kata & kalimat yang telah dihafal mahasiswa.
 - ✅ Memperbarui dan menyelaraskan visual section "Biaya Tambahan Lainnya" dengan desain modern (kartu elegan dengan ikon, judul deskriptif, status pelunasan otomatis berbasis bukti bayar/dokumen, input nominal yang tetap editable, dan upload staged draft berkas PDF).
 - ✅ Mengubah label "Ujian TOEIC" menjadi "Sertifikasi Bahasa" secara konsisten pada antarmuka Tab Keuangan dan Dashboard Finance.
 - ✅ Memperbaiki Modal "Tambah / Edit Penerima Fee Sharing" pada Tab PMB: menghapus input duplikat (Rekening & Bank yang muncul dua kali), serta menghapus input Nominal Fee & Status Pencairan dari form PMB (karena nominal fee, status pencairan, dan upload invoice dikelola khusus oleh Divisi Finance).
@@ -133,8 +236,6 @@ Semua akun demo di-seed dengan password: `password`
   - Memperbaiki sinkronisasi skema database PostgreSQL lokal (kolom `total_biaya_promosi` & tabel `finance_talangan_installments`) sehingga seluruh 13 data mahasiswa tampil normal dengan status HTTP 200.
 - ✅ Penyesuaian Navigasi Sidebar Superadmin (`Sidebar.tsx`):
   - Menghapus item navigasi "Panel PA" (`/dashboard/pa`) dari menu Superadmin sehingga hanya tampil khusus untuk role Pembimbing Akademik (`roles: ["pa"]`). Superadmin tetap dapat mengelola PA melalui menu "Manajemen PA" di bawah menu Akademik.
-<<<<<<< Updated upstream
-=======
 - ✅ Pemisahan Tab Anggaran Praktik ke Sub-Navigasi Panel Finance (`/dashboard/finance/anggaran-praktik`):
   - Mengeluarkan tab "Anggaran Praktik" dari view detail per mahasiswa (`FinancePanel.tsx`) sehingga halaman detail mahasiswa terfokus pada urusan personal (Pembayaran & Tagihan dan Biaya Promosi / Fee Sharing).
   - Menjadikan menu "Panel Finance" pada `Sidebar.tsx` sebagai grup menu dengan 2 sub-navigasi: **Monitoring Mahasiswa** (`/dashboard/finance`) dan **Anggaran Praktik** (`/dashboard/finance/anggaran-praktik`).
@@ -151,6 +252,29 @@ Semua akun demo di-seed dengan password: `password`
   - Memperbaiki Foreign Key Constraint Error pada Approval & Upload Bukti Anggaran Praktik:
     - Menambahkan helper `getValidUserId(user)` pada `permissions.ts` untuk memverifikasi dan mencocokkan ID user secara dinamis terhadap tabel `users` database PostgreSQL.
     - Menangani fallback user ID dan non-student file metadata pada `FileService.uploadFile` dan endpoint `approve` sehingga proses approval dan upload berkas berjalan lancar tanpa error query.
-
-
->>>>>>> Stashed changes
+- ✅ Implementasi Modul & View Manajemen Kehadiran Piket (`/dashboard/kehadiran-piket`):
+  - **Endpoint API Backend (`attendance.ts`):**
+    - `GET /attendance/piket/daily-board`: Mengambil daftar kelompok piket yang bertugas pada tanggal tertentu beserta status presensi real-time seluruh anggota dan ringkasan metrik statistik harian.
+    - `POST /attendance/piket/daily-board/save`: Batch upsert presensi piket per kelompok (Hadir, Izin, Sakit, Alpha + catatan) dengan auto-sinkronisasi agregat kehadiran piket mahasiswa ke tabel `academicData`.
+    - `GET /attendance/piket/rekap-history`: Menampilkan riwayat histori sesi presensi piket dengan filter rentang tanggal, angkatan, dan kata kunci pencarian.
+    - `GET /attendance/piket/student-summary`: Menghitung kepatuhan presensi piket per mahasiswa lengkap dengan persentase kepatuhan dan status (AMAN $\ge 85\%$, PERLU_PERHATIAN $70-84\%$, TIDAK_AMAN $< 70\%$).
+  - **Frontend UI/UX (`KehadiranPiketDashboard.tsx` & `page.tsx`):**
+    - **Header Eksekutif & Date Controller:** Kontrol tanggal pintar (Hari Ini, Kemarin, Besok, date picker), filter angkatan, toggle "Tampilkan Semua Hari", dan tombol Export CSV.
+    - **6 Kartu Metrik KPI:** Kelompok Bertugas, Total Mahasiswa Terjadwal, Hadir, Izin/Sakit, Alpha/Belum, dan Persentase Kepatuhan Hari Ini.
+    - **Tab 1 — Presensi Harian Kelompok (Live Attendance Board):** Redesain kartu kelompok menjadi tampilan eksekutif yang bersih, ringkas, dan modern (nama kelompok, ruangan, jam, progress bar ketercapaian, preview badge anggota dengan status dot) bebas dari tumpukan input inline.
+    - **Modal Input & Kelola Presensi Kelompok (`GroupAttendanceDialog`):** Memindahkan form input detail kehadiran ke dalam modal dialog terdedikasi yang elegan dan mudah digunakan, dilengkapi tombol cepat *"⚡ Tandai Semua Hadir"*, segmented toggle status berwarna cerah (*Hadir 🟢, Izin 🟡, Sakit 🔵, Alpha 🔴*), input keterangan, catatan evaluasi kebersihan kelompok, dan tombol *"Simpan Presensi"*.
+    - **Tab 2 — Riwayat & Rekap Presensi Piket:** Tabel rekapitulasi sesi piket per tanggal, rincian hadir/izin/sakit/alpha, persentase kepatuhan, modal peninjauan detail sesi, dan export data CSV.
+    - **Tab 3 — Monitoring Kepatuhan Mahasiswa:** Tabel kepatuhan per mahasiswa dengan progress bar visual, filter status cepat, tautan WhatsApp interaktif, dan navigasi detail mahasiswa.
+  - **Navigasi Sidebar:** Menambahkan sub-item *"Kehadiran Piket"* pada menu dropdown **Akademik** di `Sidebar.tsx`.
+- ✅ Penguncian Otoritas Input ODS & Pra-Magang Khusus Divisi CRM (Mode Monitoring untuk Akademik):
+  - **Backend Endpoints (`apps/api/src/routes/attendance.ts` & `apps/api/src/routes/student/crm.ts`):** Mengunci hak akses `POST` dan `PATCH` untuk One Day Service (`/mahasiswa/:studentId/ods`) dan Pra Magang (`/mahasiswa/:studentId/pramagang`) hanya untuk role `crm` dan `superadmin` (`hasRole(user, "crm")`), mengembalikan status 403 Forbidden bagi role lain.
+  - **Panel Akademik (`TabManajemenMahasiswa.tsx`):** Menghapus input form manual presensi ODS & Pra Magang, menggantinya dengan tampilan monitoring eksekutif read-only yang menampilkan status 5 milestone pelaksanaan ODS, kelengkapan laporan akhir ODS/Pra-Magang, nama mitra industri, masa pra-magang, link video dokumentasi, dan riwayat catatan presensi langsung dari CRM.
+  - **Komponen Detail Kehadiran (`TabODS.tsx` & `TabPramagang.tsx` & `TabManajemenMahasiswa.tsx`):** Menghapus seluruh tombol input kehadiran (`+ Input Kehadiran ODS` / `+ Input Kehadiran`), aksi edit baris, modal dialog, serta teks deskripsi panjang (*"Mode Monitoring: Data kehadiran..."*), menghasilkan antarmuka monitoring yang jauh lebih bersih, ringkas, dan fokus pada ringkasan milestone dan riwayat presensi. Seluruh input/pengelolaan data ODS dan Pra-Magang kini terpusat secara eksklusif pada **Panel CRM** (`TabOds.tsx` & `TabPraMagang.tsx`).
+- ✅ Pengembalian Sesi PKKMB & Beginning Class Menjadi Fully-Editable (Manajemen Mata Kuliah):
+  - **Frontend UI/UX (`apps/web/src/app/dashboard/mata-kuliah/[id]/page.tsx` & `rekap/[id]/page.tsx`):**
+    - Sesi PKKMB (P-1) dan Beginning Class (P0) dikembalikan fungsinya agar dapat diedit sepenuhnya sama seperti pertemuan lainnya (P1–P16).
+    - Tombol *"Edit Sesi"* aktif untuk mengubah Judul, Jenis Sesi (Teori / Praktik / Keduanya), Tanggal, dan Deskripsi/Materi Pokok.
+    - Tombol *"Simpan Presensi & Nilai"* aktif untuk menyimpan data presensi dan penilaian harian.
+    - Dropdown status kehadiran (*Hadir, Izin, Sakit, Alpha, Belum Diisi*), input nilai teori, input nilai praktik, dan input catatan dosen berfungsi normal.
+    - Kalkulasi rekap kehadiran dan nilai pada halaman rekap perkuliahan disinkronkan berdasarkan input riil.
+  - **Backend API (`apps/api/src/routes/courses.ts`):** Membuka kembali hak akses `PATCH /:id/meetings/:meetingId` dan `POST /:id/meetings/:meetingId/attendances` untuk sesi PKKMB dan Beginning Class bagi Dosen pengampu dan Akademik.

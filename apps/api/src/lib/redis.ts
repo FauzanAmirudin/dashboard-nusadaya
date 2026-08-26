@@ -32,12 +32,21 @@ const redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
 	},
 });
 
+let hasWarnedRedis = false;
+
 redis.on("connect", () => {
 	console.log("✅ Redis connected");
+	hasWarnedRedis = false;
 });
 
 redis.on("error", (err) => {
-	console.error("[Redis] Connection error:", err.message);
+	if (!hasWarnedRedis) {
+		console.warn(
+			"⚠️  [Redis] Optional Redis service not connected. App will continue running normally without cache/queue worker:",
+			err.message,
+		);
+		hasWarnedRedis = true;
+	}
 });
 
 export { redis };

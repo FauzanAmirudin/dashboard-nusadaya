@@ -16,6 +16,7 @@ import {
 	Plane,
 	Settings,
 	ShieldCheck,
+	Sparkles,
 	UserCog,
 	Users,
 	Wallet,
@@ -131,12 +132,6 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 				icon: CalendarDays,
 			},
 			{
-				label: "Manajemen Kehadiran",
-				href: "/dashboard/kehadiran",
-				roles: ["superadmin", "akademik"],
-				icon: ClipboardCheck,
-			},
-			{
 				label: "Manajemen Mata Kuliah",
 				href: "/dashboard/mata-kuliah",
 				roles: ["superadmin", "akademik", "dosen"],
@@ -147,6 +142,18 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 				href: "/dashboard/mata-kuliah/rekap",
 				roles: ["superadmin", "akademik", "dosen"],
 				icon: CheckSquare,
+			},
+			{
+				label: "Manajemen Kehadiran",
+				href: "/dashboard/kehadiran",
+				roles: ["superadmin", "akademik"],
+				icon: ClipboardCheck,
+			},
+			{
+				label: "Kehadiran Piket",
+				href: "/dashboard/kehadiran-piket",
+				roles: ["superadmin", "akademik"],
+				icon: Sparkles,
 			},
 			{
 				label: "Manajemen PA",

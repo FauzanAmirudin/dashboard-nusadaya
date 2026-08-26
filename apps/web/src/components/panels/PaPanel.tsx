@@ -120,6 +120,9 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 						form.language === "lainnya" ? form.languageCustom.trim() : null,
 					vocabCount: Number(form.vocabCount) || 0,
 					sentenceCount: Number(form.sentenceCount) || 0,
+					vocabList: form.vocabList || [],
+					sentenceList: form.sentenceList || [],
+					notes: form.notes ? form.notes.trim() : null,
 					date: form.date
 						? new Date(form.date).toISOString()
 						: new Date().toISOString(),
@@ -153,6 +156,9 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 							form.language === "lainnya" ? form.languageCustom.trim() : null,
 						vocabCount: Number(form.vocabCount) || 0,
 						sentenceCount: Number(form.sentenceCount) || 0,
+						vocabList: form.vocabList || [],
+						sentenceList: form.sentenceList || [],
+						notes: form.notes ? form.notes.trim() : null,
 						date: form.date ? new Date(form.date).toISOString() : undefined,
 					}),
 				},
