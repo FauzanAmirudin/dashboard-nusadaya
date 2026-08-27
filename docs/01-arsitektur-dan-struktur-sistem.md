@@ -226,4 +226,29 @@ API menjalankan background workers non-blocking di runtime Bun:
 
 ---
 
+## 6. Hardening Keamanan: Rate Limiting Login & Auto-Logout Sesi Idle
+
+Untuk melindungi integritas sistem dari serangan brute force dan mencegah kebocoran sesi di perangkat bersama, sistem menerapkan mekanisme proteksi terintegrasi antara backend dan frontend:
+
+### 6.1 Proteksi Brute Force & Rate Limiting Backend (`apps/api/src/lib/auth-rate-limit.ts`)
+- **Batas Percobaan Gagal**: Maksimal **7 kali** percobaan gagal dalam jendela 7 menit per kombinasi `(IP + username)`.
+- **Lockout Sesi**: Setelah 7 kegagalan berturut-turut, request login ke kombinasi tersebut diblokir instan selama **7 menit (420 detik)** sebelum request mencapai database (memitigasi timing attack dan beban PostgreSQL).
+- **Reset Counter**: Counter kegagalan di Redis otomatis dihapus tepat setelah login berhasil.
+- **Global IP Rate Limit**: Maksimal 15 request login per menit per IP untuk mencegah credential stuffing / enumerasi username.
+- **Audit Logging**: Setiap kegagalan login dan pemicu lockout dicatat ke tabel `audit_logs` (`auth.login_failed`, `auth.lockout_triggered`).
+
+### 6.2 Server-side Session Tracking & Idle Timeout (`apps/api/src/lib/session.ts`)
+- **Server Session di Redis**: Setiap login menghasilkan `sessionId` unik yang dicatat di Redis (`session:{sessionId}`) dan disematkan dalam payload JWT.
+- **Batas Idle 30 Menit**: Request dengan sesi yang tidak memiliki aktivitas selama > 30 menit (1800 detik) otomatis ditolak dengan kode status 401 dan response code `IDLE_TIMEOUT`.
+- **Throttled Activity Touch**: Pembaruan timestamp `lastActivity` di Redis dibatasi maksimal sekali per 10 detik per sesi untuk menjaga efisiensi I/O.
+- **Server-side Session Revocation**: Logout manual maupun auto-logout langsung menghapus sesi dari Redis, memastikan token tidak bisa disalahgunakan lagi.
+
+### 6.3 Deteksi Idle & Sinkronisasi Multi-Tab Frontend (`apps/web/src/providers/IdleTimeoutProvider.tsx`)
+- **Activity Monitoring**: Mendeteksi event `mousemove`, `mousedown`, `keydown`, `touchstart`, `scroll`, dan `visibilitychange`.
+- **Warning Countdown Modal**: 2 menit sebelum batas waktu (menit ke-28), muncul modal interaktif dengan timer countdown dan opsi **Tetap Masuk** (merefresh sesi via `POST /auth/touch`) atau **Logout Sekarang**.
+- **Multi-Tab Synchronization**: Memanfaatkan `BroadcastChannel` (`nusadaya_session_channel`) dan `storage` event sehingga aktivitas, perpanjangan sesi, atau logout di satu tab langsung tersinkronisasi di seluruh tab browser yang terbuka.
+
+---
+
 > Lanjutkan membaca detail alur data, mekanisme caching, komunikasi API, dan logika bisnis pada **[Bagian 2: Alur Data, Logika Bisnis & Presentasi UI](file:///c:/.PROJECT/dashboard-nusadaya/docs/02-alur-data-dan-logika-bisnis.md)**.
+

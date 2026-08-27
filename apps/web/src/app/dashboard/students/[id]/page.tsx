@@ -549,36 +549,45 @@ function StudentDetailContent() {
 		title: string,
 		isAcc: boolean,
 		date?: string,
-		accBy?: string,
-	) => (
-		<div className="flex flex-col items-center p-3 border border-slate-200 rounded-md bg-slate-50 min-w-[120px] max-w-[150px]">
-			<span className="text-xs font-semibold text-slate-500 mb-2 truncate w-full text-center">
-				{title}
-			</span>
-			{isAcc ? (
-				<>
-					<CheckCircle className="w-6 h-6 text-emerald-500 mb-1" />
-					<span className="text-[10px] text-emerald-400">ACC</span>
-					{date && (
-						<span className="text-[10px] text-slate-500 mt-1">{date}</span>
-					)}
-					{accBy && (
-						<span
-							className="text-[10px] text-emerald-600 mt-0.5 truncate w-full text-center px-1"
-							title={accBy}
-						>
-							Oleh: {accBy.split(" ")[0]}
-						</span>
-					)}
-				</>
-			) : (
-				<>
-					<Clock className="w-6 h-6 text-slate-600 mb-1" />
-					<span className="text-[10px] text-slate-500">Pending</span>
-				</>
-			)}
-		</div>
-	);
+		accBy?: string | { fullName?: string } | null,
+	) => {
+		const accByName =
+			typeof accBy === "object" && accBy !== null
+				? accBy.fullName
+				: typeof accBy === "string"
+					? accBy
+					: undefined;
+
+		return (
+			<div className="flex flex-col items-center p-3 border border-slate-200 rounded-md bg-slate-50 min-w-[120px] max-w-[150px]">
+				<span className="text-xs font-semibold text-slate-500 mb-2 truncate w-full text-center">
+					{title}
+				</span>
+				{isAcc ? (
+					<>
+						<CheckCircle className="w-6 h-6 text-emerald-500 mb-1" />
+						<span className="text-[10px] text-emerald-400">ACC</span>
+						{date && (
+							<span className="text-[10px] text-slate-500 mt-1">{date}</span>
+						)}
+						{accByName && (
+							<span
+								className="text-[10px] text-emerald-600 mt-0.5 truncate w-full text-center px-1"
+								title={accByName}
+							>
+								Oleh: {accByName.split(" ")[0]}
+							</span>
+						)}
+					</>
+				) : (
+					<>
+						<Clock className="w-6 h-6 text-slate-600 mb-1" />
+						<span className="text-[10px] text-slate-500">Pending</span>
+					</>
+				)}
+			</div>
+		);
+	};
 
 	const flagUrl = getCountryFlag(s.subProgram, s.destinationCountry);
 
@@ -1064,7 +1073,11 @@ function StudentDetailContent() {
 								data.pmb?.accAt
 									? new Date(data.pmb.accAt).toLocaleDateString("id-ID")
 									: undefined,
-								data.pmb?.accByUser?.fullName,
+								data.pmb?.accBy?.fullName ||
+									data.pmb?.accByUser?.fullName ||
+									(typeof data.pmb?.accBy === "string"
+										? data.pmb?.accBy
+										: undefined),
 							)}
 							{renderStamp(
 								"CRM",
@@ -1072,7 +1085,11 @@ function StudentDetailContent() {
 								data.crm?.accAt
 									? new Date(data.crm.accAt).toLocaleDateString("id-ID")
 									: undefined,
-								data.crm?.accByUser?.fullName,
+								data.crm?.accBy?.fullName ||
+									data.crm?.accByUser?.fullName ||
+									(typeof data.crm?.accBy === "string"
+										? data.crm?.accBy
+										: undefined),
 							)}
 							{renderStamp(
 								"Finance",
@@ -1080,7 +1097,11 @@ function StudentDetailContent() {
 								data.finance?.accAt
 									? new Date(data.finance.accAt).toLocaleDateString("id-ID")
 									: undefined,
-								data.finance?.accByUser?.fullName,
+								data.finance?.accBy?.fullName ||
+									data.finance?.accByUser?.fullName ||
+									(typeof data.finance?.accBy === "string"
+										? data.finance?.accBy
+										: undefined),
 							)}
 							{renderStamp(
 								"Akademik",
@@ -1088,7 +1109,11 @@ function StudentDetailContent() {
 								data.academic?.accAt
 									? new Date(data.academic.accAt).toLocaleDateString("id-ID")
 									: undefined,
-								data.academic?.accByUser?.fullName,
+								data.academic?.accBy?.fullName ||
+									data.academic?.accByUser?.fullName ||
+									(typeof data.academic?.accBy === "string"
+										? data.academic?.accBy
+										: undefined),
 							)}
 							{renderStamp(
 								"Dosen",
@@ -1115,7 +1140,11 @@ function StudentDetailContent() {
 								data.pa?.accAt
 									? new Date(data.pa.accAt).toLocaleDateString("id-ID")
 									: undefined,
-								data.pa?.accByUser?.fullName,
+								data.pa?.accBy?.fullName ||
+									data.pa?.accByUser?.fullName ||
+									(typeof data.pa?.accBy === "string"
+										? data.pa?.accBy
+										: undefined),
 							)}
 							{renderStamp(
 								"Magang",
@@ -1123,7 +1152,11 @@ function StudentDetailContent() {
 								data.internship?.accAt
 									? new Date(data.internship.accAt).toLocaleDateString("id-ID")
 									: undefined,
-								data.internship?.accByUser?.fullName,
+								data.internship?.accBy?.fullName ||
+									data.internship?.accByUser?.fullName ||
+									(typeof data.internship?.accBy === "string"
+										? data.internship?.accBy
+										: undefined),
 							)}
 						</div>
 

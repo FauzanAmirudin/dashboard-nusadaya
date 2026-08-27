@@ -1,9 +1,18 @@
 "use client";
 
-import { AlertCircle, ArrowRight, Eye, EyeOff, Lock, User } from "lucide-react";
+import {
+	AlertCircle,
+	ArrowRight,
+	Clock,
+	Eye,
+	EyeOff,
+	Lock,
+	ShieldAlert,
+	User,
+} from "lucide-react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,12 +20,16 @@ import { Label } from "@/components/ui/label";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 
-export default function LoginPage() {
+function LoginForm() {
 	const [username, setUsername] = useState("");
 	const [password, setPassword] = useState("");
 	const [showPassword, setShowPassword] = useState(false);
 	const [error, setError] = useState("");
+	const [isLocked, setIsLocked] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
+
+	const searchParams = useSearchParams();
+	const reason = searchParams.get("reason");
 
 	const router = useRouter();
 	const login = useAuthStore((state) => state.login);
@@ -24,24 +37,45 @@ export default function LoginPage() {
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setError("");
+		setIsLocked(false);
 		setIsLoading(true);
 
 		try {
-			const { data, error: apiError } = await api.auth.login.post({
+			const res = await api.auth.login.post({
 				username,
 				password,
 			});
 
-			if (apiError || !data?.success || !data.user) {
-				setError(apiError?.value?.message || "Username atau password salah.");
+			const resData = res.data as any;
+			const resError = (res.error?.value as any) || resData;
+
+			if (
+				res.status === 429 ||
+				resError?.code === "ACCOUNT_LOCKED" ||
+				resData?.code === "ACCOUNT_LOCKED"
+			) {
+				setIsLocked(true);
+				setError(
+					resError?.message ||
+						resData?.message ||
+						"Terlalu banyak percobaan gagal. Akun dikunci sementara.",
+				);
 				return;
 			}
 
-			// Save both user info and the raw JWT token
-			// The token is needed for cross-origin API calls (Authorization: Bearer)
-			const rawToken = data.token as string | undefined;
-			login(data.user, rawToken || "");
-			if (data.user.role === "mahasiswa") {
+			if (res.error || !resData?.success || !resData?.user) {
+				setError(
+					resError?.message ||
+						resData?.message ||
+						"Username atau password salah.",
+				);
+				return;
+			}
+
+			// Save user info and raw JWT token
+			const rawToken = resData.token as string | undefined;
+			login(resData.user, rawToken || "");
+			if (resData.user.role === "mahasiswa") {
 				router.push("/mahasiswa/dashboard");
 			} else {
 				router.push("/dashboard");
@@ -68,7 +102,7 @@ export default function LoginPage() {
 			{/* Enhanced Glassmorphism Card */}
 			<div className="relative z-10 w-full max-w-md bg-white/80 backdrop-blur-2xl rounded-[2rem] shadow-[0_20px_60px_-15px_rgba(5,23,176,0.15)] border border-white/60 p-8 sm:p-10 animate-in fade-in zoom-in-95 duration-700 ease-out ring-1 ring-slate-900/5">
 				{/* Logo Header */}
-				<div className="flex flex-col items-center text-center mb-10">
+				<div className="flex flex-col items-center text-center mb-8">
 					<div className="w-20 h-20 flex items-center justify-center mb-5">
 						<Image
 							src="/logonusadaya.png"
@@ -87,17 +121,45 @@ export default function LoginPage() {
 					</p>
 				</div>
 
-				{/* Error Alert */}
+				{/* Idle Timeout Alert Banner */}
+				{reason === "idle" && (
+					<Alert className="mb-6 bg-amber-50/90 backdrop-blur-sm border-amber-200 text-amber-900 shadow-sm rounded-xl">
+						<Clock className="h-4 w-4 text-amber-600 shrink-0" />
+						<div className="ml-2">
+							<AlertTitle className="font-bold text-amber-900 text-xs">
+								Sesi Berakhir Otomatis
+							</AlertTitle>
+							<AlertDescription className="text-xs mt-0.5 text-amber-700 leading-relaxed">
+								Sesi Anda telah diakhiri karena tidak ada aktivitas selama 30
+								menit. Silakan login kembali untuk melanjutkan.
+							</AlertDescription>
+						</div>
+					</Alert>
+				)}
+
+				{/* Error / Lockout Alert */}
 				{error && (
 					<Alert
 						variant="destructive"
-						className="mb-6 bg-rose-50/80 backdrop-blur-sm border-rose-200 text-rose-800 shadow-sm rounded-xl"
+						className={`mb-6 backdrop-blur-sm shadow-sm rounded-xl ${
+							isLocked
+								? "bg-amber-50/90 border-amber-300 text-amber-900"
+								: "bg-rose-50/80 border-rose-200 text-rose-800"
+						}`}
 					>
-						<AlertCircle className="h-4 w-4" />
-						<AlertTitle className="font-bold">Login Gagal</AlertTitle>
-						<AlertDescription className="text-xs mt-1">
-							{error}
-						</AlertDescription>
+						{isLocked ? (
+							<ShieldAlert className="h-4 w-4 text-amber-600 shrink-0" />
+						) : (
+							<AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+						)}
+						<div className="ml-2">
+							<AlertTitle className="font-bold text-xs">
+								{isLocked ? "Akun Dikunci Sementara" : "Login Gagal"}
+							</AlertTitle>
+							<AlertDescription className="text-xs mt-0.5 leading-relaxed">
+								{error}
+							</AlertDescription>
+						</div>
 					</Alert>
 				)}
 
@@ -186,5 +248,19 @@ export default function LoginPage() {
 				</div>
 			</div>
 		</div>
+	);
+}
+
+export default function LoginPage() {
+	return (
+		<Suspense
+			fallback={
+				<div className="min-h-screen bg-slate-50 flex items-center justify-center">
+					Memuat...
+				</div>
+			}
+		>
+			<LoginForm />
+		</Suspense>
 	);
 }

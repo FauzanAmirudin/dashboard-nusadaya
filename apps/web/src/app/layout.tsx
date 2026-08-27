@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { IdleTimeoutProvider } from "@/providers/IdleTimeoutProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import "./globals.css";
 
@@ -24,7 +25,7 @@ export default function RootLayout({
 		<html lang="en" className={`${poppins.variable} h-full antialiased`}>
 			<body className="min-h-full flex flex-col">
 				<QueryProvider>
-					{children}
+					<IdleTimeoutProvider>{children}</IdleTimeoutProvider>
 					<Toaster />
 				</QueryProvider>
 			</body>

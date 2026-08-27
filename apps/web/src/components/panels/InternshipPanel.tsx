@@ -281,28 +281,44 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 
 	const handleAcc = async () => {
 		setIsSaving(true);
-		const { error } =
-			await api.students[studentId.toString()].internship.acc.post();
-		if (error) {
-			toast.error("Gagal memberikan ACC Magang");
-		} else {
-			toast.success("Status ACC Magang berhasil disetujui");
-			await fetchInternshipData();
-			onUpdate();
+		try {
+			const res =
+				await api.students[studentId.toString()].internship.acc.post();
+			if (res.error || !res.data?.success) {
+				toast.error(
+					(res.data as any)?.message ||
+						(res.error as any)?.value?.message ||
+						"Gagal memberikan ACC Magang",
+				);
+			} else {
+				toast.success("Status ACC Magang berhasil disetujui");
+				await fetchInternshipData();
+				onUpdate();
+			}
+		} catch (err: any) {
+			toast.error(err.message || "Gagal memberikan ACC Magang");
 		}
 		setIsSaving(false);
 	};
 
 	const handleCancelAcc = async () => {
 		setIsSaving(true);
-		const { error } =
-			await api.students[studentId.toString()].internship.acc.delete();
-		if (error) {
-			toast.error("Gagal membatalkan ACC Magang");
-		} else {
-			toast.success("Status ACC Magang berhasil dibatalkan");
-			await fetchInternshipData();
-			onUpdate();
+		try {
+			const res =
+				await api.students[studentId.toString()].internship.acc.delete();
+			if (res.error || !res.data?.success) {
+				toast.error(
+					(res.data as any)?.message ||
+						(res.error as any)?.value?.message ||
+						"Gagal membatalkan ACC Magang",
+				);
+			} else {
+				toast.success("Status ACC Magang berhasil dibatalkan");
+				await fetchInternshipData();
+				onUpdate();
+			}
+		} catch (err: any) {
+			toast.error(err.message || "Gagal membatalkan ACC Magang");
 		}
 		setIsSaving(false);
 	};
@@ -385,6 +401,7 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 					}
 					badge={
 						<PanelStatusBadge
+							status={data?.status}
 							isAcc={data?.isAcc}
 							completed={validatedCount}
 							total={totalCount}

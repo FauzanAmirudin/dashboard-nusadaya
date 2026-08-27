@@ -255,6 +255,13 @@ export const paRoutes = new Elysia()
 				notes: (body as any).notes,
 			});
 
+			await Promise.all([
+				cacheDel(`cache:student:${id}`),
+				cacheInvalidatePattern("cache:students:*"),
+				cacheInvalidatePattern("cache:mahasiswa:*"),
+				cacheInvalidatePattern("cache:dashboard:*"),
+			]);
+
 			return { success: true };
 		},
 		{
@@ -268,6 +275,7 @@ export const paRoutes = new Elysia()
 	.delete("/:id/pa/vocabulary/:logId", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
+		const id = Number(params.id);
 		const logId = Number(params.logId);
 
 		if (!hasRole(user, "pa", "akademik")) {
@@ -276,6 +284,14 @@ export const paRoutes = new Elysia()
 		}
 
 		await db.delete(vocabLogs).where(eq(vocabLogs.id, logId));
+
+		await Promise.all([
+			cacheDel(`cache:student:${id}`),
+			cacheInvalidatePattern("cache:students:*"),
+			cacheInvalidatePattern("cache:mahasiswa:*"),
+			cacheInvalidatePattern("cache:dashboard:*"),
+		]);
+
 		return { success: true };
 	})
 	.post(
@@ -298,6 +314,13 @@ export const paRoutes = new Elysia()
 				notes: (body as any).notes,
 			});
 
+			await Promise.all([
+				cacheDel(`cache:student:${id}`),
+				cacheInvalidatePattern("cache:students:*"),
+				cacheInvalidatePattern("cache:mahasiswa:*"),
+				cacheInvalidatePattern("cache:dashboard:*"),
+			]);
+
 			return { success: true };
 		},
 		{
@@ -312,6 +335,7 @@ export const paRoutes = new Elysia()
 	.delete("/:id/pa/counseling/:logId", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
+		const id = Number(params.id);
 		const logId = Number(params.logId);
 
 		if (!hasRole(user, "pa", "akademik")) {
@@ -320,6 +344,14 @@ export const paRoutes = new Elysia()
 		}
 
 		await db.delete(counselingLogs).where(eq(counselingLogs.id, logId));
+
+		await Promise.all([
+			cacheDel(`cache:student:${id}`),
+			cacheInvalidatePattern("cache:students:*"),
+			cacheInvalidatePattern("cache:mahasiswa:*"),
+			cacheInvalidatePattern("cache:dashboard:*"),
+		]);
+
 		return { success: true };
 	})
 	.post(
@@ -367,13 +399,18 @@ export const paRoutes = new Elysia()
 					languageCustom: languageCustom ?? null,
 					vocabCount: finalVocabCount,
 					sentenceCount: finalSentenceCount,
-					vocabList: cleanVocabList,
-					sentenceList: cleanSentenceList,
-					notes: notes ? String(notes).trim() : null,
 					createdAt: date ? new Date(date) : new Date(),
 					createdBy: user.id,
 				})
 				.returning();
+
+			await Promise.all([
+				cacheDel(`cache:student:${id}`),
+				cacheInvalidatePattern("cache:students:*"),
+				cacheInvalidatePattern("cache:mahasiswa:*"),
+				cacheInvalidatePattern("cache:dashboard:*"),
+			]);
+
 			return { success: true, data: inserted[0] };
 		},
 		{
@@ -398,17 +435,10 @@ export const paRoutes = new Elysia()
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
+			const id = Number(params.id);
 			const logId = Number(params.logId);
-			const {
-				language,
-				languageCustom,
-				vocabCount,
-				sentenceCount,
-				vocabList,
-				sentenceList,
-				notes,
-				date,
-			} = body as any;
+			const { language, languageCustom, vocabCount, sentenceCount, date } =
+				body as any;
 
 			const updateData: any = {
 				updatedAt: new Date(),
@@ -428,19 +458,6 @@ export const paRoutes = new Elysia()
 			if (sentenceCount !== undefined) {
 				updateData.sentenceCount = Number(sentenceCount) || 0;
 			}
-			if (vocabList !== undefined) {
-				updateData.vocabList = Array.isArray(vocabList)
-					? vocabList.map((v: any) => String(v).trim()).filter(Boolean)
-					: [];
-			}
-			if (sentenceList !== undefined) {
-				updateData.sentenceList = Array.isArray(sentenceList)
-					? sentenceList.map((s: any) => String(s).trim()).filter(Boolean)
-					: [];
-			}
-			if (notes !== undefined) {
-				updateData.notes = notes ? String(notes).trim() : null;
-			}
 			if (date) {
 				updateData.createdAt = new Date(date);
 			}
@@ -449,6 +466,14 @@ export const paRoutes = new Elysia()
 				.update(paHafalanSessions)
 				.set(updateData)
 				.where(eq(paHafalanSessions.id, logId));
+
+			await Promise.all([
+				cacheDel(`cache:student:${id}`),
+				cacheInvalidatePattern("cache:students:*"),
+				cacheInvalidatePattern("cache:mahasiswa:*"),
+				cacheInvalidatePattern("cache:dashboard:*"),
+			]);
+
 			return { success: true };
 		},
 		{
@@ -471,9 +496,18 @@ export const paRoutes = new Elysia()
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
-		await db
-			.delete(paHafalanSessions)
-			.where(eq(paHafalanSessions.id, Number(params.logId)));
+		const id = Number(params.id);
+		const logId = Number(params.logId);
+
+		await db.delete(paHafalanSessions).where(eq(paHafalanSessions.id, logId));
+
+		await Promise.all([
+			cacheDel(`cache:student:${id}`),
+			cacheInvalidatePattern("cache:students:*"),
+			cacheInvalidatePattern("cache:mahasiswa:*"),
+			cacheInvalidatePattern("cache:dashboard:*"),
+		]);
+
 		return { success: true };
 	})
 	.post(
@@ -496,6 +530,14 @@ export const paRoutes = new Elysia()
 					createdBy: user.id,
 				})
 				.returning();
+
+			await Promise.all([
+				cacheDel(`cache:student:${id}`),
+				cacheInvalidatePattern("cache:students:*"),
+				cacheInvalidatePattern("cache:mahasiswa:*"),
+				cacheInvalidatePattern("cache:dashboard:*"),
+			]);
+
 			return { success: true, data: inserted[0] };
 		},
 		{
@@ -514,12 +556,21 @@ export const paRoutes = new Elysia()
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
+			const id = Number(params.id);
 			const noteId = Number(params.noteId);
 			const { content } = body as any;
 			await db
 				.update(paStudentNotes)
 				.set({ content, updatedAt: new Date() })
 				.where(eq(paStudentNotes.id, noteId));
+
+			await Promise.all([
+				cacheDel(`cache:student:${id}`),
+				cacheInvalidatePattern("cache:students:*"),
+				cacheInvalidatePattern("cache:mahasiswa:*"),
+				cacheInvalidatePattern("cache:dashboard:*"),
+			]);
+
 			return { success: true };
 		},
 		{
@@ -533,13 +584,22 @@ export const paRoutes = new Elysia()
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
-		await db
-			.delete(paStudentNotes)
-			.where(eq(paStudentNotes.id, Number(params.noteId)));
+		const id = Number(params.id);
+		const noteId = Number(params.noteId);
+
+		await db.delete(paStudentNotes).where(eq(paStudentNotes.id, noteId));
+
+		await Promise.all([
+			cacheDel(`cache:student:${id}`),
+			cacheInvalidatePattern("cache:students:*"),
+			cacheInvalidatePattern("cache:mahasiswa:*"),
+			cacheInvalidatePattern("cache:dashboard:*"),
+		]);
+
 		return { success: true };
 	})
 	.post("/:id/pa/acc", async ({ params, set, user }: any) => {
-		if (!hasRole(user, "pa")) {
+		if (!hasRole(user, "pa", "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -565,10 +625,18 @@ export const paRoutes = new Elysia()
 				updatedAt: new Date(),
 			})
 			.where(eq(paData.studentId, id));
+
+		await Promise.all([
+			cacheDel(`cache:student:${id}`),
+			cacheInvalidatePattern("cache:students:*"),
+			cacheInvalidatePattern("cache:mahasiswa:*"),
+			cacheInvalidatePattern("cache:dashboard:*"),
+		]);
+
 		return { success: true };
 	})
 	.delete("/:id/pa/acc", async ({ params, set, user }: any) => {
-		if (!hasRole(user, "pa")) {
+		if (!hasRole(user, "pa", "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -594,6 +662,14 @@ export const paRoutes = new Elysia()
 				updatedAt: new Date(),
 			})
 			.where(eq(paData.studentId, id));
+
+		await Promise.all([
+			cacheDel(`cache:student:${id}`),
+			cacheInvalidatePattern("cache:students:*"),
+			cacheInvalidatePattern("cache:mahasiswa:*"),
+			cacheInvalidatePattern("cache:dashboard:*"),
+		]);
+
 		return { success: true };
 	})
 	.post("/:id/pa/tripartite", async ({ params, body, set, user }: any) => {
@@ -601,9 +677,10 @@ export const paRoutes = new Elysia()
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
+		const id = Number(params.id);
 		const b = body as any;
 		await db.insert(paTripartiteLogs).values({
-			studentId: Number(params.id),
+			studentId: id,
 			contactDate: new Date(b.contactDate || b.date || Date.now()),
 			contactName: b.contactName || b.parentName || null,
 			contactType: b.contactType || b.contactMethod || "Orang Tua",
@@ -611,6 +688,14 @@ export const paRoutes = new Elysia()
 			result: b.result || null,
 			createdBy: user.id,
 		});
+
+		await Promise.all([
+			cacheDel(`cache:student:${id}`),
+			cacheInvalidatePattern("cache:students:*"),
+			cacheInvalidatePattern("cache:mahasiswa:*"),
+			cacheInvalidatePattern("cache:dashboard:*"),
+		]);
+
 		return { success: true };
 	})
 	.delete("/:id/pa/tripartite/:logId", async ({ params, set, user }: any) => {
@@ -618,9 +703,18 @@ export const paRoutes = new Elysia()
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
-		await db
-			.delete(paTripartiteLogs)
-			.where(eq(paTripartiteLogs.id, Number(params.logId)));
+		const id = Number(params.id);
+		const logId = Number(params.logId);
+
+		await db.delete(paTripartiteLogs).where(eq(paTripartiteLogs.id, logId));
+
+		await Promise.all([
+			cacheDel(`cache:student:${id}`),
+			cacheInvalidatePattern("cache:students:*"),
+			cacheInvalidatePattern("cache:mahasiswa:*"),
+			cacheInvalidatePattern("cache:dashboard:*"),
+		]);
+
 		return { success: true };
 	})
 	.post("/:id/pa/interview", async ({ params, body, set, user }: any) => {
@@ -628,9 +722,10 @@ export const paRoutes = new Elysia()
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
+		const id = Number(params.id);
 		const b = body as any;
 		await db.insert(paInterviewLogs).values({
-			studentId: Number(params.id),
+			studentId: id,
 			interviewDate: new Date(b.interviewDate || b.date || Date.now()),
 			companyName: b.companyName || b.company || "N/A",
 			country: b.country || null,
@@ -638,6 +733,14 @@ export const paRoutes = new Elysia()
 			notes: b.notes || null,
 			createdBy: user.id,
 		});
+
+		await Promise.all([
+			cacheDel(`cache:student:${id}`),
+			cacheInvalidatePattern("cache:students:*"),
+			cacheInvalidatePattern("cache:mahasiswa:*"),
+			cacheInvalidatePattern("cache:dashboard:*"),
+		]);
+
 		return { success: true };
 	})
 	.delete("/:id/pa/interview/:logId", async ({ params, set, user }: any) => {
@@ -645,8 +748,17 @@ export const paRoutes = new Elysia()
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
-		await db
-			.delete(paInterviewLogs)
-			.where(eq(paInterviewLogs.id, Number(params.logId)));
+		const id = Number(params.id);
+		const logId = Number(params.logId);
+
+		await db.delete(paInterviewLogs).where(eq(paInterviewLogs.id, logId));
+
+		await Promise.all([
+			cacheDel(`cache:student:${id}`),
+			cacheInvalidatePattern("cache:students:*"),
+			cacheInvalidatePattern("cache:mahasiswa:*"),
+			cacheInvalidatePattern("cache:dashboard:*"),
+		]);
+
 		return { success: true };
 	});

@@ -305,16 +305,9 @@ const getInternshipChecklist = (internship: any) => {
 
 const getPaChecklist = (pa: any) => {
 	const items = [
-		{ name: "Sesi 1: Perkenalan & Adaptasi", done: Boolean(pa?.session1Done) },
-		{ name: "Sesi 2: Monitoring Akademik", done: Boolean(pa?.session2Done) },
-		{
-			name: "Sesi 3: Kesiapan Magang & Karir",
-			done: Boolean(pa?.session3Done),
-		},
-		{
-			name: "Sesi 4: Evaluasi Final Pra-Terbang",
-			done: Boolean(pa?.session4Done),
-		},
+		{ name: "Konseling Selesai", done: Boolean(pa?.counselingDone) },
+		{ name: "Mental Stabil", done: Boolean(pa?.mentalStable) },
+		{ name: "Disiplin Baik", done: Boolean(pa?.disciplineGood) },
 	];
 	const completed = items.filter((i) => i.done).length;
 	return {

@@ -93,6 +93,46 @@ export const internalNotesRoutes = new Elysia()
 				return { success: false, message: "Forbidden" };
 			}
 
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+
+			const rawValidFrom = (body as any).validFrom;
+			const rawValidUntil = (body as any).validUntil;
+			const validFrom = rawValidFrom ? new Date(rawValidFrom) : null;
+			const validUntil = rawValidUntil ? new Date(rawValidUntil) : null;
+
+			if (validFrom) {
+				const vf = new Date(validFrom);
+				vf.setHours(0, 0, 0, 0);
+				if (vf < today) {
+					set.status = 400;
+					return {
+						success: false,
+						message: "Tanggal mulai tidak boleh tanggal lampau (mundur)",
+					};
+				}
+			}
+
+			if (validUntil) {
+				const vu = new Date(validUntil);
+				vu.setHours(0, 0, 0, 0);
+				if (vu < today) {
+					set.status = 400;
+					return {
+						success: false,
+						message: "Tanggal berakhir tidak boleh tanggal lampau (mundur)",
+					};
+				}
+			}
+
+			if (validFrom && validUntil && validFrom > validUntil) {
+				set.status = 400;
+				return {
+					success: false,
+					message: "Tanggal mulai tidak boleh lebih dari tanggal berakhir",
+				};
+			}
+
 			const [newNote] = await db
 				.insert(internalNotes)
 				.values({
@@ -100,12 +140,8 @@ export const internalNotesRoutes = new Elysia()
 					authorId: user.id,
 					note: (body as any).note,
 					noteType: (body as any).noteType || "informasi_umum",
-					validFrom: (body as any).validFrom
-						? new Date((body as any).validFrom)
-						: null,
-					validUntil: (body as any).validUntil
-						? new Date((body as any).validUntil)
-						: null,
+					validFrom,
+					validUntil,
 				})
 				.returning();
 
@@ -148,17 +184,53 @@ export const internalNotesRoutes = new Elysia()
 				};
 			}
 
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+
+			const rawValidFrom = (body as any).validFrom;
+			const rawValidUntil = (body as any).validUntil;
+			const validFrom = rawValidFrom ? new Date(rawValidFrom) : null;
+			const validUntil = rawValidUntil ? new Date(rawValidUntil) : null;
+
+			if (validFrom) {
+				const vf = new Date(validFrom);
+				vf.setHours(0, 0, 0, 0);
+				if (vf < today) {
+					set.status = 400;
+					return {
+						success: false,
+						message: "Tanggal mulai tidak boleh tanggal lampau (mundur)",
+					};
+				}
+			}
+
+			if (validUntil) {
+				const vu = new Date(validUntil);
+				vu.setHours(0, 0, 0, 0);
+				if (vu < today) {
+					set.status = 400;
+					return {
+						success: false,
+						message: "Tanggal berakhir tidak boleh tanggal lampau (mundur)",
+					};
+				}
+			}
+
+			if (validFrom && validUntil && validFrom > validUntil) {
+				set.status = 400;
+				return {
+					success: false,
+					message: "Tanggal mulai tidak boleh lebih dari tanggal berakhir",
+				};
+			}
+
 			await db
 				.update(internalNotes)
 				.set({
 					note: (body as any).note,
 					noteType: (body as any).noteType,
-					validFrom: (body as any).validFrom
-						? new Date((body as any).validFrom)
-						: null,
-					validUntil: (body as any).validUntil
-						? new Date((body as any).validUntil)
-						: null,
+					validFrom,
+					validUntil,
 					updatedAt: new Date(),
 				})
 				.where(eq(internalNotes.id, noteId));

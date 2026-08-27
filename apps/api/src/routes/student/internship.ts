@@ -2,40 +2,62 @@ import { and, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../../db";
 import {
-	academicAttitudeLogs,
 	academicData,
 	academicDocuments,
-	auditLogs,
-	counselingLogs,
-	courseGradeDocuments,
-	courseGrades,
-	crmData,
-	crmDocuments,
-	crmLogs,
-	entrepreneurshipRecords,
-	feeShareRecipients,
-	finalDecision,
-	financeData,
-	financeDocuments,
-	internalNotes,
 	internshipData,
 	internshipDocuments,
-	paData,
-	paDocuments,
-	paInterviewLogs,
-	paTripartiteLogs,
 	pmbData,
 	pmbDocuments,
-	pmbFeeDisbursements,
-	pmbPaymentPlan,
-	postInternshipDocs,
 	students,
 	users,
-	vocabLogs,
-	weeklyEvents,
 } from "../../db/schema";
-import { hasRole } from "../../lib/permissions";
-import { requireRole } from "../../middleware/rbac";
+import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
+import { getValidUserId, hasRole } from "../../lib/permissions";
+
+/**
+ * Standard Helper to compute completed count and total items for Magang
+ */
+function getInternshipChecks(internship: any, isGapYear = false) {
+	const praPasporChecks = [
+		Boolean(internship?.praPasporPasFoto),
+		Boolean(internship?.praPasporKtm),
+		Boolean(internship?.praPasporKtp),
+		Boolean(internship?.praPasporKk),
+		Boolean(internship?.praPasporAktaKelahiran),
+		Boolean(internship?.praPasporSl21),
+		Boolean(internship?.praPasporSkma),
+		Boolean(internship?.praPasporRekomendasiDisdik),
+		...(isGapYear ? [Boolean(internship?.praPasporGapYear)] : []),
+		Boolean(internship?.praPasporCv),
+	];
+
+	const dokumenChecks = [
+		Boolean(internship?.passportReady),
+		Boolean(internship?.interviewReady),
+		Boolean(internship?.lolReady),
+		Boolean(internship?.loaConfirmed),
+		Boolean(internship?.moaReady),
+		Boolean(internship?.contractReady),
+		Boolean(internship?.mcuReady),
+		Boolean(internship?.visaReady),
+		Boolean(internship?.ticketReady),
+		Boolean(internship?.pdtReady),
+		Boolean(internship?.dokumentasiReady),
+		Boolean(internship?.agenReady),
+	];
+
+	const syaratAkhirChecks = [
+		Boolean(internship?.logbookReady),
+		Boolean(internship?.laporanAkhirReady),
+		Boolean(internship?.videoDokumentasiReady),
+	];
+
+	const all = [...praPasporChecks, ...dokumenChecks, ...syaratAkhirChecks];
+	const completed = all.filter(Boolean).length;
+	const total = all.length;
+
+	return { completed, total, isAllCompleted: completed === total };
+}
 
 export const internshipRoutes = new Elysia()
 	.get("/:id/internship", async ({ params }) => {
@@ -120,7 +142,7 @@ export const internshipRoutes = new Elysia()
 			const user = (context as any).user;
 			const updates = body as Record<string, any>;
 
-			if (!hasRole(user, "magang")) {
+			if (!hasRole(user, "magang", "internship", "superadmin")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -148,12 +170,6 @@ export const internshipRoutes = new Elysia()
 				...updates,
 				updatedAt: new Date(),
 			};
-
-			console.log("PATCH /:id/internship Payload:", {
-				id,
-				updates,
-				cleanUpdates,
-			});
 
 			// Validate LoL -> LoA -> MoA State Machine
 			if (cleanUpdates.loaConfirmed === true) {
@@ -202,7 +218,6 @@ export const internshipRoutes = new Elysia()
 			});
 
 			if (!existing) {
-				// Create a fresh row for this student
 				await db.insert(internshipData).values({
 					studentId: id,
 					...cleanUpdates,
@@ -223,60 +238,28 @@ export const internshipRoutes = new Elysia()
 					where: eq(pmbData.studentId, id),
 				});
 				const isGapYear = pmbDataRow?.isGapYear || false;
-
-				const praPasporChecks = [
-					current.praPasporPasFoto,
-					current.praPasporKtm,
-					current.praPasporKtp,
-					current.praPasporKk,
-					current.praPasporAktaKelahiran,
-					current.praPasporSl21,
-					current.praPasporSkma,
-					current.praPasporRekomendasiDisdik,
-					...(isGapYear ? [current.praPasporGapYear] : []),
-					current.praPasporPddikti,
-					current.praPasporCv,
-				];
-
-				const dokumenChecks = [
-					current.passportReady,
-					current.interviewReady,
-					current.contractReady,
-					current.loaReady,
-					current.mcuReady,
-					current.visaReady,
-					current.pdtReady,
-					current.dokumentasiReady,
-					current.ticketReady,
-					current.agenReady,
-				];
-
-				const syaratAkhirChecks = [
-					current.logbookReady,
-					current.laporanAkhirReady,
-					current.videoDokumentasiReady,
-				];
-
-				const checks = [
-					...praPasporChecks,
-					...dokumenChecks,
-					...syaratAkhirChecks,
-				];
-				const completedCount = checks.filter(Boolean).length;
-				const totalCount = checks.length;
+				const { completed, total } = getInternshipChecks(current, isGapYear);
 
 				let newStatus: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
 					"BUTUH_PERHATIAN";
 
 				if (current.isAcc) newStatus = "ACC";
-				else if (completedCount === totalCount) newStatus = "AMAN";
-				else if ((completedCount / totalCount) * 100 > 30) newStatus = "PROSES";
+				else if (completed === total) newStatus = "AMAN";
+				else if (total > 0 && (completed / total) * 100 > 30)
+					newStatus = "PROSES";
 
 				await db
 					.update(internshipData)
 					.set({ status: newStatus })
 					.where(eq(internshipData.studentId, id));
 			}
+
+			await Promise.all([
+				cacheDel(`cache:student:${id}`),
+				cacheInvalidatePattern("cache:students:*"),
+				cacheInvalidatePattern("cache:mahasiswa:*"),
+				cacheInvalidatePattern("cache:dashboard:*"),
+			]);
 
 			return { success: true };
 		},
@@ -292,7 +275,7 @@ export const internshipRoutes = new Elysia()
 			const user = (context as any).user;
 			const input = body as any;
 
-			if (!hasRole(user, "magang")) {
+			if (!hasRole(user, "magang", "internship", "superadmin")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -303,17 +286,29 @@ export const internshipRoutes = new Elysia()
 					estDepartureDate: input.estDepartureDate
 						? new Date(input.estDepartureDate)
 						: null,
-					destinationCity: input.destinationCity,
-					internshipDuration: input.internshipDuration,
-					internshipCompany: input.internshipCompany,
+					destinationCity: input.destinationCity ?? null,
+					internshipDuration: input.internshipDuration ?? null,
+					internshipCompany: input.internshipCompany ?? null,
 					updatedAt: new Date(),
 				})
 				.where(eq(internshipData.studentId, id));
 
+			await Promise.all([
+				cacheDel(`cache:student:${id}`),
+				cacheInvalidatePattern("cache:students:*"),
+				cacheInvalidatePattern("cache:mahasiswa:*"),
+				cacheInvalidatePattern("cache:dashboard:*"),
+			]);
+
 			return { success: true };
 		},
 		{
-			body: t.Record(t.String(), t.Any()),
+			body: t.Object({
+				estDepartureDate: t.Optional(t.Union([t.String(), t.Null()])),
+				destinationCity: t.Optional(t.Union([t.String(), t.Null()])),
+				internshipDuration: t.Optional(t.Union([t.String(), t.Null()])),
+				internshipCompany: t.Optional(t.Union([t.String(), t.Null()])),
+			}),
 		},
 	)
 	.post("/:id/internship/acc", async (context) => {
@@ -321,7 +316,7 @@ export const internshipRoutes = new Elysia()
 		const user = (context as any).user;
 		const id = Number(params.id);
 
-		if (!hasRole(user, "magang")) {
+		if (!hasRole(user, "magang", "internship", "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -333,7 +328,10 @@ export const internshipRoutes = new Elysia()
 			.where(eq(internshipData.studentId, id));
 		if (!internship) {
 			set.status = 404;
-			return { success: false, message: "Internship data not found" };
+			return {
+				success: false,
+				message: "Data magang mahasiswa tidak ditemukan",
+			};
 		}
 
 		const pmbDataRow = await db.query.pmbData.findFirst({
@@ -341,53 +339,37 @@ export const internshipRoutes = new Elysia()
 		});
 		const isGapYear = pmbDataRow?.isGapYear || false;
 
-		const requiredReadyFields: (keyof typeof internshipData.$inferSelect)[] = [
-			"praPasporPasFoto",
-			"praPasporKtm",
-			"praPasporKtp",
-			"praPasporKk",
-			"praPasporAktaKelahiran",
-			"praPasporSl21",
-			"praPasporSkma",
-			"praPasporRekomendasiDisdik",
-			...(isGapYear ? ["praPasporGapYear" as const] : []),
-			"praPasporPddikti",
-			"praPasporCv",
-			"passportReady",
-			"interviewReady",
-			"contractReady",
-			"loaReady",
-			"mcuReady",
-			"visaReady",
-			"pdtReady",
-			"dokumentasiReady",
-			"ticketReady",
-			"agenReady",
-			"logbookReady",
-			"laporanAkhirReady",
-			"videoDokumentasiReady",
-		];
-
-		const missingValidation = requiredReadyFields.filter(
-			(field) => !internship[field],
+		const { completed, total, isAllCompleted } = getInternshipChecks(
+			internship,
+			isGapYear,
 		);
-		if (missingValidation.length > 0) {
+		if (!isAllCompleted) {
 			set.status = 400;
 			return {
 				success: false,
-				message: `Gagal memberikan ACC: Ada ${missingValidation.length} progres (ceklist) yang belum selesai.`,
+				message: `Gagal memberikan ACC: Masih ada ${total - completed} dari ${total} checklist magang yang belum selesai.`,
 			};
 		}
+
+		const userId = (await getValidUserId(user)) || user?.id;
 
 		await db
 			.update(internshipData)
 			.set({
 				isAcc: true,
 				accAt: new Date(),
-				accBy: user.id,
+				accBy: userId,
 				status: "ACC",
+				updatedAt: new Date(),
 			})
 			.where(eq(internshipData.studentId, id));
+
+		await Promise.all([
+			cacheDel(`cache:student:${id}`),
+			cacheInvalidatePattern("cache:students:*"),
+			cacheInvalidatePattern("cache:mahasiswa:*"),
+			cacheInvalidatePattern("cache:dashboard:*"),
+		]);
 
 		return { success: true };
 	})
@@ -396,7 +378,7 @@ export const internshipRoutes = new Elysia()
 		const user = (context as any).user;
 		const id = Number(params.id);
 
-		if (!hasRole(user, "magang")) {
+		if (!hasRole(user, "magang", "internship", "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -411,47 +393,11 @@ export const internshipRoutes = new Elysia()
 				where: eq(pmbData.studentId, id),
 			});
 			const isGapYear = pmbDataRow?.isGapYear || false;
-			const praPasporChecks = [
-				current.praPasporPasFoto,
-				current.praPasporKtm,
-				current.praPasporKtp,
-				current.praPasporKk,
-				current.praPasporAktaKelahiran,
-				current.praPasporSl21,
-				current.praPasporSkma,
-				current.praPasporRekomendasiDisdik,
-				...(isGapYear ? [current.praPasporGapYear] : []),
-				current.praPasporPddikti,
-				current.praPasporCv,
-			];
-			const dokumenChecks = [
-				current.passportReady,
-				current.interviewReady,
-				current.contractReady,
-				current.loaReady,
-				current.mcuReady,
-				current.visaReady,
-				current.pdtReady,
-				current.dokumentasiReady,
-				current.ticketReady,
-				current.agenReady,
-			];
-			const syaratAkhirChecks = [
-				current.logbookReady,
-				current.laporanAkhirReady,
-				current.videoDokumentasiReady,
-			];
-			const checks = [
-				...praPasporChecks,
-				...dokumenChecks,
-				...syaratAkhirChecks,
-			];
-			const completedCount = checks.filter(Boolean).length;
-			const totalCount = checks.length;
+			const { completed, total } = getInternshipChecks(current, isGapYear);
 			fallbackStatus =
-				completedCount === totalCount
+				completed === total
 					? "AMAN"
-					: (completedCount / totalCount) * 100 > 30
+					: total > 0 && (completed / total) * 100 > 30
 						? "PROSES"
 						: "BUTUH_PERHATIAN";
 		}
@@ -463,45 +409,16 @@ export const internshipRoutes = new Elysia()
 				accAt: null,
 				accBy: null,
 				status: fallbackStatus,
+				updatedAt: new Date(),
 			})
 			.where(eq(internshipData.studentId, id));
 
+		await Promise.all([
+			cacheDel(`cache:student:${id}`),
+			cacheInvalidatePattern("cache:students:*"),
+			cacheInvalidatePattern("cache:mahasiswa:*"),
+			cacheInvalidatePattern("cache:dashboard:*"),
+		]);
+
 		return { success: true };
-	})
-
-	.patch(
-		"/:id/internship/schedule",
-		async (context) => {
-			const { params, body, set } = context;
-			const user = (context as any).user;
-			const id = Number(params.id);
-
-			if (!hasRole(user, "magang")) {
-				set.status = 403;
-				return { success: false, message: "Forbidden" };
-			}
-
-			await db
-				.update(internshipData)
-				.set({
-					estDepartureDate: body.estDepartureDate
-						? new Date(body.estDepartureDate)
-						: null,
-					destinationCity: body.destinationCity,
-					internshipDuration: body.internshipDuration,
-					internshipCompany: body.internshipCompany,
-					updatedAt: new Date(),
-				})
-				.where(eq(internshipData.studentId, id));
-
-			return { success: true };
-		},
-		{
-			body: t.Object({
-				estDepartureDate: t.Optional(t.Union([t.String(), t.Null()])),
-				destinationCity: t.Optional(t.Union([t.String(), t.Null()])),
-				internshipDuration: t.Optional(t.Union([t.String(), t.Null()])),
-				internshipCompany: t.Optional(t.Union([t.String(), t.Null()])),
-			}),
-		},
-	);
+	});

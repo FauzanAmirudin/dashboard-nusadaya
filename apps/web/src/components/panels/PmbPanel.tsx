@@ -290,7 +290,11 @@ export function PmbPanel({
 			{/* Status ACC Panel PMB Card (Persistent across all tabs) */}
 			<AccPanelStatusCard
 				isAcc={Boolean(pmbData?.isAcc)}
-				accByUser={pmbData?.accByUser?.fullName || pmbData?.accBy}
+				accByUser={
+					pmbData?.accBy?.fullName ||
+					pmbData?.accByUser?.fullName ||
+					(typeof pmbData?.accBy === "string" ? pmbData?.accBy : "Tim PMB")
+				}
 				accAt={pmbData?.accAt}
 				isReadyForAcc={isAllChecklistDone}
 				title="ACC Panel PMB"

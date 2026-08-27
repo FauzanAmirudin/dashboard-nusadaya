@@ -76,10 +76,12 @@ export const statusRoutes = new Elysia().get(
 			.select()
 			.from(crmDocuments)
 			.where(eq(crmDocuments.studentId, id));
-		const hasOdsReport = crmDocs.some((d) => d.documentKey === "ods_report");
-		const hasPrammagangReport = crmDocs.some(
-			(d) => d.documentKey === "pramagang_report",
-		);
+		const hasOdsReport =
+			Boolean(crm?.isOdsReport) ||
+			crmDocs.some((d) => d.documentKey === "ods_report");
+		const hasPrammagangReport =
+			Boolean(crm?.isPrammagangReport) ||
+			crmDocs.some((d) => d.documentKey === "pramagang_report");
 		const [finance] = await db
 			.select()
 			.from(financeData)
@@ -353,8 +355,12 @@ export const statusRoutes = new Elysia().get(
 			{ prop: internship?.interviewReady, name: "Interview User" },
 			{ prop: internship?.contractReady, name: "Kontrak Magang" },
 			{
-				prop: internship?.loaReady,
-				name: "Surat Izin Penerimaan Negara Tujuan",
+				prop:
+					internship?.loaConfirmed ||
+					internship?.loaReady ||
+					internship?.lolReady ||
+					internship?.moaReady,
+				name: "Surat Izin Penerimaan Negara Tujuan (LoA)",
 			},
 			{ prop: internship?.mcuReady, name: "Medical Check Up (MCU)" },
 			{ prop: internship?.visaReady, name: "Visa" },

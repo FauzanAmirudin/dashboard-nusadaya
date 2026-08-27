@@ -48,6 +48,35 @@ export const api = edenTreaty<App>(API_URL, {
 		const finalUrl = cleanUrl(url);
 		try {
 			const res = await fetch(finalUrl, { ...options, headers });
+
+			// Handle 401 Unauthorized / Idle Timeout from backend
+			if (res.status === 401) {
+				try {
+					const cloned = res.clone();
+					const body = await cloned.json();
+					if (body?.code === "IDLE_TIMEOUT") {
+						if (typeof window !== "undefined") {
+							// Clear auth storage & redirect to login with idle reason
+							localStorage.removeItem("auth-storage");
+							try {
+								const channel = new BroadcastChannel(
+									"nusadaya_session_channel",
+								);
+								channel.postMessage({ type: "IDLE_TIMEOUT" });
+								channel.close();
+							} catch {
+								// ignore
+							}
+							if (!window.location.pathname.includes("/login")) {
+								window.location.href = "/login?reason=idle";
+							}
+						}
+					}
+				} catch {
+					// Ignore json parsing error on 401 response
+				}
+			}
+
 			return res;
 		} catch (err: any) {
 			console.warn(

@@ -173,6 +173,20 @@ export function CatatanPanel({ studentId }: { studentId: number }) {
 			return;
 		}
 
+		const todayStr = new Date().toISOString().split("T")[0];
+		if (formValidFrom && formValidFrom < todayStr) {
+			toast.error("Tanggal mulai tidak boleh tanggal lampau (mundur)");
+			return;
+		}
+		if (formValidUntil && formValidUntil < todayStr) {
+			toast.error("Tanggal berakhir tidak boleh tanggal lampau (mundur)");
+			return;
+		}
+		if (formValidFrom && formValidUntil && formValidFrom > formValidUntil) {
+			toast.error("Tanggal mulai tidak boleh lebih dari tanggal berakhir");
+			return;
+		}
+
 		setIsSubmitting(true);
 		try {
 			const payload = {
@@ -192,7 +206,7 @@ export function CatatanPanel({ studentId }: { studentId: number }) {
 					setIsDialogOpen(false);
 					fetchNotes();
 				} else {
-					toast.error("Gagal memperbarui catatan");
+					toast.error(res.data?.message || "Gagal memperbarui catatan");
 				}
 			} else {
 				const res =
@@ -204,7 +218,7 @@ export function CatatanPanel({ studentId }: { studentId: number }) {
 					setIsDialogOpen(false);
 					fetchNotes();
 				} else {
-					toast.error("Gagal menambahkan catatan");
+					toast.error(res.data?.message || "Gagal menambahkan catatan");
 				}
 			}
 		} catch (error) {
@@ -486,29 +500,54 @@ export function CatatanPanel({ studentId }: { studentId: number }) {
 								<Label className="text-slate-700 font-semibold">
 									Periode Berlaku (Opsional)
 								</Label>
+								<span className="text-[11px] text-slate-400">
+									Tidak dapat memilih tanggal mundur
+								</span>
 							</div>
 							<div className="grid grid-cols-2 gap-4">
 								<div className="space-y-1.5">
-									<Label className="text-xs text-slate-500">
+									<Label className="text-xs text-slate-500 font-medium">
 										Mulai Tanggal
 									</Label>
 									<Input
 										type="date"
+										min={new Date().toISOString().split("T")[0]}
 										value={formValidFrom}
-										onChange={(e) => setFormValidFrom(e.target.value)}
+										onChange={(e) => {
+											const newFrom = e.target.value;
+											setFormValidFrom(newFrom);
+											if (
+												formValidUntil &&
+												newFrom &&
+												formValidUntil < newFrom
+											) {
+												setFormValidUntil(newFrom);
+											}
+										}}
 									/>
 								</div>
 								<div className="space-y-1.5">
-									<Label className="text-xs text-slate-500">
+									<Label className="text-xs text-slate-500 font-medium">
 										Hingga Tanggal
 									</Label>
 									<Input
 										type="date"
+										min={
+											formValidFrom || new Date().toISOString().split("T")[0]
+										}
 										value={formValidUntil}
 										onChange={(e) => setFormValidUntil(e.target.value)}
 									/>
 								</div>
 							</div>
+							{formValidFrom &&
+								formValidUntil &&
+								formValidFrom > formValidUntil && (
+									<p className="text-xs text-rose-600 bg-rose-50 p-2 rounded flex items-center gap-1.5 border border-rose-200">
+										<AlertTriangle className="w-4 h-4 shrink-0" />
+										Tanggal mulai tidak boleh lebih besar dari tanggal berakhir.
+									</p>
+								)}
 							{(formNoteType === "pengecualian_akademik" ||
 								formNoteType === "sedang_ods") && (
 								<p className="text-xs text-amber-600 bg-amber-50 p-2 rounded flex items-start gap-1.5 border border-amber-200 mt-2">

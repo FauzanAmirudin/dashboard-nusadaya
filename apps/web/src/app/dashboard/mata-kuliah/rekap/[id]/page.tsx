@@ -12,7 +12,6 @@ import {
 	GraduationCap,
 	Layers,
 	Loader2,
-	Printer,
 	Search,
 	Settings,
 	Sparkles,
@@ -33,13 +32,6 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import {
 	Table,
 	TableBody,
@@ -100,10 +92,8 @@ export default function RekapMataKuliahDetailPage() {
 	const [students, setStudents] = useState<StudentItem[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 
-	// Filters
+	// Filter
 	const [searchQuery, setSearchQuery] = useState("");
-	const [filterGrade, setFilterGrade] = useState<string>("all");
-	const [filterStatus, setFilterStatus] = useState<string>("all");
 
 	const fetchData = async () => {
 		setIsLoading(true);
@@ -249,7 +239,7 @@ export default function RekapMataKuliahDetailPage() {
 					? "AMAN"
 					: attendanceRate >= 75
 						? "PERLU_PERHATIAN"
-						: "TIDAK_AMAN";
+						: "KURANG";
 
 			let statusKelulusan = "LULUS";
 			if (attendanceRate < 75) {
@@ -289,11 +279,9 @@ export default function RekapMataKuliahDetailPage() {
 				const matchNim = item.student.nim.toLowerCase().includes(q);
 				if (!matchName && !matchNim) return false;
 			}
-			if (filterGrade !== "all" && item.grade !== filterGrade) return false;
-			if (filterStatus !== "all" && item.status !== filterStatus) return false;
 			return true;
 		});
-	}, [studentRecaps, searchQuery, filterGrade, filterStatus]);
+	}, [studentRecaps, searchQuery]);
 
 	// Export Handlers
 	const handleExportMatrix = () => {
@@ -480,13 +468,6 @@ export default function RekapMataKuliahDetailPage() {
 				<div className="flex items-center gap-2 flex-wrap self-stretch sm:self-auto">
 					<Button
 						variant="outline"
-						onClick={() => window.print()}
-						className="border-slate-300 text-slate-700 hover:bg-slate-50 h-9"
-					>
-						<Printer className="mr-2 h-4 w-4 text-slate-600" /> Cetak
-					</Button>
-					<Button
-						variant="outline"
 						onClick={handleExportMatrix}
 						disabled={filteredRecaps.length === 0}
 						className="border-slate-300 text-slate-700 hover:bg-slate-50 h-9"
@@ -504,57 +485,20 @@ export default function RekapMataKuliahDetailPage() {
 			{/* Filter Bar */}
 			<Card className="border-slate-200 shadow-xs bg-white">
 				<CardContent className="p-4">
-					<div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-						<div className="relative w-full sm:w-80">
-							<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-							<Input
-								placeholder="Cari NIM atau Nama Mahasiswa..."
-								className="pl-9 bg-white border-slate-200 h-9 text-sm"
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-							/>
-						</div>
-
-						<div className="flex items-center gap-2 w-full sm:w-auto">
-							<Select
-								value={filterGrade}
-								onValueChange={(val) => setFilterGrade(val || "all")}
-							>
-								<SelectTrigger className="w-full sm:w-[150px] bg-white border-slate-200 h-9 text-sm">
-									<SelectValue placeholder="Semua Grade" />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="all">Semua Grade</SelectItem>
-									<SelectItem value="A">Grade A (≥ 85)</SelectItem>
-									<SelectItem value="B">Grade B (75–84)</SelectItem>
-									<SelectItem value="C">Grade C (65–74)</SelectItem>
-									<SelectItem value="D">Grade D (50–64)</SelectItem>
-									<SelectItem value="E">Grade E (&lt; 50)</SelectItem>
-								</SelectContent>
-							</Select>
-
-							<Select
-								value={filterStatus}
-								onValueChange={(val) => setFilterStatus(val || "all")}
-							>
-								<SelectTrigger className="w-full sm:w-[160px] bg-white border-slate-200 h-9 text-sm">
-									<SelectValue placeholder="Semua Status" />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="all">Semua Status</SelectItem>
-									<SelectItem value="AMAN">AMAN (≥ 90%)</SelectItem>
-									<SelectItem value="PERLU_PERHATIAN">
-										PERHATIAN (75-89%)
-									</SelectItem>
-									<SelectItem value="TIDAK_AMAN">KRITIS (&lt; 75%)</SelectItem>
-								</SelectContent>
-							</Select>
-						</div>
+					<div className="relative w-full">
+						<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+						<Input
+							placeholder="Cari NIM atau Nama Mahasiswa..."
+							className="pl-9 bg-white border-slate-200 h-9 text-sm w-full sm:max-w-md"
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+						/>
 					</div>
 				</CardContent>
 			</Card>
 
 			{/* Main Recap Tabs */}
+
 			<Tabs defaultValue="matrix" className="w-full">
 				<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
 					<TabsList className="bg-slate-100 p-1 rounded-xl border border-slate-200">
@@ -843,7 +787,7 @@ export default function RekapMataKuliahDetailPage() {
 																? "AMAN"
 																: item.status === "PERLU_PERHATIAN"
 																	? "PERHATIAN"
-																	: "KRITIS"}
+																	: "KURANG"}
 														</Badge>
 													</TableCell>
 												</TableRow>
@@ -866,8 +810,7 @@ export default function RekapMataKuliahDetailPage() {
 										Laporan Transkrip & Evaluasi Nilai Akhir
 									</CardTitle>
 									<CardDescription className="text-xs text-slate-500">
-										Format rekapitulasi nilai akhir perkuliahan siap cetak /
-										arsip akademik
+										Format rekapitulasi nilai akhir perkuliahan / arsip akademik
 									</CardDescription>
 								</div>
 								<Button
@@ -1129,7 +1072,7 @@ export default function RekapMataKuliahDetailPage() {
 																? "AMAN (≥ 90%)"
 																: item.status === "PERLU_PERHATIAN"
 																	? "PERHATIAN (75-89%)"
-																	: "KRITIS (< 75%)"}
+																	: "KURANG (< 75%)"}
 														</Badge>
 													</TableCell>
 												</TableRow>

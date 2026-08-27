@@ -25,7 +25,7 @@ import { formatDeviceDateTime } from "@/utils/format";
 
 export interface AccPanelStatusCardProps {
 	isAcc: boolean;
-	accByUser?: string | null;
+	accByUser?: string | { fullName?: string } | null;
 	accAt?: string | Date | null;
 	isReadyForAcc: boolean;
 	title: string;
@@ -66,6 +66,13 @@ export function AccPanelStatusCard({
 	disabledReason,
 	className,
 }: AccPanelStatusCardProps) {
+	const resolvedAccUser =
+		typeof accByUser === "object" && accByUser !== null
+			? (accByUser as any).fullName || "Admin"
+			: typeof accByUser === "string" && accByUser.trim()
+				? accByUser
+				: "Admin";
+
 	return (
 		<div
 			className={cn(
@@ -118,7 +125,7 @@ export function AccPanelStatusCard({
 							{isAcc ? (
 								<>
 									<h4 className="text-slate-900 font-bold text-base sm:text-lg tracking-tight">
-										Disetujui ({title}) oleh {accByUser || "Admin"}
+										Disetujui ({title}) oleh {resolvedAccUser}
 									</h4>
 									<p className="text-xs sm:text-sm text-slate-500 mt-0.5 font-medium">
 										Pada {formatDeviceDateTime(accAt)}

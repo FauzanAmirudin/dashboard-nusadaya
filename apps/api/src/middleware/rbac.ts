@@ -7,11 +7,18 @@ export const requireRole = (allowedRoles: string[]) => {
 		const user = context.user;
 		if (!user) {
 			context.set.status = 401;
-			return { error: "Unauthorized" };
+			if (context.sessionStatus === "idle_timeout") {
+				return {
+					success: false,
+					code: "IDLE_TIMEOUT",
+					message: "Sesi Anda telah berakhir karena tidak ada aktivitas.",
+				};
+			}
+			return { success: false, code: "UNAUTHORIZED", error: "Unauthorized" };
 		}
 		if (!hasRole(user, ...allowedRoles)) {
 			context.set.status = 403;
-			return { error: "Forbidden: Insufficient privileges" };
+			return { success: false, error: "Forbidden: Insufficient privileges" };
 		}
 	});
 };

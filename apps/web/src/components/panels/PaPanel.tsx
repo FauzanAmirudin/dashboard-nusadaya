@@ -363,18 +363,17 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 		setIsSaving(false);
 	};
 
-	// Progress Calculations
+	// Progress Calculations (Standard 3 PA Checklist Indicators)
 	const totalVocab = hafalanSessions.reduce((acc, s) => acc + s.vocabCount, 0);
 	const totalSentence = hafalanSessions.reduce(
 		(acc, s) => acc + s.sentenceCount,
 		0,
 	);
-	const targetVocab = paData?.vocabTarget || 500;
-	const isVocabDone = totalVocab >= targetVocab;
 
 	const completedChecklistCount = completedCount;
-	const totalProgressItems = completedChecklistCount + (isVocabDone ? 1 : 0);
-	const totalChecklistProgress = Math.round((totalProgressItems / 4) * 100);
+	const totalChecklistProgress = Math.round(
+		(completedChecklistCount / 3) * 100,
+	);
 
 	if (isLoading) {
 		return (
@@ -393,8 +392,9 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 				subtitle="Dikelola oleh: Admin PA & Pendamping Akademik"
 				progressTag={
 					<span className="text-xs font-bold text-slate-700 bg-slate-200/70 px-2.5 py-0.5 rounded-full border border-slate-300/40">
-						Progres: {totalProgressItems}/4 Item ({completedChecklistCount}/3
-						Checklist • {totalVocab} Kosakata • {totalSentence} Kalimat)
+						Progres: {completedChecklistCount}/3 Checklist Selesai ({totalVocab}{" "}
+						Kosakata • {totalSentence} Kalimat • {counselingLogs.length} Sesi
+						Konseling)
 					</span>
 				}
 				actions={
@@ -409,9 +409,10 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 				}
 				badge={
 					<PanelStatusBadge
+						status={paData?.status}
 						isAcc={paData?.isAcc}
-						completed={totalProgressItems}
-						total={4}
+						completed={completedChecklistCount}
+						total={3}
 						size="lg"
 					/>
 				}

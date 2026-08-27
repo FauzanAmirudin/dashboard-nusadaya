@@ -586,9 +586,15 @@ export function FinalDecisionPanel({
 								<span className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-semibold">
 									{mod.acc?.isAcc ? "ACC" : "MENUNGGU"}
 								</span>
-								{mod.acc?.isAcc && mod.acc?.accBy && (
+								{mod.acc?.isAcc && (
 									<span className="text-[10px] text-emerald-600 mt-1 truncate w-full px-1">
-										Oleh: {(mod.acc as any).accBy.fullName.split(" ")[0]}
+										Oleh:{" "}
+										{typeof (mod.acc as any)?.accBy === "object" &&
+										(mod.acc as any)?.accBy?.fullName
+											? (mod.acc as any).accBy.fullName.split(" ")[0]
+											: typeof (mod.acc as any)?.accBy === "string"
+												? (mod.acc as any).accBy.split(" ")[0]
+												: "Admin"}
 									</span>
 								)}
 							</div>

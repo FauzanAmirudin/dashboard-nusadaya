@@ -191,8 +191,25 @@ export function SharedDashboardLoader({
 				user={user}
 			/>
 		);
-	if (module === "pa") return <PaDashboard user={user} data={data} />;
-	if (module === "magang") return <MagangDashboard data={data} />;
+	if (module === "pa")
+		return (
+			<PaDashboard
+				user={user}
+				data={data}
+				onUpdate={() => {
+					refetch();
+				}}
+			/>
+		);
+	if (module === "magang")
+		return (
+			<MagangDashboard
+				data={data}
+				onUpdate={() => {
+					refetch();
+				}}
+			/>
+		);
 	if (module === "finance") return <FinanceDashboard user={user} data={data} />;
 	if (module === "evaluator")
 		return (

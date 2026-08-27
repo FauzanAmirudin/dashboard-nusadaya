@@ -830,8 +830,8 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 						s.room.toLowerCase().includes(q) ||
 						s.records.some(
 							(r) =>
-								r.student?.name.toLowerCase().includes(q) ||
-								r.student?.nim.toLowerCase().includes(q),
+								(r.student?.name && r.student.name.toLowerCase().includes(q)) ||
+								(r.student?.nim && r.student.nim.toLowerCase().includes(q)),
 						)
 					);
 				})
