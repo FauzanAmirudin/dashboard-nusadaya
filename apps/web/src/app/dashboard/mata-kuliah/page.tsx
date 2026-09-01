@@ -53,6 +53,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { api } from "@/lib/eden";
+import { getPeminatanOption, PEMINATAN_OPTIONS } from "@/lib/peminatan";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store";
 
@@ -121,6 +122,22 @@ export default function MataKuliahPage() {
 					);
 				}
 				setCourses(courseList);
+
+				// Extract any dosens from courses data to ensure dropdown has them
+				const courseDosens = courseList
+					.filter((c) => c.dosen && c.dosen.id)
+					.map((c) => ({
+						id: c.dosen.id,
+						fullName: c.dosen.fullName || `Dosen #${c.dosen.id}`,
+					}));
+				if (courseDosens.length > 0) {
+					setDosenList((prev) => {
+						const map = new Map<number, DosenData>();
+						for (const d of prev) map.set(d.id, d);
+						for (const d of courseDosens) map.set(d.id, d);
+						return Array.from(map.values());
+					});
+				}
 			}
 		} catch (err: any) {
 			toast.error(err.message || "Gagal memuat data");
@@ -131,14 +148,25 @@ export default function MataKuliahPage() {
 
 	const fetchDosen = async () => {
 		try {
-			const { data, error } = await api.users.get({
-				$query: { role: "dosen" },
-			});
-			if (!error && data?.success) {
-				setDosenList(data.data as any[]);
+			const res = await fetch("/api/users?role=dosen");
+			if (res.ok) {
+				const json = await res.json();
+				if (json.success && Array.isArray(json.data)) {
+					setDosenList((prev) => {
+						const map = new Map<number, DosenData>();
+						for (const d of prev) map.set(d.id, d);
+						for (const d of json.data) {
+							map.set(d.id, {
+								id: d.id,
+								fullName: d.fullName || d.username || `Dosen #${d.id}`,
+							});
+						}
+						return Array.from(map.values());
+					});
+				}
 			}
 		} catch (err) {
-			console.error(err);
+			console.error("Gagal memuat daftar dosen:", err);
 		}
 	};
 
@@ -236,14 +264,35 @@ export default function MataKuliahPage() {
 
 	const openEdit = (course: CourseData) => {
 		setEditingId(course.id);
+		const dId = course.dosenId
+			? course.dosenId.toString()
+			: course.dosen?.id
+				? course.dosen.id.toString()
+				: "";
+
 		setFormData({
 			code: course.code,
 			name: course.name,
-			dosenId: course.dosenId.toString(),
+			dosenId: dId,
 			peminatan: course.peminatan || "",
-			cohort: course.cohort.toString(),
-			type: course.type,
+			cohort: course.cohort ? course.cohort.toString() : "",
+			type: course.type || "teori",
 		});
+
+		if (course.dosen && course.dosen.id) {
+			setDosenList((prev) => {
+				if (!prev.some((d) => d.id === course.dosen.id)) {
+					return [
+						...prev,
+						{
+							id: course.dosen.id,
+							fullName: course.dosen.fullName || `Dosen #${course.dosen.id}`,
+						},
+					];
+				}
+				return prev;
+			});
+		}
 		setIsEditOpen(true);
 	};
 
@@ -713,8 +762,23 @@ export default function MataKuliahPage() {
 										setFormData({ ...formData, dosenId: val || "" })
 									}
 								>
-									<SelectTrigger className="border border-slate-200">
-										<SelectValue placeholder="Pilih Dosen" />
+									<SelectTrigger className="border border-slate-200 bg-white">
+										{formData.dosenId ? (
+											(() => {
+												const selected = dosenList.find(
+													(d) => d.id.toString() === formData.dosenId,
+												);
+												return (
+													<span className="font-medium text-slate-800">
+														{selected?.fullName || `Dosen #${formData.dosenId}`}
+													</span>
+												);
+											})()
+										) : (
+											<span className="text-slate-400">
+												Pilih Dosen Pengampu
+											</span>
+										)}
 									</SelectTrigger>
 									<SelectContent>
 										{dosenList.map((d) => (
@@ -727,17 +791,67 @@ export default function MataKuliahPage() {
 							</div>
 						)}
 
-						<div className="grid grid-cols-2 gap-4">
+						<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 							<div className="space-y-2">
-								<Label>Peminatan (Opsional)</Label>
-								<Input
-									placeholder="Cth: F&B Service"
-									className="border border-slate-200"
-									value={formData.peminatan}
-									onChange={(e) =>
-										setFormData({ ...formData, peminatan: e.target.value })
+								<Label>Peminatan</Label>
+								<Select
+									value={formData.peminatan || "all"}
+									onValueChange={(val) =>
+										setFormData({
+											...formData,
+											peminatan: val === "all" || !val ? "" : val,
+										})
 									}
-								/>
+								>
+									<SelectTrigger className="border border-slate-200 bg-white">
+										{formData.peminatan ? (
+											(() => {
+												const opt =
+													PEMINATAN_OPTIONS.find(
+														(p) => p.value === formData.peminatan,
+													) || getPeminatanOption(formData.peminatan);
+												return (
+													<div className="flex items-center gap-2">
+														<img
+															src={opt.flag}
+															alt={opt.alt}
+															className="w-4 h-3 object-cover rounded-[1px] shrink-0 shadow-2xs border border-slate-200"
+														/>
+														<span className="font-medium text-slate-800">
+															{opt.label}
+														</span>
+													</div>
+												);
+											})()
+										) : (
+											<span className="text-slate-500">
+												Semua Peminatan (Umum)
+											</span>
+										)}
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="all">
+											<div className="flex items-center gap-2 text-slate-600">
+												<span className="w-4 h-3 bg-slate-100 rounded-[1px] border border-slate-200 flex items-center justify-center text-[9px]">
+													🌐
+												</span>
+												<span>Semua Peminatan (Mata Kuliah Umum)</span>
+											</div>
+										</SelectItem>
+										{PEMINATAN_OPTIONS.slice(0, 4).map((item) => (
+											<SelectItem key={item.value} value={item.value}>
+												<div className="flex items-center gap-2">
+													<img
+														src={item.flag}
+														alt={item.alt}
+														className="w-4 h-3 object-cover rounded-[1px] shrink-0 shadow-2xs border border-slate-200"
+													/>
+													<span className="font-medium">{item.label}</span>
+												</div>
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
 							</div>
 							<div className="space-y-2">
 								<Label>Jenis *</Label>
@@ -747,7 +861,7 @@ export default function MataKuliahPage() {
 										setFormData({ ...formData, type: val || "teori" })
 									}
 								>
-									<SelectTrigger className="border border-slate-200">
+									<SelectTrigger className="border border-slate-200 bg-white">
 										<SelectValue placeholder="Pilih Jenis" />
 									</SelectTrigger>
 									<SelectContent>

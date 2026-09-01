@@ -14,6 +14,7 @@ import {
 	CreditCard,
 	DollarSign,
 	Download,
+	ExternalLink,
 	Eye,
 	FileText,
 	GraduationCap,
@@ -89,8 +90,117 @@ export default function FinancePanelMahasiswa() {
 
 	const isTalangan = data?.metodePembayaran === "dana_talangan";
 
-	// Kalkulasi Partisi
-	const totalBiayaPendidikan = data?.totalBiayaPendidikan || 0;
+	// Kalkulasi Tahapan/Partisi & Progress Terpadu
+	const defaultItems = isTalangan
+		? [
+				{
+					key: "registrasi",
+					label: "1. Registrasi Awal",
+					desc: "Pembayaran biaya registrasi awal masuk kuliah",
+					status: Boolean(data?.registrasiStatus),
+					paidDate: data?.registrasiPaidDate,
+					nominal: data?.registrasiNominal || 0,
+					badge: "Partisi 1",
+				},
+				{
+					key: "admin_talangan",
+					label: "2. Administrasi Talangan",
+					desc: "Biaya administrasi perjanjian notaris & lembaga keuangan",
+					status: Boolean(data?.adminTalaganStatus),
+					paidDate: data?.adminTalaganPaidDate,
+					nominal: data?.adminTalaganNominal || 0,
+					badge: "Biaya Admin",
+				},
+				{
+					key: "tahap_1",
+					label: "3. Dana Talangan Tahap 1",
+					desc: "Plafon perkuliahan semester & interview magang ditalangi",
+					status: Boolean(data?.t1InterviewStatus || data?.t1SemesterStatus),
+					paidDate: data?.t1InterviewPaidDate || data?.t1SemesterPaidDate,
+					nominal:
+						(data?.t1SemesterNominalTotal || 0) +
+						(data?.t1InterviewNominal || 0),
+					badge: "Talangan Tahap 1",
+				},
+				{
+					key: "tahap_2",
+					label: "4. Dana Talangan Tahap 2",
+					desc: "Plafon biaya visa, tiket pesawat & keberangkatan magang",
+					status: Boolean(data?.t2KeberangkatanStatus),
+					paidDate: data?.t2KeberangkatanPaidDate,
+					nominal: data?.t2KeberangkatanNominal || 0,
+					badge: "Talangan Tahap 2",
+				},
+			]
+		: [
+				{
+					key: "registrasi",
+					label: "1. Registrasi Awal",
+					desc: "Pembayaran biaya registrasi awal masuk kuliah",
+					status: Boolean(data?.registrasiStatus),
+					paidDate: data?.registrasiPaidDate,
+					nominal: data?.registrasiNominal || 0,
+					badge: "Partisi 1",
+				},
+				{
+					key: "semester",
+					label: "2. Perkuliahan 6 Semester",
+					desc: "Biaya perkuliahan semester 1 s.d semester 6",
+					status: Boolean(data?.mandiriSemesterStatus),
+					paidDate: data?.mandiriSemesterPaidDate,
+					nominal: data?.mandiriSemesterNominal || 0,
+					badge: "Partisi 2",
+				},
+				{
+					key: "interview",
+					label: "3. Biaya Interview Magang",
+					desc: "Biaya pelaksanaan wawancara kerja magang luar negeri",
+					status: Boolean(data?.mandiriInterviewStatus),
+					paidDate: data?.mandiriInterviewPaidDate,
+					nominal: data?.mandiriInterviewNominal || 0,
+					badge: "Partisi 3",
+				},
+				{
+					key: "keberangkatan",
+					label: "4. Biaya Keberangkatan",
+					desc: "Biaya visa kerja, asuransi & tiket penerbangan ke negara tujuan",
+					status: Boolean(data?.mandiriKeberangkatanStatus),
+					paidDate: data?.mandiriKeberangkatanPaidDate,
+					nominal: data?.mandiriKeberangkatanNominal || 0,
+					badge: "Partisi 4",
+				},
+			];
+
+	const progress = data?.progress || {
+		items: defaultItems,
+		completedItems: defaultItems.filter((i) => i.status).length,
+		totalItems: defaultItems.length,
+		completedPartitions: defaultItems.filter((i) => i.status).length,
+		totalPartitions: defaultItems.length,
+		progressPercent: Math.round(
+			(defaultItems.filter((i) => i.status).length / defaultItems.length) * 100,
+		),
+		totalBiayaPendidikan: data?.totalBiayaPendidikan || 0,
+		totalTerbayar: 0,
+		sisaTagihan: data?.totalBiayaPendidikan || 0,
+		nominalPercent: 0,
+		registrasiStatus: Boolean(data?.registrasiStatus),
+		semesterStatus: Boolean(
+			isTalangan ? data?.t1SemesterStatus : data?.mandiriSemesterStatus,
+		),
+		interviewStatus: Boolean(
+			isTalangan ? data?.t1InterviewStatus : data?.mandiriInterviewStatus,
+		),
+		keberangkatanStatus: Boolean(
+			isTalangan
+				? data?.t2KeberangkatanStatus
+				: data?.mandiriKeberangkatanStatus,
+		),
+		adminTalaganStatus: Boolean(data?.adminTalaganStatus),
+	};
+
+	const totalBiayaPendidikan =
+		progress.totalBiayaPendidikan || data?.totalBiayaPendidikan || 0;
 	const regNominal = data?.registrasiNominal || 0;
 	const semNominal = isTalangan
 		? data?.t1SemesterNominalTotal || 0
@@ -122,6 +232,38 @@ export default function FinancePanelMahasiswa() {
 			</Badge>
 		);
 	};
+
+	const renderChecklistItem = (
+		label: string,
+		isChecked: boolean,
+		note?: string,
+	) => (
+		<div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl transition-colors hover:bg-slate-100/60">
+			<div className="min-w-0 pr-2">
+				<span className="font-medium text-slate-700 flex items-center gap-2.5 text-sm">
+					<ShieldCheck className="w-4 h-4 text-slate-400 shrink-0" />
+					<span className="truncate">{label}</span>
+				</span>
+				{note && (
+					<p className="text-[11px] text-slate-400 pl-6.5 mt-0.5 truncate">
+						{note}
+					</p>
+				)}
+			</div>
+			{isChecked ? (
+				<Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-0 text-xs font-semibold shrink-0">
+					<CheckCircle2 className="w-3 h-3 mr-1" /> Lunas / Selesai
+				</Badge>
+			) : (
+				<Badge
+					variant="outline"
+					className="text-amber-700 bg-amber-50/50 border-amber-200 text-xs font-medium shrink-0"
+				>
+					<Clock className="w-3 h-3 mr-1" /> Proses
+				</Badge>
+			)}
+		</div>
+	);
 
 	const formatDate = (dateString: string | null | undefined) => {
 		if (!dateString) return "-";
@@ -176,9 +318,17 @@ export default function FinancePanelMahasiswa() {
 							</CardDescription>
 						</div>
 						{data?.isAcc ? (
-							<Badge className="bg-emerald-500 text-white px-3.5 py-1.5 text-sm rounded-full shadow-sm font-semibold">
-								<CheckCircle className="w-4 h-4 mr-1.5" /> Telah di-ACC Finance
-							</Badge>
+							<div className="flex flex-col items-end gap-1">
+								<Badge className="bg-emerald-500 text-white px-3.5 py-1.5 text-sm rounded-full shadow-sm font-semibold">
+									<CheckCircle className="w-4 h-4 mr-1.5" /> Telah di-ACC
+									Finance
+								</Badge>
+								{data?.accAt && (
+									<span className="text-[11px] text-slate-500 font-medium">
+										Disetujui: {formatDate(data.accAt)}
+									</span>
+								)}
+							</div>
 						) : (
 							<Badge
 								variant="outline"
@@ -190,6 +340,110 @@ export default function FinancePanelMahasiswa() {
 					</div>
 				</CardHeader>
 				<CardContent className="p-6 sm:p-8 space-y-8">
+					{/* Section 0: Progres Pemenuhan Finansial & Partisi Biaya */}
+					<div className="space-y-4">
+						<div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+							<div>
+								<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+									<Coins className="w-4 h-4 text-[#0517B0]" />
+									{isTalangan
+										? "Progres Tahapan Pembiayaan Dana Talangan"
+										: "Progres Pemenuhan Partisi Biaya Mandiri"}
+								</h3>
+								<p className="text-xs text-slate-500 mt-0.5">
+									{progress.completedItems ?? progress.completedPartitions} dari{" "}
+									{progress.totalItems ?? progress.totalPartitions}{" "}
+									{isTalangan
+										? "tahapan kewajiban talangan"
+										: "partisi biaya mandiri"}{" "}
+									telah terpenuhi
+								</p>
+							</div>
+							<span className="text-base font-extrabold text-[#0517B0] font-mono">
+								{progress.progressPercent}%
+							</span>
+						</div>
+
+						<Progress
+							value={progress.progressPercent}
+							className="h-3 bg-slate-100 rounded-full"
+						/>
+
+						{/* Method-Aware Checklist Cards */}
+						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+							{isTalangan ? (
+								<>
+									{renderChecklistItem(
+										"1. Registrasi Awal (DP)",
+										progress.registrasiStatus,
+										data?.registrasiPaidDate
+											? `Lunas pada ${formatDate(data.registrasiPaidDate)}`
+											: "Kewajiban awal pendaftaran langsung",
+									)}
+									{renderChecklistItem(
+										"2. Administrasi Talangan",
+										Boolean(data?.adminTalaganStatus),
+										data?.adminTalaganPaidDate
+											? `Lunas pada ${formatDate(data.adminTalaganPaidDate)}`
+											: "Biaya administrasi perjanjian lembaga keuangan",
+									)}
+									{renderChecklistItem(
+										"3. Dana Talangan Tahap 1",
+										Boolean(
+											data?.t1InterviewStatus ||
+												data?.t1SemesterStatus ||
+												(t1TotalBill > 0 && t1Paid >= t1TotalBill),
+										),
+										t1TotalBill > 0
+											? `Plafon: ${formatRupiah(t1TotalBill)}${t1Paid > 0 ? ` • Terbayar: ${formatRupiah(t1Paid)}` : ""}`
+											: "Plafon perkuliahan semester & interview magang",
+									)}
+									{renderChecklistItem(
+										"4. Dana Talangan Tahap 2",
+										Boolean(
+											data?.t2KeberangkatanStatus ||
+												(t2TotalBill > 0 && t2Paid >= t2TotalBill),
+										),
+										t2TotalBill > 0
+											? `Plafon: ${formatRupiah(t2TotalBill)}${t2Paid > 0 ? ` • Terbayar: ${formatRupiah(t2Paid)}` : ""}`
+											: "Plafon tiket pesawat, visa & keberangkatan",
+									)}
+								</>
+							) : (
+								<>
+									{renderChecklistItem(
+										"1. Registrasi Awal (DP)",
+										progress.registrasiStatus,
+										data?.registrasiPaidDate
+											? `Lunas pada ${formatDate(data.registrasiPaidDate)}`
+											: "Kewajiban awal pendaftaran langsung",
+									)}
+									{renderChecklistItem(
+										"2. Perkuliahan 6 Semester",
+										progress.semesterStatus,
+										data?.mandiriSemesterPaidDate
+											? `Lunas pada ${formatDate(data.mandiriSemesterPaidDate)}`
+											: "Pelunasan perkuliahan semester 1 s.d 6",
+									)}
+									{renderChecklistItem(
+										"3. Biaya Interview Magang",
+										progress.interviewStatus,
+										data?.mandiriInterviewPaidDate
+											? `Lunas pada ${formatDate(data.mandiriInterviewPaidDate)}`
+											: "Wawancara kerja user luar negeri",
+									)}
+									{renderChecklistItem(
+										"4. Biaya Keberangkatan",
+										progress.keberangkatanStatus,
+										data?.mandiriKeberangkatanPaidDate
+											? `Lunas pada ${formatDate(data.mandiriKeberangkatanPaidDate)}`
+											: "Visa kerja, asuransi & tiket penerbangan",
+									)}
+								</>
+							)}
+						</div>
+					</div>
+
 					{/* Section 1: Top Partisi Biaya Pendidikan */}
 					<div className="bg-gradient-to-br from-slate-900 via-[#07135e] to-[#0517B0] text-white p-6 rounded-2xl shadow-md space-y-5">
 						<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-white/15 pb-4">
@@ -201,12 +455,48 @@ export default function FinancePanelMahasiswa() {
 									{formatRupiah(totalBiayaPendidikan)}
 								</p>
 							</div>
-							<div className="flex items-center gap-2">
+							<div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
 								<Badge className="bg-white/20 text-white border-white/30 backdrop-blur-sm text-xs font-semibold px-3 py-1">
 									Metode: {isTalangan ? "Dana Talangan" : "Dana Mandiri"}
 								</Badge>
 							</div>
 						</div>
+
+						{/* Realisasi Keuangan Banner */}
+						{totalBiayaPendidikan > 0 && (
+							<div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 pb-2 border-b border-white/10">
+								<div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm border border-white/10">
+									<span className="text-[11px] text-emerald-300 block font-medium">
+										Total Terbayar / Terpenuhi
+									</span>
+									<p className="text-base font-extrabold font-mono mt-0.5 text-emerald-200">
+										{formatRupiah(progress.totalTerbayar)}
+									</p>
+								</div>
+								<div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm border border-white/10">
+									<span className="text-[11px] text-amber-300 block font-medium">
+										Sisa Kewajiban Tagihan
+									</span>
+									<p className="text-base font-extrabold font-mono mt-0.5 text-amber-200">
+										{formatRupiah(progress.sisaTagihan)}
+									</p>
+								</div>
+								<div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm border border-white/10 flex flex-col justify-between">
+									<div className="flex justify-between items-center">
+										<span className="text-[11px] text-blue-200 block font-medium">
+											Realisasi Finansial
+										</span>
+										<span className="text-xs font-bold font-mono text-white">
+											{progress.nominalPercent}%
+										</span>
+									</div>
+									<Progress
+										value={progress.nominalPercent}
+										className="h-2 bg-white/20 rounded-full mt-2"
+									/>
+								</div>
+							</div>
+						)}
 
 						{/* 4 Mini Cards Partisi */}
 						<div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -217,7 +507,7 @@ export default function FinancePanelMahasiswa() {
 								<p className="text-sm font-bold font-mono mt-0.5">
 									{formatRupiah(regNominal)}
 								</p>
-								<div className="mt-2">
+								<div className="mt-2 flex items-center justify-between">
 									{data?.registrasiStatus ? (
 										<span className="text-[10px] bg-emerald-400/30 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
 											Lunas
@@ -225,6 +515,11 @@ export default function FinancePanelMahasiswa() {
 									) : (
 										<span className="text-[10px] bg-amber-400/30 text-amber-300 px-2 py-0.5 rounded-full font-bold">
 											Pending
+										</span>
+									)}
+									{data?.registrasiPaidDate && (
+										<span className="text-[10px] text-blue-200">
+											{formatDate(data.registrasiPaidDate)}
 										</span>
 									)}
 								</div>
@@ -677,7 +972,7 @@ export default function FinancePanelMahasiswa() {
 												</p>
 											</div>
 										</div>
-										<div className="shrink-0 ml-2">
+										<div className="shrink-0 ml-2 flex items-center gap-1.5">
 											{doc.isVerified ? (
 												<Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 px-2 py-0.5 text-[10px] border-0">
 													Terverifikasi
@@ -689,6 +984,17 @@ export default function FinancePanelMahasiswa() {
 												>
 													Menunggu
 												</Badge>
+											)}
+											{doc.fileUrl && (
+												<a
+													href={doc.fileUrl}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+													title="Buka Dokumen"
+												>
+													<ExternalLink className="w-3.5 h-3.5" />
+												</a>
 											)}
 										</div>
 									</div>

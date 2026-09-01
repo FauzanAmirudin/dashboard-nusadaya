@@ -31,7 +31,6 @@ import {
 	paTripartiteLogs,
 	pmbData,
 	pmbDocuments,
-	pmbFeeDisbursements,
 	pmbPaymentPlan,
 	students,
 	users,
@@ -44,6 +43,268 @@ import {
 	cacheSet,
 } from "../lib/cache";
 import { fileService } from "../modules/file/service/file.service";
+
+function computeFinanceProgress(
+	finance: any,
+	semesters: any[] = [],
+	talanganInstallments: any[] = [],
+) {
+	if (!finance) {
+		return {
+			isAcc: false,
+			accAt: null,
+			status: "PERLU_PERHATIAN",
+			completedPartitions: 0,
+			totalPartitions: 4,
+			progressPercent: 0,
+			totalBiayaPendidikan: 0,
+			totalTerbayar: 0,
+			sisaTagihan: 0,
+			nominalPercent: 0,
+			metodePembayaran: "mandiri",
+			items: [],
+			completedItems: 0,
+			totalItems: 4,
+			registrasiStatus: false,
+			semesterStatus: false,
+			interviewStatus: false,
+			keberangkatanStatus: false,
+			adminTalaganStatus: false,
+		};
+	}
+
+	const isTalangan = finance.metodePembayaran === "dana_talangan";
+	const totalBiayaPendidikan = finance.totalBiayaPendidikan || 0;
+	const registrasiStatus = Boolean(finance.registrasiStatus);
+
+	let items: Array<{
+		key: string;
+		label: string;
+		desc: string;
+		status: boolean;
+		paidDate?: string | Date | null;
+		nominal: number;
+		paidNominal?: number;
+		badge: string;
+	}> = [];
+
+	let totalTerbayar = 0;
+	if (registrasiStatus) {
+		totalTerbayar += finance.registrasiNominal || 0;
+	}
+
+	if (isTalangan) {
+		const t1PaidFromInstallments = (talanganInstallments || [])
+			.filter((ti: any) => ti.stage === "tahap_1")
+			.reduce((sum: number, ti: any) => sum + (ti.nominalPaid || 0), 0);
+		const t1Paid = Math.max(
+			finance.t1SemesterNominalDibayar || 0,
+			t1PaidFromInstallments,
+		);
+
+		const t2PaidFromInstallments = (talanganInstallments || [])
+			.filter((ti: any) => ti.stage === "tahap_2")
+			.reduce((sum: number, ti: any) => sum + (ti.nominalPaid || 0), 0);
+		const t2Paid = t2PaidFromInstallments;
+
+		const t1SemesterNominal = finance.t1SemesterNominalTotal || 0;
+		const t1InterviewNominal = finance.t1InterviewNominal || 0;
+		const totalTahap1Nominal = t1SemesterNominal + t1InterviewNominal;
+		const totalTahap2Nominal = finance.t2KeberangkatanNominal || 0;
+
+		const adminTalaganStatus = Boolean(finance.adminTalaganStatus);
+		const t1Status = Boolean(
+			finance.t1InterviewStatus ||
+				finance.t1SemesterStatus ||
+				(totalTahap1Nominal > 0 && t1Paid >= totalTahap1Nominal),
+		);
+		const t2Status = Boolean(
+			finance.t2KeberangkatanStatus ||
+				(totalTahap2Nominal > 0 && t2Paid >= totalTahap2Nominal),
+		);
+
+		if (adminTalaganStatus) {
+			totalTerbayar += finance.adminTalaganNominal || 0;
+		}
+
+		if (t1Status) {
+			totalTerbayar += Math.max(totalTahap1Nominal, t1Paid);
+		} else {
+			totalTerbayar += t1Paid;
+		}
+
+		if (t2Status) {
+			totalTerbayar += Math.max(totalTahap2Nominal, t2Paid);
+		} else {
+			totalTerbayar += t2Paid;
+		}
+
+		items = [
+			{
+				key: "registrasi",
+				label: "1. Registrasi Awal",
+				desc: "Pembayaran biaya registrasi awal masuk kuliah",
+				status: registrasiStatus,
+				paidDate: finance.registrasiPaidDate,
+				nominal: finance.registrasiNominal || 0,
+				paidNominal: registrasiStatus ? finance.registrasiNominal || 0 : 0,
+				badge: "Partisi 1",
+			},
+			{
+				key: "admin_talangan",
+				label: "2. Administrasi Talangan",
+				desc: "Biaya administrasi perjanjian notaris & lembaga keuangan",
+				status: adminTalaganStatus,
+				paidDate: finance.adminTalaganPaidDate,
+				nominal: finance.adminTalaganNominal || 0,
+				paidNominal: adminTalaganStatus ? finance.adminTalaganNominal || 0 : 0,
+				badge: "Biaya Admin",
+			},
+			{
+				key: "tahap_1",
+				label: "3. Dana Talangan Tahap 1",
+				desc: "Plafon biaya perkuliahan semester & interview magang ditalangi",
+				status: t1Status,
+				paidDate: finance.t1InterviewPaidDate || finance.t1SemesterPaidDate,
+				nominal: totalTahap1Nominal,
+				paidNominal: t1Paid,
+				badge: "Talangan Tahap 1",
+			},
+			{
+				key: "tahap_2",
+				label: "4. Dana Talangan Tahap 2",
+				desc: "Plafon biaya visa, tiket penerbangan & keberangkatan magang",
+				status: t2Status,
+				paidDate: finance.t2KeberangkatanPaidDate,
+				nominal: totalTahap2Nominal,
+				paidNominal: t2Paid,
+				badge: "Talangan Tahap 2",
+			},
+		];
+	} else {
+		// Mandiri: 4 Partisi
+		const semestersLunasCount = (semesters || []).filter(
+			(s: any) =>
+				((s.installments || []).reduce(
+					(sum: number, i: any) => sum + (i.nominalPaid || 0),
+					0,
+				) >= (s.totalBilled || 0) &&
+					(s.totalBilled || 0) > 0) ||
+				s.isTalangan,
+		).length;
+
+		let semPaid = 0;
+		for (const sem of semesters || []) {
+			for (const ins of sem.installments || []) {
+				semPaid += ins.nominalPaid || 0;
+			}
+		}
+
+		const semesterStatus = Boolean(
+			finance.mandiriSemesterStatus || semestersLunasCount === 6,
+		);
+		const interviewStatus = Boolean(finance.mandiriInterviewStatus);
+		const keberangkatanStatus = Boolean(finance.mandiriKeberangkatanStatus);
+
+		if (semesterStatus) {
+			totalTerbayar += Math.max(finance.mandiriSemesterNominal || 0, semPaid);
+		} else {
+			totalTerbayar += semPaid;
+		}
+
+		if (interviewStatus) {
+			totalTerbayar += finance.mandiriInterviewNominal || 0;
+		}
+
+		if (keberangkatanStatus) {
+			totalTerbayar += finance.mandiriKeberangkatanNominal || 0;
+		}
+
+		items = [
+			{
+				key: "registrasi",
+				label: "1. Registrasi Awal",
+				desc: "Pembayaran biaya registrasi awal masuk kuliah",
+				status: registrasiStatus,
+				paidDate: finance.registrasiPaidDate,
+				nominal: finance.registrasiNominal || 0,
+				paidNominal: registrasiStatus ? finance.registrasiNominal || 0 : 0,
+				badge: "Partisi 1",
+			},
+			{
+				key: "semester",
+				label: "2. Perkuliahan 6 Semester",
+				desc: "Biaya perkuliahan semester 1 s.d semester 6",
+				status: semesterStatus,
+				paidDate: finance.mandiriSemesterPaidDate,
+				nominal: finance.mandiriSemesterNominal || 0,
+				paidNominal: semPaid,
+				badge: `${semestersLunasCount}/6 Semester`,
+			},
+			{
+				key: "interview",
+				label: "3. Biaya Interview Magang",
+				desc: "Biaya pelaksanaan wawancara kerja magang luar negeri",
+				status: interviewStatus,
+				paidDate: finance.mandiriInterviewPaidDate,
+				nominal: finance.mandiriInterviewNominal || 0,
+				paidNominal: interviewStatus ? finance.mandiriInterviewNominal || 0 : 0,
+				badge: "Partisi 3",
+			},
+			{
+				key: "keberangkatan",
+				label: "4. Biaya Keberangkatan",
+				desc: "Biaya visa kerja, asuransi & tiket penerbangan ke negara tujuan",
+				status: keberangkatanStatus,
+				paidDate: finance.mandiriKeberangkatanPaidDate,
+				nominal: finance.mandiriKeberangkatanNominal || 0,
+				paidNominal: keberangkatanStatus
+					? finance.mandiriKeberangkatanNominal || 0
+					: 0,
+				badge: "Partisi 4",
+			},
+		];
+	}
+
+	const completedItems = items.filter((i) => i.status).length;
+	const totalItems = items.length;
+	const progressPercent =
+		totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+	const sisaTagihan = Math.max(0, totalBiayaPendidikan - totalTerbayar);
+	const nominalPercent =
+		totalBiayaPendidikan > 0
+			? Math.min(100, Math.round((totalTerbayar / totalBiayaPendidikan) * 100))
+			: 0;
+
+	return {
+		isAcc: Boolean(finance.isAcc),
+		accAt: finance.accAt,
+		status: finance.status || "PERLU_PERHATIAN",
+		completedPartitions: completedItems,
+		totalPartitions: totalItems,
+		completedItems,
+		totalItems,
+		progressPercent,
+		totalBiayaPendidikan,
+		totalTerbayar,
+		sisaTagihan,
+		nominalPercent,
+		metodePembayaran: finance.metodePembayaran || "mandiri",
+		items,
+		registrasiStatus,
+		semesterStatus: isTalangan
+			? Boolean(finance.t1SemesterStatus)
+			: Boolean(finance.mandiriSemesterStatus),
+		interviewStatus: isTalangan
+			? Boolean(finance.t1InterviewStatus)
+			: Boolean(finance.mandiriInterviewStatus),
+		keberangkatanStatus: isTalangan
+			? Boolean(finance.t2KeberangkatanStatus)
+			: Boolean(finance.mandiriKeberangkatanStatus),
+		adminTalaganStatus: Boolean(finance.adminTalaganStatus),
+	};
+}
 
 export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 	.derive(async ({ request, jwt, cookie: { auth } }: any) => {
@@ -115,38 +376,224 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			return { success: false, message: "Data mahasiswa tidak ditemukan" };
 		}
 
-		const [pmb, crm, finance, academic, pa, internship, decision] =
-			await Promise.all([
-				db.query.pmbData.findFirst({
-					where: eq(pmbData.studentId, studentData.id),
-				}),
-				db.query.crmData.findFirst({
-					where: eq(crmData.studentId, studentData.id),
-				}),
-				db.query.financeData.findFirst({
-					where: eq(financeData.studentId, studentData.id),
-				}),
-				db.query.academicData.findFirst({
-					where: eq(academicData.studentId, studentData.id),
-				}),
-				db.query.paData.findFirst({
-					where: eq(paData.studentId, studentData.id),
-				}),
-				db.query.internshipData.findFirst({
-					where: eq(internshipData.studentId, studentData.id),
-				}),
-				db.query.finalDecision.findFirst({
-					where: eq(finalDecision.studentId, studentData.id),
-				}),
-			]);
+		const [
+			pmb,
+			crm,
+			finance,
+			academic,
+			pa,
+			internship,
+			decision,
+			hafalanSessions,
+		] = await Promise.all([
+			db.query.pmbData.findFirst({
+				where: eq(pmbData.studentId, studentData.id),
+			}),
+			db.query.crmData.findFirst({
+				where: eq(crmData.studentId, studentData.id),
+			}),
+			db.query.financeData.findFirst({
+				where: eq(financeData.studentId, studentData.id),
+			}),
+			db.query.academicData.findFirst({
+				where: eq(academicData.studentId, studentData.id),
+			}),
+			db.query.paData.findFirst({
+				where: eq(paData.studentId, studentData.id),
+			}),
+			db.query.internshipData.findFirst({
+				where: eq(internshipData.studentId, studentData.id),
+			}),
+			db.query.finalDecision.findFirst({
+				where: eq(finalDecision.studentId, studentData.id),
+			}),
+			db.query.paHafalanSessions.findMany({
+				where: eq(paHafalanSessions.studentId, studentData.id),
+			}),
+		]);
+
+		// Hitung Progress PMB (14 item: 4 utama + 10 dokumen fisik)
+		const pmbChecklist = [
+			pmb?.formReceived,
+			pmb?.documentsComplete,
+			pmb?.dataInputted,
+			pmb?.initialFollowUp,
+			pmb?.docKtp,
+			pmb?.docKk,
+			pmb?.docCv,
+			pmb?.docIjazah,
+			pmb?.docTranskrip,
+			pmb?.docPassportDepan,
+			pmb?.docPassportVisa,
+			pmb?.docSkbm,
+			pmb?.docMcu,
+			pmb?.docSertifikasiBahasa,
+		];
+		const pmbCompleted = pmbChecklist.filter(Boolean).length;
+		const pmbTotal = 14;
+		const pmbPercent = Math.round((pmbCompleted / pmbTotal) * 100);
+
+		// Hitung Progress CRM (8 kriteria)
+		const crmChecklist = [
+			crm?.isMonitoringParent,
+			crm?.isMonitoringIndustry,
+			crm?.isVocabComplete,
+			crm?.practiceAttendance,
+			crm?.isOdsReport,
+			crm?.odsDocumentation,
+			crm?.isPrammagangReport,
+			crm?.isPrammagangDocumentation,
+		];
+		const crmCompleted = crmChecklist.filter(Boolean).length;
+		const crmTotal = 8;
+		const crmPercent = Math.round((crmCompleted / crmTotal) * 100);
+		const crmPresent = crm?.practiceDaysPresent ?? 0;
+		const crmDaysTotal = crm?.practiceDaysTotal ?? 0;
+		const crmAttendancePercent =
+			crmDaysTotal > 0
+				? Math.min(Math.round((crmPresent / crmDaysTotal) * 100), 100)
+				: 0;
+
+		// Hitung Progress Finance (Partisi & Realisasi Pembayaran)
+		const financeProgress = computeFinanceProgress(finance);
+
+		// Hitung Progress Akademik (6 checklist dasar + GPA + Kehadiran)
+		const academicChecklist = [
+			academic?.pddiktiInput,
+			academic?.utsPassed,
+			academic?.uasPassed,
+			academic?.assignmentsCompleted,
+			academic?.attitudeIndicator,
+			academic?.academicCommunication,
+		];
+		const academicCompleted = academicChecklist.filter(Boolean).length;
+		const academicTotal = 6;
+		const academicPercent = Math.round(
+			(academicCompleted / academicTotal) * 100,
+		);
+		const academicPresent = academic?.attendancePresent ?? 0;
+		const academicTotalDays = academic?.attendanceTotal ?? 0;
+		const academicAttendancePercent =
+			academicTotalDays > 0
+				? Math.min(Math.round((academicPresent / academicTotalDays) * 100), 100)
+				: 0;
+
+		// Hitung Progress PA (3 checklist + Hafalan Vocab)
+		const paChecklist = [
+			pa?.counselingDone,
+			pa?.mentalStable,
+			pa?.disciplineGood,
+		];
+		const paCompleted = paChecklist.filter(Boolean).length;
+		const paChecklistPercent = Math.round((paCompleted / 3) * 100);
+		const totalVocabCount = (hafalanSessions || []).reduce(
+			(sum: number, h: any) => sum + (h.vocabCount || 0),
+			0,
+		);
+		const vocabTarget = pa?.vocabTarget || 500;
+		const vocabPercent = Math.min(
+			Math.round((totalVocabCount / vocabTarget) * 100),
+			100,
+		);
+
+		// Hitung Progress Magang (11 Pra-Paspor + 12 Tahapan Magang)
+		const praPasporChecklist = [
+			internship?.praPasporPasFoto,
+			internship?.praPasporKtm,
+			internship?.praPasporKtp,
+			internship?.praPasporKk,
+			internship?.praPasporAktaKelahiran,
+			internship?.praPasporSl21,
+			internship?.praPasporSkma,
+			internship?.praPasporRekomendasiDisdik,
+			internship?.praPasporGapYear,
+			internship?.praPasporPddikti,
+			internship?.praPasporCv,
+		];
+		const praPasporCompleted = praPasporChecklist.filter(Boolean).length;
+		const praPasporPercent = Math.round((praPasporCompleted / 11) * 100);
+
+		const mainMagangChecklist = [
+			internship?.passportReady,
+			internship?.interviewReady,
+			internship?.loaReady,
+			internship?.lolReady,
+			internship?.moaReady,
+			internship?.contractReady,
+			internship?.mcuReady,
+			internship?.visaReady,
+			internship?.ticketReady,
+			internship?.pdtReady,
+			internship?.dokumentasiReady,
+			internship?.agenReady,
+		];
+		const mainMagangCompleted = mainMagangChecklist.filter(Boolean).length;
+		const mainMagangPercent = Math.round((mainMagangCompleted / 12) * 100);
 
 		const responseData = {
-			pmb: { isAcc: pmb?.isAcc, status: pmb?.status },
-			crm: { isAcc: crm?.isAcc, status: crm?.status },
-			finance: { isAcc: finance?.isAcc, status: finance?.status },
-			academic: { isAcc: academic?.isAcc, status: academic?.status },
-			pa: { isAcc: pa?.isAcc, status: pa?.status },
-			internship: { isAcc: internship?.isAcc, status: internship?.status },
+			pmb: {
+				isAcc: pmb?.isAcc ?? false,
+				status: pmb?.status,
+				completedItems: pmbCompleted,
+				totalItems: pmbTotal,
+				progressPercent: pmbPercent,
+			},
+			crm: {
+				isAcc: crm?.isAcc ?? false,
+				status: crm?.status,
+				completedItems: crmCompleted,
+				totalItems: crmTotal,
+				progressPercent: crmPercent,
+				practiceAttendancePercent: crmAttendancePercent,
+				practiceDaysPresent: crmPresent,
+				practiceDaysTotal: crmDaysTotal,
+			},
+			finance: {
+				isAcc: financeProgress.isAcc,
+				status: financeProgress.status,
+				progressPercent: financeProgress.progressPercent,
+				completedPartitions: financeProgress.completedPartitions,
+				totalPartitions: financeProgress.totalPartitions,
+				totalBiayaPendidikan: financeProgress.totalBiayaPendidikan,
+				totalTerbayar: financeProgress.totalTerbayar,
+				sisaTagihan: financeProgress.sisaTagihan,
+				nominalPercent: financeProgress.nominalPercent,
+				metodePembayaran: financeProgress.metodePembayaran,
+				registrasiStatus: financeProgress.registrasiStatus,
+				semesterStatus: financeProgress.semesterStatus,
+				interviewStatus: financeProgress.interviewStatus,
+				keberangkatanStatus: financeProgress.keberangkatanStatus,
+			},
+			academic: {
+				isAcc: academic?.isAcc ?? false,
+				status: academic?.status,
+				completedItems: academicCompleted,
+				totalItems: academicTotal,
+				progressPercent: academicPercent,
+				gpa: academic?.gpa ? academic.gpa / 100 : 0,
+				creditsCompleted: academic?.creditsCompleted ?? 0,
+				attendancePercent: academicAttendancePercent,
+			},
+			pa: {
+				isAcc: pa?.isAcc ?? false,
+				status: pa?.status,
+				completedItems: paCompleted,
+				totalItems: 3,
+				checklistPercent: paChecklistPercent,
+				totalVocab: totalVocabCount,
+				vocabTarget: vocabTarget,
+				vocabPercent: vocabPercent,
+			},
+			internship: {
+				isAcc: internship?.isAcc ?? false,
+				status: internship?.status,
+				praPasporCompleted,
+				praPasporTotal: 11,
+				praPasporPercent,
+				mainCompleted: mainMagangCompleted,
+				mainTotal: 12,
+				mainPercent: mainMagangPercent,
+			},
 			finalDecision: {
 				evaluatorDecision: decision?.evaluatorDecision,
 				isApprovedByDirector: decision?.isApprovedByDirector,
@@ -326,22 +773,17 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 		let data: any = null;
 
 		if (panelKey === "pmb") {
-			const [pmb, paymentPlan, documents, feeDisbursements] = await Promise.all(
-				[
-					db.query.pmbData.findFirst({
-						where: eq(pmbData.studentId, studentData.id),
-					}),
-					db.query.pmbPaymentPlan.findFirst({
-						where: eq(pmbPaymentPlan.studentId, studentData.id),
-					}),
-					db.query.pmbDocuments.findMany({
-						where: eq(pmbDocuments.studentId, studentData.id),
-					}),
-					db.query.pmbFeeDisbursements.findMany({
-						where: eq(pmbFeeDisbursements.studentId, studentData.id),
-					}),
-				],
-			);
+			const [pmb, paymentPlan, documents] = await Promise.all([
+				db.query.pmbData.findFirst({
+					where: eq(pmbData.studentId, studentData.id),
+				}),
+				db.query.pmbPaymentPlan.findFirst({
+					where: eq(pmbPaymentPlan.studentId, studentData.id),
+				}),
+				db.query.pmbDocuments.findMany({
+					where: eq(pmbDocuments.studentId, studentData.id),
+				}),
+			]);
 
 			data = {
 				// 4 Checklist Utama
@@ -397,20 +839,13 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 						}
 					: null,
 
-				// Dokumen & Fee
+				// Dokumen Digital PMB (Fee sharing sepenuhnya dirahasiakan)
 				documents: documents.map((d) => ({
 					documentKey: d.documentKey,
 					fileName: d.fileName,
 					fileUrl: d.fileUrl,
 					isVerified: d.isVerified,
 					uploadedAt: d.uploadedAt,
-				})),
-				fees: feeDisbursements.map((f) => ({
-					channel: f.channel,
-					namaReferral: f.namaReferral,
-					nominalFee: f.nominalFee,
-					statusPencairan: f.statusPencairan,
-					tanggalCair: f.tanggalCair,
 				})),
 			};
 		} else if (panelKey === "crm") {
@@ -516,7 +951,6 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			data = {
 				// Plafon & Partisi Biaya Pendidikan
 				totalBiayaPendidikan: finance?.totalBiayaPendidikan ?? 0,
-				totalBiayaPromosi: finance?.totalBiayaPromosi ?? 0,
 				metodePembayaran: finance?.metodePembayaran ?? "mandiri",
 
 				// 1. Registrasi Awal
@@ -623,6 +1057,13 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 					isVerified: d.isVerified,
 					uploadedAt: d.uploadedAt,
 				})),
+
+				// Real-time Progress & Financial Summary
+				progress: computeFinanceProgress(
+					finance,
+					semesters,
+					talanganInstallments,
+				),
 
 				status: finance?.status,
 				isAcc: finance?.isAcc,
@@ -736,6 +1177,7 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				tripartites,
 				hafalanSessionsList,
 				documents,
+				studentNotesList,
 			] = await Promise.all([
 				db.query.paData.findFirst({
 					where: eq(paData.studentId, studentData.id),
@@ -768,6 +1210,12 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				}),
 				db.query.paDocuments.findMany({
 					where: eq(paDocuments.studentId, studentData.id),
+				}),
+				db.query.paStudentNotes.findMany({
+					where: eq(paStudentNotes.studentId, studentData.id),
+					orderBy: (paStudentNotes, { desc }) => [
+						desc(paStudentNotes.createdAt),
+					],
 				}),
 			]);
 
@@ -824,6 +1272,14 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 					contactDate: t.contactDate,
 					summary: t.summary,
 					result: t.result,
+				})),
+
+				// Catatan Khusus PA untuk Mahasiswa
+				studentNotes: studentNotesList.map((sn) => ({
+					id: sn.id,
+					type: sn.type,
+					content: sn.content,
+					createdAt: sn.createdAt,
 				})),
 
 				documents: documents.map((d) => ({

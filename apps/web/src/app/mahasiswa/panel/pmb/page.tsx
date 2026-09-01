@@ -8,9 +8,12 @@ import {
 	CheckCircle2,
 	Clock,
 	DollarSign,
+	Download,
+	ExternalLink,
 	FileCheck,
 	FileText,
 	Info,
+	MessageSquare,
 	RefreshCw,
 	ShieldCheck,
 	Users,
@@ -66,6 +69,15 @@ export default function PmbPanelMahasiswa() {
 			</div>
 		);
 	}
+
+	const formatDate = (dateString: string | null | undefined) => {
+		if (!dateString) return "-";
+		return new Date(dateString).toLocaleDateString("id-ID", {
+			day: "numeric",
+			month: "short",
+			year: "numeric",
+		});
+	};
 
 	const renderChecklistItem = (label: string, isChecked: boolean) => (
 		<div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl transition-colors hover:bg-slate-100/60">
@@ -145,9 +157,16 @@ export default function PmbPanelMahasiswa() {
 							</CardDescription>
 						</div>
 						{data?.isAcc ? (
-							<Badge className="bg-emerald-500 text-white px-3.5 py-1.5 text-sm rounded-full shadow-sm font-semibold">
-								<CheckCircle className="w-4 h-4 mr-1.5" /> Telah di-ACC PMB
-							</Badge>
+							<div className="flex flex-col items-end gap-1">
+								<Badge className="bg-emerald-500 text-white px-3.5 py-1.5 text-sm rounded-full shadow-sm font-semibold">
+									<CheckCircle className="w-4 h-4 mr-1.5" /> Telah di-ACC PMB
+								</Badge>
+								{data?.accAt && (
+									<span className="text-[11px] text-slate-500 font-medium">
+										Disetujui: {formatDate(data.accAt)}
+									</span>
+								)}
+							</div>
 						) : (
 							<Badge
 								variant="outline"
@@ -160,6 +179,21 @@ export default function PmbPanelMahasiswa() {
 					</div>
 				</CardHeader>
 				<CardContent className="p-6 sm:p-8 space-y-8">
+					{/* Catatan Khusus PMB jika ada */}
+					{data?.notes && (
+						<div className="p-4 bg-blue-50/60 border border-blue-200/80 rounded-2xl flex items-start gap-3">
+							<MessageSquare className="w-5 h-5 text-[#0517B0] shrink-0 mt-0.5" />
+							<div>
+								<h4 className="font-bold text-slate-900 text-sm">
+									Catatan dari Tim PMB
+								</h4>
+								<p className="text-xs text-slate-700 mt-1 leading-relaxed whitespace-pre-wrap">
+									{data.notes}
+								</p>
+							</div>
+						</div>
+					)}
+
 					{/* Section 1: Progress & Checklist Utama */}
 					<div>
 						<div className="flex justify-between items-end mb-3">
@@ -441,7 +475,7 @@ export default function PmbPanelMahasiswa() {
 												</p>
 											</div>
 										</div>
-										<div className="shrink-0 ml-2">
+										<div className="shrink-0 ml-2 flex items-center gap-1.5">
 											{doc.isVerified ? (
 												<Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 px-2 py-0.5 text-[10px] border-0">
 													Terverifikasi
@@ -453,6 +487,17 @@ export default function PmbPanelMahasiswa() {
 												>
 													Menunggu
 												</Badge>
+											)}
+											{doc.fileUrl && (
+												<a
+													href={doc.fileUrl}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+													title="Buka Dokumen"
+												>
+													<ExternalLink className="w-3.5 h-3.5" />
+												</a>
 											)}
 										</div>
 									</div>

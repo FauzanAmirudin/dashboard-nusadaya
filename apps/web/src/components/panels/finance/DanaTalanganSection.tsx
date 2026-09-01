@@ -16,12 +16,18 @@ import {
 import type React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import { Input } from "@/components/ui/input";
 import { API_URL } from "@/lib/eden";
+import {
+	filterFinanceInteger,
+	preventFinanceIntegerKey,
+} from "@/utils/form-validators";
 import { formatRupiah } from "@/utils/format";
-import { StagedDocumentUpload } from "./StagedDocumentUpload";
 
 interface DanaTalanganSectionProps {
+	studentId: number;
 	formData: any;
 	canEdit: boolean;
 	isEditingUtama: boolean;
@@ -42,18 +48,14 @@ interface DanaTalanganSectionProps {
 	t2Installments: any[];
 	openTalanganModal: (stage: "tahap_1" | "tahap_2", inst?: any) => void;
 	handleDeleteTalanganInstallment: (id: number) => void;
-	financeDocs: Record<string, any[]>;
-	stagedDocsUtama: Record<string, File | null>;
-	deletedDocKeysUtama: string[];
-	handleStageDoc: (section: "utama", docKey: string, file: File) => void;
-	handleRemoveStagedDoc: (section: "utama", docKey: string) => void;
-	handleDeleteExistingDoc: (section: "utama", docKey: string) => void;
-	handleRestoreExistingDoc: (section: "utama", docKey: string) => void;
 	hasAdminTalanganDoc: boolean;
 	preventMinus: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+	handleToggleStatus?: (fieldKey: string, nextStatus: boolean) => void;
+	onUpdate: () => void;
 }
 
 export function DanaTalanganSection({
+	studentId,
 	formData,
 	canEdit,
 	isEditingUtama,
@@ -74,19 +76,24 @@ export function DanaTalanganSection({
 	t2Installments,
 	openTalanganModal,
 	handleDeleteTalanganInstallment,
-	financeDocs,
-	stagedDocsUtama,
-	deletedDocKeysUtama,
-	handleStageDoc,
-	handleRemoveStagedDoc,
-	handleDeleteExistingDoc,
-	handleRestoreExistingDoc,
 	hasAdminTalanganDoc,
 	preventMinus,
+	handleToggleStatus,
+	onUpdate,
 }: DanaTalanganSectionProps) {
 	if (formData?.metodePembayaran !== "dana_talangan") {
 		return null;
 	}
+
+	const isTahap1Checked = Boolean(
+		formData?.t1InterviewStatus || formData?.t1SemesterStatus || isTahap1Lunas,
+	);
+	const isTahap2Checked = Boolean(
+		formData?.t2KeberangkatanStatus || isTahap2Lunas,
+	);
+	const isAdminChecked = Boolean(
+		formData?.adminTalaganStatus || hasAdminTalanganDoc,
+	);
 
 	return (
 		<div className="space-y-6 p-5 border border-emerald-100 bg-emerald-50/40 rounded-xl">
@@ -102,16 +109,46 @@ export function DanaTalanganSection({
 
 			<div className="grid gap-6">
 				{/* 1. Card Tahap 1: Interview Magang & Semester Ditalangi */}
-				<div className="bg-white p-5 border border-slate-200/90 rounded-xl shadow-2xs space-y-4">
+				<div
+					className={`p-5 rounded-xl border transition-colors space-y-4 ${
+						isTahap1Checked
+							? "border-emerald-200 bg-emerald-50/20 shadow-xs"
+							: "border-slate-200/90 bg-white shadow-2xs"
+					}`}
+				>
 					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-						<div className="flex items-center gap-2.5">
-							<div className="p-2 rounded-lg bg-amber-50 text-amber-600 border border-amber-100/80 shadow-2xs">
-								<Building className="w-4 h-4" />
+						<div className="flex items-start gap-3">
+							<Checkbox
+								id="chk-t1Status"
+								checked={isTahap1Checked}
+								disabled={!canEdit}
+								onCheckedChange={(checked) => {
+									if (isEditingUtama) {
+										handleFieldChange("t1InterviewStatus", Boolean(checked));
+										handleFieldChange("t1SemesterStatus", Boolean(checked));
+										if (checked && !formData?.t1InterviewPaidDate) {
+											handleFieldChange(
+												"t1InterviewPaidDate",
+												new Date().toISOString().split("T")[0],
+											);
+										}
+									} else if (handleToggleStatus) {
+										handleToggleStatus("t1InterviewStatus", Boolean(checked));
+										handleToggleStatus("t1SemesterStatus", Boolean(checked));
+									}
+								}}
+								className="mt-1 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+							/>
+							<div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-700 border border-amber-500/20">
+								<Building className="w-5 h-5 text-amber-600" />
 							</div>
 							<div>
-								<div className="font-bold text-slate-800 text-base flex items-center gap-2">
+								<label
+									htmlFor="chk-t1Status"
+									className="font-bold text-slate-800 text-base flex items-center gap-2 cursor-pointer hover:text-[#0517B0] transition-colors"
+								>
 									Tahap 1: Interview Magang & Semester Ditalangi
-								</div>
+								</label>
 								<div className="flex items-center gap-2 mt-0.5">
 									<Badge
 										variant="outline"
@@ -124,10 +161,10 @@ export function DanaTalanganSection({
 						</div>
 
 						<div className="flex items-center gap-3">
-							{isTahap1Lunas ? (
+							{isTahap1Checked ? (
 								<Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs py-1 px-2.5 font-bold">
 									<CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />{" "}
-									Lunas
+									Lunas / Selesai
 								</Badge>
 							) : t1Paid > 0 ? (
 								<Badge className="bg-amber-50 text-amber-700 border border-amber-200 text-xs py-1 px-2.5 font-bold">
@@ -307,11 +344,7 @@ export function DanaTalanganSection({
 													<span className="text-sm font-bold text-slate-800 font-mono">
 														{formatRupiah(inst.nominalPaid)}
 													</span>
-													{inst.file ? (
-														<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] py-0">
-															Draft Baru
-														</Badge>
-													) : inst.buktiBayarUrl ? (
+													{inst.buktiBayarUrl ? (
 														<a
 															href={`${API_URL}${inst.buktiBayarUrl.startsWith("/") ? "" : "/"}${inst.buktiBayarUrl}`}
 															target="_blank"
@@ -371,16 +404,50 @@ export function DanaTalanganSection({
 				</div>
 
 				{/* 2. Card Tahap 2: Keberangkatan */}
-				<div className="bg-white p-5 border border-slate-200/90 rounded-xl shadow-2xs space-y-4">
+				<div
+					className={`p-5 rounded-xl border transition-colors space-y-4 ${
+						isTahap2Checked
+							? "border-emerald-200 bg-emerald-50/20 shadow-xs"
+							: "border-slate-200/90 bg-white shadow-2xs"
+					}`}
+				>
 					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-						<div className="flex items-center gap-2.5">
-							<div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100/80 shadow-2xs">
-								<Plane className="w-4 h-4" />
+						<div className="flex items-start gap-3">
+							<Checkbox
+								id="chk-t2Status"
+								checked={isTahap2Checked}
+								disabled={!canEdit}
+								onCheckedChange={(checked) => {
+									if (isEditingUtama) {
+										handleFieldChange(
+											"t2KeberangkatanStatus",
+											Boolean(checked),
+										);
+										if (checked && !formData?.t2KeberangkatanPaidDate) {
+											handleFieldChange(
+												"t2KeberangkatanPaidDate",
+												new Date().toISOString().split("T")[0],
+											);
+										}
+									} else if (handleToggleStatus) {
+										handleToggleStatus(
+											"t2KeberangkatanStatus",
+											Boolean(checked),
+										);
+									}
+								}}
+								className="mt-1 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+							/>
+							<div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
+								<Plane className="w-5 h-5 text-emerald-600" />
 							</div>
 							<div>
-								<div className="font-bold text-slate-800 text-base flex items-center gap-2">
-									Tahap 2: Keberangkatan (Visa & Tiket)
-								</div>
+								<label
+									htmlFor="chk-t2Status"
+									className="font-bold text-slate-800 text-base flex items-center gap-2 cursor-pointer hover:text-[#0517B0] transition-colors"
+								>
+									Tahap 2: Tiket, Visa & Keberangkatan
+								</label>
 								<div className="flex items-center gap-2 mt-0.5">
 									<Badge
 										variant="outline"
@@ -393,10 +460,10 @@ export function DanaTalanganSection({
 						</div>
 
 						<div className="flex items-center gap-3">
-							{isTahap2Lunas ? (
+							{isTahap2Checked ? (
 								<Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs py-1 px-2.5 font-bold">
 									<CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />{" "}
-									Lunas
+									Lunas / Selesai
 								</Badge>
 							) : t2Paid > 0 ? (
 								<Badge className="bg-amber-50 text-amber-700 border border-amber-200 text-xs py-1 px-2.5 font-bold">
@@ -537,11 +604,7 @@ export function DanaTalanganSection({
 													<span className="text-sm font-bold text-slate-800 font-mono">
 														{formatRupiah(inst.nominalPaid)}
 													</span>
-													{inst.file ? (
-														<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] py-0">
-															Draft Baru
-														</Badge>
-													) : inst.buktiBayarUrl ? (
+													{inst.buktiBayarUrl ? (
 														<a
 															href={`${API_URL}${inst.buktiBayarUrl.startsWith("/") ? "" : "/"}${inst.buktiBayarUrl}`}
 															target="_blank"
@@ -598,24 +661,77 @@ export function DanaTalanganSection({
 							</div>
 						)}
 					</div>
+
+					{/* Bukti Bayar Keberangkatan */}
+					<div className="pt-2">
+						<label className="text-[11px] font-semibold text-slate-500 block mb-1 uppercase tracking-wider">
+							Bukti Bayar Keberangkatan (PDF)
+						</label>
+						<DocumentUpload
+							studentId={studentId}
+							panel="finance"
+							documentKey="t2_keberangkatan"
+							canEdit={canEdit}
+							onUploadSuccess={onUpdate}
+							onDeleteSuccess={onUpdate}
+							onUpdate={onUpdate}
+						/>
+					</div>
 				</div>
 
-				{/* 3. Biaya Administrasi Talangan */}
-				<div className="bg-white p-5 border border-slate-200/90 rounded-xl shadow-2xs space-y-4">
+				{/* 3. Card Biaya Administrasi Talangan */}
+				<div
+					className={`p-5 rounded-xl border transition-colors space-y-4 ${
+						isAdminChecked
+							? "border-emerald-200 bg-emerald-50/20 shadow-xs"
+							: "border-slate-200/90 bg-white shadow-2xs"
+					}`}
+				>
 					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-						<div className="font-bold text-slate-800 flex items-center gap-2 text-sm">
-							<Banknote className="w-4 h-4 text-violet-600" />
-							Biaya Administrasi Talangan
+						<div className="flex items-center gap-2.5">
+							<Checkbox
+								id="chk-adminTalaganStatus"
+								checked={isAdminChecked}
+								disabled={!canEdit}
+								onCheckedChange={(checked) => {
+									if (isEditingUtama) {
+										handleFieldChange("adminTalaganStatus", Boolean(checked));
+										if (checked && !formData?.adminTalaganPaidDate) {
+											handleFieldChange(
+												"adminTalaganPaidDate",
+												new Date().toISOString().split("T")[0],
+											);
+										}
+									} else if (handleToggleStatus) {
+										handleToggleStatus("adminTalaganStatus", Boolean(checked));
+									}
+								}}
+								className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+							/>
+							<div className="p-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-100">
+								<Banknote className="w-4 h-4" />
+							</div>
+							<div>
+								<label
+									htmlFor="chk-adminTalaganStatus"
+									className="font-bold text-slate-800 text-sm tracking-tight cursor-pointer hover:text-[#0517B0] transition-colors block"
+								>
+									Biaya Administrasi & Operasional Talangan
+								</label>
+								<p className="text-xs text-slate-500 mt-0.5">
+									Biaya administrasi perjanjian talangan & notaris (jika ada)
+								</p>
+							</div>
 						</div>
 						<div>
-							{hasAdminTalanganDoc ? (
-								<Badge className="bg-emerald-100 text-emerald-700 border-0">
-									<CheckCircle className="w-3 h-3 mr-1" /> Lunas
+							{isAdminChecked ? (
+								<Badge className="bg-emerald-100 text-emerald-700 border-0 font-semibold">
+									<CheckCircle className="w-3.5 h-3.5 mr-1" /> Lunas / Selesai
 								</Badge>
 							) : (
 								<Badge
 									variant="outline"
-									className="text-slate-500 border-slate-200"
+									className="text-slate-500 border-slate-300"
 								>
 									Belum Lunas
 								</Badge>
@@ -623,50 +739,53 @@ export function DanaTalanganSection({
 						</div>
 					</div>
 
-					<div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+					<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 						<div>
-							<label className="text-xs font-semibold text-slate-500 block mb-1.5 uppercase tracking-wider">
+							<label className="text-xs font-semibold text-slate-500 block mb-1 uppercase tracking-wider">
 								Nominal Administrasi
 							</label>
 							{isEditingUtama ? (
 								<div className="relative">
-									<span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
+									<span className="absolute left-3 top-2 text-xs font-bold text-slate-400">
 										Rp
 									</span>
 									<Input
 										type="number"
 										min={0}
-										onKeyDown={preventMinus}
+										max={999999999}
+										maxLength={9}
+										onKeyDown={preventFinanceIntegerKey}
 										value={formData?.adminTalaganNominal || ""}
 										onChange={(e) =>
 											handleFieldChange(
 												"adminTalaganNominal",
-												Number(e.target.value) || 0,
+												filterFinanceInteger(e.target.value),
 											)
 										}
 										placeholder="0"
-										className="pl-9 h-10 font-bold"
+										className="pl-9 h-9 text-xs font-semibold"
 									/>
 								</div>
 							) : (
-								<div className="text-base font-bold text-slate-800">
+								<div className="text-sm font-bold text-slate-800 font-mono">
 									{formatRupiah(formData?.adminTalaganNominal || 0)}
 								</div>
 							)}
 						</div>
 
 						<div>
-							<label className="text-xs font-semibold text-slate-500 block mb-1.5 uppercase tracking-wider">
-								Bank / Rekening Tujuan
+							<label className="text-xs font-semibold text-slate-500 block mb-1 uppercase tracking-wider">
+								Bank Tujuan
 							</label>
 							{isEditingUtama ? (
 								<Input
+									type="text"
 									value={formData?.adminTalaganBankTujuan || ""}
 									onChange={(e) =>
 										handleFieldChange("adminTalaganBankTujuan", e.target.value)
 									}
-									placeholder="Contoh: BCA 123456789 a.n PT Nusadaya"
-									className="h-10 text-xs"
+									placeholder="Contoh: BCA 123456789"
+									className="h-9 text-xs"
 								/>
 							) : (
 								<div className="text-xs font-medium text-slate-700">
@@ -679,25 +798,14 @@ export function DanaTalanganSection({
 							<label className="text-xs font-semibold text-slate-500 block mb-1.5 uppercase tracking-wider">
 								Bukti Bayar Administrasi (PDF)
 							</label>
-							<StagedDocumentUpload
-								docKey="admin_talangan"
-								isEditing={isEditingUtama}
+							<DocumentUpload
+								studentId={studentId}
+								panel="finance"
+								documentKey="admin_talangan"
 								canEdit={canEdit}
-								existingDocs={financeDocs.admin_talangan}
-								stagedFile={stagedDocsUtama.admin_talangan}
-								isDeleted={deletedDocKeysUtama.includes("admin_talangan")}
-								onStageFile={(file) =>
-									handleStageDoc("utama", "admin_talangan", file)
-								}
-								onRemoveStagedFile={() =>
-									handleRemoveStagedDoc("utama", "admin_talangan")
-								}
-								onDeleteExistingDoc={() =>
-									handleDeleteExistingDoc("utama", "admin_talangan")
-								}
-								onRestoreExistingDoc={() =>
-									handleRestoreExistingDoc("utama", "admin_talangan")
-								}
+								onUploadSuccess={onUpdate}
+								onDeleteSuccess={onUpdate}
+								onUpdate={onUpdate}
 							/>
 						</div>
 					</div>

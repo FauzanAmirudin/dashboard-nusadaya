@@ -11,8 +11,10 @@ import {
 	CheckCircle,
 	CheckCircle2,
 	Clock,
+	ExternalLink,
 	FileText,
 	HeartHandshake,
+	Layers,
 	MessageSquare,
 	RefreshCw,
 	ShieldCheck,
@@ -140,9 +142,16 @@ export default function CrmPanelMahasiswa() {
 							</CardDescription>
 						</div>
 						{data?.isAcc ? (
-							<Badge className="bg-emerald-500 text-white px-3.5 py-1.5 text-sm rounded-full shadow-sm font-semibold">
-								<CheckCircle className="w-4 h-4 mr-1.5" /> Telah di-ACC CRM
-							</Badge>
+							<div className="flex flex-col items-end gap-1">
+								<Badge className="bg-emerald-500 text-white px-3.5 py-1.5 text-sm rounded-full shadow-sm font-semibold">
+									<CheckCircle className="w-4 h-4 mr-1.5" /> Telah di-ACC CRM
+								</Badge>
+								{data?.accAt && (
+									<span className="text-[11px] text-slate-500 font-medium">
+										Disetujui: {formatDate(data.accAt)}
+									</span>
+								)}
+							</div>
 						) : (
 							<Badge
 								variant="outline"
@@ -269,7 +278,7 @@ export default function CrmPanelMahasiswa() {
 								</div>
 							</div>
 
-							{/* Card Detail Pra-Magang */}
+							{/* Card Detail Pra-Magang & Izin Belajar */}
 							<div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-3">
 								<h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
 									<Briefcase className="w-4 h-4 text-blue-600" />
@@ -294,6 +303,20 @@ export default function CrmPanelMahasiswa() {
 												: "-"}
 										</span>
 									</div>
+									<div className="flex justify-between items-center pt-1 border-t border-slate-200/60">
+										<span className="text-slate-500">
+											Izin Belajar (Study Permit):
+										</span>
+										<Badge
+											className={
+												data?.hasStudyPermit
+													? "bg-emerald-100 text-emerald-800 border-0 text-[10px]"
+													: "bg-slate-100 text-slate-600 border-0 text-[10px]"
+											}
+										>
+											{data?.hasStudyPermit ? "Telah Terbit" : "Belum Ada"}
+										</Badge>
+									</div>
 									{data?.pramagangVideoLink && (
 										<div className="pt-2">
 											<a
@@ -310,6 +333,42 @@ export default function CrmPanelMahasiswa() {
 								</div>
 							</div>
 						</div>
+
+						{/* ODS Details Session Breakdown jika ada */}
+						{data?.odsDetails && data.odsDetails.length > 0 && (
+							<div className="mt-4 p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2.5">
+								<h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+									<Layers className="w-4 h-4 text-indigo-600" />
+									Rincian Sesi Orientasi Dasar Studi (ODS)
+								</h4>
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+									{data.odsDetails.map((ods: any, idx: number) => (
+										<div
+											key={idx}
+											className="p-3 bg-white rounded-xl border border-slate-100 flex items-center justify-between"
+										>
+											<div>
+												<span className="font-semibold text-slate-800 block">
+													{ods.sessionName || `Sesi ODS #${idx + 1}`}
+												</span>
+												<span className="text-slate-500 text-[11px]">
+													{ods.date ? formatDate(ods.date) : "Jadwal Terdaftar"}
+												</span>
+											</div>
+											<Badge
+												className={
+													ods.completed
+														? "bg-emerald-100 text-emerald-800 border-0 text-[10px]"
+														: "bg-slate-100 text-slate-600 border-0 text-[10px]"
+												}
+											>
+												{ods.completed ? "Hadir" : "Pending"}
+											</Badge>
+										</div>
+									))}
+								</div>
+							</div>
+						)}
 					</div>
 
 					{/* Section 3: Status Kasus Aktif */}
@@ -398,7 +457,7 @@ export default function CrmPanelMahasiswa() {
 												</p>
 											</div>
 										</div>
-										<div className="shrink-0 ml-2">
+										<div className="shrink-0 ml-2 flex items-center gap-1.5">
 											{doc.isVerified ? (
 												<Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 px-2 py-0.5 text-[10px] border-0">
 													Terverifikasi
@@ -410,6 +469,17 @@ export default function CrmPanelMahasiswa() {
 												>
 													Menunggu
 												</Badge>
+											)}
+											{doc.fileUrl && (
+												<a
+													href={doc.fileUrl}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+													title="Buka Dokumen"
+												>
+													<ExternalLink className="w-3.5 h-3.5" />
+												</a>
 											)}
 										</div>
 									</div>

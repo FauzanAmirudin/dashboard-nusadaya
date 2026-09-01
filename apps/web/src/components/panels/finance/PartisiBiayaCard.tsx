@@ -7,6 +7,7 @@ import {
 	Lock,
 	PieChart,
 	SlidersHorizontal,
+	Sparkles,
 } from "lucide-react";
 import React from "react";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,15 @@ interface PartisiBiayaCardProps {
 	semestersLunasCount: number;
 	isInterviewLunas: boolean;
 	isKeberangkatanLunas: boolean;
+	// Dana Talangan specific props
+	hasAdminTalanganDoc?: boolean;
+	adminTalaganNominal?: number;
+	totalTahap1Nominal?: number;
+	totalTahap2Nominal?: number;
+	t1Paid?: number;
+	t2Paid?: number;
+	isTahap1Lunas?: boolean;
+	isTahap2Lunas?: boolean;
 }
 
 export function PartisiBiayaCard({
@@ -53,7 +63,34 @@ export function PartisiBiayaCard({
 	semestersLunasCount,
 	isInterviewLunas,
 	isKeberangkatanLunas,
+	hasAdminTalanganDoc = false,
+	adminTalaganNominal = 0,
+	totalTahap1Nominal = 0,
+	totalTahap2Nominal = 0,
+	t1Paid = 0,
+	t2Paid = 0,
+	isTahap1Lunas = false,
+	isTahap2Lunas = false,
 }: PartisiBiayaCardProps) {
+	const isTalangan = formData?.metodePembayaran === "dana_talangan";
+
+	const t1Pct =
+		totalBiaya > 0
+			? Math.min(100, Math.round((totalTahap1Nominal / totalBiaya) * 100))
+			: 0;
+	const t2Pct =
+		totalBiaya > 0
+			? Math.min(100, Math.round((totalTahap2Nominal / totalBiaya) * 100))
+			: 0;
+	const adminPct =
+		totalBiaya > 0
+			? Math.min(100, Math.round((adminTalaganNominal / totalBiaya) * 100))
+			: 0;
+
+	const isAdminLunas = Boolean(
+		formData?.adminTalaganStatus || hasAdminTalanganDoc,
+	);
+
 	return (
 		<div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-4 sm:p-5 space-y-3.5">
 			<div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -64,20 +101,23 @@ export function PartisiBiayaCard({
 					<div>
 						<div className="flex items-center gap-2">
 							<h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-								Partisi Biaya Pendidikan
+								{isTalangan
+									? "Tahapan & Plafon Dana Talangan"
+									: "Partisi Biaya Pendidikan"}
 							</h3>
 							<Badge
 								variant="outline"
 								className="text-[10px] font-bold bg-slate-50 border-slate-200 text-slate-700 px-2 py-0.5"
 							>
-								{formData?.metodePembayaran === "dana_talangan"
-									? "Skema Talangan"
-									: "Skema Mandiri"}
+								{isTalangan
+									? "Skema Talangan (2 Tahap)"
+									: "Skema Mandiri (4 Partisi)"}
 							</Badge>
 						</div>
 						<p className="text-xs text-slate-500 mt-0.5">
-							Alokasi resmi dari total biaya pendidikan ke 4 pos pembayaran
-							utama
+							{isTalangan
+								? "Plafon pembiayaan bertahap melalui lembaga keuangan dan registrasi"
+								: "Alokasi resmi dari total biaya pendidikan ke 4 pos pembayaran utama"}
 						</p>
 					</div>
 				</div>
@@ -136,7 +176,7 @@ export function PartisiBiayaCard({
 				</div>
 			</div>
 
-			{/* Allocation Progress Bar & 4 Compact Metric Boxes */}
+			{/* Allocation Progress Bar & Method-specific Metric Boxes */}
 			{totalBiaya > 0 && (
 				<div className="space-y-2.5 pt-2 border-t border-slate-100">
 					{/* Multi-segment bar */}
@@ -148,132 +188,288 @@ export function PartisiBiayaCard({
 								title={`Registrasi Awal: ${regPct}% (${formatRupiah(curRegistrasi)})`}
 							/>
 						)}
-						{semPct > 0 && (
-							<div
-								style={{ width: `${semPct}%` }}
-								className="h-full bg-indigo-500 rounded-xs transition-all duration-500"
-								title={`Perkuliahan 6 Semester: ${semPct}% (${formatRupiah(curSemestersTotal)})`}
-							/>
-						)}
-						{intPct > 0 && (
-							<div
-								style={{ width: `${intPct}%` }}
-								className="h-full bg-amber-500 rounded-xs transition-all duration-500"
-								title={`Interview Magang: ${intPct}% (${formatRupiah(curInterview)})`}
-							/>
-						)}
-						{kebPct > 0 && (
-							<div
-								style={{ width: `${kebPct}%` }}
-								className="h-full bg-emerald-500 rounded-xs transition-all duration-500"
-								title={`Keberangkatan: ${kebPct}% (${formatRupiah(curKeberangkatan)})`}
-							/>
+						{isTalangan ? (
+							<>
+								{adminPct > 0 && (
+									<div
+										style={{ width: `${adminPct}%` }}
+										className="h-full bg-violet-500 rounded-xs transition-all duration-500"
+										title={`Administrasi Talangan: ${adminPct}% (${formatRupiah(adminTalaganNominal)})`}
+									/>
+								)}
+								{t1Pct > 0 && (
+									<div
+										style={{ width: `${t1Pct}%` }}
+										className="h-full bg-amber-500 rounded-xs transition-all duration-500"
+										title={`Talangan Tahap 1: ${t1Pct}% (${formatRupiah(totalTahap1Nominal)})`}
+									/>
+								)}
+								{t2Pct > 0 && (
+									<div
+										style={{ width: `${t2Pct}%` }}
+										className="h-full bg-emerald-500 rounded-xs transition-all duration-500"
+										title={`Talangan Tahap 2: ${t2Pct}% (${formatRupiah(totalTahap2Nominal)})`}
+									/>
+								)}
+							</>
+						) : (
+							<>
+								{semPct > 0 && (
+									<div
+										style={{ width: `${semPct}%` }}
+										className="h-full bg-indigo-500 rounded-xs transition-all duration-500"
+										title={`Perkuliahan 6 Semester: ${semPct}% (${formatRupiah(curSemestersTotal)})`}
+									/>
+								)}
+								{intPct > 0 && (
+									<div
+										style={{ width: `${intPct}%` }}
+										className="h-full bg-amber-500 rounded-xs transition-all duration-500"
+										title={`Interview Magang: ${intPct}% (${formatRupiah(curInterview)})`}
+									/>
+								)}
+								{kebPct > 0 && (
+									<div
+										style={{ width: `${kebPct}%` }}
+										className="h-full bg-emerald-500 rounded-xs transition-all duration-500"
+										title={`Keberangkatan: ${kebPct}% (${formatRupiah(curKeberangkatan)})`}
+									/>
+								)}
+							</>
 						)}
 					</div>
 
-					{/* 4 Compact Inline Chips */}
-					<div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-						<div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between">
-							<div className="flex items-center gap-2">
-								<span className="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0" />
-								<div>
-									<p className="text-[10px] font-bold text-slate-500 uppercase">
-										1. Registrasi ({regPct}%)
-									</p>
-									<p className="text-xs font-bold text-slate-800 font-mono">
-										{formatRupiah(curRegistrasi)}
-									</p>
+					{/* 4 Method-Specific Inline Chips */}
+					{isTalangan ? (
+						<div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+							{/* 1. Registrasi */}
+							<div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between">
+								<div className="flex items-center gap-2">
+									<span className="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0" />
+									<div>
+										<p className="text-[10px] font-bold text-slate-500 uppercase">
+											1. Registrasi ({regPct}%)
+										</p>
+										<p className="text-xs font-bold text-slate-800 font-mono">
+											{formatRupiah(curRegistrasi)}
+										</p>
+									</div>
 								</div>
+								{isRegistrasiLunas ? (
+									<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[9px] px-1.5 py-0 font-bold">
+										Lunas
+									</Badge>
+								) : (
+									<Badge
+										variant="outline"
+										className="text-slate-400 border-slate-200 text-[9px] px-1.5 py-0"
+									>
+										Belum
+									</Badge>
+								)}
 							</div>
-							{isRegistrasiLunas ? (
-								<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[9px] px-1.5 py-0 font-bold">
-									Lunas
-								</Badge>
-							) : (
-								<Badge
-									variant="outline"
-									className="text-slate-400 border-slate-200 text-[9px] px-1.5 py-0"
-								>
-									Belum
-								</Badge>
-							)}
-						</div>
 
-						<div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between">
-							<div className="flex items-center gap-2">
-								<span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0" />
-								<div>
-									<p className="text-[10px] font-bold text-slate-500 uppercase">
-										2. 6 Semester ({semPct}%)
-									</p>
-									<p className="text-xs font-bold text-slate-800 font-mono">
-										{formatRupiah(curSemestersTotal)}
-									</p>
+							{/* 2. Administrasi Talangan */}
+							<div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between">
+								<div className="flex items-center gap-2">
+									<span className="w-2.5 h-2.5 rounded-full bg-violet-500 shrink-0" />
+									<div>
+										<p className="text-[10px] font-bold text-slate-500 uppercase">
+											2. Admin Talangan
+										</p>
+										<p className="text-xs font-bold text-slate-800 font-mono">
+											{formatRupiah(adminTalaganNominal)}
+										</p>
+									</div>
 								</div>
+								{isAdminLunas ? (
+									<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[9px] px-1.5 py-0 font-bold">
+										Lunas
+									</Badge>
+								) : (
+									<Badge
+										variant="outline"
+										className="text-slate-400 border-slate-200 text-[9px] px-1.5 py-0"
+									>
+										Belum
+									</Badge>
+								)}
 							</div>
-							<Badge
-								className={
-									semestersLunasCount === 6
-										? "bg-emerald-100 text-emerald-700 border-0 text-[9px] px-1.5 py-0 font-bold"
-										: "bg-indigo-50 text-indigo-700 border-0 text-[9px] px-1.5 py-0 font-bold"
-								}
-							>
-								{semestersLunasCount}/6 Smt
-							</Badge>
-						</div>
 
-						<div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between">
-							<div className="flex items-center gap-2">
-								<span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-								<div>
-									<p className="text-[10px] font-bold text-slate-500 uppercase">
-										3. Interview ({intPct}%)
-									</p>
-									<p className="text-xs font-bold text-slate-800 font-mono">
-										{formatRupiah(curInterview)}
-									</p>
+							{/* 3. Talangan Tahap 1 */}
+							<div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between">
+								<div className="flex items-center gap-2">
+									<span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+									<div>
+										<p className="text-[10px] font-bold text-slate-500 uppercase">
+											3. Talangan Tahap 1
+										</p>
+										<p className="text-xs font-bold text-slate-800 font-mono">
+											{formatRupiah(totalTahap1Nominal)}
+										</p>
+									</div>
 								</div>
+								{isTahap1Lunas ? (
+									<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[9px] px-1.5 py-0 font-bold">
+										Lunas
+									</Badge>
+								) : t1Paid > 0 ? (
+									<Badge className="bg-amber-100 text-amber-700 border-0 text-[9px] px-1.5 py-0 font-bold">
+										{totalTahap1Nominal > 0
+											? `${Math.round((t1Paid / totalTahap1Nominal) * 100)}%`
+											: "Cicil"}
+									</Badge>
+								) : (
+									<Badge
+										variant="outline"
+										className="text-slate-400 border-slate-200 text-[9px] px-1.5 py-0"
+									>
+										Belum
+									</Badge>
+								)}
 							</div>
-							{isInterviewLunas ? (
-								<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[9px] px-1.5 py-0 font-bold">
-									Lunas
-								</Badge>
-							) : (
-								<Badge
-									variant="outline"
-									className="text-slate-400 border-slate-200 text-[9px] px-1.5 py-0"
-								>
-									Belum
-								</Badge>
-							)}
-						</div>
 
-						<div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between">
-							<div className="flex items-center gap-2">
-								<span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-								<div>
-									<p className="text-[10px] font-bold text-slate-500 uppercase">
-										4. Berangkat ({kebPct}%)
-									</p>
-									<p className="text-xs font-bold text-slate-800 font-mono">
-										{formatRupiah(curKeberangkatan)}
-									</p>
+							{/* 4. Talangan Tahap 2 */}
+							<div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between">
+								<div className="flex items-center gap-2">
+									<span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+									<div>
+										<p className="text-[10px] font-bold text-slate-500 uppercase">
+											4. Talangan Tahap 2
+										</p>
+										<p className="text-xs font-bold text-slate-800 font-mono">
+											{formatRupiah(totalTahap2Nominal)}
+										</p>
+									</div>
 								</div>
+								{isTahap2Lunas ? (
+									<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[9px] px-1.5 py-0 font-bold">
+										Lunas
+									</Badge>
+								) : t2Paid > 0 ? (
+									<Badge className="bg-amber-100 text-amber-700 border-0 text-[9px] px-1.5 py-0 font-bold">
+										{totalTahap2Nominal > 0
+											? `${Math.round((t2Paid / totalTahap2Nominal) * 100)}%`
+											: "Cicil"}
+									</Badge>
+								) : (
+									<Badge
+										variant="outline"
+										className="text-slate-400 border-slate-200 text-[9px] px-1.5 py-0"
+									>
+										Belum
+									</Badge>
+								)}
 							</div>
-							{isKeberangkatanLunas ? (
-								<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[9px] px-1.5 py-0 font-bold">
-									Lunas
-								</Badge>
-							) : (
-								<Badge
-									variant="outline"
-									className="text-slate-400 border-slate-200 text-[9px] px-1.5 py-0"
-								>
-									Belum
-								</Badge>
-							)}
 						</div>
-					</div>
+					) : (
+						<div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+							{/* 1. Registrasi */}
+							<div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between">
+								<div className="flex items-center gap-2">
+									<span className="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0" />
+									<div>
+										<p className="text-[10px] font-bold text-slate-500 uppercase">
+											1. Registrasi ({regPct}%)
+										</p>
+										<p className="text-xs font-bold text-slate-800 font-mono">
+											{formatRupiah(curRegistrasi)}
+										</p>
+									</div>
+								</div>
+								{isRegistrasiLunas ? (
+									<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[9px] px-1.5 py-0 font-bold">
+										Lunas
+									</Badge>
+								) : (
+									<Badge
+										variant="outline"
+										className="text-slate-400 border-slate-200 text-[9px] px-1.5 py-0"
+									>
+										Belum
+									</Badge>
+								)}
+							</div>
+
+							{/* 2. 6 Semester */}
+							<div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between">
+								<div className="flex items-center gap-2">
+									<span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0" />
+									<div>
+										<p className="text-[10px] font-bold text-slate-500 uppercase">
+											2. 6 Semester ({semPct}%)
+										</p>
+										<p className="text-xs font-bold text-slate-800 font-mono">
+											{formatRupiah(curSemestersTotal)}
+										</p>
+									</div>
+								</div>
+								<Badge
+									className={
+										semestersLunasCount === 6
+											? "bg-emerald-100 text-emerald-700 border-0 text-[9px] px-1.5 py-0 font-bold"
+											: "bg-indigo-50 text-indigo-700 border-0 text-[9px] px-1.5 py-0 font-bold"
+									}
+								>
+									{semestersLunasCount}/6 Smt
+								</Badge>
+							</div>
+
+							{/* 3. Interview */}
+							<div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between">
+								<div className="flex items-center gap-2">
+									<span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+									<div>
+										<p className="text-[10px] font-bold text-slate-500 uppercase">
+											3. Interview ({intPct}%)
+										</p>
+										<p className="text-xs font-bold text-slate-800 font-mono">
+											{formatRupiah(curInterview)}
+										</p>
+									</div>
+								</div>
+								{isInterviewLunas ? (
+									<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[9px] px-1.5 py-0 font-bold">
+										Lunas
+									</Badge>
+								) : (
+									<Badge
+										variant="outline"
+										className="text-slate-400 border-slate-200 text-[9px] px-1.5 py-0"
+									>
+										Belum
+									</Badge>
+								)}
+							</div>
+
+							{/* 4. Berangkat */}
+							<div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between">
+								<div className="flex items-center gap-2">
+									<span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+									<div>
+										<p className="text-[10px] font-bold text-slate-500 uppercase">
+											4. Berangkat ({kebPct}%)
+										</p>
+										<p className="text-xs font-bold text-slate-800 font-mono">
+											{formatRupiah(curKeberangkatan)}
+										</p>
+									</div>
+								</div>
+								{isKeberangkatanLunas ? (
+									<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[9px] px-1.5 py-0 font-bold">
+										Lunas
+									</Badge>
+								) : (
+									<Badge
+										variant="outline"
+										className="text-slate-400 border-slate-200 text-[9px] px-1.5 py-0"
+									>
+										Belum
+									</Badge>
+								)}
+							</div>
+						</div>
+					)}
 				</div>
 			)}
 		</div>

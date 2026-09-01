@@ -9,10 +9,12 @@ import {
 	CheckCircle,
 	CheckCircle2,
 	Clock,
+	ExternalLink,
 	FileText,
 	HeartHandshake,
 	Languages,
 	MessageCircle,
+	MessageSquare,
 	RefreshCw,
 	ShieldCheck,
 	Sparkles,
@@ -131,6 +133,17 @@ export default function PaPanelMahasiswa() {
 		});
 	};
 
+	const totalInterviews = data?.interviews?.length || 0;
+	const passedInterviews =
+		data?.interviews?.filter((i: any) => i.result === "Lulus")?.length || 0;
+	const failedInterviews =
+		data?.interviews?.filter((i: any) => i.result === "Tidak Lulus")?.length ||
+		0;
+	const pendingInterviews =
+		data?.interviews?.filter(
+			(i: any) => i.result !== "Lulus" && i.result !== "Tidak Lulus",
+		)?.length || 0;
+
 	return (
 		<div className="max-w-4xl mx-auto space-y-6 pb-12">
 			<Link
@@ -154,9 +167,16 @@ export default function PaPanelMahasiswa() {
 							</CardDescription>
 						</div>
 						{data?.isAcc ? (
-							<Badge className="bg-emerald-500 text-white px-3.5 py-1.5 text-sm rounded-full shadow-sm font-semibold">
-								<CheckCircle className="w-4 h-4 mr-1.5" /> Telah di-ACC PA
-							</Badge>
+							<div className="flex flex-col items-end gap-1">
+								<Badge className="bg-emerald-500 text-white px-3.5 py-1.5 text-sm rounded-full shadow-sm font-semibold">
+									<CheckCircle className="w-4 h-4 mr-1.5" /> Telah di-ACC PA
+								</Badge>
+								{data?.accAt && (
+									<span className="text-[11px] text-slate-500 font-medium">
+										Disetujui: {formatDate(data.accAt)}
+									</span>
+								)}
+							</div>
 						) : (
 							<Badge
 								variant="outline"
@@ -392,11 +412,29 @@ export default function PaPanelMahasiswa() {
 
 					{/* Section 4: Riwayat Interview Magang */}
 					<div className="pt-6 border-t border-slate-100 space-y-4">
-						<div className="flex items-center gap-2">
-							<Building2 className="w-5 h-5 text-fuchsia-600" />
-							<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-								Riwayat Interview Perusahaan & User Luar Negeri
-							</h3>
+						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+							<div className="flex items-center gap-2">
+								<Building2 className="w-5 h-5 text-fuchsia-600" />
+								<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+									Riwayat Interview Perusahaan & User Luar Negeri
+								</h3>
+							</div>
+							<div className="flex items-center gap-2 text-xs font-semibold">
+								<span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+									Total: {totalInterviews}
+								</span>
+								<span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+									Lulus: {passedInterviews}
+								</span>
+								<span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800">
+									Gagal: {failedInterviews}
+								</span>
+								{pendingInterviews > 0 && (
+									<span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">
+										Menunggu: {pendingInterviews}
+									</span>
+								)}
+							</div>
 						</div>
 
 						{data?.interviews && data.interviews.length > 0 ? (
@@ -447,6 +485,38 @@ export default function PaPanelMahasiswa() {
 						)}
 					</div>
 
+					{/* Section Tambahan: Catatan Khusus PA untuk Mahasiswa */}
+					{data?.studentNotes && data.studentNotes.length > 0 && (
+						<div className="pt-6 border-t border-slate-100 space-y-3">
+							<div className="flex items-center gap-2">
+								<MessageSquare className="w-5 h-5 text-indigo-600" />
+								<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+									Catatan Bimbingan & Arahan Pembimbing Akademik
+								</h3>
+							</div>
+							<div className="space-y-2.5">
+								{data.studentNotes.map((note: any) => (
+									<div
+										key={note.id}
+										className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-1 text-xs"
+									>
+										<div className="flex items-center justify-between">
+											<Badge className="bg-indigo-100 text-indigo-800 border-0 text-[10px] uppercase font-bold">
+												{note.type || "Arahan Bimbingan"}
+											</Badge>
+											<span className="text-slate-400 text-[11px]">
+												{formatDate(note.createdAt)}
+											</span>
+										</div>
+										<p className="text-slate-800 mt-1 leading-relaxed whitespace-pre-wrap font-medium">
+											{note.content}
+										</p>
+									</div>
+								))}
+							</div>
+						</div>
+					)}
+
 					{/* Section 5: Dokumen PA */}
 					<div className="pt-6 border-t border-slate-100">
 						<div className="flex items-center gap-2 mb-4">
@@ -473,7 +543,7 @@ export default function PaPanelMahasiswa() {
 												</p>
 											</div>
 										</div>
-										<div className="shrink-0 ml-2">
+										<div className="shrink-0 ml-2 flex items-center gap-1.5">
 											{doc.isVerified ? (
 												<Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 px-2 py-0.5 text-[10px] border-0">
 													Terverifikasi
@@ -485,6 +555,17 @@ export default function PaPanelMahasiswa() {
 												>
 													Menunggu
 												</Badge>
+											)}
+											{doc.fileUrl && (
+												<a
+													href={doc.fileUrl}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+													title="Buka Dokumen"
+												>
+													<ExternalLink className="w-3.5 h-3.5" />
+												</a>
 											)}
 										</div>
 									</div>

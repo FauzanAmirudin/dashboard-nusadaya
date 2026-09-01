@@ -19,11 +19,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import { Input } from "@/components/ui/input";
+import {
+	filterFinanceInteger,
+	preventFinanceIntegerKey,
+} from "@/utils/form-validators";
 import { formatRupiah } from "@/utils/format";
-import { StagedDocumentUpload } from "./StagedDocumentUpload";
 
 interface BiayaTambahanSectionProps {
+	studentId: number;
 	canEdit: boolean;
 	isEditingTambahan: boolean;
 	setIsEditingTambahan: (val: boolean) => void;
@@ -36,20 +41,21 @@ interface BiayaTambahanSectionProps {
 	hasPasporDoc: boolean;
 	hasRumahJuangDoc: boolean;
 	financeDocs: Record<string, any[]>;
-	stagedDocsTambahan: Record<string, File | null>;
-	deletedDocKeysTambahan: string[];
-	handleStageDoc: (section: "tambahan", docKey: string, file: File) => void;
-	handleRemoveStagedDoc: (section: "tambahan", docKey: string) => void;
-	handleDeleteExistingDoc: (section: "tambahan", docKey: string) => void;
-	handleRestoreExistingDoc: (section: "tambahan", docKey: string) => void;
 	customData: any[];
 	handleCustomFieldChange: (idx: number, field: string, val: any) => void;
 	triggerAddCustomField: (type: string) => void;
 	triggerDeleteCustomField: (id: number) => void;
 	preventMinus: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+	handleToggleStatus?: (fieldKey: string, nextStatus: boolean) => void;
+	handleToggleCustomStatus?: (
+		fieldId: number,
+		nextStatus: "lunas" | "belum_lunas",
+	) => void;
+	onUpdate: () => void;
 }
 
 export function BiayaTambahanSection({
+	studentId,
 	canEdit,
 	isEditingTambahan,
 	setIsEditingTambahan,
@@ -62,84 +68,125 @@ export function BiayaTambahanSection({
 	hasPasporDoc,
 	hasRumahJuangDoc,
 	financeDocs,
-	stagedDocsTambahan,
-	deletedDocKeysTambahan,
-	handleStageDoc,
-	handleRemoveStagedDoc,
-	handleDeleteExistingDoc,
-	handleRestoreExistingDoc,
 	customData,
 	handleCustomFieldChange,
 	triggerAddCustomField,
 	triggerDeleteCustomField,
-	preventMinus,
+	handleToggleStatus,
+	handleToggleCustomStatus,
+	onUpdate,
 }: BiayaTambahanSectionProps) {
+	const isToeicChecked = Boolean(formData?.toeicStatus || hasToeicDoc);
+	const isPasporChecked = Boolean(formData?.pasporStatus || hasPasporDoc);
+	const isRumahJuangChecked = Boolean(
+		formData?.rumahJuangStatus || hasRumahJuangDoc,
+	);
+
 	return (
-		<Card className="border border-slate-200/90 shadow-2xs overflow-hidden rounded-xl bg-white">
-			<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-5 sm:px-6 flex flex-row items-center justify-between">
-				<div className="flex items-center gap-2.5">
-					<div className="p-2 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100/70 shadow-2xs">
-						<Sparkles className="w-4 h-4" />
-					</div>
+		<Card className="border-0 shadow-sm ring-1 ring-slate-200/80 rounded-xl overflow-hidden">
+			<CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-200/80 px-5 sm:px-6 py-4">
+				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 					<div>
-						<CardTitle className="text-base font-bold text-slate-900 tracking-tight">
-							Biaya Tambahan Lainnya
+						<CardTitle className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
+							<Sparkles className="w-5 h-5 text-indigo-600" />
+							Biaya Tambahan & Fasilitas Lainnya
 						</CardTitle>
 						<p className="text-xs text-slate-500 mt-0.5">
-							Sertifikasi bahasa, paspor, asrama, dan pos biaya khusus lainnya
+							Kelola biaya sertifikasi, paspor, asrama dan pos biaya tambahan
+							lainnya
 						</p>
 					</div>
-				</div>
-				<div className="flex items-center gap-2">
-					{canEdit && !isEditingTambahan && (
-						<Button
-							size="sm"
-							onClick={() => setIsEditingTambahan(true)}
-							className="bg-[#0517B0] hover:bg-blue-800 text-white font-semibold text-xs h-8.5 rounded-lg shadow-2xs gap-1.5"
-						>
-							<Edit className="w-3.5 h-3.5" /> Edit Data
-						</Button>
-					)}
-					{isEditingTambahan && (
-						<>
-							<Button
-								size="sm"
-								variant="outline"
-								onClick={() => handleCancelEdit("tambahan")}
-								disabled={loadingTambahan}
-								className="h-8.5 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50"
-							>
-								<X className="w-3.5 h-3.5 mr-1" /> Batal
-							</Button>
-							<Button
-								size="sm"
-								onClick={() => triggerSave("tambahan")}
-								disabled={loadingTambahan}
-								className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8.5 rounded-lg shadow-2xs"
-							>
-								{loadingTambahan ? (
-									<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-								) : (
-									<Save className="w-3.5 h-3.5 mr-1.5" />
-								)}
-								Simpan
-							</Button>
-						</>
+
+					{canEdit && (
+						<div className="flex items-center gap-2 self-end sm:self-auto">
+							{isEditingTambahan ? (
+								<>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={() => handleCancelEdit("tambahan")}
+										disabled={loadingTambahan}
+										className="h-8 text-xs font-semibold border-slate-300"
+									>
+										<X className="w-3.5 h-3.5 mr-1" /> Batal
+									</Button>
+									<Button
+										type="button"
+										size="sm"
+										onClick={() => triggerSave("tambahan")}
+										disabled={loadingTambahan}
+										className="h-8 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white"
+									>
+										{loadingTambahan ? (
+											<>
+												<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />{" "}
+												Menyimpan...
+											</>
+										) : (
+											<>
+												<Save className="w-3.5 h-3.5 mr-1" /> Simpan
+											</>
+										)}
+									</Button>
+								</>
+							) : (
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={() => setIsEditingTambahan(true)}
+									className="h-8 text-xs font-semibold border-slate-300 hover:bg-slate-50 gap-1"
+								>
+									<Edit className="w-3.5 h-3.5" /> Edit Biaya Tambahan
+								</Button>
+							)}
+						</div>
 					)}
 				</div>
 			</CardHeader>
-			<CardContent className="p-5 sm:p-6 space-y-5 bg-white">
+			<CardContent className="p-5 sm:p-6 space-y-6 bg-white">
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 					{/* 1. Sertifikasi Bahasa */}
-					<div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-3 flex flex-col justify-between shadow-2xs hover:border-slate-300 transition-all">
+					<div
+						className={`p-4 rounded-xl border transition-colors space-y-3.5 flex flex-col justify-between shadow-2xs hover:border-slate-300 ${
+							isToeicChecked
+								? "border-emerald-200 bg-emerald-50/20"
+								: "border-slate-200/80 bg-slate-50"
+						}`}
+					>
 						<div>
 							<div className="flex items-center justify-between mb-2">
-								<div className="flex items-center gap-2 font-bold text-slate-800 text-sm">
+								<div className="flex items-center gap-2.5">
+									<Checkbox
+										id="chk-toeicStatus"
+										checked={isToeicChecked}
+										disabled={!canEdit}
+										onCheckedChange={(checked) => {
+											if (isEditingTambahan) {
+												handleFieldChange("toeicStatus", Boolean(checked));
+												if (checked && !formData?.toeicPaidDate) {
+													handleFieldChange(
+														"toeicPaidDate",
+														new Date().toISOString().split("T")[0],
+													);
+												}
+											} else if (handleToggleStatus) {
+												handleToggleStatus("toeicStatus", Boolean(checked));
+											}
+										}}
+										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+									/>
 									<Languages className="w-4 h-4 text-sky-600" />
-									<span>Sertifikasi Bahasa</span>
+									<label
+										htmlFor="chk-toeicStatus"
+										className="font-bold text-slate-800 text-sm cursor-pointer hover:text-[#0517B0] transition-colors"
+									>
+										Sertifikasi Bahasa
+									</label>
 								</div>
-								{hasToeicDoc ? (
-									<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px]">
+								{isToeicChecked ? (
+									<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px] font-bold">
 										<CheckCircle className="w-3 h-3 mr-1" /> Lunas
 									</Badge>
 								) : (
@@ -152,7 +199,7 @@ export function BiayaTambahanSection({
 								)}
 							</div>
 
-							<div className="space-y-3">
+							<div className="space-y-3 pt-1">
 								<div>
 									<label className="text-[11px] font-semibold text-slate-500 block mb-1 uppercase tracking-wider">
 										Nominal Tagihan
@@ -165,12 +212,14 @@ export function BiayaTambahanSection({
 											<Input
 												type="number"
 												min={0}
-												onKeyDown={preventMinus}
+												max={999999999}
+												maxLength={9}
+												onKeyDown={preventFinanceIntegerKey}
 												value={formData?.toeicNominal || ""}
 												onChange={(e) =>
 													handleFieldChange(
 														"toeicNominal",
-														Number(e.target.value) || 0,
+														filterFinanceInteger(e.target.value),
 													)
 												}
 												placeholder="0"
@@ -188,25 +237,14 @@ export function BiayaTambahanSection({
 									<label className="text-[11px] font-semibold text-slate-500 block mb-1 uppercase tracking-wider">
 										Bukti Pembayaran (PDF)
 									</label>
-									<StagedDocumentUpload
-										docKey="toeic"
-										isEditing={isEditingTambahan}
+									<DocumentUpload
+										studentId={studentId}
+										panel="finance"
+										documentKey="toeic"
 										canEdit={canEdit}
-										existingDocs={financeDocs.toeic}
-										stagedFile={stagedDocsTambahan.toeic}
-										isDeleted={deletedDocKeysTambahan.includes("toeic")}
-										onStageFile={(file) =>
-											handleStageDoc("tambahan", "toeic", file)
-										}
-										onRemoveStagedFile={() =>
-											handleRemoveStagedDoc("tambahan", "toeic")
-										}
-										onDeleteExistingDoc={() =>
-											handleDeleteExistingDoc("tambahan", "toeic")
-										}
-										onRestoreExistingDoc={() =>
-											handleRestoreExistingDoc("tambahan", "toeic")
-										}
+										onUploadSuccess={onUpdate}
+										onDeleteSuccess={onUpdate}
+										onUpdate={onUpdate}
 									/>
 								</div>
 							</div>
@@ -214,15 +252,45 @@ export function BiayaTambahanSection({
 					</div>
 
 					{/* 2. Paspor */}
-					<div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-3 flex flex-col justify-between shadow-2xs hover:border-slate-300 transition-all">
+					<div
+						className={`p-4 rounded-xl border transition-colors space-y-3.5 flex flex-col justify-between shadow-2xs hover:border-slate-300 ${
+							isPasporChecked
+								? "border-emerald-200 bg-emerald-50/20"
+								: "border-slate-200/80 bg-slate-50"
+						}`}
+					>
 						<div>
 							<div className="flex items-center justify-between mb-2">
-								<div className="flex items-center gap-2 font-bold text-slate-800 text-sm">
+								<div className="flex items-center gap-2.5">
+									<Checkbox
+										id="chk-pasporStatus"
+										checked={isPasporChecked}
+										disabled={!canEdit}
+										onCheckedChange={(checked) => {
+											if (isEditingTambahan) {
+												handleFieldChange("pasporStatus", Boolean(checked));
+												if (checked && !formData?.pasporPaidDate) {
+													handleFieldChange(
+														"pasporPaidDate",
+														new Date().toISOString().split("T")[0],
+													);
+												}
+											} else if (handleToggleStatus) {
+												handleToggleStatus("pasporStatus", Boolean(checked));
+											}
+										}}
+										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+									/>
 									<Plane className="w-4 h-4 text-indigo-600" />
-									<span>Pembuatan Paspor</span>
+									<label
+										htmlFor="chk-pasporStatus"
+										className="font-bold text-slate-800 text-sm cursor-pointer hover:text-[#0517B0] transition-colors"
+									>
+										Pembuatan Paspor
+									</label>
 								</div>
-								{hasPasporDoc ? (
-									<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px]">
+								{isPasporChecked ? (
+									<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px] font-bold">
 										<CheckCircle className="w-3 h-3 mr-1" /> Lunas
 									</Badge>
 								) : (
@@ -235,7 +303,7 @@ export function BiayaTambahanSection({
 								)}
 							</div>
 
-							<div className="space-y-3">
+							<div className="space-y-3 pt-1">
 								<div>
 									<label className="text-[11px] font-semibold text-slate-500 block mb-1 uppercase tracking-wider">
 										Nominal Tagihan
@@ -248,12 +316,14 @@ export function BiayaTambahanSection({
 											<Input
 												type="number"
 												min={0}
-												onKeyDown={preventMinus}
+												max={999999999}
+												maxLength={9}
+												onKeyDown={preventFinanceIntegerKey}
 												value={formData?.pasporNominal || ""}
 												onChange={(e) =>
 													handleFieldChange(
 														"pasporNominal",
-														Number(e.target.value) || 0,
+														filterFinanceInteger(e.target.value),
 													)
 												}
 												placeholder="0"
@@ -271,25 +341,14 @@ export function BiayaTambahanSection({
 									<label className="text-[11px] font-semibold text-slate-500 block mb-1 uppercase tracking-wider">
 										Bukti Pembayaran (PDF)
 									</label>
-									<StagedDocumentUpload
-										docKey="paspor"
-										isEditing={isEditingTambahan}
+									<DocumentUpload
+										studentId={studentId}
+										panel="finance"
+										documentKey="paspor"
 										canEdit={canEdit}
-										existingDocs={financeDocs.paspor}
-										stagedFile={stagedDocsTambahan.paspor}
-										isDeleted={deletedDocKeysTambahan.includes("paspor")}
-										onStageFile={(file) =>
-											handleStageDoc("tambahan", "paspor", file)
-										}
-										onRemoveStagedFile={() =>
-											handleRemoveStagedDoc("tambahan", "paspor")
-										}
-										onDeleteExistingDoc={() =>
-											handleDeleteExistingDoc("tambahan", "paspor")
-										}
-										onRestoreExistingDoc={() =>
-											handleRestoreExistingDoc("tambahan", "paspor")
-										}
+										onUploadSuccess={onUpdate}
+										onDeleteSuccess={onUpdate}
+										onUpdate={onUpdate}
 									/>
 								</div>
 							</div>
@@ -297,16 +356,49 @@ export function BiayaTambahanSection({
 					</div>
 
 					{/* 3. Fasilitas Rumah Juang */}
-					<div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-3 flex flex-col justify-between shadow-2xs hover:border-slate-300 transition-all">
+					<div
+						className={`p-4 rounded-xl border transition-colors space-y-3.5 flex flex-col justify-between shadow-2xs hover:border-slate-300 ${
+							isRumahJuangChecked
+								? "border-emerald-200 bg-emerald-50/20"
+								: "border-slate-200/80 bg-slate-50"
+						}`}
+					>
 						<div>
 							<div className="flex items-center justify-between mb-2">
-								<div className="flex items-center gap-2 font-bold text-slate-800 text-sm">
+								<div className="flex items-center gap-2.5">
+									<Checkbox
+										id="chk-rumahJuangStatus"
+										checked={isRumahJuangChecked}
+										disabled={!canEdit}
+										onCheckedChange={(checked) => {
+											if (isEditingTambahan) {
+												handleFieldChange("rumahJuangStatus", Boolean(checked));
+												if (checked && !formData?.rumahJuangPaidDate) {
+													handleFieldChange(
+														"rumahJuangPaidDate",
+														new Date().toISOString().split("T")[0],
+													);
+												}
+											} else if (handleToggleStatus) {
+												handleToggleStatus(
+													"rumahJuangStatus",
+													Boolean(checked),
+												);
+											}
+										}}
+										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+									/>
 									<Home className="w-4 h-4 text-amber-600" />
-									<span>Rumah Juang / Asrama</span>
+									<label
+										htmlFor="chk-rumahJuangStatus"
+										className="font-bold text-slate-800 text-sm cursor-pointer hover:text-[#0517B0] transition-colors"
+									>
+										Rumah Juang / Asrama
+									</label>
 								</div>
 								{formData?.rumahJuangAktif ? (
-									hasRumahJuangDoc ? (
-										<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px]">
+									isRumahJuangChecked ? (
+										<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px] font-bold">
 											<CheckCircle className="w-3 h-3 mr-1" /> Lunas
 										</Badge>
 									) : (
@@ -327,7 +419,7 @@ export function BiayaTambahanSection({
 								)}
 							</div>
 
-							<div className="space-y-3">
+							<div className="space-y-3 pt-1">
 								<div>
 									<div className="flex items-center gap-2 mb-1.5">
 										{isEditingTambahan ? (
@@ -369,12 +461,14 @@ export function BiayaTambahanSection({
 													<Input
 														type="number"
 														min={0}
-														onKeyDown={preventMinus}
+														max={999999999}
+														maxLength={9}
+														onKeyDown={preventFinanceIntegerKey}
 														value={formData?.rumahJuangNominal || ""}
 														onChange={(e) =>
 															handleFieldChange(
 																"rumahJuangNominal",
-																Number(e.target.value) || 0,
+																filterFinanceInteger(e.target.value),
 															)
 														}
 														placeholder="0"
@@ -395,25 +489,14 @@ export function BiayaTambahanSection({
 										<label className="text-[11px] font-semibold text-slate-500 block mb-1 uppercase tracking-wider">
 											Bukti Pembayaran (PDF)
 										</label>
-										<StagedDocumentUpload
-											docKey="rumah_juang"
-											isEditing={isEditingTambahan}
+										<DocumentUpload
+											studentId={studentId}
+											panel="finance"
+											documentKey="rumah_juang"
 											canEdit={canEdit}
-											existingDocs={financeDocs.rumah_juang}
-											stagedFile={stagedDocsTambahan.rumah_juang}
-											isDeleted={deletedDocKeysTambahan.includes("rumah_juang")}
-											onStageFile={(file) =>
-												handleStageDoc("tambahan", "rumah_juang", file)
-											}
-											onRemoveStagedFile={() =>
-												handleRemoveStagedDoc("tambahan", "rumah_juang")
-											}
-											onDeleteExistingDoc={() =>
-												handleDeleteExistingDoc("tambahan", "rumah_juang")
-											}
-											onRestoreExistingDoc={() =>
-												handleRestoreExistingDoc("tambahan", "rumah_juang")
-											}
+											onUploadSuccess={onUpdate}
+											onDeleteSuccess={onUpdate}
+											onUpdate={onUpdate}
 										/>
 									</div>
 								)}
@@ -424,27 +507,51 @@ export function BiayaTambahanSection({
 					{/* Custom Fields Dinamis */}
 					{customData.map((cf: any, idx: number) => {
 						const docKey = `custom_${cf.id || idx}`;
-						const hasDoc =
-							!!stagedDocsTambahan[docKey] ||
-							(((financeDocs[docKey]?.length ?? 0) > 0 || !!cf.status) &&
-								!deletedDocKeysTambahan.includes(docKey));
+						const isCfLunas =
+							cf.status === "lunas" ||
+							cf.status === "sudah_bayar" ||
+							cf.status === "selesai" ||
+							(financeDocs[docKey]?.length ?? 0) > 0;
 
 						return (
 							<div
 								key={cf.id || idx}
-								className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-3 flex flex-col justify-between shadow-2xs hover:border-slate-300 transition-all"
+								className={`p-4 rounded-xl border transition-colors space-y-3.5 flex flex-col justify-between shadow-2xs hover:border-slate-300 ${
+									isCfLunas
+										? "border-emerald-200 bg-emerald-50/20"
+										: "border-slate-200/80 bg-slate-50"
+								}`}
 							>
 								<div>
 									<div className="flex items-center justify-between mb-2">
-										<div className="flex items-center gap-2 font-bold text-slate-800 text-sm">
+										<div className="flex items-center gap-2.5">
+											<Checkbox
+												id={`chk-custom-${cf.id || idx}`}
+												checked={isCfLunas}
+												disabled={!canEdit}
+												onCheckedChange={(checked) => {
+													const nextStatus = checked ? "lunas" : "belum_lunas";
+													if (isEditingTambahan) {
+														handleCustomFieldChange(idx, "status", nextStatus);
+													} else if (cf.id && handleToggleCustomStatus) {
+														handleToggleCustomStatus(cf.id, nextStatus);
+													} else {
+														handleCustomFieldChange(idx, "status", nextStatus);
+													}
+												}}
+												className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+											/>
 											<FileText className="w-4 h-4 text-violet-600" />
-											<span className="truncate">
+											<label
+												htmlFor={`chk-custom-${cf.id || idx}`}
+												className="font-bold text-slate-800 text-sm truncate cursor-pointer hover:text-[#0517B0] transition-colors"
+											>
 												{cf.label || "Biaya Tambahan"}
-											</span>
+											</label>
 										</div>
 										<div className="flex items-center gap-1.5">
-											{hasDoc ? (
-												<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px]">
+											{isCfLunas ? (
+												<Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px] font-bold">
 													<CheckCircle className="w-3 h-3 mr-1" /> Lunas
 												</Badge>
 											) : (
@@ -469,7 +576,7 @@ export function BiayaTambahanSection({
 										</div>
 									</div>
 
-									<div className="space-y-3">
+									<div className="space-y-3 pt-1">
 										<div>
 											<label className="text-[11px] font-semibold text-slate-500 block mb-1 uppercase tracking-wider">
 												Nominal Tagihan
@@ -482,13 +589,15 @@ export function BiayaTambahanSection({
 													<Input
 														type="number"
 														min={0}
-														onKeyDown={preventMinus}
+														max={999999999}
+														maxLength={9}
+														onKeyDown={preventFinanceIntegerKey}
 														value={cf.nominal || ""}
 														onChange={(e) =>
 															handleCustomFieldChange(
 																idx,
 																"nominal",
-																Number(e.target.value) || 0,
+																filterFinanceInteger(e.target.value),
 															)
 														}
 														placeholder="0"
@@ -506,25 +615,14 @@ export function BiayaTambahanSection({
 											<label className="text-[11px] font-semibold text-slate-500 block mb-1 uppercase tracking-wider">
 												Bukti Pembayaran (PDF)
 											</label>
-											<StagedDocumentUpload
-												docKey={docKey}
-												isEditing={isEditingTambahan}
+											<DocumentUpload
+												studentId={studentId}
+												panel="finance"
+												documentKey={docKey}
 												canEdit={canEdit}
-												existingDocs={financeDocs[docKey]}
-												stagedFile={stagedDocsTambahan[docKey]}
-												isDeleted={deletedDocKeysTambahan.includes(docKey)}
-												onStageFile={(file) =>
-													handleStageDoc("tambahan", docKey, file)
-												}
-												onRemoveStagedFile={() =>
-													handleRemoveStagedDoc("tambahan", docKey)
-												}
-												onDeleteExistingDoc={() =>
-													handleDeleteExistingDoc("tambahan", docKey)
-												}
-												onRestoreExistingDoc={() =>
-													handleRestoreExistingDoc("tambahan", docKey)
-												}
+												onUploadSuccess={onUpdate}
+												onDeleteSuccess={onUpdate}
+												onUpdate={onUpdate}
 											/>
 										</div>
 									</div>

@@ -49,6 +49,20 @@ export async function ensureDatabaseSchema() {
 			END
 			$$;
 		`);
+
+		await client.unsafe(`
+			CREATE TABLE IF NOT EXISTS course_enrollments (
+				id SERIAL PRIMARY KEY,
+				course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+				student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+				added_by INTEGER REFERENCES users(id),
+				notes TEXT,
+				created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+				CONSTRAINT uq_course_enrollment UNIQUE (course_id, student_id)
+			);
+			CREATE INDEX IF NOT EXISTS idx_course_enrollments_course_id ON course_enrollments(course_id);
+			CREATE INDEX IF NOT EXISTS idx_course_enrollments_student_id ON course_enrollments(student_id);
+		`);
 	} catch (err) {
 		console.warn("[Database] Schema check warning:", err);
 	}

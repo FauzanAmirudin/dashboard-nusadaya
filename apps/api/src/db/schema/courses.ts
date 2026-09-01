@@ -1,10 +1,12 @@
-﻿import {
+import {
 	date,
+	index,
 	integer,
 	pgTable,
 	serial,
 	text,
 	timestamp,
+	unique,
 } from "drizzle-orm/pg-core";
 import { activityTypeEnum, courseTypeEnum, meetingTypeEnum } from "./enums";
 import { students, users } from "./shared";
@@ -72,3 +74,24 @@ export const courseMeetingAttendances = pgTable("course_meeting_attendances", {
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export const courseEnrollments = pgTable(
+	"course_enrollments",
+	{
+		id: serial("id").primaryKey(),
+		courseId: integer("course_id")
+			.references(() => courses.id)
+			.notNull(),
+		studentId: integer("student_id")
+			.references(() => students.id)
+			.notNull(),
+		addedBy: integer("added_by").references(() => users.id),
+		notes: text("notes"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(t) => [
+		index("idx_course_enrollments_course_id").on(t.courseId),
+		index("idx_course_enrollments_student_id").on(t.studentId),
+		unique("uq_course_enrollment").on(t.courseId, t.studentId),
+	],
+);

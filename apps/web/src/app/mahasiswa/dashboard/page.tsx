@@ -19,8 +19,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
+import { Progress } from "@/components/ui/progress";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
+import { formatRupiah } from "@/utils/format";
 
 export default function MahasiswaDashboard() {
 	const { user, isAuthenticated, hasHydrated } = useAuthStore();
@@ -44,10 +46,14 @@ export default function MahasiswaDashboard() {
 				api.mahasiswa.progress.get(),
 			]);
 
-			if (meRes.data?.success) setStudent(meRes.data.data);
-			if (progressRes.data?.success) setProgress(progressRes.data.data);
+			if (meRes.data?.success) {
+				setStudent(meRes.data.data);
+			}
+			if (progressRes.data?.success) {
+				setProgress(progressRes.data.data);
+			}
 		} catch (err) {
-			console.error(err);
+			console.error("Gagal memuat dashboard:", err);
 		} finally {
 			setLoading(false);
 		}
@@ -64,8 +70,8 @@ export default function MahasiswaDashboard() {
 	}
 
 	const renderStatus = (
-		isAcc: boolean | undefined | null,
-		status: string | undefined | null,
+		isAcc: boolean | undefined,
+		status: string | undefined,
 	) => {
 		if (isAcc)
 			return (
@@ -75,19 +81,19 @@ export default function MahasiswaDashboard() {
 			);
 		if (status === "AMAN")
 			return (
-				<Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200 text-xs">
+				<Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200 text-xs font-semibold">
 					<CheckCircle2 className="w-3 h-3 mr-1" /> Aman
 				</Badge>
 			);
 		if (status === "TIDAK_AMAN")
 			return (
-				<Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100 border-0 text-xs">
+				<Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100 border-0 text-xs font-semibold">
 					<AlertCircle className="w-3 h-3 mr-1" /> Tidak Aman
 				</Badge>
 			);
 		if (status === "PERLU_PERHATIAN")
 			return (
-				<Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-0 text-xs">
+				<Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-0 text-xs font-semibold">
 					<Clock className="w-3 h-3 mr-1" /> Dalam Proses
 				</Badge>
 			);
@@ -96,6 +102,59 @@ export default function MahasiswaDashboard() {
 				Belum Diproses
 			</Badge>
 		);
+	};
+
+	const getPanelProgressInfo = (
+		key: string,
+		data: any,
+	): { percent: number; label: string; subLabel?: string } => {
+		if (!data) return { percent: 0, label: "Memuat data progress..." };
+		switch (key) {
+			case "pmb":
+				return {
+					percent: data.progressPercent ?? 0,
+					label: `${data.completedItems ?? 0}/${data.totalItems ?? 14} Berkas & Syarat Lengkap`,
+				};
+			case "crm":
+				return {
+					percent: data.progressPercent ?? 0,
+					label: `${data.completedItems ?? 0}/8 Kriteria • Hadir ODS: ${data.practiceAttendancePercent ?? 0}%`,
+				};
+			case "finance": {
+				const isTalangan = data.metodePembayaran === "dana_talangan";
+				const method = isTalangan
+					? "Dana Talangan (2 Tahap)"
+					: "Dana Mandiri (4 Partisi)";
+				const completed = data.completedItems ?? data.completedPartitions ?? 0;
+				const total = data.totalItems ?? data.totalPartitions ?? 4;
+				const unit = isTalangan ? "Tahapan" : "Partisi";
+				return {
+					percent: data.progressPercent ?? 0,
+					label: `${completed}/${total} ${unit} Lunas • ${method}`,
+					subLabel:
+						data.totalBiayaPendidikan > 0
+							? `Terbayar: ${formatRupiah(data.totalTerbayar ?? 0)} / ${formatRupiah(data.totalBiayaPendidikan ?? 0)}`
+							: undefined,
+				};
+			}
+			case "academic":
+				return {
+					percent: data.progressPercent ?? 0,
+					label: `IPK ${(data.gpa ?? 0).toFixed(2)} • ${data.creditsCompleted ?? 0} SKS • Hadir ${data.attendancePercent ?? 0}%`,
+				};
+			case "pa":
+				return {
+					percent: data.vocabPercent ?? 0,
+					label: `Hafalan: ${data.totalVocab ?? 0}/${data.vocabTarget ?? 500} Kata (${data.vocabPercent ?? 0}%)`,
+				};
+			case "internship":
+				return {
+					percent: data.mainPercent ?? 0,
+					label: `Pra-Paspor ${data.praPasporCompleted ?? 0}/11 • Tahapan ${data.mainCompleted ?? 0}/12`,
+				};
+			default:
+				return { percent: 0, label: "-" };
+		}
 	};
 
 	const panels = [
@@ -210,18 +269,25 @@ export default function MahasiswaDashboard() {
 
 			{/* HEADING PROGRESS */}
 			<div className="flex items-center justify-between mt-8 mb-2">
-				<h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-					<FileText className="w-5 h-5 text-[#0517B0]" />
-					Progress Tracking 6 Divisi
-				</h2>
+				<div>
+					<h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+						<FileText className="w-5 h-5 text-[#0517B0]" />
+						Progress Tracking 6 Divisi
+					</h2>
+					<p className="text-xs text-slate-500 mt-0.5">
+						Rincian capaian kelengkapan berkas, pemenuhan kualifikasi & validasi
+						per divisi
+					</p>
+				</div>
 			</div>
 
-			{/* 6 PANEL CARDS */}
+			{/* 6 PANEL CARDS WITH PROGRESS BARS */}
 			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 				{panels.map((panel, idx) => {
 					const panelData = progress?.[panel.key];
 					const isAcc = panelData?.isAcc;
 					const status = panelData?.status;
+					const progressInfo = getPanelProgressInfo(panel.key, panelData);
 
 					return (
 						<Card
@@ -230,33 +296,54 @@ export default function MahasiswaDashboard() {
 						>
 							<CardContent className="p-5 flex flex-col h-full justify-between space-y-4">
 								<div>
-									<div className="flex items-center gap-3 mb-2">
-										<div className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm bg-[#0517B0] text-white shadow-xs">
+									<div className="flex items-center gap-3 mb-3">
+										<div className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm bg-[#0517B0] text-white shadow-xs shrink-0">
 											{idx + 1}
 										</div>
-										<div>
-											<h3 className="font-bold text-slate-900 text-base">
-												{panel.name}
-											</h3>
-											<p className="text-xs text-slate-500 line-clamp-1">
+										<div className="min-w-0 flex-1">
+											<div className="flex items-center justify-between gap-1">
+												<h3 className="font-bold text-slate-900 text-base truncate">
+													{panel.name}
+												</h3>
+												{renderStatus(isAcc, status)}
+											</div>
+											<p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
 												{panel.desc}
 											</p>
 										</div>
 									</div>
+
+									{/* Progress Bar & Sub-metrics */}
+									<div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
+										<div className="flex items-center justify-between text-xs">
+											<span className="font-medium text-slate-600">
+												Progres Divisi:
+											</span>
+											<span className="font-extrabold text-[#0517B0] font-mono">
+												{progressInfo.percent}%
+											</span>
+										</div>
+										<Progress
+											value={progressInfo.percent}
+											className="h-2 bg-slate-200/60 rounded-full"
+										/>
+										<p className="text-[11px] text-slate-600 font-medium truncate pt-0.5">
+											{progressInfo.label}
+										</p>
+										{progressInfo.subLabel && (
+											<p className="text-[10px] text-slate-500 font-mono truncate">
+												{progressInfo.subLabel}
+											</p>
+										)}
+									</div>
 								</div>
 
-								<div className="pt-3 border-t border-slate-100 flex flex-col gap-2.5">
-									<div className="flex items-center justify-between">
-										<span className="text-xs font-semibold text-slate-500">
-											Status:
-										</span>
-										{renderStatus(isAcc, status)}
-									</div>
+								<div className="pt-2 border-t border-slate-100">
 									<Link
 										href={`/mahasiswa/panel/${panel.path}`}
 										className="inline-flex items-center justify-center rounded-xl text-xs font-semibold transition-colors border h-9 px-3 w-full text-[#0517B0] bg-blue-50/50 hover:bg-blue-100/70 border-blue-200/60"
 									>
-										Lihat Detail Panel{" "}
+										Lihat Rincian Panel {panel.name}{" "}
 										<ExternalLink className="w-3 h-3 ml-1.5" />
 									</Link>
 								</div>

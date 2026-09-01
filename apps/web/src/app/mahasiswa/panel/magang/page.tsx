@@ -11,6 +11,7 @@ import {
 	CheckCircle2,
 	Clock,
 	Coins,
+	ExternalLink,
 	FileCheck,
 	FileText,
 	GraduationCap,
@@ -22,6 +23,7 @@ import {
 	ShieldCheck,
 	Stethoscope,
 	Ticket,
+	Users,
 	Video,
 	XCircle,
 } from "lucide-react";
@@ -193,9 +195,16 @@ export default function MagangPanelMahasiswa() {
 							</CardDescription>
 						</div>
 						{data?.isAcc ? (
-							<Badge className="bg-emerald-500 text-white px-3.5 py-1.5 text-sm rounded-full shadow-sm font-semibold">
-								<CheckCircle className="w-4 h-4 mr-1.5" /> Telah di-ACC Magang
-							</Badge>
+							<div className="flex flex-col items-end gap-1">
+								<Badge className="bg-emerald-500 text-white px-3.5 py-1.5 text-sm rounded-full shadow-sm font-semibold">
+									<CheckCircle className="w-4 h-4 mr-1.5" /> Telah di-ACC Magang
+								</Badge>
+								{data?.accAt && (
+									<span className="text-[11px] text-slate-500 font-medium">
+										Disetujui: {formatDate(data.accAt)}
+									</span>
+								)}
+							</div>
 						) : (
 							<Badge
 								variant="outline"
@@ -477,6 +486,80 @@ export default function MagangPanelMahasiswa() {
 									</p>
 								</div>
 							</div>
+
+							{/* PDT Card */}
+							<div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
+								<div className="flex items-center justify-between">
+									<span className="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
+										<GraduationCap className="w-4 h-4 text-purple-600" />{" "}
+										Pembekalan PDT
+									</span>
+									{data?.pdtReady ? (
+										<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px]">
+											Selesai
+										</Badge>
+									) : (
+										<Badge
+											variant="outline"
+											className="text-slate-500 text-[10px]"
+										>
+											Menunggu Jadwal
+										</Badge>
+									)}
+								</div>
+								<div className="text-xs space-y-1">
+									<p className="text-slate-500">
+										Lokasi / Tempat:{" "}
+										<span className="font-medium text-slate-700">
+											{data?.pdtPlace || "Kampus / Daring"}
+										</span>
+									</p>
+									<p className="text-slate-500">
+										Jadwal PDT:{" "}
+										<span className="font-medium text-slate-700">
+											{data?.pdtDate ? formatDate(data.pdtDate) : "-"}
+											{data?.pdtEndDate
+												? ` s/d ${formatDate(data.pdtEndDate)}`
+												: ""}
+										</span>
+									</p>
+								</div>
+							</div>
+
+							{/* Agen Verification Card */}
+							<div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
+								<div className="flex items-center justify-between">
+									<span className="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
+										<Users className="w-4 h-4 text-blue-600" /> Verifikasi Agen
+									</span>
+									{data?.agenReady ? (
+										<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px]">
+											Terverifikasi
+										</Badge>
+									) : (
+										<Badge
+											variant="outline"
+											className="text-slate-500 text-[10px]"
+										>
+											Proses
+										</Badge>
+									)}
+								</div>
+								<div className="text-xs space-y-1">
+									<p className="text-slate-500">
+										Negara Tujuan Agen:{" "}
+										<span className="font-medium text-slate-700">
+											{data?.agenNegaraTujuan || data?.destinationCity || "-"}
+										</span>
+									</p>
+									<p className="text-slate-500">
+										Peminatan / Bidang:{" "}
+										<span className="font-medium text-slate-700">
+											{data?.agenPeminatan || "-"}
+										</span>
+									</p>
+								</div>
+							</div>
 						</div>
 					</div>
 
@@ -506,7 +589,7 @@ export default function MagangPanelMahasiswa() {
 												</p>
 											</div>
 										</div>
-										<div className="shrink-0 ml-2">
+										<div className="shrink-0 ml-2 flex items-center gap-1.5">
 											{doc.isVerified ? (
 												<Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 px-2 py-0.5 text-[10px] border-0">
 													Terverifikasi
@@ -518,6 +601,17 @@ export default function MagangPanelMahasiswa() {
 												>
 													Menunggu
 												</Badge>
+											)}
+											{doc.fileUrl && (
+												<a
+													href={doc.fileUrl}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+													title="Buka Dokumen"
+												>
+													<ExternalLink className="w-3.5 h-3.5" />
+												</a>
 											)}
 										</div>
 									</div>

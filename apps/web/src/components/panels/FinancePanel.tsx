@@ -55,9 +55,11 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 	const [isLoading, setIsLoading] = useState(true);
 	const [isAccSaving, setIsAccSaving] = useState(false);
 
-	const fetchData = async () => {
+	const fetchData = async (silent = false) => {
 		try {
-			setIsLoading(true);
+			if (!silent && !finState) {
+				setIsLoading(true);
+			}
 			const { data, error } =
 				await api.finance.student[studentId.toString()].get();
 			if (!error && data?.success) {
@@ -77,8 +79,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 	}, [studentId]);
 
 	const refreshData = () => {
-		fetchData();
-		onUpdate();
+		fetchData(true);
 	};
 
 	const isTalangan = finState?.metodePembayaran === "dana_talangan";

@@ -24,6 +24,9 @@ export class BackupRepository {
 	}
 
 	async listJobs(): Promise<BackupJobRecord[]> {
+		// Pastikan record backup lama tipe full yang melebihi batas 5 dihapus dari DB
+		await this.cleanupJobRecordsByType("full", 5);
+
 		return db.query.backupJobs.findMany({
 			orderBy: (t, { desc }) => [desc(t.createdAt)],
 		});
@@ -80,6 +83,26 @@ export class BackupRepository {
 
 	async deleteJobsBySuffix(suffix: string): Promise<void> {
 		await db.delete(backupJobs).where(like(backupJobs.id, `%${suffix}`));
+	}
+
+	async deleteJobsByOutputPath(outputPath: string): Promise<void> {
+		await db.delete(backupJobs).where(eq(backupJobs.outputPath, outputPath));
+	}
+
+	async cleanupJobRecordsByType(
+		type: string,
+		maxKeep: number = 5,
+	): Promise<void> {
+		const jobs = await db.query.backupJobs.findMany({
+			where: eq(backupJobs.type, type),
+			orderBy: (t, { desc }) => [desc(t.createdAt)],
+		});
+		if (jobs.length > maxKeep) {
+			const jobsToDelete = jobs.slice(maxKeep);
+			for (const job of jobsToDelete) {
+				await db.delete(backupJobs).where(eq(backupJobs.id, job.id));
+			}
+		}
 	}
 }
 

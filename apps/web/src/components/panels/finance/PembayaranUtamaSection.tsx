@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import {
 	Select,
 	SelectContent,
@@ -30,9 +31,9 @@ import {
 } from "@/components/ui/select";
 import { API_URL } from "@/lib/eden";
 import { formatRupiah } from "@/utils/format";
-import { StagedDocumentUpload } from "./StagedDocumentUpload";
 
 interface PembayaranUtamaSectionProps {
+	studentId: number;
 	canEdit: boolean;
 	isEditingUtama: boolean;
 	setIsEditingUtama: (val: boolean) => void;
@@ -44,12 +45,6 @@ interface PembayaranUtamaSectionProps {
 	isRegistrasiLunas: boolean;
 	regPct: number;
 	financeDocs: Record<string, any[]>;
-	stagedDocsUtama: Record<string, File | null>;
-	deletedDocKeysUtama: string[];
-	handleStageDoc: (section: "utama", docKey: string, file: File) => void;
-	handleRemoveStagedDoc: (section: "utama", docKey: string) => void;
-	handleDeleteExistingDoc: (section: "utama", docKey: string) => void;
-	handleRestoreExistingDoc: (section: "utama", docKey: string) => void;
 	isSemesterAllLunas: boolean;
 	semPct: number;
 	curSemestersTotal: number;
@@ -62,13 +57,16 @@ interface PembayaranUtamaSectionProps {
 	handleToggleTalangan: (semester: any) => void;
 	openInstallmentModal: (semester: any, installment?: any) => void;
 	handleDeleteInstallment: (semesterId: number, installmentId: number) => void;
+	handleToggleStatus?: (fieldKey: string, nextStatus: boolean) => void;
 	isInterviewLunas: boolean;
 	isKeberangkatanLunas: boolean;
 	intPct: number;
 	kebPct: number;
+	onUpdate: () => void;
 }
 
 export function PembayaranUtamaSection({
+	studentId,
 	canEdit,
 	isEditingUtama,
 	setIsEditingUtama,
@@ -80,12 +78,6 @@ export function PembayaranUtamaSection({
 	isRegistrasiLunas,
 	regPct,
 	financeDocs,
-	stagedDocsUtama,
-	deletedDocKeysUtama,
-	handleStageDoc,
-	handleRemoveStagedDoc,
-	handleDeleteExistingDoc,
-	handleRestoreExistingDoc,
 	isSemesterAllLunas,
 	semPct,
 	curSemestersTotal,
@@ -98,10 +90,12 @@ export function PembayaranUtamaSection({
 	handleToggleTalangan,
 	openInstallmentModal,
 	handleDeleteInstallment,
+	handleToggleStatus,
 	isInterviewLunas,
 	isKeberangkatanLunas,
 	intPct,
 	kebPct,
+	onUpdate,
 }: PembayaranUtamaSectionProps) {
 	const isMetodeTalangan = formData?.metodePembayaran === "dana_talangan";
 
@@ -463,68 +457,176 @@ export function PembayaranUtamaSection({
 			</CardHeader>
 			<CardContent className="p-5 sm:p-6 space-y-6 bg-white">
 				{/* 1. Registrasi Awal */}
-				<div>
-					<div className="flex items-center justify-between mb-4">
-						<div className="flex items-center gap-2">
-							<h4 className="font-semibold text-slate-800 flex items-center">
-								Registrasi Awal
-								{isRegistrasiLunas ? (
-									<Badge className="ml-3 bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0">
-										<CheckCircle className="w-3 h-3 mr-1" /> Lunas
+				<div
+					className={`p-4 rounded-xl border transition-colors space-y-3.5 ${
+						formData?.registrasiStatus || isRegistrasiLunas
+							? "border-emerald-200 bg-emerald-50/20 shadow-xs"
+							: "border-slate-200 bg-white shadow-xs"
+					}`}
+				>
+					<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3 border-slate-100">
+						<div className="flex items-start gap-3">
+							<Checkbox
+								id="chk-registrasiStatus"
+								checked={Boolean(
+									formData?.registrasiStatus || isRegistrasiLunas,
+								)}
+								disabled={!canEdit}
+								onCheckedChange={(checked) => {
+									if (isEditingUtama) {
+										handleFieldChange("registrasiStatus", Boolean(checked));
+										if (checked && !formData?.registrasiPaidDate) {
+											handleFieldChange(
+												"registrasiPaidDate",
+												new Date().toISOString().split("T")[0],
+											);
+										}
+									} else if (handleToggleStatus) {
+										handleToggleStatus("registrasiStatus", Boolean(checked));
+									}
+								}}
+								className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+							/>
+							<div>
+								<label
+									htmlFor="chk-registrasiStatus"
+									className="text-sm font-bold text-slate-800 cursor-pointer flex items-center gap-2 hover:text-[#0517B0] transition-colors"
+								>
+									<span>1. Registrasi Awal</span>
+									<Badge
+										variant="outline"
+										className="text-[10px] font-semibold bg-sky-50 border-sky-200 text-sky-700"
+									>
+										Partisi 1 ({regPct}% Total)
+									</Badge>
+								</label>
+								<p className="text-[11px] text-slate-500 mt-0.5">
+									Biaya masuk & pendaftaran awal mahasiswa
+								</p>
+							</div>
+						</div>
+
+						<div className="flex items-center gap-3 shrink-0">
+							<div className="text-right">
+								<span className="text-xs text-slate-400 block font-normal">
+									Tagihan:
+								</span>
+								<span className="text-base font-bold text-slate-800 font-mono">
+									{formatRupiah(formData?.registrasiNominal || 0)}
+								</span>
+							</div>
+							<div>
+								{formData?.registrasiStatus || isRegistrasiLunas ? (
+									<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-bold gap-1">
+										<CheckCircle className="w-3.5 h-3.5 text-emerald-600" />{" "}
+										Lunas
 									</Badge>
 								) : (
 									<Badge
 										variant="outline"
-										className="ml-3 text-slate-500 border-slate-300"
+										className="text-slate-400 border-slate-200 text-xs"
 									>
 										Belum Lunas
 									</Badge>
 								)}
-							</h4>
-							<Badge
-								variant="outline"
-								className="text-[10px] font-semibold bg-sky-50 border-sky-200 text-sky-700"
-							>
-								Partisi 1 ({regPct}% Total)
-							</Badge>
+							</div>
 						</div>
 					</div>
 
 					<div className="p-4 bg-slate-50 rounded-lg border border-slate-100 flex flex-col md:flex-row gap-6">
-						<div className="flex-1">
-							<label className="text-xs font-semibold text-slate-500 mb-1.5 block uppercase tracking-wider">
-								Nominal Tagihan Registrasi
-							</label>
-							<div className="text-lg font-bold text-slate-800">
-								{formatRupiah(formData?.registrasiNominal || 0)}
+						<div className="flex-1 space-y-3.5">
+							<div>
+								<label className="text-xs font-semibold text-slate-500 mb-1.5 block uppercase tracking-wider">
+									Nominal Tagihan Registrasi
+								</label>
+								<div className="text-lg font-bold text-slate-800 font-mono">
+									{formatRupiah(formData?.registrasiNominal || 0)}
+								</div>
+								<p className="text-xs text-slate-400 mt-1">
+									Disesuaikan otomatis melalui Partisi Biaya Pendidikan
+								</p>
 							</div>
-							<p className="text-xs text-slate-400 mt-1">
-								Disesuaikan otomatis melalui Partisi Biaya Pendidikan
-							</p>
+
+							{/* Status & Tanggal Pembayaran */}
+							{isEditingUtama ? (
+								<div className="space-y-3 pt-2.5 border-t border-slate-200/80">
+									<div className="flex items-center space-x-2">
+										<Checkbox
+											id="registrasiStatusCheckbox"
+											checked={Boolean(
+												formData?.registrasiStatus || isRegistrasiLunas,
+											)}
+											onCheckedChange={(checked) => {
+												handleFieldChange("registrasiStatus", Boolean(checked));
+												if (checked && !formData?.registrasiPaidDate) {
+													handleFieldChange(
+														"registrasiPaidDate",
+														new Date().toISOString().split("T")[0],
+													);
+												}
+											}}
+										/>
+										<label
+											htmlFor="registrasiStatusCheckbox"
+											className="text-xs font-semibold text-slate-700 cursor-pointer select-none"
+										>
+											Tandai Lunas Pembayaran Registrasi
+										</label>
+									</div>
+
+									{(formData?.registrasiStatus || isRegistrasiLunas) && (
+										<div>
+											<label className="text-[11px] font-medium text-slate-500 mb-1 block">
+												Tanggal Pembayaran Registrasi
+											</label>
+											<input
+												type="date"
+												value={
+													formData?.registrasiPaidDate
+														? String(formData.registrasiPaidDate).split("T")[0]
+														: new Date().toISOString().split("T")[0]
+												}
+												onChange={(e) =>
+													handleFieldChange(
+														"registrasiPaidDate",
+														e.target.value,
+													)
+												}
+												className="w-full text-xs h-8 px-2.5 rounded-lg border border-slate-200 bg-white"
+											/>
+										</div>
+									)}
+								</div>
+							) : (
+								formData?.registrasiPaidDate && (
+									<div className="pt-2 border-t border-slate-200/60 text-xs text-slate-500">
+										<span className="font-medium text-slate-700">
+											Tanggal Bayar:{" "}
+										</span>
+										{new Date(formData.registrasiPaidDate).toLocaleDateString(
+											"id-ID",
+											{
+												day: "numeric",
+												month: "long",
+												year: "numeric",
+											},
+										)}
+									</div>
+								)
+							)}
 						</div>
 						<div className="flex-1 border-t md:border-t-0 md:border-l border-slate-200 md:pl-6 pt-4 md:pt-0">
 							<label className="text-xs font-semibold text-slate-500 mb-2 block uppercase tracking-wider">
 								Bukti Pembayaran Registrasi (PDF)
 							</label>
-							<StagedDocumentUpload
-								docKey="registrasi"
-								isEditing={isEditingUtama}
+							<DocumentUpload
+								studentId={studentId}
+								panel="finance"
+								documentKey="registrasi"
 								canEdit={canEdit}
-								existingDocs={financeDocs.registrasi}
-								stagedFile={stagedDocsUtama.registrasi}
-								isDeleted={deletedDocKeysUtama.includes("registrasi")}
-								onStageFile={(file) =>
-									handleStageDoc("utama", "registrasi", file)
-								}
-								onRemoveStagedFile={() =>
-									handleRemoveStagedDoc("utama", "registrasi")
-								}
-								onDeleteExistingDoc={() =>
-									handleDeleteExistingDoc("utama", "registrasi")
-								}
-								onRestoreExistingDoc={() =>
-									handleRestoreExistingDoc("utama", "registrasi")
-								}
+								onUploadSuccess={onUpdate}
+								onDeleteSuccess={onUpdate}
+								onUpdate={onUpdate}
 							/>
 						</div>
 					</div>
@@ -659,83 +761,116 @@ export function PembayaranUtamaSection({
 									label: "Interview Magang",
 									docKey: "mandiri_interview",
 									nomField: "mandiriInterviewNominal",
-									isLunas: isInterviewLunas,
+									statusField: "mandiriInterviewStatus",
 									pct: intPct,
 									partisiNum: 3,
 									badgeColor: "bg-amber-50 border-amber-200 text-amber-700",
+									chkId: "chk-mandiriInterview",
 								},
 								{
 									label: "Keberangkatan",
 									docKey: "mandiri_keberangkatan",
 									nomField: "mandiriKeberangkatanNominal",
-									isLunas: isKeberangkatanLunas,
+									statusField: "mandiriKeberangkatanStatus",
 									pct: kebPct,
 									partisiNum: 4,
 									badgeColor:
 										"bg-emerald-50 border-emerald-200 text-emerald-700",
+									chkId: "chk-mandiriKeberangkatan",
 								},
-							].map((item, idx) => (
-								<div
-									key={idx}
-									className="bg-white p-4 border border-slate-200 rounded-lg shadow-sm space-y-3"
-								>
-									<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 border-slate-100">
-										<div className="flex items-center gap-2 font-medium text-slate-700">
-											<span>{item.label}</span>
-											<Badge
-												variant="outline"
-												className={`text-[10px] font-semibold ${item.badgeColor}`}
-											>
-												Partisi {item.partisiNum} ({item.pct}% Total)
-											</Badge>
-										</div>
-										<div className="flex items-center gap-4">
-											<div className="font-bold text-slate-800 text-right">
-												{formatRupiah(formData?.[item.nomField] || 0)}
-											</div>
-											<div>
-												{item.isLunas ? (
-													<Badge className="bg-emerald-100 text-emerald-700 border-0">
-														<CheckCircle className="w-3 h-3 mr-1" /> Lunas
-													</Badge>
-												) : (
-													<Badge
-														variant="outline"
-														className="text-slate-500 border-slate-200"
+							].map((item, idx) => {
+								const isLunas = Boolean(formData?.[item.statusField]);
+								return (
+									<div
+										key={idx}
+										className={`p-4 rounded-xl border transition-colors space-y-3.5 ${
+											isLunas
+												? "border-emerald-200 bg-emerald-50/20 shadow-xs"
+												: "border-slate-200 bg-white shadow-xs"
+										}`}
+									>
+										<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 border-slate-100">
+											<div className="flex items-center gap-3">
+												<Checkbox
+													id={item.chkId}
+													checked={isLunas}
+													disabled={!canEdit}
+													onCheckedChange={(checked) => {
+														if (isEditingUtama) {
+															handleFieldChange(
+																item.statusField,
+																Boolean(checked),
+															);
+															if (
+																checked &&
+																!formData?.[`${item.statusField}PaidDate`]
+															) {
+																handleFieldChange(
+																	`${item.statusField}PaidDate`,
+																	new Date().toISOString().split("T")[0],
+																);
+															}
+														} else if (handleToggleStatus) {
+															handleToggleStatus(
+																item.statusField,
+																Boolean(checked),
+															);
+														}
+													}}
+													className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+												/>
+												<div>
+													<label
+														htmlFor={item.chkId}
+														className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer flex items-center gap-2 hover:text-[#0517B0] transition-colors"
 													>
-														Belum Lunas
-													</Badge>
-												)}
+														<span>{item.label}</span>
+														<Badge
+															variant="outline"
+															className={`text-[10px] font-semibold ${item.badgeColor}`}
+														>
+															Partisi {item.partisiNum} ({item.pct}% Total)
+														</Badge>
+													</label>
+												</div>
+											</div>
+											<div className="flex items-center gap-4">
+												<div className="font-bold text-slate-800 text-right font-mono">
+													{formatRupiah(formData?.[item.nomField] || 0)}
+												</div>
+												<div>
+													{isLunas ? (
+														<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+															<CheckCircle className="w-3 h-3 mr-1" /> Lunas
+														</Badge>
+													) : (
+														<Badge
+															variant="outline"
+															className="text-slate-400 border-slate-200 text-[10px]"
+														>
+															Belum Lunas
+														</Badge>
+													)}
+												</div>
 											</div>
 										</div>
+										<div>
+											<label className="text-[11px] font-semibold text-slate-500 block mb-1 uppercase tracking-wider">
+												Bukti Bayar {item.label} (PDF)
+											</label>
+											<DocumentUpload
+												studentId={studentId}
+												panel="finance"
+												documentKey={item.docKey}
+												canEdit={canEdit}
+												onUploadSuccess={onUpdate}
+												onDeleteSuccess={onUpdate}
+												onUpdate={onUpdate}
+											/>
+										</div>
 									</div>
-									<div>
-										<label className="text-[11px] font-semibold text-slate-500 block mb-1 uppercase tracking-wider">
-											Bukti Bayar {item.label} (PDF)
-										</label>
-										<StagedDocumentUpload
-											docKey={item.docKey}
-											isEditing={isEditingUtama}
-											canEdit={canEdit}
-											existingDocs={financeDocs[item.docKey]}
-											stagedFile={stagedDocsUtama[item.docKey]}
-											isDeleted={deletedDocKeysUtama.includes(item.docKey)}
-											onStageFile={(file) =>
-												handleStageDoc("utama", item.docKey, file)
-											}
-											onRemoveStagedFile={() =>
-												handleRemoveStagedDoc("utama", item.docKey)
-											}
-											onDeleteExistingDoc={() =>
-												handleDeleteExistingDoc("utama", item.docKey)
-											}
-											onRestoreExistingDoc={() =>
-												handleRestoreExistingDoc("utama", item.docKey)
-											}
-										/>
-									</div>
-								</div>
-							))}
+								);
+							})}
 						</div>
 					</div>
 				)}

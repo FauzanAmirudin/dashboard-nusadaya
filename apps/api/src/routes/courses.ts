@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
 import {
+	courseEnrollments,
 	courseGrades,
 	courseMeetingActivities,
 	courseMeetingAttendances,
@@ -247,6 +248,218 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 		return {
 			success: true,
 			message: "Mata kuliah beserta jadwal mengajar berhasil dihapus",
+		};
+	})
+
+	// ==========================================
+	// 1b. CUSTOM ENROLLMENTS (LINTAS ANGKATAN)
+	// ==========================================
+	.get("/:id/enrollments", async ({ params, user, set }) => {
+		const courseId = parseInt(params.id, 10);
+		const course = await db.query.courses.findFirst({
+			where: eq(courses.id, courseId),
+		});
+		if (!course) {
+			set.status = 404;
+			return { success: false, message: "Mata kuliah tidak ditemukan" };
+		}
+		const data = await db.query.courseEnrollments.findMany({
+			where: eq(courseEnrollments.courseId, courseId),
+			with: {
+				student: {
+					columns: {
+						id: true,
+						nim: true,
+						name: true,
+						cohort: true,
+						program: true,
+						subProgram: true,
+						studentStatus: true,
+					},
+				},
+				addedBy: {
+					columns: { id: true, fullName: true, username: true },
+				},
+			},
+			orderBy: [desc(courseEnrollments.createdAt)],
+		});
+		return { success: true, data };
+	})
+	.get("/:id/enrollments/search", async ({ params, query, set }) => {
+		const courseId = parseInt(params.id, 10);
+		const q = ((query?.q as string) || "").trim().toLowerCase();
+
+		const course = await db.query.courses.findFirst({
+			where: eq(courses.id, courseId),
+		});
+		if (!course) {
+			set.status = 404;
+			return { success: false, message: "Mata kuliah tidak ditemukan" };
+		}
+
+		// Get already enrolled student IDs
+		const existingCustom = await db.query.courseEnrollments.findMany({
+			where: eq(courseEnrollments.courseId, courseId),
+			columns: { studentId: true },
+		});
+		const enrolledIds = new Set(existingCustom.map((e) => e.studentId));
+
+		// Fetch active students
+		const allStudents = await db.query.students.findMany({
+			where: eq(students.isArchived, false),
+			columns: {
+				id: true,
+				nim: true,
+				name: true,
+				cohort: true,
+				program: true,
+				subProgram: true,
+				studentStatus: true,
+			},
+			orderBy: [asc(students.name)],
+			limit: 200,
+		});
+
+		const filtered = allStudents
+			.filter((s) => {
+				// Exclude if already manually enrolled OR if already in the course's regular cohort
+				if (enrolledIds.has(s.id) || s.cohort === course.cohort) return false;
+				if (!q) return true;
+				return (
+					s.name.toLowerCase().includes(q) ||
+					(s.nim && s.nim.toLowerCase().includes(q)) ||
+					s.cohort.toString().includes(q) ||
+					(s.subProgram && s.subProgram.toLowerCase().includes(q))
+				);
+			})
+			.slice(0, 50);
+
+		return { success: true, data: filtered };
+	})
+	.post(
+		"/:id/enrollments",
+		async ({ params, body, user, set }) => {
+			if (!hasRole(user, "akademik", "superadmin", "dosen")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			const courseId = parseInt(params.id, 10);
+			const { studentId, studentIds, notes } = body as {
+				studentId?: number;
+				studentIds?: number[];
+				notes?: string;
+			};
+
+			const targetIds: number[] =
+				Array.isArray(studentIds) && studentIds.length > 0
+					? studentIds
+					: typeof studentId === "number"
+						? [studentId]
+						: [];
+
+			if (targetIds.length === 0) {
+				set.status = 400;
+				return {
+					success: false,
+					message: "Silakan pilih minimal satu mahasiswa",
+				};
+			}
+
+			const course = await db.query.courses.findFirst({
+				where: eq(courses.id, courseId),
+			});
+			if (!course) {
+				set.status = 404;
+				return { success: false, message: "Mata kuliah tidak ditemukan" };
+			}
+
+			// Fetch candidate student details
+			const studentRecords = await db.query.students.findMany({
+				where: inArray(students.id, targetIds),
+				columns: { id: true, cohort: true, name: true },
+			});
+
+			// 1. Check if any student is already in the course's regular cohort
+			const regularCohortIds = new Set(
+				studentRecords
+					.filter((s) => s.cohort === course.cohort)
+					.map((s) => s.id),
+			);
+
+			// 2. Check if already registered in custom course enrollments
+			const existing = await db.query.courseEnrollments.findMany({
+				where: and(
+					eq(courseEnrollments.courseId, courseId),
+					inArray(courseEnrollments.studentId, targetIds),
+				),
+			});
+			const existingIds = new Set(existing.map((e) => e.studentId));
+
+			// Only insert students who are neither in regular cohort nor already in courseEnrollments
+			const toInsert = targetIds.filter(
+				(id) => !regularCohortIds.has(id) && !existingIds.has(id),
+			);
+
+			if (toInsert.length === 0) {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Mahasiswa yang dipilih sudah terdaftar di mata kuliah ini (baik sebagai peserta reguler maupun peserta tambahan).",
+				};
+			}
+
+			const validUserId = (await getValidUserId(user)) || user?.id || null;
+
+			const recordsToInsert = toInsert.map((sId) => ({
+				courseId,
+				studentId: sId,
+				addedBy: validUserId,
+				notes: notes || null,
+			}));
+
+			const inserted = await db
+				.insert(courseEnrollments)
+				.values(recordsToInsert)
+				.returning();
+
+			return {
+				success: true,
+				message: `${inserted.length} mahasiswa berhasil ditambahkan ke mata kuliah`,
+				data: inserted,
+			};
+		},
+		{
+			body: t.Object({
+				studentId: t.Optional(t.Number()),
+				studentIds: t.Optional(t.Array(t.Number())),
+				notes: t.Optional(t.Union([t.String(), t.Null()])),
+			}),
+		},
+	)
+	.delete("/:id/enrollments/:enrollId", async ({ params, user, set }) => {
+		if (!hasRole(user, "akademik", "superadmin", "dosen")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		const enrollId = parseInt(params.enrollId, 10);
+		const existing = await db.query.courseEnrollments.findFirst({
+			where: eq(courseEnrollments.id, enrollId),
+		});
+		if (!existing) {
+			set.status = 404;
+			return { success: false, message: "Data pendaftaran tidak ditemukan" };
+		}
+
+		await db
+			.delete(courseEnrollments)
+			.where(eq(courseEnrollments.id, enrollId));
+
+		return {
+			success: true,
+			message: "Pendaftaran mahasiswa berhasil dihapus dari mata kuliah",
 		};
 	})
 

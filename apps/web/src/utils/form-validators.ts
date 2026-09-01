@@ -168,3 +168,67 @@ export function validateIntegerRange(
 	}
 	return { isValid: true };
 }
+
+/**
+ * Filter integer khusus panel Finance: maksimal 9 digit (maks 999.999.999).
+ * Mengembalikan number bersih yang aman untuk integer SQL.
+ */
+export function filterFinanceInteger(
+	value: string | number,
+	maxDigits = 9,
+): number {
+	const str = String(value ?? "").replace(/\D/g, "");
+	const sliced = str.slice(0, maxDigits);
+	return sliced ? Number(sliced) : 0;
+}
+
+/**
+ * Filter integer khusus panel Finance: mengembalikan string (maks 9 digit).
+ */
+export function filterFinanceIntegerString(
+	value: string | number,
+	maxDigits = 9,
+): string {
+	const str = String(value ?? "").replace(/\D/g, "");
+	return str.slice(0, maxDigits);
+}
+
+/**
+ * Event handler onKeyDown untuk mencegah pengetikan karakter non-angka
+ * dan mencegah pengetikan melebihi batas 9 digit pada panel Finance.
+ */
+export function preventFinanceIntegerKey(
+	e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+	maxDigits = 9,
+) {
+	const controlKeys = [
+		"Backspace",
+		"Delete",
+		"Tab",
+		"Enter",
+		"ArrowLeft",
+		"ArrowRight",
+		"ArrowUp",
+		"ArrowDown",
+		"Home",
+		"End",
+	];
+
+	if (controlKeys.includes(e.key) || e.ctrlKey || e.metaKey) {
+		return;
+	}
+
+	if (!/^[0-9]$/.test(e.key)) {
+		e.preventDefault();
+		return;
+	}
+
+	const input = e.currentTarget as HTMLInputElement;
+	const selectedText = window.getSelection()?.toString() || "";
+	const currentVal = input.value.replace(/\D/g, "");
+
+	if (currentVal.length >= maxDigits && !selectedText) {
+		e.preventDefault();
+		toast.warning(`Input angka maksimal ${maxDigits} digit`);
+	}
+}

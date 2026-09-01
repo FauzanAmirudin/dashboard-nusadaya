@@ -35,6 +35,7 @@ import {
 	weeklyEvents,
 } from "../../db/schema";
 import { fileService } from "../../modules/file/service/file.service";
+import { invalidateFinanceCaches } from "./finance";
 
 export const documentsRoutes = new Elysia()
 	.get("/:id/:panel/documents", async (context) => {
@@ -154,6 +155,95 @@ export const documentsRoutes = new Elysia()
 				uploadedBy: user.id,
 			});
 
+			// Jika panel finance, update status field terkait secara otomatis & invalidate cache
+			if (panel === "finance") {
+				if (documentKey === "registrasi") {
+					await db
+						.update(financeData)
+						.set({
+							registrasiStatus: true,
+							registrasiPaidDate: new Date(),
+							registrasiBuktiBayarUrl: fileUrl,
+							updatedAt: new Date(),
+						})
+						.where(eq(financeData.studentId, studentId));
+				} else if (documentKey === "mandiri_interview") {
+					await db
+						.update(financeData)
+						.set({
+							mandiriInterviewStatus: true,
+							mandiriInterviewBuktiBayarUrl: fileUrl,
+							updatedAt: new Date(),
+						})
+						.where(eq(financeData.studentId, studentId));
+				} else if (documentKey === "t1_interview") {
+					await db
+						.update(financeData)
+						.set({
+							t1InterviewStatus: true,
+							t1InterviewBuktiBayarUrl: fileUrl,
+							updatedAt: new Date(),
+						})
+						.where(eq(financeData.studentId, studentId));
+				} else if (documentKey === "mandiri_keberangkatan") {
+					await db
+						.update(financeData)
+						.set({
+							mandiriKeberangkatanStatus: true,
+							mandiriKeberangkatanBuktiBayarUrl: fileUrl,
+							updatedAt: new Date(),
+						})
+						.where(eq(financeData.studentId, studentId));
+				} else if (documentKey === "t2_keberangkatan") {
+					await db
+						.update(financeData)
+						.set({
+							t2KeberangkatanStatus: true,
+							t2KeberangkatanBuktiBayarUrl: fileUrl,
+							updatedAt: new Date(),
+						})
+						.where(eq(financeData.studentId, studentId));
+				} else if (documentKey === "admin_talangan") {
+					await db
+						.update(financeData)
+						.set({
+							adminTalaganStatus: true,
+							adminTalaganBuktiBayarUrl: fileUrl,
+							updatedAt: new Date(),
+						})
+						.where(eq(financeData.studentId, studentId));
+				} else if (documentKey === "toeic") {
+					await db
+						.update(financeData)
+						.set({
+							toeicStatus: true,
+							toeicBuktiBayarUrl: fileUrl,
+							updatedAt: new Date(),
+						})
+						.where(eq(financeData.studentId, studentId));
+				} else if (documentKey === "paspor") {
+					await db
+						.update(financeData)
+						.set({
+							pasporStatus: true,
+							pasporBuktiBayarUrl: fileUrl,
+							updatedAt: new Date(),
+						})
+						.where(eq(financeData.studentId, studentId));
+				} else if (documentKey === "rumah_juang") {
+					await db
+						.update(financeData)
+						.set({
+							rumahJuangStatus: true,
+							rumahJuangBuktiBayarUrl: fileUrl,
+							updatedAt: new Date(),
+						})
+						.where(eq(financeData.studentId, studentId));
+				}
+
+				await invalidateFinanceCaches(studentId);
+			}
+
 			return { success: true, message: "Dokumen berhasil diunggah", fileUrl };
 		},
 		{
@@ -200,6 +290,11 @@ export const documentsRoutes = new Elysia()
 		await db
 			.delete(table)
 			.where(and(eq(table.studentId, studentId), eq(table.id, docId)));
+
+		if (panel === "finance") {
+			await invalidateFinanceCaches(studentId);
+		}
+
 		return { success: true, message: "Dokumen berhasil dihapus" };
 	})
 	.patch(

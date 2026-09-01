@@ -1,4 +1,4 @@
-﻿import { relations } from "drizzle-orm";
+import { relations } from "drizzle-orm";
 import {
 	academicAttitudeLogs,
 	academicData,
@@ -13,6 +13,7 @@ import {
 	academicPeriods,
 } from "./academic-calendar";
 import {
+	courseEnrollments,
 	courseMeetingActivities,
 	courseMeetingAttendances,
 	courseMeetings,
@@ -691,7 +692,26 @@ export const coursesRelations = relations(courses, ({ one, many }) => ({
 		references: [users.id],
 	}),
 	meetings: many(courseMeetings),
+	enrollments: many(courseEnrollments),
 }));
+
+export const courseEnrollmentsRelations = relations(
+	courseEnrollments,
+	({ one }) => ({
+		course: one(courses, {
+			fields: [courseEnrollments.courseId],
+			references: [courses.id],
+		}),
+		student: one(students, {
+			fields: [courseEnrollments.studentId],
+			references: [students.id],
+		}),
+		addedBy: one(users, {
+			fields: [courseEnrollments.addedBy],
+			references: [users.id],
+		}),
+	}),
+);
 
 export const courseMeetingsRelations = relations(
 	courseMeetings,

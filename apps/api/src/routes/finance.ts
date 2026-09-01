@@ -10,9 +10,19 @@ import {
 	practicesMaterialReports,
 	students,
 } from "../db/schema";
+import { cacheDel, cacheInvalidatePattern } from "../lib/cache";
 import { getValidUserId, hasRole } from "../lib/permissions";
 import { requireRole } from "../middleware/rbac";
 import { fileService } from "../modules/file/service/file.service";
+
+async function invalidateFinanceCache(studentId?: number) {
+	await Promise.all([
+		cacheInvalidatePattern("cache:mahasiswa:*"),
+		cacheInvalidatePattern("cache:students:*"),
+		cacheInvalidatePattern("cache:dashboard:*"),
+		studentId ? cacheDel(`cache:student:${studentId}`) : Promise.resolve(),
+	]);
+}
 
 export const financeRouter = new Elysia({ prefix: "/finance" })
 	// Dashboard: Requires finance or superadmin
@@ -108,10 +118,11 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 			if (!hasRole(user, "finance"))
 				return { success: false, message: "Forbidden" };
 
+			const sId = parseInt(studentId);
 			await db
 				.insert(financeData)
 				.values({
-					studentId: parseInt(studentId),
+					studentId: sId,
 					registrasiNominal: body.registrasiNominal,
 					registrasiStatus: body.registrasiStatus,
 					registrasiBuktiBayarUrl: body.registrasiBuktiBayarUrl,
@@ -128,6 +139,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 					},
 				});
 
+			await invalidateFinanceCache(sId);
 			return { success: true };
 		},
 		{
@@ -145,10 +157,11 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 		async ({ params: { studentId }, body, user }: any) => {
 			if (!user || (user.role !== "finance" && user.role !== "superadmin"))
 				return { success: false, message: "Forbidden" };
+			const sId = parseInt(studentId);
 			await db
 				.insert(financeData)
 				.values({
-					studentId: parseInt(studentId),
+					studentId: sId,
 					metodePembayaran: body.metodePembayaran,
 				})
 				.onConflictDoUpdate({
@@ -158,6 +171,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 						updatedAt: new Date(),
 					},
 				});
+			await invalidateFinanceCache(sId);
 			return { success: true };
 		},
 		{ body: t.Object({ metodePembayaran: t.String() }) },
@@ -169,16 +183,18 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 		async ({ params: { studentId }, body, user }: any) => {
 			if (!user || (user.role !== "finance" && user.role !== "superadmin"))
 				return { success: false, message: "Forbidden" };
+			const sId = parseInt(studentId);
 			await db
 				.insert(financeData)
 				.values({
-					studentId: parseInt(studentId),
+					studentId: sId,
 					...body,
 				})
 				.onConflictDoUpdate({
 					target: financeData.studentId,
 					set: { ...body, updatedAt: new Date() },
 				});
+			await invalidateFinanceCache(sId);
 			return { success: true };
 		},
 	)
@@ -189,16 +205,18 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 		async ({ params: { studentId }, body, user }: any) => {
 			if (!user || (user.role !== "finance" && user.role !== "superadmin"))
 				return { success: false, message: "Forbidden" };
+			const sId = parseInt(studentId);
 			await db
 				.insert(financeData)
 				.values({
-					studentId: parseInt(studentId),
+					studentId: sId,
 					...body,
 				})
 				.onConflictDoUpdate({
 					target: financeData.studentId,
 					set: { ...body, updatedAt: new Date() },
 				});
+			await invalidateFinanceCache(sId);
 			return { success: true };
 		},
 	)
@@ -209,16 +227,18 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 		async ({ params: { studentId }, body, user }: any) => {
 			if (!hasRole(user, "finance"))
 				return { success: false, message: "Forbidden" };
+			const sId = parseInt(studentId);
 			await db
 				.insert(financeData)
 				.values({
-					studentId: parseInt(studentId),
+					studentId: sId,
 					...body,
 				})
 				.onConflictDoUpdate({
 					target: financeData.studentId,
 					set: { ...body, updatedAt: new Date() },
 				});
+			await invalidateFinanceCache(sId);
 			return { success: true };
 		},
 	)
@@ -229,33 +249,53 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 		async ({ params: { studentId }, body, user }: any) => {
 			if (!hasRole(user, "finance"))
 				return { success: false, message: "Forbidden" };
+			const sId = parseInt(studentId);
+			const safeBody = { ...body };
+			if (safeBody.nominal !== undefined) {
+				safeBody.nominal = Math.min(
+					999999999,
+					Math.max(0, Number(safeBody.nominal) || 0),
+				);
+			}
 			await db.insert(financeCustomFields).values({
-				studentId: parseInt(studentId),
-				...body,
+				studentId: sId,
+				...safeBody,
 			});
+			await invalidateFinanceCache(sId);
 			return { success: true };
 		},
 	)
 	.patch(
 		"/student/:studentId/custom-field/:fieldId",
-		async ({ params: { fieldId }, body, user }: any) => {
+		async ({ params: { studentId, fieldId }, body, user }: any) => {
 			if (!hasRole(user, "finance"))
 				return { success: false, message: "Forbidden" };
+			const sId = parseInt(studentId);
+			const safeBody = { ...body };
+			if (safeBody.nominal !== undefined) {
+				safeBody.nominal = Math.min(
+					999999999,
+					Math.max(0, Number(safeBody.nominal) || 0),
+				);
+			}
 			await db
 				.update(financeCustomFields)
-				.set({ ...body, updatedAt: new Date() })
+				.set({ ...safeBody, updatedAt: new Date() })
 				.where(eq(financeCustomFields.id, parseInt(fieldId)));
+			await invalidateFinanceCache(sId);
 			return { success: true };
 		},
 	)
 	.delete(
 		"/student/:studentId/custom-field/:fieldId",
-		async ({ params: { fieldId }, user }: any) => {
+		async ({ params: { studentId, fieldId }, user }: any) => {
 			if (!hasRole(user, "finance"))
 				return { success: false, message: "Forbidden" };
+			const sId = parseInt(studentId);
 			await db
 				.delete(financeCustomFields)
 				.where(eq(financeCustomFields.id, parseInt(fieldId)));
+			await invalidateFinanceCache(sId);
 			return { success: true };
 		},
 	)

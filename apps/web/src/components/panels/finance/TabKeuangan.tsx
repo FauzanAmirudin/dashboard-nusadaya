@@ -731,6 +731,84 @@ export function TabKeuangan({
 		});
 	};
 
+	const handleToggleStatus = async (fieldKey: string, nextStatus: boolean) => {
+		if (!canEdit) return;
+		const previousVal = formData?.[fieldKey];
+		const dateKey = `${fieldKey.replace("Status", "")}PaidDate`;
+		const previousPaidDate = formData?.[dateKey];
+
+		try {
+			const updatePayload: Record<string, any> = { [fieldKey]: nextStatus };
+			if (nextStatus && !formData?.[dateKey]) {
+				updatePayload[dateKey] = new Date().toISOString();
+			}
+
+			// Optimistic UI state update (seamless, no page reload)
+			setFormData((prev: any) => ({ ...prev, ...updatePayload }));
+
+			const res = await fetchApi(`/students/${studentId}/finance`, {
+				method: "PATCH",
+				body: JSON.stringify(updatePayload),
+			});
+
+			if (res.ok) {
+				toast.success(
+					`Status ${nextStatus ? "Lunas" : "Belum Lunas"} berhasil diperbarui`,
+				);
+			} else {
+				// Revert on error
+				setFormData((prev: any) => ({
+					...prev,
+					[fieldKey]: previousVal,
+					...(previousPaidDate !== undefined
+						? { [dateKey]: previousPaidDate }
+						: {}),
+				}));
+				const err = await res.json();
+				toast.error(err.message || "Gagal memperbarui status");
+			}
+		} catch (e: any) {
+			setFormData((prev: any) => ({
+				...prev,
+				[fieldKey]: previousVal,
+			}));
+			toast.error(e.message || "Terjadi kesalahan sistem");
+		}
+	};
+
+	const handleToggleCustomStatus = async (
+		fieldId: number,
+		nextStatus: "lunas" | "belum_lunas",
+	) => {
+		if (!canEdit) return;
+		const previousCustom = [...customData];
+		try {
+			setCustomData((prev) =>
+				prev.map((cf) =>
+					cf.id === fieldId ? { ...cf, status: nextStatus } : cf,
+				),
+			);
+			const res = await fetchApi(
+				`/finance/student/${studentId}/custom-field/${fieldId}`,
+				{
+					method: "PATCH",
+					body: JSON.stringify({ status: nextStatus }),
+				},
+			);
+			if (res.ok) {
+				toast.success(
+					`Status pos biaya berhasil ditandai ${nextStatus === "lunas" ? "Lunas" : "Belum Lunas"}`,
+				);
+			} else {
+				setCustomData(previousCustom);
+				toast.error("Gagal memperbarui status pos biaya");
+			}
+		} catch (e: any) {
+			setCustomData(previousCustom);
+			toast.error("Terjadi kesalahan saat memperbarui status");
+		}
+	};
+
 	const triggerSave = (section: "utama" | "tambahan") => {
 		setSectionToSave(section);
 		setSaveConfirmOpen(true);
@@ -739,35 +817,7 @@ export function TabKeuangan({
 	const executeSaveUtama = async () => {
 		setLoadingUtama(true);
 		try {
-			// 1. Upload Staged Documents
-			for (const [docKey, file] of Object.entries(stagedDocsUtama)) {
-				if (file) {
-					const fd = new FormData();
-					fd.append("file", file);
-					const uploadRes = await fetchApi(
-						`/students/${studentId}/finance/documents/${docKey}`,
-						{ method: "POST", body: fd },
-					);
-					if (!uploadRes.ok) {
-						toast.error(`Gagal mengunggah berkas untuk ${docKey}`);
-					}
-				}
-			}
-
-			// 2. Delete Staged Deleted Documents
-			for (const docKey of deletedDocKeysUtama) {
-				const existing = financeDocs[docKey];
-				if (existing && existing.length > 0) {
-					for (const doc of existing) {
-						await fetchApi(
-							`/students/${studentId}/finance/documents/${doc.id.toString()}`,
-							{ method: "DELETE" },
-						);
-					}
-				}
-			}
-
-			// 3. Process Deleted Semester Installments
+			// 1. Process Deleted Semester Installments
 			for (const item of deletedInstallments) {
 				if (item.installmentId > 0) {
 					await fetchApi(
@@ -904,6 +954,13 @@ export function TabKeuangan({
 			delete cleanData.accAt;
 			delete cleanData.accBy;
 
+			cleanData.registrasiStatus = Boolean(
+				formData?.registrasiStatus || isRegistrasiLunas,
+			);
+			if (cleanData.registrasiStatus && !cleanData.registrasiPaidDate) {
+				cleanData.registrasiPaidDate = new Date().toISOString();
+			}
+
 			const res = await fetchApi(`/students/${studentId}/finance`, {
 				method: "PATCH",
 				body: JSON.stringify(cleanData),
@@ -934,35 +991,7 @@ export function TabKeuangan({
 	const executeSaveTambahan = async () => {
 		setLoadingTambahan(true);
 		try {
-			// 1. Upload Staged Documents
-			for (const [docKey, file] of Object.entries(stagedDocsTambahan)) {
-				if (file) {
-					const fd = new FormData();
-					fd.append("file", file);
-					const uploadRes = await fetchApi(
-						`/students/${studentId}/finance/documents/${docKey}`,
-						{ method: "POST", body: fd },
-					);
-					if (!uploadRes.ok) {
-						toast.error(`Gagal mengunggah berkas untuk ${docKey}`);
-					}
-				}
-			}
-
-			// 2. Delete Staged Deleted Documents
-			for (const docKey of deletedDocKeysTambahan) {
-				const existing = financeDocs[docKey];
-				if (existing && existing.length > 0) {
-					for (const doc of existing) {
-						await fetchApi(
-							`/students/${studentId}/finance/documents/${doc.id.toString()}`,
-							{ method: "DELETE" },
-						);
-					}
-				}
-			}
-
-			// 3. Save standard fields
+			// 1. Save standard fields
 			const cleanData = {
 				toeicNominal: formData.toeicNominal,
 				pasporNominal: formData.pasporNominal,
@@ -1279,10 +1308,19 @@ export function TabKeuangan({
 				semestersLunasCount={semestersLunasCount}
 				isInterviewLunas={isInterviewLunas}
 				isKeberangkatanLunas={isKeberangkatanLunas}
+				hasAdminTalanganDoc={hasAdminTalanganDoc}
+				adminTalaganNominal={Number(formData?.adminTalaganNominal) || 0}
+				totalTahap1Nominal={totalTahap1Nominal}
+				totalTahap2Nominal={totalTahap2Nominal}
+				t1Paid={t1Paid}
+				t2Paid={t2Paid}
+				isTahap1Lunas={isTahap1Lunas}
+				isTahap2Lunas={isTahap2Lunas}
 			/>
 
 			{/* 2. Pembayaran Utama Section */}
 			<PembayaranUtamaSection
+				studentId={studentId}
 				canEdit={canEdit}
 				isEditingUtama={isEditingUtama}
 				setIsEditingUtama={setIsEditingUtama}
@@ -1294,12 +1332,6 @@ export function TabKeuangan({
 				isRegistrasiLunas={isRegistrasiLunas}
 				regPct={regPct}
 				financeDocs={financeDocs}
-				stagedDocsUtama={stagedDocsUtama}
-				deletedDocKeysUtama={deletedDocKeysUtama}
-				handleStageDoc={handleStageDoc}
-				handleRemoveStagedDoc={handleRemoveStagedDoc}
-				handleDeleteExistingDoc={handleDeleteExistingDoc}
-				handleRestoreExistingDoc={handleRestoreExistingDoc}
 				isSemesterAllLunas={isSemesterAllLunas}
 				semPct={semPct}
 				curSemestersTotal={curSemestersTotal}
@@ -1316,10 +1348,16 @@ export function TabKeuangan({
 				isKeberangkatanLunas={isKeberangkatanLunas}
 				intPct={intPct}
 				kebPct={kebPct}
+				handleToggleStatus={handleToggleStatus}
+				onUpdate={() => {
+					fetchFinanceDocs();
+					onUpdate();
+				}}
 			/>
 
 			{/* 3. Dana Talangan Section */}
 			<DanaTalanganSection
+				studentId={studentId}
 				formData={formData}
 				canEdit={canEdit}
 				isEditingUtama={isEditingUtama}
@@ -1340,19 +1378,18 @@ export function TabKeuangan({
 				t2Installments={t2Installments}
 				openTalanganModal={openTalanganModal}
 				handleDeleteTalanganInstallment={handleDeleteTalanganInstallment}
-				financeDocs={financeDocs}
-				stagedDocsUtama={stagedDocsUtama}
-				deletedDocKeysUtama={deletedDocKeysUtama}
-				handleStageDoc={handleStageDoc}
-				handleRemoveStagedDoc={handleRemoveStagedDoc}
-				handleDeleteExistingDoc={handleDeleteExistingDoc}
-				handleRestoreExistingDoc={handleRestoreExistingDoc}
 				hasAdminTalanganDoc={hasAdminTalanganDoc}
 				preventMinus={preventMinus}
+				handleToggleStatus={handleToggleStatus}
+				onUpdate={() => {
+					fetchFinanceDocs();
+					onUpdate();
+				}}
 			/>
 
 			{/* 4. Biaya Tambahan Section */}
 			<BiayaTambahanSection
+				studentId={studentId}
 				canEdit={canEdit}
 				isEditingTambahan={isEditingTambahan}
 				setIsEditingTambahan={setIsEditingTambahan}
@@ -1365,17 +1402,17 @@ export function TabKeuangan({
 				hasPasporDoc={hasPasporDoc}
 				hasRumahJuangDoc={hasRumahJuangDoc}
 				financeDocs={financeDocs}
-				stagedDocsTambahan={stagedDocsTambahan}
-				deletedDocKeysTambahan={deletedDocKeysTambahan}
-				handleStageDoc={handleStageDoc}
-				handleRemoveStagedDoc={handleRemoveStagedDoc}
-				handleDeleteExistingDoc={handleDeleteExistingDoc}
-				handleRestoreExistingDoc={handleRestoreExistingDoc}
 				customData={customData}
 				handleCustomFieldChange={handleCustomFieldChange}
 				triggerAddCustomField={triggerAddCustomField}
 				triggerDeleteCustomField={triggerDeleteCustomField}
 				preventMinus={preventMinus}
+				handleToggleStatus={handleToggleStatus}
+				handleToggleCustomStatus={handleToggleCustomStatus}
+				onUpdate={() => {
+					fetchFinanceDocs();
+					onUpdate();
+				}}
 			/>
 
 			{/* Modal Atur Pembagian Biaya Pendidikan */}

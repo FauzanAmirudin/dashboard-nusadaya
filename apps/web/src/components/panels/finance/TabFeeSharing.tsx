@@ -42,6 +42,11 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { API_URL, api, getToken } from "@/lib/eden";
+import {
+	filterFinanceInteger,
+	filterFinanceIntegerString,
+	preventFinanceIntegerKey,
+} from "@/utils/form-validators";
 import { formatRupiah } from "@/utils/format";
 
 interface TabFeeSharingProps {
@@ -622,22 +627,20 @@ export function TabFeeSharing({ studentId, canEdit }: TabFeeSharingProps) {
 															<Input
 																type="number"
 																min={0}
+																max={999999999}
+																maxLength={9}
 																placeholder="0"
 																value={
 																	r.nominalFee === 0 || r.nominalFee === "0"
 																		? ""
 																		: (r.nominalFee ?? "")
 																}
-																onKeyDown={(e) => {
-																	if (
-																		e.key === "-" ||
-																		e.key === "e" ||
-																		e.key === "E"
-																	)
-																		e.preventDefault();
-																}}
+																onKeyDown={preventFinanceIntegerKey}
 																onChange={(e) =>
-																	handleLocalNominalChange(r.id, e.target.value)
+																	handleLocalNominalChange(
+																		r.id,
+																		filterFinanceIntegerString(e.target.value),
+																	)
 																}
 																onBlur={() =>
 																	handleUpdateFee(
@@ -813,21 +816,16 @@ export function TabFeeSharing({ studentId, canEdit }: TabFeeSharingProps) {
 								<Input
 									type="number"
 									min={0}
+									max={999999999}
+									maxLength={9}
 									placeholder="0"
 									value={tempPromosiInput}
-									onKeyDown={(e) => {
-										if (e.key === "-" || e.key === "e" || e.key === "E")
-											e.preventDefault();
-									}}
-									onChange={(e) => {
-										const val = e.target.value;
-										if (val === "") {
-											setTempPromosiInput("");
-										} else {
-											const clean = val.replace(/^0+(?=\d)/, "");
-											setTempPromosiInput(clean);
-										}
-									}}
+									onKeyDown={preventFinanceIntegerKey}
+									onChange={(e) =>
+										setTempPromosiInput(
+											filterFinanceIntegerString(e.target.value),
+										)
+									}
 									className="pl-9 font-black text-sm h-10 bg-slate-50/50 border-slate-200 rounded-lg text-slate-900 focus:bg-white transition-all shadow-2xs"
 								/>
 							</div>

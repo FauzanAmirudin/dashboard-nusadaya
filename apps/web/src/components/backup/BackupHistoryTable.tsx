@@ -11,6 +11,9 @@ export function BackupHistoryTable() {
 	const [jobs, setJobs] = useState<any[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [selectedJob, setSelectedJob] = useState<any | null>(null);
+	const [filterType, setFilterType] = useState<"all" | "full" | "manual">(
+		"all",
+	);
 
 	const fetchJobs = async () => {
 		setLoading(true);
@@ -51,7 +54,7 @@ export function BackupHistoryTable() {
 				: "Per Mahasiswa";
 		}
 		if (job.type === "full") {
-			return "Full Backup";
+			return "Full Backup (Otomatis Harian)";
 		}
 		return job.type;
 	};
@@ -85,21 +88,80 @@ export function BackupHistoryTable() {
 		}
 	};
 
+	// Pisahkan & filter list
+	const fullJobs = jobs.filter((j) => j.type === "full").slice(0, 5);
+	const manualJobs = jobs.filter((j) => j.type !== "full");
+
+	const displayedJobs =
+		filterType === "full"
+			? fullJobs
+			: filterType === "manual"
+				? manualJobs
+				: [...fullJobs, ...manualJobs].sort(
+						(a, b) =>
+							new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+					);
+
 	return (
 		<div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
-			<div className="p-5 border-b border-slate-200 flex items-center justify-between">
-				<h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-					<History className="h-5 w-5 text-slate-500" />
-					Riwayat Backup
-				</h3>
-				<button
-					onClick={fetchJobs}
-					disabled={loading}
-					className="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-lg transition-colors"
-					title="Refresh data"
-				>
-					<RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-				</button>
+			<div className="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+				<div>
+					<div className="flex items-center gap-2">
+						<h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+							<History className="h-5 w-5 text-[#0517B0]" />
+							Riwayat Backup
+						</h3>
+						<span className="text-[11px] font-bold bg-blue-50 text-[#0517B0] border border-blue-200 px-2 py-0.5 rounded-full">
+							Maks. 5 Full Backup Terbaru
+						</span>
+					</div>
+					<p className="text-xs text-slate-500 mt-1">
+						Sistem secara otomatis menyimpan 5 full backup harian terbaru.
+						Backup yang lebih lama otomatis dihapus dari penyimpanan & riwayat.
+					</p>
+				</div>
+				<div className="flex items-center gap-2">
+					<div className="flex bg-slate-100 p-1 rounded-lg text-xs font-medium text-slate-600">
+						<button
+							onClick={() => setFilterType("all")}
+							className={`px-3 py-1 rounded-md transition-colors ${
+								filterType === "all"
+									? "bg-white text-slate-900 shadow-xs font-semibold"
+									: "hover:text-slate-900"
+							}`}
+						>
+							Semua
+						</button>
+						<button
+							onClick={() => setFilterType("full")}
+							className={`px-3 py-1 rounded-md transition-colors ${
+								filterType === "full"
+									? "bg-white text-slate-900 shadow-xs font-semibold"
+									: "hover:text-slate-900"
+							}`}
+						>
+							Full Backup (5)
+						</button>
+						<button
+							onClick={() => setFilterType("manual")}
+							className={`px-3 py-1 rounded-md transition-colors ${
+								filterType === "manual"
+									? "bg-white text-slate-900 shadow-xs font-semibold"
+									: "hover:text-slate-900"
+							}`}
+						>
+							Manual
+						</button>
+					</div>
+					<button
+						onClick={fetchJobs}
+						disabled={loading}
+						className="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-lg transition-colors"
+						title="Refresh data"
+					>
+						<RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+					</button>
+				</div>
 			</div>
 
 			<div className="overflow-x-auto flex-1">
@@ -107,14 +169,14 @@ export function BackupHistoryTable() {
 					<thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-medium">
 						<tr>
 							<th className="px-6 py-4">Waktu</th>
-							<th className="px-6 py-4">Tipe</th>
+							<th className="px-6 py-4">Tipe Backup</th>
 							<th className="px-6 py-4">Status</th>
 							<th className="px-6 py-4">Ukuran</th>
 							<th className="px-6 py-4 text-right">Aksi</th>
 						</tr>
 					</thead>
 					<tbody className="divide-y divide-slate-100">
-						{loading && jobs.length === 0 ? (
+						{loading && displayedJobs.length === 0 ? (
 							<tr>
 								<td
 									colSpan={5}
@@ -123,7 +185,7 @@ export function BackupHistoryTable() {
 									Memuat data riwayat...
 								</td>
 							</tr>
-						) : jobs.length === 0 ? (
+						) : displayedJobs.length === 0 ? (
 							<tr>
 								<td
 									colSpan={5}
@@ -133,7 +195,7 @@ export function BackupHistoryTable() {
 								</td>
 							</tr>
 						) : (
-							jobs.map((job) => (
+							displayedJobs.map((job) => (
 								<tr
 									key={job.id}
 									className="hover:bg-slate-50 transition-colors"

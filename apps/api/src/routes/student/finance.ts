@@ -41,7 +41,7 @@ import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
 import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 
-async function invalidateFinanceCaches(studentId: number) {
+export async function invalidateFinanceCaches(studentId: number) {
 	await Promise.all([
 		cacheDel(`cache:student:${studentId}`),
 		cacheInvalidatePattern("cache:students:*"),
@@ -143,6 +143,30 @@ export const financeRoutes = new Elysia()
 				...updates,
 				updatedAt: new Date(),
 			};
+
+			const intFields = [
+				"totalBiayaPendidikan",
+				"registrasiNominal",
+				"mandiriSemesterNominalPerSem",
+				"mandiriSemesterNominalTotal",
+				"mandiriInterviewNominal",
+				"mandiriKeberangkatanNominal",
+				"t1SemesterNominalTotal",
+				"t1InterviewNominal",
+				"t2KeberangkatanNominal",
+				"adminTalaganNominal",
+				"toeicNominal",
+				"pasporNominal",
+				"rumahJuangNominal",
+			];
+			for (const field of intFields) {
+				if (cleanUpdates[field] !== undefined && cleanUpdates[field] !== null) {
+					cleanUpdates[field] = Math.min(
+						999999999,
+						Math.max(0, Number(cleanUpdates[field]) || 0),
+					);
+				}
+			}
 
 			if (cleanUpdates.registrasiPaidDate)
 				cleanUpdates.registrasiPaidDate = new Date(
@@ -638,11 +662,15 @@ export const financeRoutes = new Elysia()
 			}
 
 			const installmentNumber = current.installments.length + 1;
+			const safeNominal = Math.min(
+				999999999,
+				Math.max(0, Number(b.nominalPaid) || 0),
+			);
 
 			await db.insert(financeSemesterInstallments).values({
 				semesterId,
 				installmentNumber,
-				nominalPaid: b.nominalPaid,
+				nominalPaid: safeNominal,
 				paymentDate: b.paymentDate ? new Date(b.paymentDate) : new Date(),
 				buktiBayarUrl: b.buktiBayarUrl,
 				notes: b.notes,
@@ -652,7 +680,7 @@ export const financeRoutes = new Elysia()
 			// Recalculate status
 			const newTotalPaid =
 				current.installments.reduce((sum, inst) => sum + inst.nominalPaid, 0) +
-				Number(b.nominalPaid);
+				safeNominal;
 			let newStatus = current.status;
 
 			if (newTotalPaid === 0) newStatus = "BELUM_BAYAR";
@@ -721,7 +749,13 @@ export const financeRoutes = new Elysia()
 			await db
 				.update(financeSemesterInstallments)
 				.set({
-					nominalPaid: updates.nominalPaid ?? inst.nominalPaid,
+					nominalPaid:
+						updates.nominalPaid !== undefined
+							? Math.min(
+									999999999,
+									Math.max(0, Number(updates.nominalPaid) || 0),
+								)
+							: inst.nominalPaid,
 					paymentDate: updates.paymentDate
 						? new Date(updates.paymentDate)
 						: inst.paymentDate,
@@ -866,6 +900,10 @@ export const financeRoutes = new Elysia()
 			});
 
 			const installmentNumber = existing.length + 1;
+			const safeTalanganNominal = Math.min(
+				999999999,
+				Math.max(0, Number(b.nominalPaid) || 0),
+			);
 
 			const [inserted] = await db
 				.insert(financeTalanganInstallments)
@@ -873,7 +911,7 @@ export const financeRoutes = new Elysia()
 					studentId,
 					stage: b.stage,
 					installmentNumber,
-					nominalPaid: Number(b.nominalPaid) || 0,
+					nominalPaid: safeTalanganNominal,
 					paymentDate: b.paymentDate ? new Date(b.paymentDate) : new Date(),
 					buktiBayarUrl: b.buktiBayarUrl,
 					notes: b.notes,
@@ -908,7 +946,10 @@ export const financeRoutes = new Elysia()
 
 			const updateData: any = { updatedAt: new Date() };
 			if (b.nominalPaid !== undefined)
-				updateData.nominalPaid = Number(b.nominalPaid) || 0;
+				updateData.nominalPaid = Math.min(
+					999999999,
+					Math.max(0, Number(b.nominalPaid) || 0),
+				);
 			if (b.paymentDate !== undefined)
 				updateData.paymentDate = b.paymentDate ? new Date(b.paymentDate) : null;
 			if (b.buktiBayarUrl !== undefined)

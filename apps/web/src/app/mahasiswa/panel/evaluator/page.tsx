@@ -8,25 +8,17 @@ import {
 	CheckCircle2,
 	Clock,
 	ExternalLink,
-	FileCheck,
 	FileDown,
 	FileText,
-	GraduationCap,
-	HelpCircle,
-	History,
 	Info,
-	Plane,
 	RefreshCw,
-	ShieldAlert,
 	ShieldCheck,
 	Sparkles,
-	UserCheck,
 	XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -34,6 +26,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 
@@ -78,23 +71,23 @@ export default function EvaluatorPanelMahasiswa() {
 		if (!dateString) return "-";
 		return new Date(dateString).toLocaleDateString("id-ID", {
 			day: "numeric",
-			month: "long",
+			month: "short",
 			year: "numeric",
 		});
 	};
 
 	const decisionMap: Record<
 		string,
-		{ label: string; color: string; desc: string; badge: string }
+		{ label: string; color: string; badge: string; desc: string }
 	> = {
 		layak_berangkat: {
-			label: "Layak Berangkat (ACC Final)",
+			label: "Layak Berangkat (ACC Penuh)",
 			color: "text-emerald-700 bg-emerald-50 border-emerald-200",
-			badge: "bg-emerald-500 text-white",
-			desc: "Mahasiswa dinyatakan memenuhi seluruh kualifikasi dan siap diberangkatkan magang ke luar negeri.",
+			badge: "bg-emerald-600 text-white",
+			desc: "Seluruh kualifikasi dari 6 divisi telah terpenuhi dan disetujui. Mahasiswa siap diberangkatkan ke negara penempatan magang.",
 		},
 		lanjut_interview: {
-			label: "Lanjut Interview User",
+			label: "Lanjut Tahap Interview User",
 			color: "text-blue-700 bg-blue-50 border-blue-200",
 			badge: "bg-blue-600 text-white",
 			desc: "Mahasiswa direkomendasikan untuk mengikuti tahap wawancara langsung dengan pihak industri/perusahaan luar negeri.",
@@ -162,6 +155,7 @@ export default function EvaluatorPanelMahasiswa() {
 	const accCount = panelList.filter(
 		(p) => data?.panels?.[p.key]?.isAcc === true,
 	).length;
+	const accPercent = Math.round((accCount / 6) * 100);
 
 	return (
 		<div className="max-w-4xl mx-auto space-y-6 pb-12">
@@ -192,7 +186,7 @@ export default function EvaluatorPanelMahasiswa() {
 									: "bg-amber-500 text-white px-3.5 py-1.5 text-sm rounded-full shadow-sm font-semibold"
 							}
 						>
-							{accCount}/6 Divisi ACC
+							{accCount}/6 Divisi ACC ({accPercent}%)
 						</Badge>
 					</div>
 				</CardHeader>
@@ -301,20 +295,30 @@ export default function EvaluatorPanelMahasiswa() {
 						</div>
 					</div>
 
-					{/* Section 3: Ringkasan Status ACC 6 Divisi */}
+					{/* Section 3: Ringkasan Status ACC 6 Divisi with Progress Bar */}
 					<div className="space-y-4 pt-2">
-						<div>
-							<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-								<Award className="w-4 h-4 text-[#0517B0]" />
-								Status Rekomendasi 6 Pintu Validasi Divisi
-							</h3>
-							<p className="text-xs text-slate-500 mt-0.5">
-								Seluruh 6 pintu divisi harus berstatus ACC agar proses
-								verifikasi akhir dapat disahkan.
-							</p>
+						<div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+							<div>
+								<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+									<Award className="w-4 h-4 text-[#0517B0]" />
+									Status Rekomendasi 6 Pintu Validasi Divisi
+								</h3>
+								<p className="text-xs text-slate-500 mt-0.5">
+									{accCount} dari 6 divisi telah memberikan status rekomendasi
+									ACC
+								</p>
+							</div>
+							<span className="text-base font-extrabold text-[#0517B0] font-mono">
+								{accPercent}%
+							</span>
 						</div>
 
-						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+						<Progress
+							value={accPercent}
+							className="h-3 bg-slate-100 rounded-full"
+						/>
+
+						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
 							{panelList.map((p) => {
 								const panelData = data?.panels?.[p.key];
 								const isAcc = Boolean(panelData?.isAcc);
@@ -332,6 +336,11 @@ export default function EvaluatorPanelMahasiswa() {
 												<p className="text-[11px] text-slate-500 mt-0.5">
 													{p.desc}
 												</p>
+												{isAcc && panelData?.accAt && (
+													<p className="text-[10px] text-emerald-600 font-medium mt-1">
+														ACC: {formatDate(panelData.accAt)}
+													</p>
+												)}
 											</div>
 											{isAcc ? (
 												<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px] font-bold">
@@ -351,13 +360,30 @@ export default function EvaluatorPanelMahasiswa() {
 											href={`/mahasiswa/panel/${p.path}`}
 											className="inline-flex items-center justify-between text-xs text-[#0517B0] hover:text-blue-800 font-semibold pt-2 border-t border-slate-100"
 										>
-											<span>Lihat Detail Panel</span>
+											<span>Buka Panel Divisi</span>
 											<ExternalLink className="w-3 h-3" />
 										</Link>
 									</div>
 								);
 							})}
 						</div>
+
+						{/* Action Tip */}
+						{!allPanelsAcc && (
+							<div className="p-4 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex items-start gap-3 mt-4">
+								<Info className="w-5 h-5 text-[#0517B0] shrink-0 mt-0.5" />
+								<div className="text-xs text-slate-700 leading-relaxed">
+									<span className="font-bold text-slate-900 block mb-0.5">
+										Panduan Langkah Mahasiswa:
+									</span>
+									Periksa panel divisi yang masih bertanda{" "}
+									<span className="font-semibold text-amber-700">"Proses"</span>{" "}
+									untuk melengkapi berkas, tagihan, atau syarat kehadiran yang
+									belum terpenuhi agar evaluator dapat merekomendasikan
+									penerbitan SK Keberangkatan.
+								</div>
+							</div>
+						)}
 					</div>
 				</CardContent>
 			</Card>

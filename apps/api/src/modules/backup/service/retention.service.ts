@@ -7,8 +7,8 @@ interface RetentionConfig {
 }
 
 const RETENTION_RULES: Record<string, RetentionConfig> = {
-	full: { maxKeep: 7 },
-	student: { maxKeep: 7 },
+	full: { maxKeep: 5 }, // Menyediakan maksimal 5 full backup harian terbaru
+	student: { maxKeep: 5 },
 	cohort: { maxKeep: 4 },
 	program: { maxKeep: 4 },
 	specialization: { maxKeep: 4 },
@@ -28,7 +28,7 @@ export class RetentionService {
 		);
 
 		try {
-			// 1. Bersihkan backups/full/
+			// 1. Bersihkan backups/full/ (maks 5 terbaru)
 			await this.cleanupBackupGroup(
 				join(backupBasePath, "full"),
 				RETENTION_RULES.full.maxKeep,
@@ -55,6 +55,28 @@ export class RetentionService {
 			// 5. Bersihkan backups/specializations/*/
 			await this.cleanupGroupOfGroups(
 				join(backupBasePath, "specializations"),
+				RETENTION_RULES.specialization.maxKeep,
+			);
+
+			// 6. Pastikan record di database backup_jobs disinkronkan & dihapus jika melebihi batas
+			await backupRepository.cleanupJobRecordsByType(
+				"full",
+				RETENTION_RULES.full.maxKeep,
+			);
+			await backupRepository.cleanupJobRecordsByType(
+				"student",
+				RETENTION_RULES.student.maxKeep,
+			);
+			await backupRepository.cleanupJobRecordsByType(
+				"cohort",
+				RETENTION_RULES.cohort.maxKeep,
+			);
+			await backupRepository.cleanupJobRecordsByType(
+				"program",
+				RETENTION_RULES.program.maxKeep,
+			);
+			await backupRepository.cleanupJobRecordsByType(
+				"specialization",
 				RETENTION_RULES.specialization.maxKeep,
 			);
 
@@ -134,15 +156,11 @@ export class RetentionService {
 					);
 
 					// Hapus dari database terlebih dahulu (silang validasi)
-					// Pastikan path yang dicari cocok dengan pola path di DB
-					// Path di DB biasanya absolute atau menyesuaikan struktur,
-					// jadi kita gunakan pencarian dengan LIKE atau mencocokkan id dari nama folder (8 digit terakhir).
-
-					// Ambil jobId dari 8 karakter terakhir nama folder
 					const jobIdSuffix = folder.name.split("-").pop();
 					if (jobIdSuffix) {
 						await backupRepository.deleteJobsBySuffix(jobIdSuffix);
 					}
+					await backupRepository.deleteJobsByOutputPath(folder.path);
 
 					// Hapus folder fisik secara rekursif
 					await rm(folder.path, { recursive: true, force: true });
