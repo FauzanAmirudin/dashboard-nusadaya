@@ -9,6 +9,7 @@ import {
 	Download,
 	Edit,
 	Edit2,
+	ExternalLink,
 	FileText,
 	Loader2,
 	PackageCheck,
@@ -98,6 +99,7 @@ interface MaterialReport {
 	fileUrl?: string;
 	fileName?: string;
 	createdAt: string;
+	budgetRequest?: BudgetRequest;
 }
 
 interface TabAnggaranPraktikProps {
@@ -216,7 +218,19 @@ export function TabAnggaranPraktik({
 			});
 			if (res.ok) {
 				const json = await res.json();
-				if (json.success) setReports(json.data || []);
+				if (json.success) {
+					const allReports = (json.data as any[]) || [];
+					const filtered = courseId
+						? allReports.filter(
+								(r) =>
+									r.budgetRequest?.courseId?.toString() ===
+										courseId.toString() ||
+									r.budgetRequest?.course?.id?.toString() ===
+										courseId.toString(),
+							)
+						: allReports;
+					setReports(filtered);
+				}
 			}
 		} catch (error) {
 			console.error("Failed to fetch material reports", error);
@@ -226,8 +240,8 @@ export function TabAnggaranPraktik({
 	useEffect(() => {
 		if (!courseId) return;
 		setIsLoading(true);
-		Promise.all([fetchRequests(), fetchDosenCourses()]).finally(() =>
-			setIsLoading(false),
+		Promise.all([fetchRequests(), fetchDosenCourses(), fetchReports()]).finally(
+			() => setIsLoading(false),
 		);
 	}, [token, courseId, user]);
 
@@ -237,6 +251,21 @@ export function TabAnggaranPraktik({
 			sum + (Number(item.jumlah) || 0) * (Number(item.satuanHarga) || 0),
 		0,
 	);
+
+	// Helper to extract clear human-readable names of requested materials
+	const getItemsSummary = (req?: any) => {
+		if (!req) return "Kebutuhan Praktik";
+		const daftar = req.daftarKebutuhan;
+		if (!daftar || !Array.isArray(daftar) || daftar.length === 0) {
+			return "Kebutuhan Bahan Praktikum";
+		}
+		const itemNames = daftar
+			.map((item: any) => (item.namaItem || item.name || "").trim())
+			.filter(Boolean);
+		if (itemNames.length === 0) return "Kebutuhan Bahan Praktikum";
+		if (itemNames.length <= 3) return itemNames.join(", ");
+		return `${itemNames.slice(0, 3).join(", ")} (+${itemNames.length - 3} bahan lainnya)`;
+	};
 
 	const handleAddItem = () => {
 		setItems([
@@ -374,9 +403,8 @@ export function TabAnggaranPraktik({
 					toast.error(json.message || "Gagal menghapus pengajuan anggaran");
 				}
 			} else {
-				// (Not actually implemented in this scope because report delete isn't fully migrated yet, but let's mock the endpoint anyway)
 				const res = await fetch(
-					`${API_URL}/courses/${courseId}/budget-requests/${deleteTarget.id}/report`, // Delete by report ID
+					`${API_URL}/dosen/laporan-sisa-bahan/${deleteTarget.id}`,
 					{
 						method: "DELETE",
 						headers: { Authorization: `Bearer ${authToken}` },
@@ -386,7 +414,7 @@ export function TabAnggaranPraktik({
 				if (res.ok && json.success) {
 					toast.success("Laporan sisa bahan berhasil dihapus");
 					setDeleteTarget(null);
-					fetchRequests();
+					await Promise.all([fetchRequests(), fetchReports()]);
 				} else {
 					toast.error(json.message || "Gagal menghapus laporan sisa bahan");
 				}
@@ -869,7 +897,11 @@ export function TabAnggaranPraktik({
 												</span>
 												<div>
 													<h4 className="text-sm font-bold text-slate-800">
-														{`Pengajuan #${rep.budgetRequestId}`}
+														{relatedReq
+															? getItemsSummary(relatedReq)
+															: rep.budgetRequest
+																? getItemsSummary(rep.budgetRequest)
+																: `Pengajuan Praktik #${rep.budgetRequestId}`}
 													</h4>
 													<span className="text-xs text-slate-500">
 														Diunggah pada:{" "}
@@ -916,7 +948,13 @@ export function TabAnggaranPraktik({
 												)}
 												{rep.fileName && (
 													<a
-														href={`${API_URL}/${rep.fileUrl?.replace(/\\/g, "/")}`}
+														href={
+															rep.fileUrl?.startsWith("http")
+																? rep.fileUrl
+																: rep.fileUrl?.startsWith("/")
+																	? `${API_URL}${rep.fileUrl}`
+																	: `${API_URL}/${rep.fileUrl?.replace(/\\/g, "/")}`
+														}
 														target="_blank"
 														rel="noreferrer"
 														className="inline-flex items-center gap-1.5 text-xs text-[#0517B0] font-bold hover:underline"
@@ -954,11 +992,18 @@ export function TabAnggaranPraktik({
 																<td className="p-2 text-center">
 																	<Badge
 																		variant="outline"
-																		className={
+																		className={`text-[11px] font-semibold ${
 																			item.kondisi === "Baik"
 																				? "bg-emerald-50 text-emerald-700 border-emerald-200"
-																				: "bg-amber-50 text-amber-700 border-amber-200"
-																		}
+																				: item.kondisi === "Rusak"
+																					? "bg-rose-50 text-rose-700 border-rose-200"
+																					: item.kondisi === "Kedaluwarsa"
+																						? "bg-amber-50 text-amber-700 border-amber-200"
+																						: item.kondisi ===
+																								"Perlu Penanganan"
+																							? "bg-blue-50 text-blue-700 border-blue-200"
+																							: "bg-slate-100 text-slate-700 border-slate-200"
+																		}`}
 																	>
 																		{item.kondisi || "Baik"}
 																	</Badge>
@@ -1229,17 +1274,80 @@ export function TabAnggaranPraktik({
 								value={selectedRequestId}
 								onValueChange={(val) => setSelectedRequestId(val || "")}
 							>
-								<SelectTrigger className="text-xs h-10 bg-slate-50/50">
-									<SelectValue placeholder="Pilih Mata Kuliah / Pengajuan Praktik" />
+								<SelectTrigger className="text-xs sm:text-sm h-11 bg-white border-slate-200 shadow-2xs font-medium">
+									{(() => {
+										if (!selectedRequestId) {
+											return (
+												<span className="text-slate-400">
+													Pilih Kebutuhan Bahan Praktikum yang Dilaporkan...
+												</span>
+											);
+										}
+										const selectedReq = requests.find(
+											(r) => r.id.toString() === selectedRequestId,
+										);
+										if (!selectedReq) {
+											return (
+												<span className="text-slate-700 font-semibold">
+													Pengajuan #{selectedRequestId}
+												</span>
+											);
+										}
+										const summary = getItemsSummary(selectedReq);
+										return (
+											<div className="flex items-center justify-between w-full pr-2 text-left truncate">
+												<span className="font-semibold text-slate-800 truncate">
+													{summary}
+												</span>
+												<span className="text-xs text-indigo-700 font-bold ml-2 shrink-0 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+													{formatRupiah(selectedReq.totalNominal)}
+												</span>
+											</div>
+										);
+									})()}
 								</SelectTrigger>
-								<SelectContent>
-									{requests.map((r) => (
-										<SelectItem key={r.id} value={r.id.toString()}>
-											Pengajuan #{r.id} -{" "}
-											{r.course ? `[${r.course.code}] ${r.course.name} • ` : ""}
-											{formatRupiah(r.totalNominal)}
-										</SelectItem>
-									))}
+								<SelectContent className="max-h-[300px]">
+									{requests.map((r) => {
+										const summary = getItemsSummary(r);
+										const count = r.daftarKebutuhan?.length || 0;
+										const dateStr = r.createdAt
+											? new Date(r.createdAt).toLocaleDateString("id-ID", {
+													day: "numeric",
+													month: "short",
+													year: "numeric",
+												})
+											: "";
+
+										return (
+											<SelectItem
+												key={r.id}
+												value={r.id.toString()}
+												className="py-2.5 cursor-pointer"
+											>
+												<div className="flex flex-col gap-0.5 text-left w-full">
+													<div className="flex items-center justify-between gap-3">
+														<span className="font-bold text-slate-900 text-xs sm:text-sm">
+															{summary}
+														</span>
+														<span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 shrink-0">
+															{formatRupiah(r.totalNominal)}
+														</span>
+													</div>
+													<div className="flex items-center gap-2 text-[11px] text-slate-500 font-normal">
+														<span>{count} rincian bahan</span>
+														{dateStr && <span>• Diajukan {dateStr}</span>}
+														{r.course && <span>• {r.course.name}</span>}
+													</div>
+												</div>
+											</SelectItem>
+										);
+									})}
+									{requests.length === 0 && (
+										<div className="p-4 text-center text-xs text-slate-400">
+											Belum ada data pengajuan kebutuhan praktik untuk mata
+											kuliah ini.
+										</div>
+									)}
 								</SelectContent>
 							</Select>
 						</div>
@@ -1261,20 +1369,21 @@ export function TabAnggaranPraktik({
 							</div>
 
 							<div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
-								<div className="bg-slate-100/90 text-slate-700 text-xs font-bold px-4 py-2.5 grid grid-cols-12 gap-2 border-b border-slate-200">
-									<div className="col-span-5">Nama Material Sisa</div>
-									<div className="col-span-3 text-center">Jumlah Sisa</div>
-									<div className="col-span-3 text-center">Satuan</div>
+								<div className="bg-slate-100/90 text-slate-700 text-xs font-bold px-3 py-2.5 grid grid-cols-12 gap-2 border-b border-slate-200">
+									<div className="col-span-4">Nama Material Sisa</div>
+									<div className="col-span-2 text-center">Jumlah Sisa</div>
+									<div className="col-span-2 text-center">Satuan</div>
+									<div className="col-span-3 text-center">Kondisi Bahan</div>
 									<div className="col-span-1 text-center">Aksi</div>
 								</div>
 
-								<div className="p-3 space-y-2.5 max-h-[250px] overflow-y-auto">
+								<div className="p-3 space-y-2.5 max-h-[280px] overflow-y-auto">
 									{sisaItems.map((item, idx) => (
 										<div
 											key={idx}
 											className="grid grid-cols-12 gap-2 items-center p-2 rounded-lg bg-slate-50/70 border border-slate-200/80"
 										>
-											<div className="col-span-5">
+											<div className="col-span-4">
 												<Input
 													placeholder="Nama material sisa..."
 													value={item.namaItem}
@@ -1288,7 +1397,7 @@ export function TabAnggaranPraktik({
 													className="text-xs h-9 bg-white"
 												/>
 											</div>
-											<div className="col-span-3">
+											<div className="col-span-2">
 												<Input
 													type="number"
 													min={0}
@@ -1304,7 +1413,7 @@ export function TabAnggaranPraktik({
 													className="text-xs h-9 text-center bg-white"
 												/>
 											</div>
-											<div className="col-span-3">
+											<div className="col-span-2">
 												<Input
 													placeholder="Satuan"
 													value={item.satuan}
@@ -1313,6 +1422,50 @@ export function TabAnggaranPraktik({
 													}
 													className="text-xs h-9 bg-white"
 												/>
+											</div>
+											<div className="col-span-3">
+												<Select
+													value={item.kondisi || "Baik"}
+													onValueChange={(val) =>
+														handleSisaItemChange(idx, "kondisi", val)
+													}
+												>
+													<SelectTrigger className="text-xs h-9 bg-white border-slate-200">
+														<SelectValue placeholder="Pilih kondisi" />
+													</SelectTrigger>
+													<SelectContent>
+														<SelectItem value="Baik">
+															<span className="flex items-center gap-1.5 text-emerald-700 font-medium">
+																<span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+																Baik / Layak
+															</span>
+														</SelectItem>
+														<SelectItem value="Rusak">
+															<span className="flex items-center gap-1.5 text-rose-700 font-medium">
+																<span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+																Rusak / Cacat
+															</span>
+														</SelectItem>
+														<SelectItem value="Kedaluwarsa">
+															<span className="flex items-center gap-1.5 text-amber-700 font-medium">
+																<span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+																Kedaluwarsa
+															</span>
+														</SelectItem>
+														<SelectItem value="Perlu Penanganan">
+															<span className="flex items-center gap-1.5 text-blue-700 font-medium">
+																<span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+																Perlu Penanganan
+															</span>
+														</SelectItem>
+														<SelectItem value="Habis">
+															<span className="flex items-center gap-1.5 text-slate-700 font-medium">
+																<span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
+																Habis Terpakai
+															</span>
+														</SelectItem>
+													</SelectContent>
+												</Select>
 											</div>
 											<div className="col-span-1 flex justify-center">
 												{sisaItems.length > 1 && (

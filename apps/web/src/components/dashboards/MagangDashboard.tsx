@@ -81,7 +81,7 @@ export function MagangDashboard({
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const pageSize = 20;
 
-	// Available cohorts dynamically derived from student data + fallbacks
+	// Available cohorts dynamically derived strictly from student data
 	const availableCohorts = useMemo(() => {
 		const cohorts = new Set<string>();
 		if (data && data.length > 0) {
@@ -89,7 +89,6 @@ export function MagangDashboard({
 				if (s.student?.cohort) cohorts.add(s.student.cohort.toString());
 			});
 		}
-		["16", "15", "14", "13", "12", "11", "10"].forEach((c) => cohorts.add(c));
 		return Array.from(cohorts).sort((a, b) => {
 			const numA = Number(a);
 			const numB = Number(b);

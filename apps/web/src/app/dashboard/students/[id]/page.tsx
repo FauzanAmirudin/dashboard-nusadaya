@@ -631,15 +631,42 @@ function StudentDetailContent() {
 							router.push(from);
 							return;
 						}
+						const VALID_PANEL_DASHBOARDS: Record<string, string> = {
+							pmb: "/dashboard/pmb",
+							crm: "/dashboard/crm",
+							finance: "/dashboard/finance",
+							akademik: "/dashboard/akademik",
+							kehadiran: "/dashboard/kehadiran",
+							pa: "/dashboard/pa",
+							magang: "/dashboard/magang",
+							status: "/dashboard/evaluator",
+							"final-decision": "/dashboard/evaluator",
+						};
+
 						const currentContext = requestedTab || rawTab;
-						if (currentContext && currentContext !== "all") {
-							const target =
-								currentContext === "final-decision"
-									? "evaluator"
-									: currentContext;
-							router.push(`/dashboard/${target}`);
+						if (
+							currentContext &&
+							currentContext !== "catatan" &&
+							VALID_PANEL_DASHBOARDS[currentContext]
+						) {
+							router.push(VALID_PANEL_DASHBOARDS[currentContext]);
 							return;
 						}
+
+						// If context is catatan or unknown, route to the user's role primary dashboard
+						if (user?.role) {
+							if (user.role === "superadmin") {
+								router.push("/dashboard/students");
+								return;
+							}
+							if (VALID_PANEL_DASHBOARDS[user.role]) {
+								router.push(VALID_PANEL_DASHBOARDS[user.role]);
+								return;
+							}
+							router.push(`/dashboard/${user.role}`);
+							return;
+						}
+
 						if (typeof window !== "undefined" && window.history.length > 1) {
 							router.back();
 						} else {
@@ -669,25 +696,25 @@ function StudentDetailContent() {
 						</Button>
 					)}
 					{hasRole(user, "superadmin", "pmb") && (
-						<>
-							<Button
-								size="sm"
-								variant="outline"
-								onClick={handleArchive}
-								disabled={isArchiving}
-								className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 text-xs h-8.5 font-semibold"
-							>
-								{isArchiving ? "Memproses..." : "Arsip"}
-							</Button>
-							<Button
-								size="sm"
-								variant="outline"
-								onClick={() => setShowDeleteDialog(true)}
-								className="bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 text-xs h-8.5 font-semibold"
-							>
-								Hapus
-							</Button>
-						</>
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={handleArchive}
+							disabled={isArchiving}
+							className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 text-xs h-8.5 font-semibold"
+						>
+							{isArchiving ? "Memproses..." : "Arsip"}
+						</Button>
+					)}
+					{hasRole(user, "superadmin") && (
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={() => setShowDeleteDialog(true)}
+							className="bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 text-xs h-8.5 font-semibold"
+						>
+							Hapus
+						</Button>
 					)}
 				</div>
 			</div>
@@ -1073,10 +1100,10 @@ function StudentDetailContent() {
 								data.pmb?.accAt
 									? new Date(data.pmb.accAt).toLocaleDateString("id-ID")
 									: undefined,
-								data.pmb?.accBy?.fullName ||
-									data.pmb?.accByUser?.fullName ||
-									(typeof data.pmb?.accBy === "string"
-										? data.pmb?.accBy
+								(data.pmb as any)?.accBy?.fullName ||
+									(data.pmb as any)?.accByUser?.fullName ||
+									(typeof (data.pmb as any)?.accBy === "string"
+										? (data.pmb as any)?.accBy
 										: undefined),
 							)}
 							{renderStamp(
@@ -1085,10 +1112,10 @@ function StudentDetailContent() {
 								data.crm?.accAt
 									? new Date(data.crm.accAt).toLocaleDateString("id-ID")
 									: undefined,
-								data.crm?.accBy?.fullName ||
-									data.crm?.accByUser?.fullName ||
-									(typeof data.crm?.accBy === "string"
-										? data.crm?.accBy
+								(data.crm as any)?.accBy?.fullName ||
+									(data.crm as any)?.accByUser?.fullName ||
+									(typeof (data.crm as any)?.accBy === "string"
+										? (data.crm as any)?.accBy
 										: undefined),
 							)}
 							{renderStamp(
@@ -1097,10 +1124,10 @@ function StudentDetailContent() {
 								data.finance?.accAt
 									? new Date(data.finance.accAt).toLocaleDateString("id-ID")
 									: undefined,
-								data.finance?.accBy?.fullName ||
-									data.finance?.accByUser?.fullName ||
-									(typeof data.finance?.accBy === "string"
-										? data.finance?.accBy
+								(data.finance as any)?.accBy?.fullName ||
+									(data.finance as any)?.accByUser?.fullName ||
+									(typeof (data.finance as any)?.accBy === "string"
+										? (data.finance as any)?.accBy
 										: undefined),
 							)}
 							{renderStamp(
@@ -1109,10 +1136,10 @@ function StudentDetailContent() {
 								data.academic?.accAt
 									? new Date(data.academic.accAt).toLocaleDateString("id-ID")
 									: undefined,
-								data.academic?.accBy?.fullName ||
-									data.academic?.accByUser?.fullName ||
-									(typeof data.academic?.accBy === "string"
-										? data.academic?.accBy
+								(data.academic as any)?.accBy?.fullName ||
+									(data.academic as any)?.accByUser?.fullName ||
+									(typeof (data.academic as any)?.accBy === "string"
+										? (data.academic as any)?.accBy
 										: undefined),
 							)}
 							{renderStamp(
@@ -1140,10 +1167,10 @@ function StudentDetailContent() {
 								data.pa?.accAt
 									? new Date(data.pa.accAt).toLocaleDateString("id-ID")
 									: undefined,
-								data.pa?.accBy?.fullName ||
-									data.pa?.accByUser?.fullName ||
-									(typeof data.pa?.accBy === "string"
-										? data.pa?.accBy
+								(data.pa as any)?.accBy?.fullName ||
+									(data.pa as any)?.accByUser?.fullName ||
+									(typeof (data.pa as any)?.accBy === "string"
+										? (data.pa as any)?.accBy
 										: undefined),
 							)}
 							{renderStamp(
@@ -1152,10 +1179,10 @@ function StudentDetailContent() {
 								data.internship?.accAt
 									? new Date(data.internship.accAt).toLocaleDateString("id-ID")
 									: undefined,
-								data.internship?.accBy?.fullName ||
-									data.internship?.accByUser?.fullName ||
-									(typeof data.internship?.accBy === "string"
-										? data.internship?.accBy
+								(data.internship as any)?.accBy?.fullName ||
+									(data.internship as any)?.accByUser?.fullName ||
+									(typeof (data.internship as any)?.accBy === "string"
+										? (data.internship as any)?.accBy
 										: undefined),
 							)}
 						</div>

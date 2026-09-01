@@ -536,15 +536,6 @@ export default function MataKuliahDetailPage() {
 							<Accordion type="single" collapsible className="w-full space-y-3">
 								{meetings.map((meet) => {
 									const isEditingInfo = editingMeeting === meet.id;
-									const isPkkmb =
-										meet.meetingType === "pkkmb" || meet.meetingNumber === -1;
-									const isBeginning =
-										meet.meetingType === "beginning" ||
-										meet.meetingNumber === 0;
-									const isUts =
-										meet.meetingNumber === 8 || meet.meetingType === "uts";
-									const isUas =
-										meet.meetingNumber === 16 || meet.meetingType === "uas";
 
 									const meetAtt = attendanceData[meet.id] || {};
 									const filledAttendances = Object.values(meetAtt).filter(
@@ -562,50 +553,26 @@ export default function MataKuliahDetailPage() {
 										>
 											<AccordionTrigger className="hover:no-underline py-2.5">
 												<div className="flex items-center gap-3 w-full justify-between pr-4">
-													<div className="flex items-center gap-3.5 text-left">
-														<div
-															className={`min-w-12 h-10 px-2 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 shadow-sm ${
-																isPkkmb
-																	? "bg-indigo-100 text-indigo-800 border border-indigo-300"
-																	: isBeginning
-																		? "bg-teal-100 text-teal-800 border border-teal-300"
-																		: isUts
-																			? "bg-amber-100 text-amber-800 border border-amber-300"
-																			: isUas
-																				? "bg-purple-100 text-purple-800 border border-purple-300"
-																				: "bg-blue-50 text-blue-700 border border-blue-200"
-															}`}
-														>
-															{isPkkmb
-																? "PKKMB"
-																: isBeginning
-																	? "BC"
-																	: isUts
-																		? "UTS"
-																		: isUas
-																			? "UAS"
-																			: `P${meet.meetingNumber}`}
+													<div className="text-left">
+														<div className="flex items-center gap-2 flex-wrap">
+															<p className="font-bold text-slate-800 text-base">
+																{meet.meetingLabel}
+															</p>
+															{getSessionTypeBadge(meet.sessionType)}
 														</div>
-														<div>
-															<div className="flex items-center gap-2 flex-wrap">
-																<p className="font-bold text-slate-800 text-base">
-																	{meet.meetingLabel}
-																</p>
-																{getSessionTypeBadge(meet.sessionType)}
-															</div>
-															<p className="text-xs text-slate-500 font-normal mt-0.5">
-																{meet.meetingDate
-																	? new Date(
-																			meet.meetingDate,
-																		).toLocaleDateString("id-ID", {
+														<p className="text-xs text-slate-500 font-normal mt-0.5">
+															{meet.meetingDate
+																? new Date(meet.meetingDate).toLocaleDateString(
+																		"id-ID",
+																		{
 																			weekday: "long",
 																			day: "numeric",
 																			month: "long",
 																			year: "numeric",
-																		})
-																	: "Tanggal perkuliahan belum diatur"}
-															</p>
-														</div>
+																		},
+																	)
+																: "Tanggal perkuliahan belum diatur"}
+														</p>
 													</div>
 													<div className="flex items-center gap-2 shrink-0">
 														<Badge

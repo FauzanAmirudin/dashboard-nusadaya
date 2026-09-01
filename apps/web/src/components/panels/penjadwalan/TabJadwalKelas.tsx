@@ -140,7 +140,6 @@ export function TabJadwalKelas({ canEdit }: { canEdit: boolean }) {
 		schedules.forEach((s) => {
 			if (s.cohort) cohorts.add(s.cohort.toString());
 		});
-		for (let i = 13; i <= 18; i++) cohorts.add(i.toString());
 		return Array.from(cohorts).sort((a, b) => Number(b) - Number(a));
 	}, [schedules]);
 

@@ -22,6 +22,7 @@ import {
 	internshipDocuments,
 	paData,
 	paDocuments,
+	paHafalanSessions,
 	paInterviewLogs,
 	paTripartiteLogs,
 	pmbData,
@@ -91,18 +92,54 @@ export const crmRoutes = new Elysia()
 			limit: 5,
 		});
 
-		const finance = await db.query.financeData.findFirst({
-			where: eq(financeData.studentId, id),
-		});
+		const [finance, pmb, pa, hafalanSessions, vLogs] = await Promise.all([
+			db.query.financeData.findFirst({
+				where: eq(financeData.studentId, id),
+			}),
+			db.query.pmbData.findFirst({
+				where: eq(pmbData.studentId, id),
+				with: {
+					accBy: { columns: { fullName: true } },
+				},
+			}),
+			db.query.paData.findFirst({
+				where: eq(paData.studentId, id),
+				with: {
+					accBy: { columns: { fullName: true } },
+				},
+			}),
+			db.query.paHafalanSessions
+				.findMany({
+					where: eq(paHafalanSessions.studentId, id),
+					with: {
+						createdByUser: { columns: { fullName: true, username: true } },
+					},
+					orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
+				})
+				.catch(() =>
+					db
+						.select()
+						.from(paHafalanSessions)
+						.where(eq(paHafalanSessions.studentId, id)),
+				),
+			db.query.vocabLogs.findMany({
+				where: eq(vocabLogs.studentId, id),
+				orderBy: (logs, { desc }) => [desc(logs.date)],
+			}),
+		]);
 
-		const pmb = await db.query.pmbData.findFirst({
-			where: eq(pmbData.studentId, id),
-			with: {
-				accBy: { columns: { fullName: true } },
+		return {
+			success: true,
+			data: {
+				crm,
+				logs,
+				finance,
+				pmb,
+				pa,
+				hafalanSessions,
+				vocabLogs: vLogs,
 			},
-		});
-
-		return { success: true, data: { crm, logs, finance, pmb } };
+		};
 	})
 	.get("/:id/crm/logs", async ({ params, query }) => {
 		const id = Number(params.id);
@@ -182,7 +219,19 @@ export const crmRoutes = new Elysia()
 			}
 
 			const id = Number(params.id);
-			const updates = body as Record<string, any>;
+			const updates = { ...(body as Record<string, any>) };
+
+			if ("pramagangStartDate" in updates) {
+				if (!updates.pramagangStartDate || updates.pramagangStartDate === "") {
+					updates.pramagangStartDate = null;
+				}
+			}
+
+			if ("pramagangEndDate" in updates) {
+				if (!updates.pramagangEndDate || updates.pramagangEndDate === "") {
+					updates.pramagangEndDate = null;
+				}
+			}
 
 			const current = await db.query.crmData.findFirst({
 				where: eq(crmData.studentId, id),

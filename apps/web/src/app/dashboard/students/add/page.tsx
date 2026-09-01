@@ -22,7 +22,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { api } from "@/lib/eden";
+import { API_URL, api, getToken } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 import {
 	filterNumeric,
@@ -182,7 +182,7 @@ export default function AddStudentPage() {
 			const { data, error } = await api.users.get({
 				$query: { role: "pa" },
 			});
-			if (!error && data?.data) {
+			if (!error && data && "data" in data && data.data) {
 				setPaUsers(data.data);
 			}
 		};
@@ -508,6 +508,32 @@ export default function AddStudentPage() {
 				});
 			}
 
+			// 1. Upload foto profil jika ada file yang dipilih
+			let profilePhotoUrl: string | undefined;
+			if (formData.profilePhoto) {
+				try {
+					const uploadFd = new FormData();
+					uploadFd.append("file", formData.profilePhoto);
+					uploadFd.append("category", "profile");
+					uploadFd.append("panel", "pmb");
+					uploadFd.append("documentKey", "profile_photo");
+					uploadFd.append("visibility", "public");
+
+					const token = getToken();
+					const uploadRes = await fetch(`${API_URL}/files/upload`, {
+						method: "POST",
+						headers: token ? { Authorization: `Bearer ${token}` } : {},
+						body: uploadFd,
+					});
+					const uploadJson = await uploadRes.json();
+					if (uploadJson.success && uploadJson.data?.id) {
+						profilePhotoUrl = `/files/${uploadJson.data.id}/download`;
+					}
+				} catch (photoErr) {
+					console.error("Gagal mengunggah foto profil awal:", photoErr);
+				}
+			}
+
 			const payload = {
 				// Tab 1
 				nim: formData.nim || undefined,
@@ -534,6 +560,7 @@ export default function AddStudentPage() {
 				livingWith: formData.livingWith || undefined,
 				phone: formData.phone || undefined,
 				email: formData.email || undefined,
+				profilePhotoUrl: profilePhotoUrl || undefined,
 
 				// Tab 2
 				schoolOrigin: formData.schoolOrigin || undefined,
@@ -590,16 +617,31 @@ export default function AddStudentPage() {
 
 			const newStudentId = resData.data.id;
 
+			// 2. Jika ada file foto profil, sinkronkan juga via endpoint profile-photo mahasiswa
 			if (formData.profilePhoto) {
-				const uploadRes = await api.students[newStudentId][
-					"profile-photo"
-				].post({
-					file: formData.profilePhoto,
-				});
-
-				if (!uploadRes.data?.success) {
-					toast.error(
-						"Mahasiswa berhasil dibuat, tapi gagal mengupload foto profil.",
+				try {
+					const photoFd = new FormData();
+					photoFd.append("file", formData.profilePhoto);
+					const token = getToken();
+					const photoRes = await fetch(
+						`${API_URL}/students/${newStudentId}/profile-photo`,
+						{
+							method: "POST",
+							headers: token ? { Authorization: `Bearer ${token}` } : {},
+							body: photoFd,
+						},
+					);
+					const photoJson = await photoRes.json();
+					if (!photoJson.success) {
+						console.warn(
+							"Sinkronisasi foto profil mahasiswa:",
+							photoJson.message,
+						);
+					}
+				} catch (photoUploadErr) {
+					console.warn(
+						"Gagal upload foto via student profile-photo:",
+						photoUploadErr,
 					);
 				}
 			}
@@ -1146,14 +1188,17 @@ export default function AddStudentPage() {
 								</Label>
 								<Input
 									required
-									placeholder="Contoh: 15 atau 16"
+									maxLength={2}
+									inputMode="numeric"
+									pattern="[0-9]*"
+									placeholder="Contoh: 15"
 									value={formData.cohort}
 									onKeyDown={preventNonNumericKey}
 									onChange={(e) => {
 										const val = filterNumeric(
 											e.target.value,
 											2,
-											"Angkatan berupa angka 1-99",
+											"Angkatan maksimal 2 digit angka (1-99)",
 										);
 										const cNum = parseInt(val, 10);
 										if (!Number.isNaN(cNum) && cNum >= 1 && cNum <= 99) {

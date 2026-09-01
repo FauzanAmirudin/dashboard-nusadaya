@@ -85,7 +85,7 @@ export function PmbDashboard({
 	const [currentPage, setCurrentPage] = useState(1);
 	const pageSize = 20;
 
-	// Available cohorts dynamically derived from student data
+	// Available cohorts dynamically derived strictly from student data
 	const availableCohorts = useMemo(() => {
 		const cohorts = new Set<string>();
 		if (data && data.length > 0) {
@@ -93,8 +93,6 @@ export function PmbDashboard({
 				if (s.student?.cohort) cohorts.add(s.student.cohort.toString());
 			});
 		}
-		// Default fallback cohorts (16, 15, 14, 13, 12, etc.)
-		["16", "15", "14", "13", "12", "11", "10"].forEach((c) => cohorts.add(c));
 		return Array.from(cohorts).sort((a, b) => {
 			const numA = Number(a);
 			const numB = Number(b);
@@ -114,20 +112,6 @@ export function PmbDashboard({
 					s.student?.cohort === Number(selectedCohort) - 2010),
 		);
 	}, [data, selectedCohort]);
-
-	// KPI Metrics based on cohortData using 4 standardized categories
-	const totalStudents = cohortData.length;
-	const countAcc = cohortData.filter((s: any) => s.pmb?.isAcc).length;
-	const countAman = cohortData.filter(
-		(s: any) => normalizeStatus(s.pmb?.status, s.pmb?.isAcc) === "AMAN",
-	).length;
-	const countProses = cohortData.filter(
-		(s: any) => normalizeStatus(s.pmb?.status, s.pmb?.isAcc) === "PROSES",
-	).length;
-	const countPerhatian = cohortData.filter(
-		(s: any) =>
-			normalizeStatus(s.pmb?.status, s.pmb?.isAcc) === "BUTUH_PERHATIAN",
-	).length;
 
 	const getPmbChecklist = (pmb: any) => {
 		const items = [
@@ -203,6 +187,25 @@ export function PmbDashboard({
 		};
 	};
 
+	const getStudentPmbStatus = (pmb: any) => {
+		const { completed } = getPmbChecklist(pmb);
+		return calculateProgressStatus(completed, 14, pmb?.isAcc);
+	};
+
+	// KPI Metrics based on cohortData using standardized 4 categories
+	const totalStudents = cohortData.length;
+	const countAcc = cohortData.filter(
+		(s: any) => getStudentPmbStatus(s.pmb) === "ACC",
+	).length;
+	const countAman = cohortData.filter(
+		(s: any) => getStudentPmbStatus(s.pmb) === "AMAN",
+	).length;
+	const countProses = cohortData.filter(
+		(s: any) => getStudentPmbStatus(s.pmb) === "PROSES",
+	).length;
+	const countPerhatian = cohortData.filter(
+		(s: any) => getStudentPmbStatus(s.pmb) === "BUTUH_PERHATIAN",
+	).length;
 	const countFormComplete = cohortData.filter((s: any) => {
 		return getPmbChecklist(s.pmb).isDone;
 	}).length;
@@ -220,13 +223,15 @@ export function PmbDashboard({
 				(s.student?.destinationCountry || "").toLowerCase().includes(q) ||
 				(s.student?.phone || "").toLowerCase().includes(q);
 
-			const pmbStatus = normalizeStatus(s.pmb?.status, s.pmb?.isAcc);
+			const pmbStatus = getStudentPmbStatus(s.pmb);
 			let matchStatus = true;
 			if (selectedStatus === "acc") matchStatus = pmbStatus === "ACC";
 			if (selectedStatus === "aman") matchStatus = pmbStatus === "AMAN";
 			if (selectedStatus === "proses") matchStatus = pmbStatus === "PROSES";
 			if (selectedStatus === "butuh_perhatian")
 				matchStatus = pmbStatus === "BUTUH_PERHATIAN";
+			if (selectedStatus === "lengkap")
+				matchStatus = getPmbChecklist(s.pmb).isDone;
 
 			return matchSearch && matchStatus;
 		});
@@ -341,36 +346,84 @@ export function PmbDashboard({
 					value={totalStudents}
 					icon={<Users className="h-5 w-5" />}
 					color="blue"
+					onClick={() => setSelectedStatus("all")}
+					className={`cursor-pointer transition-all ${
+						selectedStatus === "all"
+							? "ring-2 ring-[#0517B0] shadow-md"
+							: "hover:scale-[1.02]"
+					}`}
 				/>
 				<NeumorphicStatCard
 					label="ACC Divisi PMB"
 					value={countAcc}
 					icon={<ShieldCheck className="h-5 w-5" />}
 					color="sky"
+					onClick={() =>
+						setSelectedStatus(selectedStatus === "acc" ? "all" : "acc")
+					}
+					className={`cursor-pointer transition-all ${
+						selectedStatus === "acc"
+							? "ring-2 ring-sky-500 shadow-md"
+							: "hover:scale-[1.02]"
+					}`}
 				/>
 				<NeumorphicStatCard
 					label="Status Aman"
 					value={countAman}
 					icon={<CheckCircle className="h-5 w-5" />}
 					color="green"
+					onClick={() =>
+						setSelectedStatus(selectedStatus === "aman" ? "all" : "aman")
+					}
+					className={`cursor-pointer transition-all ${
+						selectedStatus === "aman"
+							? "ring-2 ring-emerald-500 shadow-md"
+							: "hover:scale-[1.02]"
+					}`}
 				/>
 				<NeumorphicStatCard
 					label="Berproses"
 					value={countProses}
 					icon={<Clock className="h-5 w-5" />}
 					color="amber"
+					onClick={() =>
+						setSelectedStatus(selectedStatus === "proses" ? "all" : "proses")
+					}
+					className={`cursor-pointer transition-all ${
+						selectedStatus === "proses"
+							? "ring-2 ring-amber-500 shadow-md"
+							: "hover:scale-[1.02]"
+					}`}
 				/>
 				<NeumorphicStatCard
 					label="Butuh Perhatian"
 					value={countPerhatian}
 					icon={<XCircle className="h-5 w-5" />}
 					color="rose"
+					onClick={() =>
+						setSelectedStatus(
+							selectedStatus === "butuh_perhatian" ? "all" : "butuh_perhatian",
+						)
+					}
+					className={`cursor-pointer transition-all ${
+						selectedStatus === "butuh_perhatian"
+							? "ring-2 ring-rose-500 shadow-md"
+							: "hover:scale-[1.02]"
+					}`}
 				/>
 				<NeumorphicStatCard
 					label="Checklist Lengkap"
 					value={countFormComplete}
 					icon={<CheckSquare className="h-5 w-5" />}
 					color="indigo"
+					onClick={() =>
+						setSelectedStatus(selectedStatus === "lengkap" ? "all" : "lengkap")
+					}
+					className={`cursor-pointer transition-all ${
+						selectedStatus === "lengkap"
+							? "ring-2 ring-indigo-500 shadow-md"
+							: "hover:scale-[1.02]"
+					}`}
 				/>
 			</div>
 
@@ -451,7 +504,7 @@ export function PmbDashboard({
 									value={selectedStatus}
 									onValueChange={(val) => setSelectedStatus(val || "all")}
 								>
-									<SelectTrigger className="w-[155px] h-9 text-xs bg-white border-slate-200">
+									<SelectTrigger className="w-[170px] h-9 text-xs bg-white border-slate-200">
 										<SelectValue placeholder="Status Filter">
 											{selectedStatus === "all"
 												? "Semua Status"
@@ -461,7 +514,9 @@ export function PmbDashboard({
 														? "Aman"
 														: selectedStatus === "proses"
 															? "Berproses"
-															: "Butuh Perhatian"}
+															: selectedStatus === "lengkap"
+																? "Checklist Lengkap"
+																: "Butuh Perhatian"}
 										</SelectValue>
 									</SelectTrigger>
 									<SelectContent>
@@ -471,6 +526,9 @@ export function PmbDashboard({
 										<SelectItem value="proses">Berproses</SelectItem>
 										<SelectItem value="butuh_perhatian">
 											Butuh Perhatian
+										</SelectItem>
+										<SelectItem value="lengkap">
+											Checklist Lengkap (14)
 										</SelectItem>
 									</SelectContent>
 								</Select>

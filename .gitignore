@@ -216,5 +216,5 @@ plan.md
 *.plan.md
 finance.md
 finance_modification.md
-demo-accounts.md
 apps/api/drop_cols.ts
+update-version.md

@@ -212,13 +212,22 @@ export default function DashboardPage() {
 		totalPages: 1,
 	};
 
-	// Cohorts from summary or fallback
+	// Cohorts strictly from database summary or loaded students (no dummy fallbacks)
 	const cohortYears = useMemo(() => {
 		if (summary?.cohorts && summary.cohorts.length > 0) {
 			return summary.cohorts;
 		}
-		return [16, 15, 14, 13, 12, 11, 10];
-	}, [summary?.cohorts]);
+		if (students && students.length > 0) {
+			const set = new Set<number>();
+			students.forEach((s) => {
+				if (typeof s.cohort === "number" && !Number.isNaN(s.cohort)) {
+					set.add(s.cohort);
+				}
+			});
+			return Array.from(set).sort((a, b) => b - a);
+		}
+		return [];
+	}, [summary?.cohorts, students]);
 
 	useEffect(() => {
 		if (!hasHydrated) return;

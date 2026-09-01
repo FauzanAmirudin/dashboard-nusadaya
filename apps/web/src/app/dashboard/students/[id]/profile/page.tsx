@@ -44,9 +44,10 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { api } from "@/lib/eden";
+import { API_URL, api, getToken } from "@/lib/eden";
 import { getPeminatanOption, PEMINATAN_OPTIONS } from "@/lib/peminatan";
 import { useAuthStore } from "@/store";
+import { filterNumeric, preventNonNumericKey } from "@/utils/form-validators";
 
 export default function StudentProfilePage() {
 	const router = useRouter();
@@ -182,7 +183,7 @@ export default function StudentProfilePage() {
 				const { data, error } = await api.users.get({
 					$query: { role: "pa" },
 				});
-				if (!error && data?.data) {
+				if (!error && data && "data" in data && data.data) {
 					setPaUsers(data.data);
 				}
 			} catch (e) {
@@ -520,6 +521,7 @@ export default function StudentProfilePage() {
 				livingWith: formData.livingWith || undefined,
 				phone: formData.phone || undefined,
 				email: formData.email || undefined,
+				profilePhotoUrl: undefined as string | undefined,
 
 				// Tab 2: Pendidikan
 				schoolOrigin: formData.schoolOrigin || undefined,
@@ -562,6 +564,38 @@ export default function StudentProfilePage() {
 				koordinator: formData.koordinator || undefined,
 			};
 
+			// 1. Upload foto profil jika ada file baru yang dipilih
+			let uploadedPhotoUrl: string | undefined;
+			if (formData.profilePhoto) {
+				try {
+					const photoFd = new FormData();
+					photoFd.append("file", formData.profilePhoto);
+					const token = getToken();
+					const uploadRes = await fetch(
+						`${API_URL}/students/${id}/profile-photo`,
+						{
+							method: "POST",
+							headers: token ? { Authorization: `Bearer ${token}` } : {},
+							body: photoFd,
+						},
+					);
+					const uploadJson = await uploadRes.json();
+					if (uploadJson.success && uploadJson.url) {
+						uploadedPhotoUrl = uploadJson.url;
+					} else {
+						toast.warning(
+							uploadJson.message || "Gagal memperbarui foto profil",
+						);
+					}
+				} catch (photoErr) {
+					console.error("Gagal upload foto profil mahasiswa:", photoErr);
+				}
+			}
+
+			if (uploadedPhotoUrl) {
+				payload.profilePhotoUrl = uploadedPhotoUrl;
+			}
+
 			const { data: resData, error } =
 				await api.students[id as string].put(payload);
 
@@ -573,21 +607,6 @@ export default function StudentProfilePage() {
 				);
 				setIsSaving(false);
 				return;
-			}
-
-			// Upload Foto Profil jika ada file baru dipilih
-			if (formData.profilePhoto) {
-				const uploadRes = await api.students[id as string][
-					"profile-photo"
-				].post({
-					file: formData.profilePhoto,
-				});
-
-				if (!uploadRes.data?.success) {
-					toast.warning(
-						"Data berhasil disimpan, namun gagal memperbarui foto profil.",
-					);
-				}
 			}
 
 			toast.success("Profil mahasiswa berhasil diperbarui!");
@@ -1681,11 +1700,20 @@ export default function StudentProfilePage() {
 										Angkatan (Cohort)
 									</Label>
 									<Input
-										type="number"
+										maxLength={2}
+										inputMode="numeric"
 										value={formData.cohort}
-										onChange={(e) => updateData("cohort", e.target.value)}
+										onKeyDown={preventNonNumericKey}
+										onChange={(e) => {
+											const val = filterNumeric(
+												e.target.value,
+												2,
+												"Angkatan maksimal 2 digit angka (1-99)",
+											);
+											updateData("cohort", val);
+										}}
 										className="h-9 text-xs mt-1 font-mono"
-										placeholder="14"
+										placeholder="Contoh: 15"
 									/>
 								</div>
 							</div>

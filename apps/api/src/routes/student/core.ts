@@ -53,6 +53,34 @@ import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 import { fileService } from "../../modules/file/service/file.service";
 
+/**
+ * Mengubah format tanggal lahir menjadi password default YYYYMMDD.
+ * Contoh: "2004-05-12" -> "20040512".
+ * Jika tanggal lahir kosong atau tidak valid, fallback ke "nusadaya123".
+ */
+export function formatBirthDateToPassword(
+	birthDateInput: string | Date | null | undefined,
+): string {
+	if (!birthDateInput) return "nusadaya123";
+	try {
+		if (
+			typeof birthDateInput === "string" &&
+			/^\d{4}-\d{2}-\d{2}/.test(birthDateInput)
+		) {
+			const [year, month, day] = birthDateInput.substring(0, 10).split("-");
+			return `${year}${month}${day}`;
+		}
+		const d = new Date(birthDateInput);
+		if (Number.isNaN(d.getTime())) return "nusadaya123";
+		const year = d.getFullYear().toString();
+		const month = String(d.getMonth() + 1).padStart(2, "0");
+		const day = String(d.getDate()).padStart(2, "0");
+		return `${year}${month}${day}`;
+	} catch {
+		return "nusadaya123";
+	}
+}
+
 export async function createStudentPipeline(body: any, userId: number) {
 	// 1. Validasi email & nim
 	if (body.nim) {
@@ -72,8 +100,9 @@ export async function createStudentPipeline(body: any, userId: number) {
 		}
 	}
 
-	// 2. Buat User Account untuk Mahasiswa
-	const passwordHash = await Bun.password.hash("nusadaya123"); // Default password
+	// 2. Buat User Account untuk Mahasiswa (Default password: YYYYMMDD tanggal lahir)
+	const defaultPassword = formatBirthDateToPassword(body.birthDate);
+	const passwordHash = await Bun.password.hash(defaultPassword);
 	const [newUser] = await db
 		.insert(users)
 		.values({
@@ -81,6 +110,9 @@ export async function createStudentPipeline(body: any, userId: number) {
 			passwordHash,
 			fullName: body.name,
 			role: "mahasiswa",
+			email: body.email || null,
+			phone: body.phone || null,
+			profilePhotoUrl: body.profilePhotoUrl || null,
 		})
 		.returning();
 
@@ -971,15 +1003,28 @@ export const coreRoutes = new Elysia()
 				return { success: false, message: error.message };
 			}
 
+			const studentData = await db.query.students.findFirst({
+				where: eq(students.id, id),
+				columns: { id: true, studentUserId: true },
+			});
+
 			await db
 				.update(students)
 				.set({ profilePhotoUrl: fileUrl, updatedAt: new Date() })
 				.where(eq(students.id, id));
 
+			if (studentData?.studentUserId) {
+				await db
+					.update(users)
+					.set({ profilePhotoUrl: fileUrl, updatedAt: new Date() })
+					.where(eq(users.id, studentData.studentUserId));
+			}
+
 			await Promise.all([
 				cacheDel(`cache:student:${id}`),
-				cacheInvalidatePattern("cache:students:list:*"),
-				cacheInvalidatePattern(`cache:mahasiswa:*`),
+				cacheInvalidatePattern("cache:students:*"),
+				cacheInvalidatePattern("cache:mahasiswa:*"),
+				cacheInvalidatePattern("cache:dashboard:*"),
 			]);
 
 			return { success: true, url: fileUrl };
@@ -1030,8 +1075,9 @@ export const coreRoutes = new Elysia()
 			return { success: false, message: "Mahasiswa sudah memiliki akun" };
 		}
 
-		// Generate account
-		const passwordHash = await Bun.password.hash("password");
+		// Generate account (Default password: YYYYMMDD tanggal lahir)
+		const defaultPassword = formatBirthDateToPassword(studentData.birthDate);
+		const passwordHash = await Bun.password.hash(defaultPassword);
 
 		const [newUser] = await db
 			.insert(users)
@@ -1051,8 +1097,7 @@ export const coreRoutes = new Elysia()
 
 		return {
 			success: true,
-			message:
-				"Akun mahasiswa berhasil dibuat dengan password default: password",
+			message: `Akun mahasiswa berhasil dibuat dengan password default: ${defaultPassword}`,
 		};
 	})
 	.patch("/:id/unarchive", async ({ params, set, user }: any) => {
@@ -1078,12 +1123,12 @@ export const coreRoutes = new Elysia()
 		};
 	})
 	.delete("/:id", async ({ params, set, user }: any) => {
-		if (!hasRole(user, "superadmin", "pmb")) {
+		if (!hasRole(user, "superadmin")) {
 			set.status = 403;
 			return {
 				success: false,
 				message:
-					"Forbidden: Hanya Superadmin dan PMB yang memiliki izin menghapus mahasiswa",
+					"Forbidden: Hanya Superadmin yang memiliki izin menghapus data mahasiswa secara permanen",
 			};
 		}
 		const id = parseInt(params.id, 10);

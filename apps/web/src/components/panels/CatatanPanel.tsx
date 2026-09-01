@@ -15,7 +15,7 @@ import {
 	Trash2,
 	Wrench,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
 	AlertDialog,
@@ -127,19 +127,28 @@ export function CatatanPanel({ studentId }: { studentId: number }) {
 
 	const fetchNotes = async () => {
 		setIsLoading(true);
-		const res = await api.students[studentId.toString()]["internal-notes"].get(
-			filterType !== "semua" ? { $query: { type: filterType } } : undefined,
-		);
+		try {
+			const res =
+				await api.students[studentId.toString()]["internal-notes"].get();
 
-		if (res.data?.success && Array.isArray(res.data.data)) {
-			setNotes(res.data.data as InternalNote[]);
+			if (res.data?.success && Array.isArray(res.data.data)) {
+				setNotes(res.data.data as InternalNote[]);
+			}
+		} catch (err) {
+			console.error("Gagal memuat catatan internal:", err);
+		} finally {
+			setIsLoading(false);
 		}
-		setIsLoading(false);
 	};
 
 	useEffect(() => {
 		fetchNotes();
-	}, [studentId, filterType]);
+	}, [studentId]);
+
+	const filteredNotes = useMemo(() => {
+		if (filterType === "semua") return notes;
+		return notes.filter((n) => n.noteType === filterType);
+	}, [notes, filterType]);
 
 	const handleOpenAdd = () => {
 		setEditingNote(null);
@@ -270,17 +279,45 @@ export function CatatanPanel({ studentId }: { studentId: number }) {
 								value={filterType}
 								onValueChange={(val) => setFilterType(val || "semua")}
 							>
-								<SelectTrigger className="w-full sm:w-[180px] bg-white">
-									<SelectValue placeholder="Semua Kategori" />
+								<SelectTrigger className="w-full sm:w-[220px] bg-white h-9 text-xs sm:text-sm font-medium border-slate-200">
+									<span className="flex items-center gap-2 truncate text-slate-800">
+										{filterType === "semua" ? (
+											<span className="font-medium">Semua Kategori</span>
+										) : (
+											(() => {
+												const conf =
+													NOTE_TYPE_CONFIG[filterType as NoteType] ||
+													NOTE_TYPE_CONFIG.lainnya;
+												const IconComp = conf.Icon;
+												return (
+													<>
+														<IconComp className="w-4 h-4 text-[#0517B0] shrink-0" />
+														<span className="font-semibold text-slate-900">
+															{conf.label}
+														</span>
+													</>
+												);
+											})()
+										)}
+									</span>
 								</SelectTrigger>
 								<SelectContent>
-									<SelectItem value="semua">Semua Kategori</SelectItem>
-									{Object.entries(NOTE_TYPE_CONFIG).map(([key, conf]) => (
-										<SelectItem key={key} value={key}>
-											<conf.Icon className="w-3.5 h-3.5 mr-1.5 inline text-slate-500" />{" "}
-											{conf.label}
-										</SelectItem>
-									))}
+									<SelectItem value="semua">
+										<span className="font-medium text-xs sm:text-sm">
+											Semua Kategori
+										</span>
+									</SelectItem>
+									{Object.entries(NOTE_TYPE_CONFIG).map(([key, conf]) => {
+										const IconComp = conf.Icon;
+										return (
+											<SelectItem key={key} value={key}>
+												<span className="flex items-center gap-2 text-xs sm:text-sm font-medium">
+													<IconComp className="w-4 h-4 text-slate-500 shrink-0" />
+													<span>{conf.label}</span>
+												</span>
+											</SelectItem>
+										);
+									})}
 								</SelectContent>
 							</Select>
 						</div>
@@ -298,7 +335,7 @@ export function CatatanPanel({ studentId }: { studentId: number }) {
 			/>
 
 			<ScrollArea className="h-[600px] pr-4">
-				{notes.length === 0 ? (
+				{filteredNotes.length === 0 ? (
 					<div className="text-center p-12 bg-white rounded-xl border border-dashed border-slate-200">
 						<p className="text-slate-500 mb-2">
 							Belum ada catatan untuk kategori ini.
@@ -315,7 +352,7 @@ export function CatatanPanel({ studentId }: { studentId: number }) {
 					</div>
 				) : (
 					<div className="space-y-4">
-						{notes.map((note) => {
+						{filteredNotes.map((note) => {
 							const isAuthor = note.authorId === user?.id;
 							const isSuperadmin = user?.role === "superadmin";
 							const canEditDelete = isAuthor || isSuperadmin;

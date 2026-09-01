@@ -108,7 +108,6 @@ export function TabPengumuman({
 		announcements.forEach((a) => {
 			if (a.targetCohort) cohorts.add(a.targetCohort.toString());
 		});
-		for (let i = 13; i <= 18; i++) cohorts.add(i.toString());
 		return Array.from(cohorts).sort((a, b) => Number(b) - Number(a));
 	}, [announcements]);
 

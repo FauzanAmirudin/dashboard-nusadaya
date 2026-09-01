@@ -93,8 +93,7 @@ export default function RekapNilaiListPage() {
 
 	const availableCohorts = useMemo(() => {
 		const fromData = courses.map((c) => c.cohort).filter(Boolean);
-		const set = new Set([...fromData, 16, 15, 14, 13, 12, 11, 10]);
-		return Array.from(set).sort((a, b) => b - a);
+		return Array.from(new Set(fromData)).sort((a, b) => Number(b) - Number(a));
 	}, [courses]);
 
 	const uniquePeminatan = useMemo(() => {

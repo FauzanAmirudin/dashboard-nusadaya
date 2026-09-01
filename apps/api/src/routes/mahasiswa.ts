@@ -283,10 +283,16 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			.set({ profilePhotoUrl: fileUrl, updatedAt: new Date() })
 			.where(eq(students.id, studentData.id));
 
+		await db
+			.update(users)
+			.set({ profilePhotoUrl: fileUrl, updatedAt: new Date() })
+			.where(eq(users.id, user.id));
+
 		await Promise.all([
-			cacheInvalidatePattern(`cache:mahasiswa:${user.id}:*`),
+			cacheInvalidatePattern(`cache:mahasiswa:*`),
 			cacheDel(`cache:student:${studentData.id}`),
-			cacheInvalidatePattern("cache:students:list:*"),
+			cacheInvalidatePattern("cache:students:*"),
+			cacheInvalidatePattern("cache:dashboard:*"),
 		]);
 
 		return {

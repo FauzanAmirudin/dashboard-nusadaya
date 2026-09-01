@@ -308,7 +308,6 @@ export function TabChecklist({
 										documentKey={item.documentKey}
 										onUploadSuccess={() => {
 											fetchDocuments();
-											handleCheckboxChange(item.id, true);
 										}}
 										canEdit={canEdit}
 									/>
@@ -421,7 +420,6 @@ export function TabChecklist({
 											documentKey={doc.key}
 											onUploadSuccess={() => {
 												fetchDocuments();
-												handleCheckboxChange(doc.propKey, true);
 											}}
 											canEdit={canEdit}
 										/>

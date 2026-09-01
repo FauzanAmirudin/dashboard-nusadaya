@@ -63,11 +63,16 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 		logs: any[];
 		finance?: any;
 		pmb?: any;
+		pa?: any;
+		hafalanSessions?: any[];
+		vocabLogs?: any[];
 	} | null>(null);
 
 	const [paState, setPaState] = useState<{
-		pa: any;
-		vocabLogs: any[];
+		data?: any;
+		pa?: any;
+		vocabLogs?: any[];
+		hafalanSessions?: any[];
 	} | null>(null);
 
 	const [kehadiranState, setKehadiranState] = useState<{
@@ -97,9 +102,19 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 
 	const fetchPaData = async () => {
 		try {
-			const { data, error } = await api.students[studentId.toString()].pa.get();
-			if (!error && data?.success) {
-				setPaState(data.data as any);
+			const res = await fetch(`${API_URL}/students/${studentId}/pa`, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
+			if (res.ok) {
+				const json = await res.json();
+				if (json.success && json.data) {
+					setPaState({
+						data: json.data.data,
+						pa: json.data.data,
+						vocabLogs: json.data.vocabLogs || [],
+						hafalanSessions: json.data.hafalanSessions || [],
+					});
+				}
 			}
 		} catch (error) {
 			console.error("Failed to fetch PA data:", error);
@@ -258,11 +273,21 @@ export function CrmPanel({ studentId, onUpdate }: CrmPanelProps) {
 					<TabsContent value="hafalan" className="space-y-6">
 						<TabHafalan
 							studentId={studentId}
-							paData={paState?.pa}
-							vocabLogs={paState?.vocabLogs || []}
+							paData={paState?.data || paState?.pa || crmState?.pa}
+							hafalanSessions={
+								paState?.hafalanSessions && paState.hafalanSessions.length > 0
+									? paState.hafalanSessions
+									: crmState?.hafalanSessions || []
+							}
+							vocabLogs={
+								paState?.vocabLogs && paState.vocabLogs.length > 0
+									? paState.vocabLogs
+									: crmState?.vocabLogs || []
+							}
 							crmState={crmState}
 							canEdit={canEdit}
 							fetchCrmData={fetchCrmData}
+							fetchPaData={fetchPaData}
 							onUpdate={onUpdate}
 						/>
 					</TabsContent>

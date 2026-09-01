@@ -234,14 +234,31 @@ export function KehadiranPiketDashboard() {
 	const [studentPage, setStudentPage] = useState(1);
 	const studentPageSize = 20;
 
-	// Cohort years generator
+	// Dynamic Registered Cohorts generator from live piket & student data
 	const cohortYears = useMemo(() => {
-		const currentYear = new Date().getFullYear();
-		return Array.from(
-			{ length: currentYear - 2022 + 2 },
-			(_, i) => currentYear + 1 - i,
-		);
-	}, []);
+		const set = new Set<string | number>();
+		if (boardData?.groups) {
+			boardData.groups.forEach((g: any) => {
+				if (g.schedule?.cohort) set.add(g.schedule.cohort);
+			});
+		}
+		if (historyData && historyData.length > 0) {
+			historyData.forEach((h: any) => {
+				if (h.cohort) set.add(h.cohort);
+				if (h.schedule?.cohort) set.add(h.schedule.cohort);
+			});
+		}
+		if (studentSummaryData && studentSummaryData.length > 0) {
+			studentSummaryData.forEach((s: any) => {
+				if (s.cohort) set.add(s.cohort);
+				if (s.student?.cohort) set.add(s.student.cohort);
+			});
+		}
+		return Array.from(set)
+			.map((c) => Number(c))
+			.filter((c) => !Number.isNaN(c) && c > 0)
+			.sort((a, b) => b - a);
+	}, [boardData?.groups, historyData, studentSummaryData]);
 
 	// ==========================================
 	// 1. FETCH DAILY BOARD

@@ -22,7 +22,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { api } from "@/lib/eden";
+import { API_URL, api, getToken } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 import {
 	filterNumeric,
@@ -308,7 +308,7 @@ export default function EditStudentPage() {
 			const { data, error } = await api.users.get({
 				$query: { role: "pa" },
 			});
-			if (!error && data?.data) {
+			if (!error && data && "data" in data && data.data) {
 				setPaUsers(data.data);
 			}
 		};
@@ -660,6 +660,7 @@ export default function EditStudentPage() {
 				livingWith: formData.livingWith || undefined,
 				phone: formData.phone || undefined,
 				email: formData.email || undefined,
+				profilePhotoUrl: undefined as string | undefined,
 
 				// Tab 2
 				schoolOrigin: formData.schoolOrigin || undefined,
@@ -702,6 +703,38 @@ export default function EditStudentPage() {
 				koordinator: formData.koordinator || undefined,
 			};
 
+			// 1. Upload foto profil jika ada file baru yang dipilih
+			let uploadedPhotoUrl: string | undefined;
+			if (formData.profilePhoto) {
+				try {
+					const photoFd = new FormData();
+					photoFd.append("file", formData.profilePhoto);
+					const token = getToken();
+					const uploadRes = await fetch(
+						`${API_URL}/students/${id}/profile-photo`,
+						{
+							method: "POST",
+							headers: token ? { Authorization: `Bearer ${token}` } : {},
+							body: photoFd,
+						},
+					);
+					const uploadJson = await uploadRes.json();
+					if (uploadJson.success && uploadJson.url) {
+						uploadedPhotoUrl = uploadJson.url;
+					} else {
+						toast.warning(
+							uploadJson.message || "Gagal memperbarui foto profil",
+						);
+					}
+				} catch (photoErr) {
+					console.error("Gagal upload foto profil mahasiswa:", photoErr);
+				}
+			}
+
+			if (uploadedPhotoUrl) {
+				payload.profilePhotoUrl = uploadedPhotoUrl;
+			}
+
 			const { data: resData, error } =
 				await api.students[id as string].put(payload);
 
@@ -715,25 +748,7 @@ export default function EditStudentPage() {
 				return;
 			}
 
-			toast.success("Berhasil mengubah data mahasiswa");
-
-			const newStudentId = id as string;
-
-			if (formData.profilePhoto) {
-				const uploadRes = await api.students[newStudentId][
-					"profile-photo"
-				].post({
-					file: formData.profilePhoto,
-				});
-
-				if (!uploadRes.data?.success) {
-					toast.error(
-						"Berhasil mengubah data, tapi gagal mengupload foto profil.",
-					);
-				}
-			}
-
-			toast.success("Mahasiswa berhasil ditambahkan!");
+			toast.success("Data mahasiswa berhasil diperbarui!");
 			localStorage.removeItem("addStudentFormData");
 			if (user?.role === "superadmin") {
 				router.push("/dashboard/students");
@@ -1275,14 +1290,17 @@ export default function EditStudentPage() {
 								</Label>
 								<Input
 									required
-									placeholder="Contoh: 15 atau 16"
+									maxLength={2}
+									inputMode="numeric"
+									pattern="[0-9]*"
+									placeholder="Contoh: 15"
 									value={formData.cohort}
 									onKeyDown={preventNonNumericKey}
 									onChange={(e) => {
 										const val = filterNumeric(
 											e.target.value,
 											2,
-											"Angkatan berupa angka 1-99",
+											"Angkatan maksimal 2 digit angka (1-99)",
 										);
 										const cNum = parseInt(val, 10);
 										if (!Number.isNaN(cNum) && cNum >= 1 && cNum <= 99) {

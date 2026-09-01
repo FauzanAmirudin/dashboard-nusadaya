@@ -322,8 +322,8 @@ export default function StudentsPage() {
 												>
 													Kembalikan
 												</Button>
-												{(useAuthStore.getState().user?.role === "superadmin" ||
-													useAuthStore.getState().user?.role === "pmb") && (
+												{useAuthStore.getState().user?.role ===
+													"superadmin" && (
 													<Button
 														variant="outline"
 														size="sm"

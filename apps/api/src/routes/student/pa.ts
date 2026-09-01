@@ -360,7 +360,7 @@ export const paRoutes = new Elysia()
 			const { params, body, set } = context;
 			const user = (context as any).user;
 			const id = Number(params.id);
-			if (!hasRole(user, "pa", "akademik")) {
+			if (!hasRole(user, "pa", "akademik", "superadmin")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -431,7 +431,7 @@ export const paRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!hasRole(user, "pa", "akademik")) {
+			if (!hasRole(user, "pa", "akademik", "superadmin")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -492,7 +492,7 @@ export const paRoutes = new Elysia()
 	.delete("/:id/pa/hafalan/:logId", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!hasRole(user, "pa", "akademik")) {
+		if (!hasRole(user, "pa", "akademik", "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}

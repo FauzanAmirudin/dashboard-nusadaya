@@ -105,10 +105,16 @@ export const dashboardRoutes = new Elysia({ prefix: "/dashboard" }).get(
 					.leftJoin(finalDecision, eq(students.id, finalDecision.studentId))
 					.where(whereClause);
 
-				// 3. Distinct cohorts list
+				// 3. Distinct cohorts list (only non-archived students with valid cohort)
 				const cohortsResult = await db
 					.selectDistinct({ cohort: students.cohort })
 					.from(students)
+					.where(
+						and(
+							eq(students.isArchived, false),
+							sql`${students.cohort} IS NOT NULL`,
+						),
+					)
 					.orderBy(sql`${students.cohort} desc`);
 
 				return {
@@ -170,7 +176,11 @@ export const dashboardRoutes = new Elysia({ prefix: "/dashboard" }).get(
 						disetujuiDirektur: Number(panelStats?.disetujuiDirektur || 0),
 						menunggu: Number(panelStats?.menungguEvaluator || 0),
 					},
-					cohorts: cohortsResult.map((c) => c.cohort),
+					cohorts: cohortsResult
+						.map((c) => c.cohort)
+						.filter(
+							(c): c is number => typeof c === "number" && !Number.isNaN(c),
+						),
 					updatedAt: new Date().toISOString(),
 				};
 			},

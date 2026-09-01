@@ -30,6 +30,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,7 +66,7 @@ import {
 	prefetchStudentDetail,
 	useStudentsList,
 } from "@/hooks/useStudentsList";
-import { api } from "@/lib/eden";
+import { API_URL, api } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 import { useAuthStore } from "@/store";
 import {
@@ -90,6 +91,7 @@ type StudentData = {
 		phone?: string;
 		overallStatus: string | null;
 		studentStatus?: string | null;
+		profilePhotoUrl?: string | null;
 		paId?: number | null;
 	};
 	pmb: any | null;
@@ -578,7 +580,7 @@ function DivisionStudentsView({
 		return data;
 	}, [data, role, user?.id]);
 
-	// Cohorts derived from data + fallbacks
+	// Cohorts derived strictly from student data
 	const availableCohorts = useMemo(() => {
 		const cohorts = new Set<string>();
 		if (baseData && baseData.length > 0) {
@@ -586,7 +588,6 @@ function DivisionStudentsView({
 				if (s.student?.cohort) cohorts.add(s.student.cohort.toString());
 			});
 		}
-		["16", "15", "14", "13", "12", "11", "10"].forEach((c) => cohorts.add(c));
 		return Array.from(cohorts).sort((a, b) => {
 			const numA = Number(a);
 			const numB = Number(b);
@@ -1233,7 +1234,7 @@ function SuperadminStudentsView({
 	const [currentPage, setCurrentPage] = useState(1);
 	const pageSize = 20;
 
-	// Cohorts derived dynamically from data + standard cohorts
+	// Cohorts derived strictly from student data
 	const availableCohorts = useMemo(() => {
 		const cohorts = new Set<string>();
 		if (data && data.length > 0) {
@@ -1241,7 +1242,6 @@ function SuperadminStudentsView({
 				if (s.student?.cohort) cohorts.add(s.student.cohort.toString());
 			});
 		}
-		["16", "15", "14", "13", "12", "11", "10"].forEach((c) => cohorts.add(c));
 		return Array.from(cohorts).sort((a, b) => {
 			const numA = Number(a);
 			const numB = Number(b);
@@ -1602,18 +1602,41 @@ function SuperadminStudentsView({
 											}
 										>
 											<TableCell>
-												<div className="font-bold text-slate-900 text-sm">
-													{s.student.name}
-												</div>
-												<div className="flex items-center gap-1.5 mt-0.5">
-													<span className="font-mono text-xs font-semibold text-slate-500">
-														{s.student.nim || "Belum ada NIM"}
-													</span>
-													{s.student.nickname && (
-														<span className="text-[11px] text-slate-400">
-															({s.student.nickname})
-														</span>
-													)}
+												<div className="flex items-center gap-3">
+													<Avatar className="w-9 h-9 border border-slate-200 shrink-0 rounded-full">
+														{s.student.profilePhotoUrl ? (
+															<img
+																src={
+																	s.student.profilePhotoUrl.startsWith("http")
+																		? s.student.profilePhotoUrl
+																		: `${API_URL}${s.student.profilePhotoUrl}`
+																}
+																alt={s.student.name}
+																className="w-full h-full object-cover rounded-full"
+															/>
+														) : (
+															<AvatarFallback className="bg-blue-50 text-[#0517B0] font-bold text-xs">
+																{s.student.name
+																	? s.student.name.substring(0, 2).toUpperCase()
+																	: "MH"}
+															</AvatarFallback>
+														)}
+													</Avatar>
+													<div>
+														<div className="font-bold text-slate-900 text-sm">
+															{s.student.name}
+														</div>
+														<div className="flex items-center gap-1.5 mt-0.5">
+															<span className="font-mono text-xs font-semibold text-slate-500">
+																{s.student.nim || "Belum ada NIM"}
+															</span>
+															{s.student.nickname && (
+																<span className="text-[11px] text-slate-400">
+																	({s.student.nickname})
+																</span>
+															)}
+														</div>
+													</div>
 												</div>
 											</TableCell>
 

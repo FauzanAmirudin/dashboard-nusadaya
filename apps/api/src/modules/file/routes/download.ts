@@ -11,19 +11,21 @@ export const downloadRoute = new Elysia().get(
 	"/files/:id/download",
 	async (context) => {
 		const { params, set } = context;
-
 		const user = (context as any).user;
-
-		if (!user) {
-			set.status = 401;
-			return { success: false, message: "Unauthorized" };
-		}
 
 		try {
 			const record = await fileService.getFileMetadata(params.id);
 			if (!record) {
 				set.status = 404;
 				return { success: false, message: "File metadata tidak ditemukan" };
+			}
+
+			// Public files & profile photos can be viewed without token (for standard <img> tags)
+			const isPublic =
+				record.visibility === "public" || record.category === "profile";
+			if (!isPublic && !user) {
+				set.status = 401;
+				return { success: false, message: "Unauthorized" };
 			}
 
 			// Local path resolution

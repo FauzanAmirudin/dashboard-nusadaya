@@ -138,9 +138,12 @@ export function AssessmentListView() {
 
 	const programs = Array.from(new Set(students.map((s) => s.program))).sort();
 	const cohorts = Array.from(
-		{ length: new Date().getFullYear() - 2022 + 2 },
-		(_, i) => new Date().getFullYear() + 1 - i,
-	);
+		new Set(
+			students
+				.map((s) => s.cohort)
+				.filter((c): c is number => typeof c === "number" && !Number.isNaN(c)),
+		),
+	).sort((a, b) => b - a);
 
 	const filteredData = students.filter((s) => {
 		const effectiveStatus = getEffectiveStatus(s);

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
 import {
@@ -7,12 +7,11 @@ import {
 	practicesMaterialReports,
 	students,
 } from "../db/schema";
-import { hasRole } from "../lib/permissions";
+import { getValidUserId, hasRole } from "../lib/permissions";
 import { fileService } from "../modules/file/service/file.service";
 
-export const dosenRouter = new Elysia({ prefix: "/dosen" }).get(
-	"/dashboard",
-	async (context) => {
+export const dosenRouter = new Elysia({ prefix: "/dosen" })
+	.get("/dashboard", async (context) => {
 		const user = (context as any).user;
 		const set = context.set;
 
@@ -113,5 +112,170 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" }).get(
 				students: studentRows,
 			},
 		};
-	},
-);
+	})
+	.get("/laporan-sisa-bahan", async (context) => {
+		const user = (context as any).user;
+		const set = context.set;
+
+		if (!hasRole(user, "dosen", "akademik", "finance", "superadmin")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		const reports = await db.query.practicesMaterialReports.findMany({
+			with: {
+				dosen: {
+					columns: {
+						id: true,
+						fullName: true,
+						username: true,
+						email: true,
+						phone: true,
+					},
+				},
+				budgetRequest: {
+					with: {
+						course: true,
+					},
+				},
+			},
+			orderBy: (practicesMaterialReports, { desc }) => [
+				desc(practicesMaterialReports.createdAt),
+			],
+		});
+
+		return { success: true, data: reports };
+	})
+	.post("/laporan-sisa-bahan", async (context) => {
+		const user = (context as any).user;
+		const set = context.set;
+		const body = context.body as any;
+
+		if (!hasRole(user, "dosen", "akademik", "superadmin")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		if (!body?.budgetRequestId) {
+			set.status = 400;
+			return { success: false, message: "Pengajuan praktik wajib dipilih" };
+		}
+
+		const budgetRequestId = body.budgetRequestId;
+		let daftarSisaBahan = body.daftarSisaBahan;
+		const catatanDosen = body.catatanDosen;
+		let fileUrl = body.fileUrl;
+		let fileName = body.fileName;
+
+		if (typeof daftarSisaBahan === "string") {
+			try {
+				daftarSisaBahan = JSON.parse(daftarSisaBahan);
+			} catch {}
+		}
+
+		if (body.file && body.file instanceof File && body.file.size > 0) {
+			try {
+				const uploadRes = await fileService.uploadFile({
+					file: body.file,
+					category: "academic",
+					panel: "dosen",
+					documentKey: "laporan_sisa_bahan",
+					uploadedBy: user.id,
+				});
+				fileUrl = `/download/${uploadRes.id}`;
+				fileName = uploadRes.originalName;
+			} catch (err: any) {
+				console.error("Upload error in laporan-sisa-bahan:", err);
+			}
+		}
+
+		const validDosenId = (await getValidUserId(user)) || user?.id;
+
+		const [newReport] = await db
+			.insert(practicesMaterialReports)
+			.values({
+				budgetRequestId: parseInt(budgetRequestId, 10),
+				dosenId: validDosenId,
+				daftarSisaBahan: daftarSisaBahan || [],
+				catatanDosen: catatanDosen || null,
+				fileUrl: fileUrl || null,
+				fileName: fileName || null,
+			})
+			.returning();
+
+		return { success: true, data: newReport };
+	})
+	.put("/laporan-sisa-bahan/:id", async (context) => {
+		const user = (context as any).user;
+		const set = context.set;
+		const id = parseInt(context.params.id, 10);
+		const body = context.body as any;
+
+		if (!hasRole(user, "dosen", "akademik", "superadmin")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		const budgetRequestId = body.budgetRequestId;
+		let daftarSisaBahan = body.daftarSisaBahan;
+		const catatanDosen = body.catatanDosen;
+		let fileUrl = body.fileUrl;
+		let fileName = body.fileName;
+
+		if (typeof daftarSisaBahan === "string") {
+			try {
+				daftarSisaBahan = JSON.parse(daftarSisaBahan);
+			} catch {}
+		}
+
+		if (body.file && body.file instanceof File && body.file.size > 0) {
+			try {
+				const uploadRes = await fileService.uploadFile({
+					file: body.file,
+					category: "academic",
+					panel: "dosen",
+					documentKey: "laporan_sisa_bahan",
+					uploadedBy: user.id,
+				});
+				fileUrl = `/download/${uploadRes.id}`;
+				fileName = uploadRes.originalName;
+			} catch (err: any) {
+				console.error("Upload error in laporan-sisa-bahan PUT:", err);
+			}
+		}
+
+		const updateData: any = {
+			updatedAt: new Date(),
+		};
+
+		if (budgetRequestId)
+			updateData.budgetRequestId = parseInt(budgetRequestId, 10);
+		if (daftarSisaBahan !== undefined)
+			updateData.daftarSisaBahan = daftarSisaBahan;
+		if (catatanDosen !== undefined) updateData.catatanDosen = catatanDosen;
+		if (fileUrl) updateData.fileUrl = fileUrl;
+		if (fileName) updateData.fileName = fileName;
+
+		await db
+			.update(practicesMaterialReports)
+			.set(updateData)
+			.where(eq(practicesMaterialReports.id, id));
+
+		return { success: true };
+	})
+	.delete("/laporan-sisa-bahan/:id", async (context) => {
+		const user = (context as any).user;
+		const set = context.set;
+		const id = parseInt(context.params.id, 10);
+
+		if (!hasRole(user, "dosen", "akademik", "superadmin")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		await db
+			.delete(practicesMaterialReports)
+			.where(eq(practicesMaterialReports.id, id));
+
+		return { success: true };
+	});
