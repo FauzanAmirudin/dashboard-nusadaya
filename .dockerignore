@@ -1,10 +1,58 @@
-node_modules
-apps/web/node_modules
-apps/web/.next
-apps/api/node_modules
+# Version Control
 .git
+.gitignore
+
+# Dependencies
+node_modules
+**/node_modules
+
+# Build Outputs & Caches
+.next
+**/.next
+.turbo
+**/.turbo
+dist
+**/dist
+out
+**/out
+build
+**/build
+.cache
+**/.cache
+
+# Environment & Secrets
 .env
+.env.*
+!.env.example
+
+# Testing & Coverage
+coverage
+**/coverage
+test-results
+*.lcov
+.nyc_output
+
+# Logs
+*.log
+**/*.log
+npm-debug.log*
+yarn-debug.log*
+bun.log*
+
+# OS & IDE Metadata
 .DS_Store
-.github
-.husky
+**/.DS_Store
+.idea
+.vscode
 .gemini
+.agents
+.husky
+.github
+
+# Persistent Storage & Backups (Handled via Docker Volumes)
+storage/*
+!storage/.gitkeep
+backups/*
+!backups/.gitkeep
+uploads/*
+!uploads/.gitkeep

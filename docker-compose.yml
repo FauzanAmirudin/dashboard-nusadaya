@@ -8,7 +8,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-nusadaya}
       TZ: ${TZ:-Asia/Jakarta}
     ports:
-      - "5454:5432"
+      # Port standar PostgreSQL 5432 (dibind ke 127.0.0.1 agar tidak terekspos ke internet publik)
+      - "${POSTGRES_PORT_BIND:-127.0.0.1:5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +23,8 @@ services:
     restart: always
     command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     ports:
-      - "6380:6379"
+      # Port standar Redis 6379 (dibind ke 127.0.0.1 demi keamanan)
+      - "${REDIS_PORT_BIND:-127.0.0.1:6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -37,7 +39,8 @@ services:
       dockerfile: apps/api/Dockerfile
     restart: always
     ports:
-      - "3001:3001"
+      # Port standar Backend API 3001
+      - "${API_PORT:-3001}:3001"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-nusadaya}
       - JWT_SECRET=${JWT_SECRET:-super_secret_jwt_key_nusadaya_2026}
@@ -50,7 +53,7 @@ services:
       - CACHE_TTL_DASHBOARD=${CACHE_TTL_DASHBOARD:-120}
       - CACHE_TTL_DETAIL=${CACHE_TTL_DETAIL:-180}
       - CACHE_TTL_DEFAULT=${CACHE_TTL_DEFAULT:-120}
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3050}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost,http://localhost:80,http://localhost:3000}
       # Storage di luar source code — persistent via Docker volume
       - STORAGE_PATH=/app/storage
       - BACKUP_PATH=/app/backups
@@ -71,7 +74,8 @@ services:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3001}
     restart: always
     ports:
-      - "3050:3000"
+      # Port standar Web HTTP 80 (langsung bisa diakses via browser)
+      - "${WEB_PORT:-80}:3000"
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3001}
       - API_INTERNAL_URL=http://api:3001
@@ -79,7 +83,7 @@ services:
       - api
 
 volumes:
-  postgres_data: # Data PostgreSQL
-  redis_data: # Data Redis
-  academic_storage: # File mahasiswa (students/, temporary/, exports/, dll.)
-  academic_backups: # File backup (students/, cohorts/, full/, dll.)
+  postgres_data:
+  redis_data:
+  academic_storage:
+  academic_backups:
