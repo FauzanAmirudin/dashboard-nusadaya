@@ -7,9 +7,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-nusadaya}
       TZ: ${TZ:-Asia/Jakarta}
-    ports:
-      # Port standar PostgreSQL 5432 (dibind ke 127.0.0.1 demi keamanan)
-      - "${POSTGRES_PORT_BIND:-127.0.0.1:5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,9 +19,6 @@ services:
     image: redis:7-alpine
     restart: always
     command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
-    ports:
-      # Port standar Redis 6379 (dibind ke 127.0.0.1 demi keamanan)
-      - "${REDIS_PORT_BIND:-127.0.0.1:6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -39,8 +33,7 @@ services:
       dockerfile: apps/api/Dockerfile
     restart: always
     ports:
-      # Port standar Backend API 3001
-      - "${API_PORT_BIND:-127.0.0.1:3001}:3001"
+      - "127.0.0.1:3001:3001"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-nusadaya}
       - JWT_SECRET=${JWT_SECRET:-super_secret_jwt_key_nusadaya_2026}
@@ -74,8 +67,7 @@ services:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://api.onedata-nusadaya.com}
     restart: always
     ports:
-      # Port 3000 jika via Nginx reverse proxy, atau Port 80 jika direct
-      - "${WEB_PORT_BIND:-127.0.0.1:3000}:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://api.onedata-nusadaya.com}
       - API_INTERNAL_URL=http://api:3001
