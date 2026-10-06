@@ -24,11 +24,15 @@ function getInternshipChecks(internship: any, isGapYear = false) {
 		Boolean(internship?.praPasporKtp),
 		Boolean(internship?.praPasporKk),
 		Boolean(internship?.praPasporAktaKelahiran),
+		Boolean(internship?.praPasporSuratIzinOrtu),
 		Boolean(internship?.praPasporSl21),
 		Boolean(internship?.praPasporSkma),
 		Boolean(internship?.praPasporRekomendasiDisdik),
+		Boolean(internship?.praPasporKhs),
+		Boolean(internship?.praPasporKrs),
+		Boolean(internship?.praPasporTranskrip),
+		Boolean(internship?.praPasporIjazah),
 		...(isGapYear ? [Boolean(internship?.praPasporGapYear)] : []),
-		Boolean(internship?.praPasporCv),
 	];
 
 	const dokumenChecks = [
@@ -98,19 +102,37 @@ export const internshipRoutes = new Elysia()
 			docs.some((d) => d.documentKey === key && d.isVerified === true);
 
 		const checks = {
-			pasFoto: hasValidDoc(pmbDocs, "pas_foto"),
-			ktm: hasValidDoc(pmbDocs, "ktm"),
-			ktp: hasValidDoc(pmbDocs, "ktp"),
-			kk: hasValidDoc(pmbDocs, "kk"),
-			aktaKelahiran: hasValidDoc(pmbDocs, "akta_kelahiran"),
-			sl21: hasValidDoc(pmbDocs, "sl21"),
-			skma: hasValidDoc(pmbDocs, "skma"),
+			pasFoto:
+				hasValidDoc(pmbDocs, "pas_foto") ||
+				hasValidDoc(internshipDocs, "pas_foto"),
+			ktm: hasValidDoc(pmbDocs, "ktm") || hasValidDoc(internshipDocs, "ktm"),
+			ktp: hasValidDoc(pmbDocs, "ktp") || hasValidDoc(internshipDocs, "ktp"),
+			kk: hasValidDoc(pmbDocs, "kk") || hasValidDoc(internshipDocs, "kk"),
+			aktaKelahiran:
+				hasValidDoc(pmbDocs, "akta_kelahiran") ||
+				hasValidDoc(internshipDocs, "akta_kelahiran"),
+			suratIzinOrtu:
+				hasValidDoc(pmbDocs, "surat_izin_ortu") ||
+				hasValidDoc(internshipDocs, "surat_izin_ortu"),
+			sl21: hasValidDoc(pmbDocs, "sl21") || hasValidDoc(internshipDocs, "sl21"),
+			skma: hasValidDoc(pmbDocs, "skma") || hasValidDoc(internshipDocs, "skma"),
 			rekomendasiDisdik:
 				hasValidDoc(pmbDocs, "rekomendasi_disdik") ||
 				hasValidDoc(internshipDocs, "rekomendasi_disdik"),
-			gapYear: pmbDataRow?.isGapYear ? hasValidDoc(pmbDocs, "gap_year") : true,
+			khs:
+				hasValidDoc(academicDocs, "khs") || hasValidDoc(internshipDocs, "khs"),
+			krs:
+				hasValidDoc(academicDocs, "krs") || hasValidDoc(internshipDocs, "krs"),
+			transkrip:
+				hasValidDoc(pmbDocs, "transkrip") ||
+				hasValidDoc(internshipDocs, "transkrip"),
+			ijazah:
+				hasValidDoc(pmbDocs, "ijazah") || hasValidDoc(internshipDocs, "ijazah"),
+			gapYear: pmbDataRow?.isGapYear
+				? hasValidDoc(pmbDocs, "gap_year") ||
+					hasValidDoc(internshipDocs, "gap_year")
+				: true,
 			pddikti: academicDataRow?.pddiktiInput === true,
-			cv: hasValidDoc(pmbDocs, "cv") || hasValidDoc(internshipDocs, "cv"),
 		};
 
 		const mandatoryChecks = [
@@ -119,9 +141,14 @@ export const internshipRoutes = new Elysia()
 			checks.ktp,
 			checks.kk,
 			checks.aktaKelahiran,
+			checks.suratIzinOrtu,
 			checks.sl21,
 			checks.skma,
 			checks.rekomendasiDisdik,
+			checks.khs,
+			checks.krs,
+			checks.transkrip,
+			checks.ijazah,
 			...(pmbDataRow?.isGapYear ? [checks.gapYear] : []),
 		];
 

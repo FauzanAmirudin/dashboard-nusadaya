@@ -13,9 +13,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { getToken } from "@/lib/eden";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+import { API_URL, getToken } from "@/lib/eden";
 
 export function TabFormulir() {
 	const [tokens, setTokens] = useState<any[]>([]);
@@ -23,14 +21,18 @@ export function TabFormulir() {
 
 	const fetchTokens = async () => {
 		try {
+			const token = getToken();
+			const headers: Record<string, string> = {};
+			if (token) {
+				headers.Authorization = `Bearer ${token}`;
+			}
 			const res = await fetch(`${API_URL}/pmb/form-tokens`, {
-				headers: {
-					Authorization: `Bearer ${getToken()}`,
-				},
+				headers,
+				credentials: "include",
 			});
 			const data = await res.json();
 			if (data.success) {
-				setTokens(data.data);
+				setTokens(data.data || []);
 			}
 		} catch (error) {
 			console.error("Failed to fetch tokens", error);
@@ -45,11 +47,15 @@ export function TabFormulir() {
 
 	const generateToken = async () => {
 		try {
+			const token = getToken();
+			const headers: Record<string, string> = {};
+			if (token) {
+				headers.Authorization = `Bearer ${token}`;
+			}
 			const res = await fetch(`${API_URL}/pmb/form-tokens`, {
 				method: "POST",
-				headers: {
-					Authorization: `Bearer ${getToken()}`,
-				},
+				headers,
+				credentials: "include",
 			});
 			const data = await res.json();
 			if (data.success) {
@@ -93,7 +99,8 @@ export function TabFormulir() {
 				<Table>
 					<TableHeader className="bg-slate-50">
 						<TableRow>
-							<TableHead className="w-[300px]">Tautan (Token)</TableHead>
+							<TableHead className="w-[260px]">Tautan (Token)</TableHead>
+							<TableHead>Pendaftar</TableHead>
 							<TableHead>Dibuat Oleh</TableHead>
 							<TableHead>Tanggal Dibuat</TableHead>
 							<TableHead>Status</TableHead>
@@ -103,59 +110,82 @@ export function TabFormulir() {
 					<TableBody>
 						{isLoading ? (
 							<TableRow>
-								<TableCell colSpan={5} className="text-center py-8">
+								<TableCell colSpan={6} className="text-center py-8">
 									Memuat data...
 								</TableCell>
 							</TableRow>
 						) : tokens.length === 0 ? (
 							<TableRow>
 								<TableCell
-									colSpan={5}
+									colSpan={6}
 									className="text-center py-8 text-slate-500"
 								>
 									Belum ada tautan formulir yang dibuat.
 								</TableCell>
 							</TableRow>
 						) : (
-							tokens.map((t) => (
-								<TableRow key={t.id}>
-									<TableCell className="font-mono text-sm text-slate-600 truncate max-w-[200px]">
-										{t.token}
-									</TableCell>
-									<TableCell>{t.creator?.fullName || "-"}</TableCell>
-									<TableCell>
-										{new Date(t.createdAt).toLocaleDateString("id-ID", {
-											day: "numeric",
-											month: "short",
-											year: "numeric",
-											hour: "2-digit",
-											minute: "2-digit",
-										})}
-									</TableCell>
-									<TableCell>
-										{t.isUsed ? (
-											<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none">
-												Sudah Digunakan
-											</Badge>
-										) : (
-											<Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none">
-												Tersedia
-											</Badge>
-										)}
-									</TableCell>
-									<TableCell className="text-right">
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={() => copyLink(t.token)}
-											className="border-blue-200 text-[#0517B0] hover:bg-blue-50"
-										>
-											<Copy className="w-4 h-4 mr-2" />
-											Salin Tautan
-										</Button>
-									</TableCell>
-								</TableRow>
-							))
+							tokens.map((t) => {
+								const isApproved =
+									t.isUsed || t.response?.status === "APPROVED";
+								const isPending = !t.isUsed && t.response?.status === "PENDING";
+								const isRejected =
+									!t.isUsed && t.response?.status === "REJECTED";
+
+								return (
+									<TableRow key={t.id}>
+										<TableCell className="font-mono text-sm text-slate-600 truncate max-w-[200px]">
+											{t.token}
+										</TableCell>
+										<TableCell className="font-medium text-slate-800">
+											{t.response?.name || (
+												<span className="text-slate-400 italic font-normal text-xs">
+													Belum ada data
+												</span>
+											)}
+										</TableCell>
+										<TableCell>{t.creator?.fullName || "-"}</TableCell>
+										<TableCell>
+											{new Date(t.createdAt).toLocaleDateString("id-ID", {
+												day: "numeric",
+												month: "short",
+												year: "numeric",
+												hour: "2-digit",
+												minute: "2-digit",
+											})}
+										</TableCell>
+										<TableCell>
+											{isApproved ? (
+												<Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none">
+													Selesai (Di-ACC)
+												</Badge>
+											) : isPending ? (
+												<Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none">
+													Menunggu Review
+												</Badge>
+											) : isRejected ? (
+												<Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none">
+													Perlu Revisi
+												</Badge>
+											) : (
+												<Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 border-none">
+													Belum Diisi
+												</Badge>
+											)}
+										</TableCell>
+										<TableCell className="text-right">
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => copyLink(t.token)}
+												className="border-blue-200 text-[#0517B0] hover:bg-blue-50"
+											>
+												<Copy className="w-4 h-4 mr-2" />
+												Salin Tautan
+											</Button>
+										</TableCell>
+									</TableRow>
+								);
+							})
 						)}
 					</TableBody>
 				</Table>

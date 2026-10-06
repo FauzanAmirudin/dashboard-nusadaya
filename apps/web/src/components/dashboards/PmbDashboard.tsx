@@ -168,8 +168,18 @@ export function PmbDashboard({
 			},
 			{ name: "Surat SKBM", done: Boolean(pmb?.docSkbm), category: "Dokumen" },
 			{
-				name: "Hasil Lab MCU",
+				name: "Pre-Medical Check Up",
+				done: Boolean(pmb?.docPreMcu),
+				category: "Dokumen",
+			},
+			{
+				name: "Medical Check Up Full",
 				done: Boolean(pmb?.docMcu),
+				category: "Dokumen",
+			},
+			{
+				name: "Service Level Agreement (SLA)",
+				done: Boolean(pmb?.docSla),
 				category: "Dokumen",
 			},
 			{

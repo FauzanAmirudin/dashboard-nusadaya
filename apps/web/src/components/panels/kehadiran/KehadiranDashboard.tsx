@@ -68,7 +68,9 @@ export function KehadiranDashboard() {
 	const fetchStudents = async () => {
 		setIsLoading(true);
 		try {
-			const { data, error } = await api.students.get();
+			const { data, error } = await api.students.get({
+				$query: { all: "true" },
+			});
 			if (!error && data?.data) {
 				setStudents(data.data);
 			} else {

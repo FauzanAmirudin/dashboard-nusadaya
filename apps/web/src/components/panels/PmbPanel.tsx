@@ -6,6 +6,7 @@ import {
 	ClipboardList,
 	Clock,
 	DollarSign,
+	Home,
 	Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -36,6 +37,7 @@ import {
 import { API_URL, api, getToken } from "@/lib/eden";
 import { hasRole, useAuthStore } from "@/store";
 import { formatDeviceDateTime } from "@/utils/format";
+import { calculatePmbChecklist } from "@/utils/panel-logic";
 
 import { TabChecklist } from "./pmb/TabChecklist";
 import { TabDataTambahan } from "./pmb/TabDataTambahan";
@@ -124,30 +126,12 @@ export function PmbPanel({
 		fetchDocuments();
 	}, [studentId]);
 
-	const mainChecklist = [
-		pmbData?.formReceived,
-		pmbData?.documentsComplete,
-		pmbData?.dataInputted,
-		pmbData?.initialFollowUp,
-	];
-
-	const docsChecklist = [
-		pmbData?.docKtp,
-		pmbData?.docKk,
-		pmbData?.docCv,
-		pmbData?.docIjazah,
-		pmbData?.docTranskrip,
-		pmbData?.docPassportDepan,
-		pmbData?.docPassportVisa,
-		pmbData?.docSkbm,
-		pmbData?.docMcu,
-		pmbData?.docSertifikasiBahasa,
-	];
-
-	const mainCompletedCount = mainChecklist.filter(Boolean).length;
-	const docsCompletedCount = docsChecklist.filter(Boolean).length;
-	const totalCompleted14 = mainCompletedCount + docsCompletedCount;
-	const isAllChecklistDone = totalCompleted14 === 14;
+	const {
+		mainCompletedCount,
+		requiredDocsCompletedCount,
+		totalRequiredCompleted16,
+		isAllChecklistDone,
+	} = calculatePmbChecklist(pmbData);
 
 	const handleAcc = async () => {
 		setIsAccSaving(true);
@@ -193,16 +177,15 @@ export function PmbPanel({
 				title="Panel PMB (Penerimaan Mahasiswa Baru)"
 				subtitle="Dikelola oleh: Admin PMB & Superadmin"
 				progressTag={
-					<span className="text-xs font-bold text-slate-700 bg-slate-200/70 px-2.5 py-0.5 rounded-full border border-slate-300/40">
-						Progres: {totalCompleted14}/14 Checklist ({mainCompletedCount}/4
-						Utama • {docsCompletedCount}/10 Dokumen)
+					<span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+						Dokumen: {totalRequiredCompleted16}/16 Wajib
 					</span>
 				}
 				badge={
 					<PanelStatusBadge
 						isAcc={pmbData?.isAcc}
-						completed={totalCompleted14}
-						total={14}
+						completed={totalRequiredCompleted16}
+						total={16}
 						size="lg"
 					/>
 				}
@@ -219,8 +202,8 @@ export function PmbPanel({
 						value="data-tambahan"
 						className="flex items-center justify-center gap-2 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
 					>
-						<ClipboardList className="w-4 h-4 text-rose-600" />
-						Data Tambahan
+						<Home className="w-4 h-4 text-rose-600" />
+						Fasilitas Rumah Juang
 					</TabsTrigger>
 					<TabsTrigger
 						value="checklist"
@@ -229,7 +212,7 @@ export function PmbPanel({
 						<CheckCircle2 className="w-4 h-4 text-emerald-600" />
 						<span>Dokumen Mahasiswa</span>
 						<span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-200">
-							{totalCompleted14}/14
+							{totalRequiredCompleted16}/16
 						</span>
 					</TabsTrigger>
 					<TabsTrigger
@@ -279,7 +262,6 @@ export function PmbPanel({
 				<TabsContent value="data-tambahan">
 					<TabDataTambahan
 						studentId={studentId}
-						studentData={studentData ?? {}}
 						pmbData={pmbData}
 						canEdit={canEdit}
 						onUpdate={handleDataUpdate}
@@ -300,18 +282,18 @@ export function PmbPanel({
 				title="ACC Panel PMB"
 				pendingTitle={
 					!isAllChecklistDone
-						? `Menunggu Kelengkapan Berkas (${14 - totalCompleted14} item belum selesai)`
+						? `Menunggu Kelengkapan Berkas (${16 - totalRequiredCompleted16} item wajib belum selesai)`
 						: "ACC Panel PMB (Penerimaan Mahasiswa Baru)"
 				}
-				pendingDescription="Selesaikan semua 4 checklist berkas utama dan 10 dokumen tambahan sebelum memberikan ACC PMB."
-				readyDescription="Semua 14 berkas PMB telah lengkap dan tervalidasi. Anda dapat memberikan persetujuan ACC resmi sekarang."
+				pendingDescription="Selesaikan semua 4 checklist berkas utama dan 12 dokumen wajib sebelum memberikan ACC PMB."
+				readyDescription="Semua 16 berkas wajib PMB telah lengkap dan tervalidasi. Anda dapat memberikan persetujuan ACC resmi sekarang."
 				canEdit={canEdit}
 				isSaving={isAccSaving}
 				onAcc={handleAcc}
 				onCancelAcc={handleCancelAcc}
 				cancelDialogTitle="Konfirmasi Pembatalan ACC PMB"
 				cancelDialogDescription="Apakah Anda yakin ingin membatalkan status ACC untuk panel PMB mahasiswa ini? Status PMB akan kembali ke tahap berproses."
-				disabledReason="Harus menyelesaikan 14/14 checklist berkas PMB sebelum ACC"
+				disabledReason="Harus menyelesaikan 16/16 checklist berkas wajib PMB sebelum ACC"
 			/>
 		</div>
 	);

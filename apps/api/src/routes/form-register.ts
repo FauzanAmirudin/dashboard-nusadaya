@@ -10,6 +10,9 @@ export const formRegisterRoutes = new Elysia()
 	.get("/form/:token", async ({ params, set }) => {
 		const tokenRecord = await db.query.pmbFormTokens.findFirst({
 			where: eq(pmbFormTokens.token, params.token),
+			with: {
+				response: true,
+			},
 		});
 
 		if (!tokenRecord) {
@@ -17,12 +20,22 @@ export const formRegisterRoutes = new Elysia()
 			return { valid: false, message: "Token tidak ditemukan" };
 		}
 
-		if (tokenRecord.isUsed) {
+		if (tokenRecord.isUsed || tokenRecord.response?.status === "APPROVED") {
 			set.status = 400;
-			return { valid: false, message: "Token sudah digunakan" };
+			return {
+				valid: false,
+				message:
+					"Pendaftaran telah disetujui / di-ACC. Tautan formulir tidak lagi aktif.",
+				isApproved: true,
+			};
 		}
 
-		return { valid: true };
+		return {
+			valid: true,
+			existingData: tokenRecord.response || null,
+			responseStatus: tokenRecord.response?.status || null,
+			rejectionNotes: tokenRecord.response?.rejectionNotes || null,
+		};
 	})
 	// 2. PUBLIC: Submit Form
 	.post(
@@ -30,13 +43,20 @@ export const formRegisterRoutes = new Elysia()
 		async ({ params, body, set }) => {
 			const tokenRecord = await db.query.pmbFormTokens.findFirst({
 				where: eq(pmbFormTokens.token, params.token),
+				with: {
+					response: true,
+				},
 			});
 
-			if (!tokenRecord || tokenRecord.isUsed) {
+			if (
+				!tokenRecord ||
+				tokenRecord.isUsed ||
+				tokenRecord.response?.status === "APPROVED"
+			) {
 				set.status = 400;
 				return {
 					valid: false,
-					message: "Token tidak valid atau sudah digunakan",
+					message: "Token tidak valid atau pendaftaran sudah disetujui",
 				};
 			}
 
@@ -57,19 +77,26 @@ export const formRegisterRoutes = new Elysia()
 			if (insertData.height) insertData.height = Number(insertData.height);
 			if (insertData.weight) insertData.weight = Number(insertData.weight);
 
-			// Save Response
-			await db.transaction(async (tx) => {
-				await tx.insert(pmbFormResponses).values({
+			// Save / Update Response
+			if (tokenRecord.response) {
+				await db
+					.update(pmbFormResponses)
+					.set({
+						...insertData,
+						status: "PENDING",
+						submittedAt: new Date(),
+						rejectionNotes: null,
+						processedAt: null,
+						processedBy: null,
+					})
+					.where(eq(pmbFormResponses.id, tokenRecord.response.id));
+			} else {
+				await db.insert(pmbFormResponses).values({
 					tokenId: tokenRecord.id,
 					status: "PENDING",
 					...insertData,
 				});
-
-				await tx
-					.update(pmbFormTokens)
-					.set({ isUsed: true, usedAt: new Date() })
-					.where(eq(pmbFormTokens.id, tokenRecord.id));
-			});
+			}
 
 			return { success: true };
 		},
@@ -153,13 +180,22 @@ export const formRegisterRoutes = new Elysia()
 				waliPhone: t.Optional(t.String()),
 				waliEmail: t.Optional(t.String()),
 				waliGuardianRelation: t.Optional(t.String()),
+
+				// Tab 7: Informasi PMB & Referensi
+				period: t.Optional(t.String()),
+				rekomendasi: t.Optional(t.String()),
+				timVisit: t.Optional(t.String()),
+				timSosialisasi: t.Optional(t.String()),
+				roReferral: t.Optional(t.String()),
+				mitraSponsor: t.Optional(t.String()),
+				koordinator: t.Optional(t.String()),
 			}),
 		},
 	)
 	// 3. ADMIN: Generate Token
 	.post("/pmb/form-tokens", async (context) => {
 		const user = (context as any).user;
-		if (!hasRole(user, "pmb")) {
+		if (!hasRole(user, "pmb", "superadmin")) {
 			context.set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -175,7 +211,7 @@ export const formRegisterRoutes = new Elysia()
 	// 4. ADMIN: Get Tokens List
 	.get("/pmb/form-tokens", async (context) => {
 		const user = (context as any).user;
-		if (!hasRole(user, "pmb")) {
+		if (!hasRole(user, "pmb", "superadmin")) {
 			context.set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -183,7 +219,9 @@ export const formRegisterRoutes = new Elysia()
 		const tokens = await db.query.pmbFormTokens.findMany({
 			with: {
 				creator: { columns: { fullName: true } },
-				response: { columns: { name: true } },
+				response: {
+					columns: { name: true, status: true, rejectionNotes: true },
+				},
 			},
 			orderBy: [desc(pmbFormTokens.createdAt)],
 		});
@@ -192,7 +230,7 @@ export const formRegisterRoutes = new Elysia()
 	// 5. ADMIN: Get Pending Responses
 	.get("/pmb/form-responses", async (context) => {
 		const user = (context as any).user;
-		if (!hasRole(user, "pmb")) {
+		if (!hasRole(user, "pmb", "superadmin")) {
 			context.set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -209,7 +247,7 @@ export const formRegisterRoutes = new Elysia()
 		async (context) => {
 			const { query, set } = context;
 			const user = (context as any).user;
-			if (!hasRole(user, "pmb")) {
+			if (!hasRole(user, "pmb", "superadmin")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -266,13 +304,16 @@ export const formRegisterRoutes = new Elysia()
 	.get("/pmb/form-responses/:id", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!hasRole(user, "pmb")) {
+		if (!hasRole(user, "pmb", "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
 		const id = parseInt(params.id, 10);
 		const response = await db.query.pmbFormResponses.findFirst({
 			where: eq(pmbFormResponses.id, id),
+			with: {
+				processor: { columns: { fullName: true } },
+			},
 		});
 		if (!response) {
 			set.status = 404;
@@ -286,7 +327,7 @@ export const formRegisterRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!hasRole(user, "pmb")) {
+			if (!hasRole(user, "pmb", "superadmin")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -314,7 +355,7 @@ export const formRegisterRoutes = new Elysia()
 	.patch("/pmb/form-responses/:id/approve", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!hasRole(user, "pmb")) {
+		if (!hasRole(user, "pmb", "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -429,6 +470,15 @@ export const formRegisterRoutes = new Elysia()
 				waliEmail: response.waliEmail,
 				waliGuardianRelation: response.waliGuardianRelation,
 
+				// PMB & Referensi
+				period: response.period || undefined,
+				rekomendasi: response.rekomendasi || undefined,
+				timVisit: response.timVisit || undefined,
+				timSosialisasi: response.timSosialisasi || undefined,
+				roReferral: response.roReferral || undefined,
+				mitraSponsor: response.mitraSponsor || undefined,
+				koordinator: response.koordinator || undefined,
+
 				studentStatus: "aktif",
 			};
 
@@ -446,6 +496,14 @@ export const formRegisterRoutes = new Elysia()
 				})
 				.where(eq(pmbFormResponses.id, id));
 
+			// Lock token
+			if (response.tokenId) {
+				await db
+					.update(pmbFormTokens)
+					.set({ isUsed: true, usedAt: new Date() })
+					.where(eq(pmbFormTokens.id, response.tokenId));
+			}
+
 			return { success: true, data: student };
 		} catch (error: any) {
 			console.error("Failed to approve form response:", error);
@@ -453,24 +511,23 @@ export const formRegisterRoutes = new Elysia()
 			return { success: false, message: error.message };
 		}
 	})
-	// 9. ADMIN: Get Single Response
-	.get("/pmb/form-responses/:id", async (context) => {
+	// 10. ADMIN: Delete Form Token
+	.delete("/pmb/form-tokens/:id", async (context) => {
+		const { params, set } = context;
 		const user = (context as any).user;
-		if (!hasRole(user, "pmb")) {
-			context.set.status = 403;
+		if (!hasRole(user, "pmb", "superadmin")) {
+			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
-
-		const id = Number(context.params.id);
-		const response = await db.query.pmbFormResponses.findFirst({
-			where: eq(pmbFormResponses.id, id),
-			with: { processor: { columns: { fullName: true } } },
+		const id = parseInt(params.id, 10);
+		const token = await db.query.pmbFormTokens.findFirst({
+			where: eq(pmbFormTokens.id, id),
 		});
-
-		if (!response) {
-			context.set.status = 404;
-			return { success: false, message: "Response not found" };
+		if (!token) {
+			set.status = 404;
+			return { success: false, message: "Token not found" };
 		}
-
-		return { success: true, data: response };
+		await db.delete(pmbFormResponses).where(eq(pmbFormResponses.tokenId, id));
+		await db.delete(pmbFormTokens).where(eq(pmbFormTokens.id, id));
+		return { success: true };
 	});

@@ -14,19 +14,29 @@ export type User = {
 
 export function getUserRoles(user: User): string[] {
 	if (!user) return [];
-	if (user.roles && Array.isArray(user.roles) && user.roles.length > 0) {
-		return user.roles;
+	const rolesSet = new Set<string>();
+	if (user.role) {
+		rolesSet.add(user.role.toLowerCase());
 	}
-	return user.role ? [user.role] : [];
+	if (user.roles && Array.isArray(user.roles)) {
+		for (const r of user.roles) {
+			if (r) rolesSet.add(String(r).toLowerCase());
+		}
+	}
+	return Array.from(rolesSet);
 }
 
 export function hasRole(user: User, ...requiredRoles: string[]): boolean {
 	if (!user) return false;
 	const userRoles = getUserRoles(user);
-	if (user.role === "superadmin" || userRoles.includes("superadmin")) {
+	const userPrimaryRole = user.role?.toLowerCase();
+	if (userPrimaryRole === "superadmin" || userRoles.includes("superadmin")) {
 		return true;
 	}
-	return requiredRoles.some((r) => userRoles.includes(r));
+	const normalizedRequired = requiredRoles.map((r) => r.toLowerCase());
+	return normalizedRequired.some(
+		(r) => userRoles.includes(r) || userPrimaryRole === r,
+	);
 }
 
 interface AuthState {

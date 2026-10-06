@@ -1553,6 +1553,8 @@ export function KehadiranPiketDashboard() {
 								<div className="p-4 border-t border-slate-100">
 									<TablePagination
 										currentPage={historyPage}
+										totalItems={historyData.length}
+										pageSize={historyPageSize}
 										totalPages={Math.ceil(historyData.length / historyPageSize)}
 										onPageChange={setHistoryPage}
 									/>
@@ -1843,6 +1845,8 @@ export function KehadiranPiketDashboard() {
 								<div className="p-4 border-t border-slate-100">
 									<TablePagination
 										currentPage={studentPage}
+										totalItems={studentSummaryData.length}
+										pageSize={studentPageSize}
 										totalPages={Math.ceil(
 											studentSummaryData.length / studentPageSize,
 										)}

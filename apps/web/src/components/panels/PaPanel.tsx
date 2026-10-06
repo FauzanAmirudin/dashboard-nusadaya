@@ -41,6 +41,7 @@ import {
 import { API_URL, api, getToken } from "@/lib/eden";
 import { hasRole, useAuthStore } from "@/store";
 import { formatDeviceDateTime } from "@/utils/format";
+import { calculatePaChecklist, canEditPa } from "@/utils/panel-logic";
 
 import { TabChecklistPa } from "./pa/TabChecklistPa";
 import { TabHafalan } from "./pa/TabHafalan";
@@ -79,18 +80,8 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 	const [loadingItem, setLoadingItem] = useState<string | null>(null);
 	const [activeTab, setActiveTab] = useState("checklist");
 
-	const isCounselingDone = Boolean(paData?.counselingDone);
-	const isMentalStable = Boolean(paData?.mentalStable);
-	const isDisciplineGood = Boolean(paData?.disciplineGood);
-	const completedCount = [
-		isCounselingDone,
-		isMentalStable,
-		isDisciplineGood,
-	].filter(Boolean).length;
-	const isAllChecksDone = completedCount === 3;
-
-	// Role PA, Akademik, and Superadmin have full CRUD permissions to manage hafalan, counseling, tripartite, interview, etc.
-	const canEdit = isPa;
+	const { completedCount, isAllChecksDone } = calculatePaChecklist(paData);
+	const canEdit = canEditPa(user);
 
 	const fetchPaData = async () => {
 		try {

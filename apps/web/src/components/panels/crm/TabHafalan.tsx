@@ -45,6 +45,7 @@ interface TabHafalanProps {
 	fetchCrmData: () => void;
 	fetchPaData?: () => void;
 	onUpdate: () => void;
+	onUpdateField?: (field: string, value: any) => void;
 }
 
 export function TabHafalan({
@@ -57,6 +58,7 @@ export function TabHafalan({
 	fetchCrmData,
 	fetchPaData,
 	onUpdate,
+	onUpdateField,
 }: TabHafalanProps) {
 	const crm = crmState?.crm;
 	const [isVocabComplete, setIsVocabComplete] = useState(false);
@@ -122,6 +124,8 @@ export function TabHafalan({
 
 	const handleToggleSetujuiHafalan = async (targetValue: boolean) => {
 		if (!canEdit) return;
+		onUpdateField?.("isVocabComplete", targetValue);
+		setIsVocabComplete(targetValue);
 		setIsLoading(true);
 		try {
 			const { error } = await api.students[studentId.toString()].crm.patch({
@@ -139,10 +143,11 @@ export function TabHafalan({
 					? "Kendali hafalan berhasil disetujui (ACC Vocab)!"
 					: "Persetujuan hafalan berhasil dibatalkan",
 			);
-			setIsVocabComplete(targetValue);
 			await Promise.all([fetchCrmData(), fetchPaData?.()]);
 			onUpdate();
 		} catch (error) {
+			onUpdateField?.("isVocabComplete", !targetValue);
+			setIsVocabComplete(!targetValue);
 			toast.error("Terjadi kesalahan saat memproses status hafalan");
 		} finally {
 			setIsLoading(false);

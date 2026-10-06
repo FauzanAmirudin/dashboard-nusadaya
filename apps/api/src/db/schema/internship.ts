@@ -26,11 +26,18 @@ export const internshipData = pgTable(
 		praPasporKtp: boolean("pra_paspor_ktp").default(false),
 		praPasporKk: boolean("pra_paspor_kk").default(false),
 		praPasporAktaKelahiran: boolean("pra_paspor_akta_kelahiran").default(false),
+		praPasporSuratIzinOrtu: boolean("pra_paspor_surat_izin_ortu").default(
+			false,
+		),
 		praPasporSl21: boolean("pra_paspor_sl21").default(false),
 		praPasporSkma: boolean("pra_paspor_skma").default(false),
 		praPasporRekomendasiDisdik: boolean(
 			"pra_paspor_rekomendasi_disdik",
 		).default(false),
+		praPasporKhs: boolean("pra_paspor_khs").default(false),
+		praPasporKrs: boolean("pra_paspor_krs").default(false),
+		praPasporTranskrip: boolean("pra_paspor_transkrip").default(false),
+		praPasporIjazah: boolean("pra_paspor_ijazah").default(false),
 		praPasporGapYear: boolean("pra_paspor_gap_year").default(false),
 		praPasporPddikti: boolean("pra_paspor_pddikti").default(false),
 		praPasporCv: boolean("pra_paspor_cv").default(false),

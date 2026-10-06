@@ -145,8 +145,9 @@ export default function ProfilePage() {
 				toast.error(errMsg);
 				return;
 			}
-			if (data?.success && data?.data) {
-				const u = data.data;
+			const resData = data as any;
+			if (resData?.success && resData?.data) {
+				const u = resData.data;
 				setProfileForm({
 					fullName: u.fullName || "",
 					username: u.username || "",
@@ -263,16 +264,17 @@ export default function ProfilePage() {
 				return;
 			}
 
-			if (data?.success && data?.data) {
+			const resData = data as any;
+			if (resData?.success && resData?.data) {
 				toast.success("Profil berhasil diperbarui!");
 				updateUser({
-					fullName: data.data.fullName,
-					username: data.data.username,
-					email: data.data.email || undefined,
-					phone: data.data.phone || undefined,
-					profilePhotoUrl: data.data.profilePhotoUrl || undefined,
-					role: data.data.role,
-					roles: data.data.roles,
+					fullName: resData.data.fullName,
+					username: resData.data.username,
+					email: resData.data.email || undefined,
+					phone: resData.data.phone || undefined,
+					profilePhotoUrl: resData.data.profilePhotoUrl || undefined,
+					role: resData.data.role,
+					roles: resData.data.roles,
 				});
 			}
 		} catch (err: any) {

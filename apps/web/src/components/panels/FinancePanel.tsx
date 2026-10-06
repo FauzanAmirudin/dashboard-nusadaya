@@ -35,6 +35,7 @@ import {
 import { api } from "@/lib/eden";
 import { hasRole, useAuthStore } from "@/store";
 import { formatDeviceDateTime } from "@/utils/format";
+import { calculateFinanceChecklist } from "@/utils/panel-logic";
 import { TabAnggaran } from "./finance/TabAnggaran";
 import { TabFeeSharing } from "./finance/TabFeeSharing";
 import { TabKeuangan } from "./finance/TabKeuangan";
@@ -82,46 +83,12 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 		fetchData(true);
 	};
 
-	const isTalangan = finState?.metodePembayaran === "dana_talangan";
-	const isSemesterDone = isTalangan
-		? Boolean(finState?.t1SemesterStatus || finState?.mandiriSemesterStatus)
-		: Boolean(finState?.mandiriSemesterStatus);
-	const isInterviewDone = isTalangan
-		? Boolean(finState?.t1InterviewStatus)
-		: Boolean(finState?.mandiriInterviewStatus);
-	const isKeberangkatanDone = isTalangan
-		? Boolean(finState?.t2KeberangkatanStatus)
-		: Boolean(finState?.mandiriKeberangkatanStatus);
-
-	const financeChecklistItems = [
-		{
-			name: "Registrasi / Pendaftaran",
-			done: Boolean(finState?.registrasiStatus || finState?.registrationPaid),
-		},
-		{
-			name: isTalangan
-				? "Perkuliahan Semester (Talangan)"
-				: "Perkuliahan 6 Semester",
-			done: isSemesterDone,
-		},
-		{
-			name: isTalangan ? "Interview Magang (Tahap 1)" : "Interview Magang",
-			done: isInterviewDone,
-		},
-		{
-			name: isTalangan ? "Keberangkatan (Tahap 2)" : "Keberangkatan",
-			done: isKeberangkatanDone,
-		},
-		{
-			name: "Sertifikasi Bahasa (TOEIC)",
-			done: Boolean(finState?.toeicStatus),
-		},
-		{ name: "Paspor & Dokumen", done: Boolean(finState?.pasporStatus) },
-	];
-
-	const completedCount = financeChecklistItems.filter((i) => i.done).length;
-	const totalChecks = 6;
-	const isFinanceReady = completedCount === totalChecks;
+	const {
+		completedCount,
+		totalChecks,
+		isFinanceReady,
+		items: financeChecklistItems,
+	} = calculateFinanceChecklist(finState);
 
 	const handleAcc = async () => {
 		setIsAccSaving(true);

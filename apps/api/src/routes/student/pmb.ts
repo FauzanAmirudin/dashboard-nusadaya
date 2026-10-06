@@ -52,7 +52,10 @@ export const pmbRoutes = new Elysia()
 					docPassportDepan: body.docPassportDepan ?? false,
 					docPassportVisa: body.docPassportVisa ?? false,
 					docSkbm: body.docSkbm ?? false,
+					docPreMcu: body.docPreMcu ?? false,
 					docMcu: body.docMcu ?? false,
+					docBpjs: body.docBpjs ?? false,
+					docSla: body.docSla ?? false,
 					docSertifikasiBahasa: body.docSertifikasiBahasa ?? false,
 					notes: body.notes,
 					rekomendasi: body.rekomendasi,
@@ -66,8 +69,8 @@ export const pmbRoutes = new Elysia()
 				})
 				.where(eq(pmbData.studentId, id));
 
-			// Auto-calculate status based on all 14 checklist items
-			const checkboxes = [
+			// Auto-calculate status based on 16 required checklist items (BPJS is optional)
+			const requiredCheckboxes = [
 				body.formReceived,
 				body.documentsComplete,
 				body.dataInputted,
@@ -80,21 +83,23 @@ export const pmbRoutes = new Elysia()
 				body.docPassportDepan,
 				body.docPassportVisa,
 				body.docSkbm,
+				body.docPreMcu,
 				body.docMcu,
+				body.docSla,
 				body.docSertifikasiBahasa,
 			];
-			const checkedCount = checkboxes.filter(Boolean).length;
+			const checkedCount = requiredCheckboxes.filter(Boolean).length;
 
 			let newStatus: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
 				"BUTUH_PERHATIAN";
-			if (checkedCount === 14) newStatus = "AMAN";
-			else if (checkedCount >= 5) newStatus = "PROSES";
+			if (checkedCount === 16) newStatus = "AMAN";
+			else if (checkedCount >= 6) newStatus = "PROSES";
 
 			await db
 				.update(pmbData)
 				.set({
 					status: newStatus,
-					...(checkedCount < 14
+					...(checkedCount < 16
 						? { isAcc: false, accAt: null, accBy: null }
 						: {}),
 				})
@@ -118,7 +123,10 @@ export const pmbRoutes = new Elysia()
 				docPassportDepan: t.Optional(t.Boolean()),
 				docPassportVisa: t.Optional(t.Boolean()),
 				docSkbm: t.Optional(t.Boolean()),
+				docPreMcu: t.Optional(t.Boolean()),
 				docMcu: t.Optional(t.Boolean()),
+				docBpjs: t.Optional(t.Boolean()),
+				docSla: t.Optional(t.Boolean()),
 				docSertifikasiBahasa: t.Optional(t.Boolean()),
 				notes: t.Optional(t.String()),
 				rekomendasi: t.Optional(t.String()),
@@ -174,7 +182,7 @@ export const pmbRoutes = new Elysia()
 	.post("/:id/pmb/acc", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!hasRole(user, "pmb")) {
+		if (!hasRole(user, "pmb", "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -184,7 +192,8 @@ export const pmbRoutes = new Elysia()
 			where: eq(pmbData.studentId, id),
 		});
 
-		const allChecks = [
+		// 16 Required checks (BPJS is optional, so it is omitted from mandatory checks)
+		const requiredChecks = [
 			currentPmb?.formReceived,
 			currentPmb?.documentsComplete,
 			currentPmb?.dataInputted,
@@ -197,16 +206,18 @@ export const pmbRoutes = new Elysia()
 			currentPmb?.docPassportDepan,
 			currentPmb?.docPassportVisa,
 			currentPmb?.docSkbm,
+			currentPmb?.docPreMcu,
 			currentPmb?.docMcu,
+			currentPmb?.docSla,
 			currentPmb?.docSertifikasiBahasa,
 		];
 
-		if (!allChecks.every(Boolean)) {
+		if (!requiredChecks.every(Boolean)) {
 			set.status = 400;
 			return {
 				success: false,
 				message:
-					"Semua checklist kelengkapan berkas utama (4) dan dokumen tambahan (10) harus selesai divalidasi sebelum melakukan ACC PMB.",
+					"Semua checklist kelengkapan berkas utama (4) dan dokumen wajib PMB (12) harus selesai divalidasi sebelum melakukan ACC PMB.",
 			};
 		}
 

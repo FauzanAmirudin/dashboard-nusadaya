@@ -21,9 +21,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { getToken } from "@/lib/eden";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+import { API_URL, getToken } from "@/lib/eden";
 
 const MONTHS = [
 	{ value: "1", label: "Januari" },
@@ -52,6 +50,11 @@ export function TabRiwayatRespons() {
 	const fetchHistory = async () => {
 		setIsLoading(true);
 		try {
+			const token = getToken();
+			const headers: Record<string, string> = {};
+			if (token) {
+				headers.Authorization = `Bearer ${token}`;
+			}
 			const query = new URLSearchParams();
 			if (filterMonth) query.append("month", filterMonth);
 			if (filterYear) query.append("year", filterYear);
@@ -59,14 +62,13 @@ export function TabRiwayatRespons() {
 			const res = await fetch(
 				`${API_URL}/pmb/form-responses/history?${query.toString()}`,
 				{
-					headers: {
-						Authorization: `Bearer ${getToken()}`,
-					},
+					headers,
+					credentials: "include",
 				},
 			);
 			const data = await res.json();
 			if (data.success) {
-				setHistory(data.data);
+				setHistory(data.data || []);
 			}
 		} catch (error) {
 			console.error("Failed to fetch history", error);

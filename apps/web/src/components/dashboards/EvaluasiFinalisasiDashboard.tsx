@@ -149,8 +149,18 @@ const getPmbChecklist = (pmb: any) => {
 		},
 		{ name: "Surat SKBM", done: Boolean(pmb?.docSkbm), category: "Dokumen" },
 		{
-			name: "Hasil Lab MCU",
+			name: "Pre-Medical Check Up",
+			done: Boolean(pmb?.docPreMcu),
+			category: "Dokumen",
+		},
+		{
+			name: "Medical Check Up Full",
 			done: Boolean(pmb?.docMcu),
+			category: "Dokumen",
+		},
+		{
+			name: "Service Level Agreement (SLA)",
+			done: Boolean(pmb?.docSla),
 			category: "Dokumen",
 		},
 		{
@@ -169,28 +179,49 @@ const getPmbChecklist = (pmb: any) => {
 };
 
 const getCrmChecklist = (crm: any) => {
+	let odsList = crm?.odsDetails;
+	if (typeof odsList === "string") {
+		try {
+			odsList = JSON.parse(odsList);
+		} catch {
+			odsList = [];
+		}
+	}
+	if (!Array.isArray(odsList)) {
+		odsList = [];
+	}
 	const items = [
-		{ name: "Pendataan Kontak & Minat", done: Boolean(crm?.contactFollowedUp) },
 		{
-			name: "Konsultasi Program & Karir",
-			done: Boolean(crm?.careerConsultationDone),
+			name: "Monitoring Orang Tua",
+			done: Boolean(crm?.isMonitoringParent || crm?.parentFollowUp),
 		},
 		{
-			name: "Verifikasi Lokasi & Minat Kerja",
-			done: Boolean(crm?.locationPreferenceVerified),
+			name: "Monitoring Industri",
+			done: Boolean(crm?.isMonitoringIndustry || crm?.studentMonitoring),
+		},
+		{ name: "Kendali Vocab/Bahasa", done: Boolean(crm?.isVocabComplete) },
+		{ name: "Presensi Praktik ODS", done: Boolean(crm?.practiceAttendance) },
+		{
+			name: "Laporan ODS 1",
+			done: Boolean(crm?.isOds1Report || odsList[0]?.isDone),
 		},
 		{
-			name: "Praktik Industri / On-Site",
-			done: Boolean(crm?.practiceAttendance || crm?.isMonitoringIndustry),
+			name: "Laporan ODS 2",
+			done: Boolean(crm?.isOds2Report || odsList[1]?.isDone),
 		},
 		{
-			name: "Dokumen Persetujuan Ortu",
-			done: Boolean(crm?.parentApprovalLetter || crm?.parentConsent),
+			name: "Laporan ODS 3",
+			done: Boolean(crm?.isOds3Report || odsList[2]?.isDone),
 		},
 		{
-			name: "Pernyataan Komitmen",
-			done: Boolean(crm?.commitmentStatement || crm?.commitmentLetter),
+			name: "Laporan ODS 4",
+			done: Boolean(crm?.isOds4Report || odsList[3]?.isDone),
 		},
+		{
+			name: "Laporan ODS 5",
+			done: Boolean(crm?.isOds5Report || odsList[4]?.isDone),
+		},
+		{ name: "Laporan Pra-Magang", done: Boolean(crm?.isPrammagangReport) },
 	];
 	const completed = items.filter((i) => i.done).length;
 	return {

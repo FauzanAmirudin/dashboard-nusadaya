@@ -116,7 +116,9 @@ export function TabJadwalPiket({ canEdit }: { canEdit: boolean }) {
 
 	const fetchStudents = async () => {
 		try {
-			const { data, error } = await api.students.get();
+			const { data, error } = await api.students.get({
+				$query: { all: "true" },
+			});
 			if (!error && data?.data) {
 				setStudents(data.data.map((item: any) => item.student));
 			}

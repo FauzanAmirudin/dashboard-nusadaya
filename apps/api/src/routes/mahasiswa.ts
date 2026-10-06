@@ -426,26 +426,30 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			pmb?.docPassportDepan,
 			pmb?.docPassportVisa,
 			pmb?.docSkbm,
+			pmb?.docPreMcu,
 			pmb?.docMcu,
+			pmb?.docSla,
 			pmb?.docSertifikasiBahasa,
 		];
 		const pmbCompleted = pmbChecklist.filter(Boolean).length;
-		const pmbTotal = 14;
+		const pmbTotal = 16;
 		const pmbPercent = Math.round((pmbCompleted / pmbTotal) * 100);
 
-		// Hitung Progress CRM (8 kriteria)
+		// Hitung Progress CRM (11 kriteria)
 		const crmChecklist = [
 			crm?.isMonitoringParent,
 			crm?.isMonitoringIndustry,
 			crm?.isVocabComplete,
 			crm?.practiceAttendance,
-			crm?.isOdsReport,
-			crm?.odsDocumentation,
+			crm?.isOds1Report,
+			crm?.isOds2Report,
+			crm?.isOds3Report,
+			crm?.isOds4Report,
+			crm?.isOds5Report,
 			crm?.isPrammagangReport,
-			crm?.isPrammagangDocumentation,
 		];
 		const crmCompleted = crmChecklist.filter(Boolean).length;
-		const crmTotal = 8;
+		const crmTotal = 10;
 		const crmPercent = Math.round((crmCompleted / crmTotal) * 100);
 		const crmPresent = crm?.practiceDaysPresent ?? 0;
 		const crmDaysTotal = crm?.practiceDaysTotal ?? 0;
@@ -496,22 +500,25 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			100,
 		);
 
-		// Hitung Progress Magang (11 Pra-Paspor + 12 Tahapan Magang)
+		// Hitung Progress Magang (14 Pra-Paspor + 12 Tahapan Magang)
 		const praPasporChecklist = [
 			internship?.praPasporPasFoto,
 			internship?.praPasporKtm,
 			internship?.praPasporKtp,
 			internship?.praPasporKk,
 			internship?.praPasporAktaKelahiran,
+			internship?.praPasporSuratIzinOrtu,
 			internship?.praPasporSl21,
 			internship?.praPasporSkma,
 			internship?.praPasporRekomendasiDisdik,
+			internship?.praPasporKhs,
+			internship?.praPasporKrs,
+			internship?.praPasporTranskrip,
+			internship?.praPasporIjazah,
 			internship?.praPasporGapYear,
-			internship?.praPasporPddikti,
-			internship?.praPasporCv,
 		];
 		const praPasporCompleted = praPasporChecklist.filter(Boolean).length;
-		const praPasporPercent = Math.round((praPasporCompleted / 11) * 100);
+		const praPasporPercent = Math.round((praPasporCompleted / 14) * 100);
 
 		const mainMagangChecklist = [
 			internship?.passportReady,
@@ -588,7 +595,7 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				isAcc: internship?.isAcc ?? false,
 				status: internship?.status,
 				praPasporCompleted,
-				praPasporTotal: 11,
+				praPasporTotal: 14,
 				praPasporPercent,
 				mainCompleted: mainMagangCompleted,
 				mainTotal: 12,
@@ -606,6 +613,7 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				decidedAt: decision?.decidedAt,
 				skDocumentUrl: decision?.skDocumentUrl,
 			},
+			studentId: studentData.id,
 		};
 
 		await cacheSet(cacheKey, responseData, 30);
@@ -803,7 +811,10 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				docPassportDepan: pmb?.docPassportDepan ?? false,
 				docPassportVisa: pmb?.docPassportVisa ?? false,
 				docSkbm: pmb?.docSkbm ?? false,
+				docPreMcu: pmb?.docPreMcu ?? false,
 				docMcu: pmb?.docMcu ?? false,
+				docBpjs: pmb?.docBpjs ?? false,
+				docSla: pmb?.docSla ?? false,
 				docSertifikasiBahasa: pmb?.docSertifikasiBahasa ?? false,
 
 				// Fasilitas Rumah Juang
@@ -873,6 +884,11 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				isVocabComplete: crm?.isVocabComplete ?? false,
 				hasStudyPermit: crm?.hasStudyPermit ?? false,
 				isOdsReport: crm?.isOdsReport ?? false,
+				isOds1Report: crm?.isOds1Report ?? false,
+				isOds2Report: crm?.isOds2Report ?? false,
+				isOds3Report: crm?.isOds3Report ?? false,
+				isOds4Report: crm?.isOds4Report ?? false,
+				isOds5Report: crm?.isOds5Report ?? false,
 				odsDocumentation: crm?.odsDocumentation ?? false,
 				isPrammagangReport: crm?.isPrammagangReport ?? false,
 				isPrammagangDocumentation: crm?.isPrammagangDocumentation ?? false,
@@ -1304,15 +1320,20 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			]);
 
 			data = {
-				// 0. Pra-Paspor (11 Berkas)
+				// 0. Pra-Paspor (14 Berkas)
 				praPasporPasFoto: magang?.praPasporPasFoto ?? false,
 				praPasporKtm: magang?.praPasporKtm ?? false,
 				praPasporKtp: magang?.praPasporKtp ?? false,
 				praPasporKk: magang?.praPasporKk ?? false,
 				praPasporAktaKelahiran: magang?.praPasporAktaKelahiran ?? false,
+				praPasporSuratIzinOrtu: magang?.praPasporSuratIzinOrtu ?? false,
 				praPasporSl21: magang?.praPasporSl21 ?? false,
 				praPasporSkma: magang?.praPasporSkma ?? false,
 				praPasporRekomendasiDisdik: magang?.praPasporRekomendasiDisdik ?? false,
+				praPasporKhs: magang?.praPasporKhs ?? false,
+				praPasporKrs: magang?.praPasporKrs ?? false,
+				praPasporTranskrip: magang?.praPasporTranskrip ?? false,
+				praPasporIjazah: magang?.praPasporIjazah ?? false,
 				praPasporGapYear: magang?.praPasporGapYear ?? false,
 				praPasporPddikti: magang?.praPasporPddikti ?? false,
 				praPasporCv: magang?.praPasporCv ?? false,
@@ -1495,6 +1516,10 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 		} else {
 			set.status = 400;
 			return { success: false, message: "Panel tidak valid" };
+		}
+
+		if (data && typeof data === "object") {
+			data.studentId = studentData.id;
 		}
 
 		await cacheSet(cacheKey, data, 60);

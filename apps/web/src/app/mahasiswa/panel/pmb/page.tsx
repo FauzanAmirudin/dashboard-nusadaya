@@ -122,7 +122,18 @@ export default function PmbPanelMahasiswa() {
 			label: "Surat Keterangan Bebas Narkoba (SKBM)",
 			checked: Boolean(data?.docSkbm),
 		},
-		{ label: "Surat Keterangan MCU", checked: Boolean(data?.docMcu) },
+		{
+			label: "Pre-Medical Check Up (Pre-MCU)",
+			checked: Boolean(data?.docPreMcu),
+		},
+		{
+			label: "Medical Check Up Full (MCU Full)",
+			checked: Boolean(data?.docMcu),
+		},
+		{
+			label: "Service Level Agreement (SLA)",
+			checked: Boolean(data?.docSla),
+		},
 		{
 			label: "Sertifikasi Bahasa (TOEIC/JLPT/TOCFL)",
 			checked: Boolean(data?.docSertifikasiBahasa),
@@ -132,7 +143,7 @@ export default function PmbPanelMahasiswa() {
 	const mainCompletedCount = mainChecklist.filter((c) => c.checked).length;
 	const docCompletedCount = docChecklist.filter((c) => c.checked).length;
 	const totalCompleted = mainCompletedCount + docCompletedCount;
-	const totalItems = 14;
+	const totalItems = 16;
 	const progressPercentage = (totalCompleted / totalItems) * 100;
 
 	return (

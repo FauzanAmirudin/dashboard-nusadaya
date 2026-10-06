@@ -220,8 +220,9 @@ export default function DashboardPage() {
 		if (students && students.length > 0) {
 			const set = new Set<number>();
 			students.forEach((s) => {
-				if (typeof s.cohort === "number" && !Number.isNaN(s.cohort)) {
-					set.add(s.cohort);
+				const cohort = (s as any).cohort ?? s.student?.cohort;
+				if (typeof cohort === "number" && !Number.isNaN(cohort)) {
+					set.add(cohort);
 				}
 			});
 			return Array.from(set).sort((a, b) => b - a);

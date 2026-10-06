@@ -56,9 +56,14 @@ interface InternshipData {
 	praPasporKtp?: boolean;
 	praPasporKk?: boolean;
 	praPasporAktaKelahiran?: boolean;
+	praPasporSuratIzinOrtu?: boolean;
 	praPasporSl21?: boolean;
 	praPasporSkma?: boolean;
 	praPasporRekomendasiDisdik?: boolean;
+	praPasporKhs?: boolean;
+	praPasporKrs?: boolean;
+	praPasporTranskrip?: boolean;
+	praPasporIjazah?: boolean;
 	praPasporGapYear?: boolean;
 	praPasporPddikti?: boolean;
 	praPasporCv?: boolean;
@@ -329,11 +334,15 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 		"praPasporKtp",
 		"praPasporKk",
 		"praPasporAktaKelahiran",
+		"praPasporSuratIzinOrtu",
 		"praPasporSl21",
 		"praPasporSkma",
 		"praPasporRekomendasiDisdik",
+		"praPasporKhs",
+		"praPasporKrs",
+		"praPasporTranskrip",
+		"praPasporIjazah",
 		...(passportClearance?.isGapYear ? ["praPasporGapYear"] : []),
-		"praPasporCv",
 	];
 
 	const praPasporCompleted = praPasporKeys.filter(

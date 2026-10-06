@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +26,7 @@ interface TabPraMagangProps {
 	fetchCrmData: () => void;
 	canEdit: boolean;
 	onUpdate: () => void;
+	onUpdateField?: (field: string, value: any) => void;
 }
 
 export function TabPraMagang({
@@ -33,6 +35,7 @@ export function TabPraMagang({
 	fetchCrmData,
 	canEdit,
 	onUpdate,
+	onUpdateField,
 }: TabPraMagangProps) {
 	const crm = crmState?.crm;
 	const [isLoading, setIsLoading] = useState(false);
@@ -91,16 +94,11 @@ export function TabPraMagang({
 
 		setIsLoading(true);
 		try {
-			const hasDoc =
-				Boolean(videoLink && videoLink.trim().length > 0) ||
-				Boolean(cleanStart && industry && industry.trim().length > 0);
-
 			const { error } = await api.students[studentId.toString()].crm.patch({
 				pramagangStartDate: cleanStart || null,
 				pramagangEndDate: cleanEnd || null,
 				pramagangIndustry: industry ? industry.trim() : null,
 				pramagangVideoLink: videoLink ? videoLink.trim() : null,
-				isPrammagangDocumentation: hasDoc,
 			});
 
 			if (error) throw new Error("Gagal menyimpan data Pra Magang");
@@ -116,104 +114,35 @@ export function TabPraMagang({
 		}
 	};
 
-	const handleToggleDoc = async (value: boolean) => {
+	const handleToggleReportApproval = async (approved: boolean) => {
 		if (!canEdit) return;
+		onUpdateField?.("isPrammagangReport", approved);
 		try {
 			const { error } = await api.students[studentId.toString()].crm.patch({
-				isPrammagangDocumentation: value,
+				isPrammagangReport: approved,
 			});
 			if (error)
-				throw new Error("Gagal mengubah status dokumentasi Pra-Magang");
+				throw new Error("Gagal mengubah status persetujuan Laporan Pra-Magang");
 			toast.success(
-				value
-					? "Dokumentasi Pra-Magang ditandai selesai"
-					: "Dokumentasi Pra-Magang dibatalkan",
+				approved
+					? "Laporan Pra-Magang berhasil disetujui (ACC Laporan)!"
+					: "Persetujuan Laporan Pra-Magang dibatalkan",
 			);
 			fetchCrmData();
 			onUpdate();
 		} catch (e) {
-			toast.error("Terjadi kesalahan sistem");
+			onUpdateField?.("isPrammagangReport", !approved);
+			toast.error("Terjadi kesalahan sistem saat mengubah status persetujuan");
 		}
 	};
 
 	const handleUploadSuccess = async () => {
-		if (!crm?.isPrammagangReport) {
-			try {
-				await api.students[studentId.toString()].crm.patch({
-					isPrammagangReport: true,
-				});
-				fetchCrmData();
-				onUpdate();
-			} catch (error) {
-				console.error("Gagal auto-check pramagang report", error);
-			}
-		}
+		fetchCrmData();
+		onUpdate();
 	};
 
 	return (
 		<div className="space-y-6">
-			{/* Status Checklist Banner Pra-Magang */}
-			<Card className="border border-slate-200 shadow-2xs bg-white overflow-hidden">
-				<CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-					<div className="flex items-center gap-3">
-						<div
-							className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-								crm?.isPrammagangDocumentation
-									? "bg-emerald-100 text-emerald-700"
-									: "bg-amber-100 text-amber-700"
-							}`}
-						>
-							{crm?.isPrammagangDocumentation ? (
-								<CheckCircle2 className="w-5 h-5" />
-							) : (
-								<Clock className="w-5 h-5" />
-							)}
-						</div>
-						<div>
-							<div className="flex items-center gap-2">
-								<h4 className="font-bold text-slate-800 text-sm">
-									Indikator: Dokumentasi Pra-Magang
-								</h4>
-								{crm?.isPrammagangDocumentation ? (
-									<Badge className="bg-emerald-100 text-emerald-800 border-0 text-xs font-semibold">
-										Selesai (Terpenuhi)
-									</Badge>
-								) : (
-									<Badge
-										variant="outline"
-										className="text-amber-700 bg-amber-50 border-amber-200 text-xs font-medium"
-									>
-										Belum Terpenuhi
-									</Badge>
-								)}
-							</div>
-							<p className="text-xs text-slate-500 mt-0.5">
-								{crm?.isPrammagangDocumentation
-									? "Data penempatan dan dokumentasi video telah tercatat."
-									: "Lengkapi data industri, periode, tautan video atau tandai selesai."}
-							</p>
-						</div>
-					</div>
-
-					{canEdit && (
-						<Button
-							size="sm"
-							variant={crm?.isPrammagangDocumentation ? "outline" : "default"}
-							onClick={() => handleToggleDoc(!crm?.isPrammagangDocumentation)}
-							className={
-								crm?.isPrammagangDocumentation
-									? "border-slate-300 text-slate-700 hover:bg-slate-50 text-xs"
-									: "bg-[#0517B0] hover:bg-blue-800 text-white text-xs font-bold"
-							}
-						>
-							{crm?.isPrammagangDocumentation
-								? "Batalkan Status Selesai"
-								: "Tandai Dokumentasi Selesai"}
-						</Button>
-					)}
-				</CardContent>
-			</Card>
-
 			<Card className="border border-slate-200 shadow-sm overflow-hidden">
 				<div className="bg-slate-50 border-b border-slate-200 p-4 flex justify-between items-center">
 					<h3 className="font-bold text-slate-800 text-lg">
@@ -432,38 +361,63 @@ export function TabPraMagang({
 				</CardContent>
 			</Card>
 
-			{/* Upload Dokumen Section */}
-			<Card className="border border-slate-200 shadow-sm overflow-hidden border-l-4 border-l-indigo-600">
-				<div className="bg-slate-50 border-b border-slate-200 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-					<div>
-						<h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-							<FileText className="w-4 h-4 text-indigo-600" /> Unggah Dokumen
-							Laporan Akhir Pra Magang
-						</h3>
-						<p className="text-[11px] text-slate-500 mt-0.5">
-							Dokumen laporan akhir Pra Magang yang telah disetujui resmi (PDF)
-						</p>
+			{/* Upload Dokumen & Checklist Persetujuan Section */}
+			<Card
+				className={`shadow-sm overflow-hidden transition-all ${
+					crm?.isPrammagangReport
+						? "border-emerald-200 bg-emerald-50/20 shadow-2xs"
+						: "border-slate-200 bg-white"
+				}`}
+			>
+				<div className="bg-slate-50/80 border-b border-slate-200 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+					<div className="flex items-center gap-2.5">
+						<Checkbox
+							id="pramagang-report-check"
+							checked={Boolean(crm?.isPrammagangReport)}
+							disabled={!canEdit || isLoading}
+							onCheckedChange={(checked) => {
+								handleToggleReportApproval(!!checked);
+							}}
+							className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+						/>
+						<div>
+							<label
+								htmlFor="pramagang-report-check"
+								className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer flex items-center gap-2"
+							>
+								<FileText className="w-4 h-4 text-indigo-600 inline" /> Laporan
+								Akhir Pra Magang
+							</label>
+							<p className="text-[11px] text-slate-500 mt-0.5">
+								Dokumen laporan akhir Pra Magang yang telah disetujui resmi
+								(PDF)
+							</p>
+						</div>
 					</div>
 
-					<Badge
-						className={`text-xs font-bold px-2.5 py-0.5 ${
-							isReportActuallyUploaded
-								? "bg-emerald-50 text-emerald-700 border-emerald-200"
-								: "bg-amber-50 text-amber-700 border-amber-200"
-						}`}
-					>
-						{isReportActuallyUploaded
-							? "✓ Terunggah (Lengkap)"
-							: "Belum Diunggah"}
-					</Badge>
+					{crm?.isPrammagangReport ? (
+						<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+							✓ Selesai
+						</Badge>
+					) : (
+						<Badge
+							variant="outline"
+							className="text-slate-400 border-slate-200 text-[10px]"
+						>
+							Belum Selesai
+						</Badge>
+					)}
 				</div>
 				<CardContent className="p-4 sm:p-5">
-					<div className="flex flex-col w-full">
-						<p className="text-xs text-slate-600 mb-3 leading-relaxed">
-							Dokumen ini merupakan salah satu syarat kelengkapan indikator
-							progress CRM (1/8 poin). Jika berkas dihapus, status progress akan
-							otomatis berkurang.
-						</p>
+					<div className="flex flex-col w-full space-y-2">
+						<div className="flex items-center justify-between mb-1">
+							<Label className="text-[10px] uppercase font-bold text-slate-500 block">
+								Upload Laporan Pra Magang (PDF)
+							</Label>
+							<span className="text-[10px] text-slate-400 font-normal">
+								Mendukung &gt;1 file
+							</span>
+						</div>
 						<DocumentUpload
 							studentId={studentId}
 							panel="crm"
@@ -471,14 +425,6 @@ export function TabPraMagang({
 							canEdit={canEdit}
 							onDocumentsLoaded={(docs) => {
 								setPraMagangDocsCount(docs.length);
-								if (docs.length === 0 && crm?.isPrammagangReport) {
-									api.students[studentId.toString()].crm
-										.patch({ isPrammagangReport: false })
-										.then(() => {
-											fetchCrmData();
-											onUpdate();
-										});
-								}
 							}}
 							onUploadSuccess={handleUploadSuccess}
 							onDeleteSuccess={() => {

@@ -88,7 +88,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 		icon: PhoneCall,
 		label: "Panel CRM",
 		href: "/dashboard/crm",
-		roles: ["superadmin", "crm"],
+		roles: ["superadmin"],
 	},
 	{
 		icon: Wallet,

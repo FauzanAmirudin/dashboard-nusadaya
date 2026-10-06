@@ -35,60 +35,91 @@ const ADDITIONAL_DOCS = [
 		propKey: "docKtp",
 		label: "KTP (Kartu Tanda Penduduk)",
 		desc: "Scan / Foto KTP asli yang masih berlaku dan terbaca jelas",
+		isOptional: false,
 	},
 	{
 		key: "kk",
 		propKey: "docKk",
 		label: "Kartu Keluarga (KK)",
 		desc: "Scan Kartu Keluarga terbaru sesuai data pendaftaran",
+		isOptional: false,
 	},
 	{
 		key: "cv",
 		propKey: "docCv",
 		label: "Curriculum Vitae (CV)",
 		desc: "Berkas riwayat hidup resmi mahasiswa dalam format PDF",
+		isOptional: false,
 	},
 	{
 		key: "ijazah",
 		propKey: "docIjazah",
 		label: "Ijazah Pendidikan Terakhir",
 		desc: "Scan legalisir Ijazah SMA/SMK/Diploma/S1 asli",
+		isOptional: false,
 	},
 	{
 		key: "transkrip",
 		propKey: "docTranskrip",
 		label: "Transkrip Nilai / SKL",
 		desc: "Scan Transkrip Nilai atau Surat Keterangan Lulus resmi",
+		isOptional: false,
 	},
 	{
 		key: "passport_depan",
 		propKey: "docPassportDepan",
 		label: "Paspor Halaman Depan (Identitas)",
 		desc: "Halaman identitas paspor berstandar internasional",
+		isOptional: false,
 	},
 	{
 		key: "passport_visa",
 		propKey: "docPassportVisa",
 		label: "Paspor Halaman Visa / Tambahan",
 		desc: "Halaman catatan visa atau lembar pengesahan paspor",
+		isOptional: false,
 	},
 	{
 		key: "skbm",
 		propKey: "docSkbm",
 		label: "Surat Keterangan Bebas Masalah (SKBM / SKCK)",
 		desc: "Surat berkelakuan baik resmi dari kepolisian / instansi berwenang",
+		isOptional: false,
+	},
+	{
+		key: "pre_mcu",
+		propKey: "docPreMcu",
+		label: "Pre-Medical Check Up (Pre-MCU)",
+		desc: "Hasil skrining dan pemeriksaan kesehatan awal calon mahasiswa",
+		isOptional: false,
 	},
 	{
 		key: "mcu",
 		propKey: "docMcu",
-		label: "Medical Check Up (MCU)",
-		desc: "Hasil pemeriksaan kesehatan dan bebas penyakit menular",
+		label: "Medical Check Up Full (MCU Full)",
+		desc: "Hasil pemeriksaan kesehatan menyeluruh dan bebas penyakit menular",
+		isOptional: false,
+	},
+	{
+		key: "sla",
+		propKey: "docSla",
+		label: "Service Level Agreement (SLA)",
+		desc: "Dokumen kesepakatan tingkat layanan (SLA) yang telah disetujui",
+		isOptional: false,
 	},
 	{
 		key: "sertifikasi_bahasa",
 		propKey: "docSertifikasiBahasa",
 		label: "Sertifikasi Bahasa (TOEIC / JLPT / Topik)",
 		desc: "Sertifikat kompetensi bahasa sesuai program negara tujuan",
+		isOptional: false,
+	},
+	{
+		key: "bpjs",
+		propKey: "docBpjs",
+		label: "BPJS / Asuransi Kesehatan",
+		desc: "Scan Kartu BPJS / KIS / Asuransi Kesehatan aktif (Opsional, tidak membatalkan ACC)",
+		isOptional: true,
 	},
 ];
 
@@ -115,7 +146,10 @@ export function TabChecklist({
 		docPassportDepan: !!pmbData?.docPassportDepan,
 		docPassportVisa: !!pmbData?.docPassportVisa,
 		docSkbm: !!pmbData?.docSkbm,
+		docPreMcu: !!pmbData?.docPreMcu,
 		docMcu: !!pmbData?.docMcu,
+		docBpjs: !!pmbData?.docBpjs,
+		docSla: !!pmbData?.docSla,
 		docSertifikasiBahasa: !!pmbData?.docSertifikasiBahasa,
 	});
 
@@ -133,7 +167,10 @@ export function TabChecklist({
 			docPassportDepan: !!pmbData?.docPassportDepan,
 			docPassportVisa: !!pmbData?.docPassportVisa,
 			docSkbm: !!pmbData?.docSkbm,
+			docPreMcu: !!pmbData?.docPreMcu,
 			docMcu: !!pmbData?.docMcu,
+			docBpjs: !!pmbData?.docBpjs,
+			docSla: !!pmbData?.docSla,
 			docSertifikasiBahasa: !!pmbData?.docSertifikasiBahasa,
 		});
 	}, [pmbData]);
@@ -176,7 +213,11 @@ export function TabChecklist({
 		localChecks.initialFollowUp,
 	].filter(Boolean).length;
 
-	const completedDocsCount = ADDITIONAL_DOCS.filter(
+	const requiredDocs = ADDITIONAL_DOCS.filter((d) => !d.isOptional);
+	const completedRequiredDocsCount = requiredDocs.filter(
+		(d) => localChecks[d.propKey],
+	).length;
+	const totalCompletedDocsCount = ADDITIONAL_DOCS.filter(
 		(d) => localChecks[d.propKey],
 	).length;
 
@@ -201,7 +242,10 @@ export function TabChecklist({
 			docPassportDepan: newState.docPassportDepan,
 			docPassportVisa: newState.docPassportVisa,
 			docSkbm: newState.docSkbm,
+			docPreMcu: newState.docPreMcu,
 			docMcu: newState.docMcu,
+			docBpjs: newState.docBpjs,
+			docSla: newState.docSla,
 			docSertifikasiBahasa: newState.docSertifikasiBahasa,
 		};
 
@@ -318,31 +362,32 @@ export function TabChecklist({
 				</CardContent>
 			</Card>
 
-			{/* 2. Checklist Dokumen Mahasiswa Tambahan (10 Item Checklist Interaktif) */}
+			{/* 2. Checklist Dokumen Mahasiswa Tambahan (13 Item) */}
 			<Card className="border border-slate-200 shadow-sm border-l-4 border-l-indigo-600">
 				<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 					<div>
 						<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
 							<FolderCheck className="w-4 h-4 text-indigo-600" />
-							Dokumen Mahasiswa Tambahan (10)
+							Dokumen Mahasiswa Tambahan ({ADDITIONAL_DOCS.length})
 						</CardTitle>
 						<p className="text-[11px] text-slate-500 mt-0.5">
-							Validasi berkas identitas, paspor, kesehatan, dan kualifikasi
-							akademik mahasiswa
+							Validasi berkas identitas, paspor, kesehatan (Pre-MCU & MCU Full),
+							SLA, dan kualifikasi
 						</p>
 					</div>
 
 					<div className="flex items-center gap-2">
 						<Badge
 							className={`text-xs font-bold px-2.5 py-0.5 ${
-								completedDocsCount === 10
+								completedRequiredDocsCount === requiredDocs.length
 									? "bg-emerald-50 text-emerald-700 border-emerald-200"
-									: completedDocsCount >= 5
+									: completedRequiredDocsCount >= 6
 										? "bg-indigo-50 text-indigo-700 border-indigo-200"
 										: "bg-amber-50 text-amber-700 border-amber-200"
 							}`}
 						>
-							{completedDocsCount}/10 Selesai
+							{completedRequiredDocsCount}/{requiredDocs.length} Dokumen Wajib
+							Selesai
 						</Badge>
 					</div>
 				</CardHeader>
@@ -375,12 +420,19 @@ export function TabChecklist({
 												className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
 											/>
 											<div>
-												<label
-													htmlFor={`doc-${doc.key}`}
-													className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block"
-												>
-													{doc.label}
-												</label>
+												<div className="flex items-center gap-1.5 flex-wrap">
+													<label
+														htmlFor={`doc-${doc.key}`}
+														className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block"
+													>
+														{doc.label}
+													</label>
+													{doc.isOptional && (
+														<span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded-full">
+															Opsional
+														</span>
+													)}
+												</div>
 												<p className="text-[11px] text-slate-500 mt-0.5">
 													{doc.desc}
 												</p>

@@ -100,7 +100,7 @@ export default function MagangPanelMahasiswa() {
 		</div>
 	);
 
-	// 11 Checklist Pra-Paspor
+	// Checklist Pra-Paspor
 	const praPasporItems = [
 		{
 			label: "Pas Foto 4x6 (Background Putih)",
@@ -117,11 +117,15 @@ export default function MagangPanelMahasiswa() {
 		{ label: "Kartu Keluarga (KK)", checked: Boolean(data?.praPasporKk) },
 		{ label: "Akta Kelahiran", checked: Boolean(data?.praPasporAktaKelahiran) },
 		{
-			label: "Sertifikat Kelulusan SL21",
+			label: "Surat Izin Orang Tua / Wali",
+			checked: Boolean(data?.praPasporSuratIzinOrtu),
+		},
+		{
+			label: "Statement Letter SL21",
 			checked: Boolean(data?.praPasporSl21),
 		},
 		{
-			label: "Surat Keterangan Masih Aktif (SKMA)",
+			label: "Surat Keterangan Mahasiswa Aktif (SKMA)",
 			checked: Boolean(data?.praPasporSkma),
 		},
 		{
@@ -129,14 +133,29 @@ export default function MagangPanelMahasiswa() {
 			checked: Boolean(data?.praPasporRekomendasiDisdik),
 		},
 		{
-			label: "Surat Pernyataan Gap Year",
-			checked: Boolean(data?.praPasporGapYear),
+			label: "Kartu Hasil Studi (KHS)",
+			checked: Boolean(data?.praPasporKhs),
 		},
-		{ label: "Status PDDIKTI Aktif", checked: Boolean(data?.praPasporPddikti) },
 		{
-			label: "Curriculum Vitae (CV) Bahasa Asing",
-			checked: Boolean(data?.praPasporCv),
+			label: "Kartu Rencana Studi (KRS)",
+			checked: Boolean(data?.praPasporKrs),
 		},
+		{
+			label: "Transkrip Nilai",
+			checked: Boolean(data?.praPasporTranskrip),
+		},
+		{
+			label: "Ijazah Pendidikan Terakhir",
+			checked: Boolean(data?.praPasporIjazah),
+		},
+		...(data?.praPasporGapYear
+			? [
+					{
+						label: "Surat Pernyataan Gap Year",
+						checked: Boolean(data?.praPasporGapYear),
+					},
+				]
+			: []),
 	];
 
 	const praPasporCompleted = praPasporItems.filter((i) => i.checked).length;

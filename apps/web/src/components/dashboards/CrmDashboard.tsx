@@ -156,6 +156,17 @@ export function CrmDashboard({
 	}, [filteredData, currentPage]);
 
 	const getCrmChecklist = (crm: any) => {
+		let odsList = crm?.odsDetails;
+		if (typeof odsList === "string") {
+			try {
+				odsList = JSON.parse(odsList);
+			} catch {
+				odsList = [];
+			}
+		}
+		if (!Array.isArray(odsList)) {
+			odsList = [];
+		}
 		const items = [
 			{
 				name: "Monitoring Orang Tua",
@@ -167,13 +178,27 @@ export function CrmDashboard({
 			},
 			{ name: "Kendali Vocab/Bahasa", done: Boolean(crm?.isVocabComplete) },
 			{ name: "Presensi Praktik ODS", done: Boolean(crm?.practiceAttendance) },
-			{ name: "Laporan ODS", done: Boolean(crm?.isOdsReport) },
-			{ name: "Dokumentasi ODS", done: Boolean(crm?.odsDocumentation) },
-			{ name: "Laporan Pra-Magang", done: Boolean(crm?.isPrammagangReport) },
 			{
-				name: "Dokumentasi Pra-Magang",
-				done: Boolean(crm?.isPrammagangDocumentation),
+				name: "Laporan ODS 1",
+				done: Boolean(crm?.isOds1Report || odsList[0]?.isDone),
 			},
+			{
+				name: "Laporan ODS 2",
+				done: Boolean(crm?.isOds2Report || odsList[1]?.isDone),
+			},
+			{
+				name: "Laporan ODS 3",
+				done: Boolean(crm?.isOds3Report || odsList[2]?.isDone),
+			},
+			{
+				name: "Laporan ODS 4",
+				done: Boolean(crm?.isOds4Report || odsList[3]?.isDone),
+			},
+			{
+				name: "Laporan ODS 5",
+				done: Boolean(crm?.isOds5Report || odsList[4]?.isDone),
+			},
+			{ name: "Laporan Pra-Magang", done: Boolean(crm?.isPrammagangReport) },
 		];
 		const completed = items.filter((i) => i.done).length;
 		return {
@@ -187,6 +212,17 @@ export function CrmDashboard({
 	const handleExport = () => {
 		const exportData = filteredData.map((s: any) => {
 			const checklist = getCrmChecklist(s.crm);
+			let odsList = s.crm?.odsDetails;
+			if (typeof odsList === "string") {
+				try {
+					odsList = JSON.parse(odsList);
+				} catch {
+					odsList = [];
+				}
+			}
+			if (!Array.isArray(odsList)) {
+				odsList = [];
+			}
 			return {
 				NIM: s.student?.nim || "-",
 				"Nama Mahasiswa": s.student?.name || "-",
@@ -198,19 +234,24 @@ export function CrmDashboard({
 					s.student?.program ||
 					"-",
 				"No. WhatsApp": s.student?.phone || "-",
-				"Progress Checklist": `${checklist.completed}/8 Item (${Math.round((checklist.completed / 8) * 100)}%)`,
+				"Progress Checklist": `${checklist.completed}/10 Item (${Math.round((checklist.completed / 10) * 100)}%)`,
 				"Monitoring Ortu": s.crm?.isMonitoringParent ? "Selesai" : "Belum",
 				"Monitoring Industri": s.crm?.isMonitoringIndustry
 					? "Selesai"
 					: "Belum",
 				"Kendali Vocab": s.crm?.isVocabComplete ? "Selesai" : "Belum",
 				"Presensi Praktik": s.crm?.practiceAttendance ? "Selesai" : "Belum",
-				"Laporan ODS": s.crm?.isOdsReport ? "Selesai" : "Belum",
-				"Dokumentasi ODS": s.crm?.odsDocumentation ? "Selesai" : "Belum",
+				"Laporan ODS 1":
+					s.crm?.isOds1Report || odsList[0]?.isDone ? "Selesai" : "Belum",
+				"Laporan ODS 2":
+					s.crm?.isOds2Report || odsList[1]?.isDone ? "Selesai" : "Belum",
+				"Laporan ODS 3":
+					s.crm?.isOds3Report || odsList[2]?.isDone ? "Selesai" : "Belum",
+				"Laporan ODS 4":
+					s.crm?.isOds4Report || odsList[3]?.isDone ? "Selesai" : "Belum",
+				"Laporan ODS 5":
+					s.crm?.isOds5Report || odsList[4]?.isDone ? "Selesai" : "Belum",
 				"Laporan Pra-Magang": s.crm?.isPrammagangReport ? "Selesai" : "Belum",
-				"Dokumentasi Pra-Magang": s.crm?.isPrammagangDocumentation
-					? "Selesai"
-					: "Belum",
 				"Status CRM": s.crm?.isAcc
 					? "Sudah ACC"
 					: s.crm?.status === "AMAN"
@@ -420,7 +461,7 @@ export function CrmDashboard({
 										No. WhatsApp
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
-										Progress (8)
+										Progress (10)
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
 										Status CRM

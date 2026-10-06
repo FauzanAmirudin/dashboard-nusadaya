@@ -25,6 +25,7 @@ interface TabKehadiranProps {
 	canEdit: boolean;
 	fetchCrmData: () => void;
 	onUpdate: () => void;
+	onUpdateField?: (field: string, value: any) => void;
 }
 
 export function TabKehadiran({
@@ -34,6 +35,7 @@ export function TabKehadiran({
 	canEdit,
 	fetchCrmData,
 	onUpdate,
+	onUpdateField,
 }: TabKehadiranProps) {
 	const crm = crmState?.crm;
 	const [isApproved, setIsApproved] = useState(false);
@@ -63,6 +65,8 @@ export function TabKehadiran({
 
 	const handleToggleApproval = async (approved: boolean) => {
 		if (!canEdit) return;
+		onUpdateField?.("practiceAttendance", approved);
+		setIsApproved(approved);
 		setIsLoading(true);
 		try {
 			const { error } = await api.students[studentId.toString()].crm.patch({
@@ -75,10 +79,11 @@ export function TabKehadiran({
 					? "Kehadiran praktik disetujui"
 					: "Persetujuan kehadiran dibatalkan",
 			);
-			setIsApproved(approved);
 			fetchCrmData();
 			onUpdate();
 		} catch (error) {
+			onUpdateField?.("practiceAttendance", !approved);
+			setIsApproved(!approved);
 			toast.error("Gagal memproses persetujuan");
 		} finally {
 			setIsLoading(false);

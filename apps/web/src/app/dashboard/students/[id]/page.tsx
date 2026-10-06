@@ -283,6 +283,10 @@ function StudentDetailContent() {
 	const [activeTab, setActiveTab] = useState(requestedTab || "");
 	const [mounted, setMounted] = useState(false);
 	const [updateTrigger, setUpdateTrigger] = useState(0);
+	const [crmProgress, setCrmProgress] = useState<{
+		completed: number;
+		total: number;
+	} | null>(null);
 	const [isGenerating, setIsGenerating] = useState(false);
 
 	useEffect(() => {
@@ -296,9 +300,21 @@ function StudentDetailContent() {
 	}, []);
 
 	const refetchStudent = useCallback(async () => {
-		await refetchQuery();
 		setUpdateTrigger((prev) => prev + 1);
+		await refetchQuery();
 	}, [refetchQuery]);
+
+	const handleCrmProgressChange = useCallback(
+		(completed: number, total: number) => {
+			setCrmProgress((prev) => {
+				if (prev && prev.completed === completed && prev.total === total) {
+					return prev;
+				}
+				return { completed, total };
+			});
+		},
+		[],
+	);
 
 	useEffect(() => {
 		if (!hasHydrated) return;
@@ -869,6 +885,7 @@ function StudentDetailContent() {
 								studentId={s.id}
 								updateTrigger={updateTrigger}
 								userRole={user?.role}
+								overrideProgress={crmProgress}
 							/>
 						</div>
 					</div>
@@ -1023,11 +1040,23 @@ function StudentDetailContent() {
 										onUpdate={refetchStudent}
 									/>
 								) : currentLink.id === "crm" ? (
-									<CrmPanel studentId={s.id} onUpdate={refetchStudent} />
+									<CrmPanel
+										studentId={s.id}
+										onUpdate={refetchStudent}
+										onProgressChange={handleCrmProgressChange}
+									/>
 								) : currentLink.id === "finance" ? (
 									<FinancePanel studentId={s.id} onUpdate={refetchStudent} />
 								) : currentLink.id === "akademik" ? (
-									<AkademikPanel studentId={s.id} onUpdate={refetchStudent} />
+									<AkademikPanel
+										studentId={s.id}
+										studentData={{
+											nim: s.nim,
+											studentStatus: s.studentStatus,
+											paId: s.paId,
+										}}
+										onUpdate={refetchStudent}
+									/>
 								) : currentLink.id === "kehadiran" ? (
 									<KehadiranPanel studentId={s.id} />
 								) : currentLink.id === "pa" ? (

@@ -50,6 +50,7 @@ interface TabMonitoringProps {
 	API_URL: string;
 	token: string;
 	onUpdate: () => void;
+	onUpdateField?: (field: string, value: any) => void;
 }
 
 export function TabMonitoring({
@@ -60,6 +61,7 @@ export function TabMonitoring({
 	API_URL,
 	token,
 	onUpdate,
+	onUpdateField,
 }: TabMonitoringProps) {
 	const logs = crmState?.logs || [];
 	const crm = crmState?.crm;
@@ -69,6 +71,7 @@ export function TabMonitoring({
 		value: boolean,
 	) => {
 		if (!canEdit) return;
+		onUpdateField?.(field, value);
 		try {
 			const { error } = await api.students[studentId.toString()].crm.patch({
 				[field]: value,
@@ -82,6 +85,7 @@ export function TabMonitoring({
 			fetchCrmData();
 			onUpdate();
 		} catch (e) {
+			onUpdateField?.(field, !value);
 			toast.error("Terjadi kesalahan saat mengubah status monitoring");
 		}
 	};
@@ -194,6 +198,7 @@ export function TabMonitoring({
 						API_URL={API_URL}
 						token={token}
 						onUpdate={onUpdate}
+						onUpdateField={onUpdateField}
 						logs={logs.filter(
 							(l: any) =>
 								l.logType === "orang_tua_masalah" ||
@@ -279,6 +284,7 @@ export function TabMonitoring({
 						API_URL={API_URL}
 						token={token}
 						onUpdate={onUpdate}
+						onUpdateField={onUpdateField}
 						logs={logs.filter((l: any) => l.logType === "industri_masalah")}
 					/>
 				</TabsContent>
@@ -296,6 +302,7 @@ interface MonitoringFormProps {
 	API_URL: string;
 	token: string;
 	onUpdate: () => void;
+	onUpdateField?: (field: string, value: any) => void;
 	logs: any[];
 }
 
@@ -308,6 +315,7 @@ function MonitoringForm({
 	API_URL,
 	token,
 	onUpdate,
+	onUpdateField,
 	logs,
 }: MonitoringFormProps) {
 	const [isLoading, setIsLoading] = useState(false);
@@ -326,6 +334,12 @@ function MonitoringForm({
 		if (!logText.trim() || logText === "<p></p>") {
 			toast.error("Deskripsi tidak boleh kosong");
 			return;
+		}
+
+		if (logType === "orang_tua_masalah" || logType === "orang_tua_komunikasi") {
+			onUpdateField?.("isMonitoringParent", true);
+		} else if (logType === "industri_masalah") {
+			onUpdateField?.("isMonitoringIndustry", true);
 		}
 
 		setIsLoading(true);
@@ -599,7 +613,6 @@ function MonitoringForm({
 										{/* Render HTML content safely */}
 										<div
 											className="prose prose-sm max-w-none text-slate-700 mb-6"
-											// biome-ignore lint/security/noDangerouslySetInnerHtml: Trusted HTML from Tiptap
 											dangerouslySetInnerHTML={{ __html: log.logText }}
 										/>
 
@@ -620,7 +633,6 @@ function MonitoringForm({
 																rel="noopener noreferrer"
 																className="block border border-slate-200 rounded-lg overflow-hidden hover:border-blue-400 transition-colors bg-slate-50"
 															>
-																{/* biome-ignore lint/performance/noImgElement: Native img is fine for user uploads */}
 																<img
 																	src={`${API_URL}${photo.url}?token=${token}`}
 																	alt={photo.name}

@@ -34,7 +34,9 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import { hasRole } from "../../lib/permissions";
 import { fileService } from "../../modules/file/service/file.service";
+import { invalidateCrmCaches } from "./crm";
 import { invalidateFinanceCaches } from "./finance";
 
 export const documentsRoutes = new Elysia()
@@ -86,6 +88,11 @@ export const documentsRoutes = new Elysia()
 			const documentKey = (body as any).documentKey;
 			const file = (body as any).file as File;
 
+			if (!user) {
+				set.status = 401;
+				return { success: false, message: "Unauthorized" };
+			}
+
 			if (file?.type !== "application/pdf") {
 				set.status = 400;
 				return { success: false, message: "Harus berupa file PDF" };
@@ -121,6 +128,54 @@ export const documentsRoutes = new Elysia()
 				default:
 					set.status = 400;
 					return { success: false, message: "Invalid panel" };
+			}
+
+			// === Guard untuk role mahasiswa ===
+			if (user && hasRole(user, "mahasiswa")) {
+				// Mahasiswa hanya bisa upload ke data miliknya sendiri
+				const studentRow = await db.query.students.findFirst({
+					where: eq(students.id, studentId),
+					columns: { studentUserId: true },
+				});
+				if (!studentRow || studentRow.studentUserId !== user.id) {
+					set.status = 403;
+					return {
+						success: false,
+						message: "Anda tidak diizinkan mengunggah dokumen mahasiswa lain",
+					};
+				}
+				// Mahasiswa hanya diizinkan upload ke panel CRM dengan documentKey tertentu
+				if (panel !== "crm") {
+					set.status = 403;
+					return {
+						success: false,
+						message: "Anda hanya diizinkan mengunggah dokumen CRM",
+					};
+				}
+				const crmAllowedKeys = [
+					"ods_1_report",
+					"ods_2_report",
+					"ods_3_report",
+					"ods_4_report",
+					"ods_5_report",
+					"ods_report",
+					"ods_1",
+					"ods_2",
+					"ods_3",
+					"ods_4",
+					"ods_5",
+					"ods_documentation",
+					"pramagang_report",
+					"pramagang",
+					"pramagang_documentation",
+				];
+				if (!crmAllowedKeys.includes(documentKey)) {
+					set.status = 403;
+					return {
+						success: false,
+						message: "Jenis dokumen tidak diizinkan untuk diupload mahasiswa",
+					};
+				}
 			}
 
 			// Upload file via FileService — tidak boleh akses filesystem langsung
@@ -244,6 +299,11 @@ export const documentsRoutes = new Elysia()
 				await invalidateFinanceCaches(studentId);
 			}
 
+			// Jika panel crm, invalidate cache
+			if (panel === "crm") {
+				await invalidateCrmCaches(studentId);
+			}
+
 			return { success: true, message: "Dokumen berhasil diunggah", fileUrl };
 		},
 		{
@@ -255,9 +315,15 @@ export const documentsRoutes = new Elysia()
 	)
 	.delete("/:id/:panel/documents/:docId", async (context) => {
 		const { params, set } = context;
+		const user = (context as any).user;
 		const studentId = Number(params.id);
 		const panel = params.panel as string;
 		const docId = Number(params.docId);
+
+		if (!user) {
+			set.status = 401;
+			return { success: false, message: "Unauthorized" };
+		}
 
 		let table: any;
 		switch (panel) {
@@ -287,12 +353,87 @@ export const documentsRoutes = new Elysia()
 				return { success: false, message: "Invalid panel" };
 		}
 
+		// === Guard untuk role mahasiswa saat hapus dokumen CRM ===
+		if (hasRole(user, "mahasiswa") && panel === "crm") {
+			// Verifikasi kepemilikan
+			const studentRow = await db.query.students.findFirst({
+				where: eq(students.id, studentId),
+				columns: { studentUserId: true },
+			});
+			if (!studentRow || studentRow.studentUserId !== user.id) {
+				set.status = 403;
+				return {
+					success: false,
+					message: "Anda tidak diizinkan menghapus dokumen mahasiswa lain",
+				};
+			}
+			// Cek apakah progress terkait sudah di-checklist (selesai)
+			const docToCheck = await db.query.crmDocuments.findFirst({
+				where: and(
+					eq(crmDocuments.studentId, studentId),
+					eq(crmDocuments.id, docId),
+				),
+			});
+			if (docToCheck) {
+				const crmRow = await db.query.crmData.findFirst({
+					where: eq(crmData.studentId, studentId),
+				});
+				const docKey = docToCheck.documentKey;
+				// Map documentKey ke field checklist
+				const odsKeyMap: Record<
+					string,
+					{ flagField: string; odsIndex: number }
+				> = {
+					ods_1_report: { flagField: "isOds1Report", odsIndex: 0 },
+					ods_2_report: { flagField: "isOds2Report", odsIndex: 1 },
+					ods_3_report: { flagField: "isOds3Report", odsIndex: 2 },
+					ods_4_report: { flagField: "isOds4Report", odsIndex: 3 },
+					ods_5_report: { flagField: "isOds5Report", odsIndex: 4 },
+				};
+				if (docKey === "pramagang_report") {
+					if (crmRow?.isPrammagangReport) {
+						set.status = 403;
+						return {
+							success: false,
+							message:
+								"Laporan Pra-Magang tidak dapat dihapus karena sudah dinyatakan selesai oleh tim CRM",
+						};
+					}
+				} else if (odsKeyMap[docKey]) {
+					const { flagField, odsIndex } = odsKeyMap[docKey];
+					let odsList: any[] = [];
+					if (crmRow?.odsDetails) {
+						try {
+							odsList =
+								typeof crmRow.odsDetails === "string"
+									? JSON.parse(crmRow.odsDetails)
+									: (crmRow.odsDetails as any[]);
+						} catch {}
+					}
+					const isChecked =
+						Boolean((crmRow as any)?.[flagField]) ||
+						Boolean(odsList[odsIndex]?.isDone);
+					if (isChecked) {
+						set.status = 403;
+						return {
+							success: false,
+							message: `Laporan ODS ${odsIndex + 1} tidak dapat dihapus karena sudah dinyatakan selesai oleh tim CRM`,
+						};
+					}
+				}
+			}
+		}
+
 		await db
 			.delete(table)
 			.where(and(eq(table.studentId, studentId), eq(table.id, docId)));
 
 		if (panel === "finance") {
 			await invalidateFinanceCaches(studentId);
+		}
+
+		if (panel === "crm") {
+			await invalidateCrmCaches(studentId);
 		}
 
 		return { success: true, message: "Dokumen berhasil dihapus" };

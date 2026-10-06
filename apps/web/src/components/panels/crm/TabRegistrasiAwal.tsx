@@ -1,18 +1,25 @@
 "use client";
 
-import { CheckCircle, DollarSign, Eye, FileText, XCircle } from "lucide-react";
+import { CheckCircle, DollarSign, FileText, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { formatRupiah } from "@/utils/format";
 
 interface TabRegistrasiAwalProps {
+	studentId: number;
 	crmState: any;
-	API_URL: string;
+	canEdit?: boolean;
+	onUpdate?: () => void;
+	API_URL?: string;
 }
 
 export function TabRegistrasiAwal({
+	studentId,
 	crmState,
+	canEdit = false,
+	onUpdate,
 	API_URL,
 }: TabRegistrasiAwalProps) {
 	return (
@@ -37,7 +44,7 @@ export function TabRegistrasiAwal({
 					)}
 				</CardHeader>
 				<CardContent className="p-5 space-y-4">
-					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 						<div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
 							<span className="text-[11px] font-semibold text-slate-500 block uppercase">
 								Nominal Pembayaran Registrasi
@@ -62,25 +69,24 @@ export function TabRegistrasiAwal({
 									: "Belum dibayar"}
 							</span>
 						</div>
-						<div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between">
-							<span className="text-[11px] font-semibold text-slate-500 block uppercase">
-								Bukti Pembayaran Registrasi (PDF)
-							</span>
-							{crmState?.finance?.registrasiBuktiBayarUrl ? (
-								<a
-									href={`${API_URL}/uploads/${crmState.finance.registrasiBuktiBayarUrl}`}
-									target="_blank"
-									rel="noreferrer"
-									className="inline-flex items-center gap-1.5 text-xs text-[#0517B0] font-bold hover:underline mt-1"
-								>
-									<Eye className="w-4 h-4" />
-									Lihat Bukti Bayar PDF
-								</a>
-							) : (
-								<span className="text-xs text-slate-400 font-medium mt-1">
-									Belum ada bukti bayar PDF
+						<div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 md:col-span-2 lg:col-span-1 flex flex-col justify-between">
+							<div className="flex items-center justify-between mb-1">
+								<span className="text-[11px] font-semibold text-slate-500 block uppercase">
+									Bukti Pembayaran Registrasi (PDF)
 								</span>
-							)}
+								<Badge
+									variant="outline"
+									className="text-[10px] bg-white text-slate-500 border-slate-200 font-medium"
+								>
+									Monitoring Finance
+								</Badge>
+							</div>
+							<DocumentUpload
+								studentId={studentId}
+								panel="finance"
+								documentKey="registrasi"
+								canEdit={false}
+							/>
 						</div>
 					</div>
 				</CardContent>

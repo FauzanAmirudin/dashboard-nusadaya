@@ -40,7 +40,7 @@ import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 import { fileService } from "../../modules/file/service/file.service";
 
-async function invalidateCrmCaches(studentId: number) {
+export async function invalidateCrmCaches(studentId: number) {
 	await Promise.all([
 		cacheDel(`cache:student:${studentId}`),
 		cacheInvalidatePattern("cache:students:*"),
@@ -50,7 +50,8 @@ async function invalidateCrmCaches(studentId: number) {
 }
 
 export const crmRoutes = new Elysia()
-	.get("/:id/crm", async ({ params }) => {
+	.get("/:id/crm", async ({ params, set }) => {
+		set.headers["cache-control"] = "no-store, no-cache, must-revalidate";
 		const id = Number(params.id);
 		const crm = await db.query.crmData.findFirst({
 			where: eq(crmData.studentId, id),
@@ -63,28 +64,6 @@ export const crmRoutes = new Elysia()
 		const docs = await db.query.crmDocuments.findMany({
 			where: eq(crmDocuments.studentId, id),
 		});
-		const hasOdsReport = docs.some((d) => d.documentKey === "ods_report");
-		const hasPrammagangReport = docs.some(
-			(d) => d.documentKey === "pramagang_report",
-		);
-
-		if (
-			crm &&
-			(crm.isOdsReport !== hasOdsReport ||
-				crm.isPrammagangReport !== hasPrammagangReport)
-		) {
-			await db
-				.update(crmData)
-				.set({
-					isOdsReport: hasOdsReport,
-					isPrammagangReport: hasPrammagangReport,
-					updatedAt: new Date(),
-				})
-				.where(eq(crmData.studentId, id));
-			crm.isOdsReport = hasOdsReport;
-			crm.isPrammagangReport = hasPrammagangReport;
-		}
-
 		const logs = await db.query.crmLogs.findMany({
 			where: eq(crmLogs.studentId, id),
 			with: { author: { columns: { fullName: true } } },
@@ -213,7 +192,7 @@ export const crmRoutes = new Elysia()
 				return { success: false, message: "Unauthorized" };
 			}
 
-			if (!hasRole(user, "crm")) {
+			if (!hasRole(user, "crm", "superadmin")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -230,6 +209,15 @@ export const crmRoutes = new Elysia()
 			if ("pramagangEndDate" in updates) {
 				if (!updates.pramagangEndDate || updates.pramagangEndDate === "") {
 					updates.pramagangEndDate = null;
+				}
+			}
+
+			if ("odsDetails" in updates && Array.isArray(updates.odsDetails)) {
+				for (let i = 0; i < 5; i++) {
+					const num = i + 1;
+					const item = updates.odsDetails[i];
+					const isDone = Boolean(item?.isDone);
+					(updates as any)[`isOds${num}Report`] = isDone;
 				}
 			}
 
@@ -250,19 +238,36 @@ export const crmRoutes = new Elysia()
 				where: eq(crmData.studentId, id),
 			});
 			if (updated) {
+				const odsList = Array.isArray(updated.odsDetails)
+					? (updated.odsDetails as any[])
+					: [];
+				const hasOds1 =
+					Boolean(updated.isOds1Report) || Boolean(odsList[0]?.isDone);
+				const hasOds2 =
+					Boolean(updated.isOds2Report) || Boolean(odsList[1]?.isDone);
+				const hasOds3 =
+					Boolean(updated.isOds3Report) || Boolean(odsList[2]?.isDone);
+				const hasOds4 =
+					Boolean(updated.isOds4Report) || Boolean(odsList[3]?.isDone);
+				const hasOds5 =
+					Boolean(updated.isOds5Report) || Boolean(odsList[4]?.isDone);
+				const hasPrammagang = Boolean(updated.isPrammagangReport);
+
 				const crmChecks = [
 					updated.isMonitoringParent,
 					updated.isMonitoringIndustry,
 					updated.isVocabComplete,
 					updated.practiceAttendance,
-					updated.isOdsReport,
-					updated.odsDocumentation,
-					updated.isPrammagangReport,
-					updated.isPrammagangDocumentation,
+					hasOds1,
+					hasOds2,
+					hasOds3,
+					hasOds4,
+					hasOds5,
+					hasPrammagang,
 				];
 
 				const checkedCount = crmChecks.filter(Boolean).length;
-				const totalChecks = 8;
+				const totalChecks = 10;
 
 				let status: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
 					"BUTUH_PERHATIAN";
@@ -409,26 +414,60 @@ export const crmRoutes = new Elysia()
 		const id = Number(params.id);
 		if (!user) {
 			set.status = 401;
-			return { success: false, message: "Unauthorized" };
+			return {
+				success: false,
+				message: "Sesi login berakhir. Silakan login kembali.",
+			};
+		}
+		if (!hasRole(user, "crm", "superadmin")) {
+			set.status = 403;
+			return {
+				success: false,
+				message:
+					"Akses ditolak: Hanya role CRM dan Superadmin yang diizinkan memberikan ACC CRM.",
+			};
 		}
 
 		const currentCrm = await db.query.crmData.findFirst({
 			where: eq(crmData.studentId, id),
 		});
+		let odsList: any[] = [];
+		if (currentCrm?.odsDetails) {
+			try {
+				odsList =
+					typeof currentCrm.odsDetails === "string"
+						? JSON.parse(currentCrm.odsDetails)
+						: (currentCrm.odsDetails as any[]);
+			} catch {}
+		}
+		const hasOds1 =
+			Boolean(currentCrm?.isOds1Report) || Boolean(odsList[0]?.isDone);
+		const hasOds2 =
+			Boolean(currentCrm?.isOds2Report) || Boolean(odsList[1]?.isDone);
+		const hasOds3 =
+			Boolean(currentCrm?.isOds3Report) || Boolean(odsList[2]?.isDone);
+		const hasOds4 =
+			Boolean(currentCrm?.isOds4Report) || Boolean(odsList[3]?.isDone);
+		const hasOds5 =
+			Boolean(currentCrm?.isOds5Report) || Boolean(odsList[4]?.isDone);
+		const hasPrammagang = Boolean(currentCrm?.isPrammagangReport);
+
 		if (
 			!currentCrm?.isMonitoringParent ||
 			!currentCrm.isMonitoringIndustry ||
 			!currentCrm.isVocabComplete ||
 			!currentCrm.practiceAttendance ||
-			!currentCrm.isOdsReport ||
-			!currentCrm.odsDocumentation ||
-			!currentCrm.isPrammagangReport ||
-			!currentCrm.isPrammagangDocumentation
+			!hasOds1 ||
+			!hasOds2 ||
+			!hasOds3 ||
+			!hasOds4 ||
+			!hasOds5 ||
+			!hasPrammagang
 		) {
 			set.status = 400;
 			return {
 				success: false,
-				message: "Semua checklist (8 item) harus selesai sebelum ACC.",
+				message: "Semua checklist (10 item) harus selesai sebelum ACC.",
 			};
 		}
 
@@ -449,35 +488,120 @@ export const crmRoutes = new Elysia()
 	.delete("/:id/crm/acc", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
-		if (!hasRole(user, "crm")) {
+		if (!user) {
+			set.status = 401;
+			return {
+				success: false,
+				message: "Sesi login berakhir. Silakan login kembali.",
+			};
+		}
+		if (!hasRole(user, "crm", "superadmin")) {
 			set.status = 403;
-			return { success: false, message: "Forbidden" };
+			return {
+				success: false,
+				message:
+					"Akses ditolak: Hanya role CRM dan Superadmin yang diizinkan membatalkan ACC CRM.",
+			};
 		}
 		const id = Number(params.id);
 
 		const currentCrm = await db.query.crmData.findFirst({
 			where: eq(crmData.studentId, id),
 		});
-		let fallbackStatus: "AMAN" | "PROSES" | "BUTUH_PERHATIAN" = "PROSES";
-		if (currentCrm) {
-			const crmChecks = [
-				currentCrm.isMonitoringParent,
-				currentCrm.isMonitoringIndustry,
-				currentCrm.isVocabComplete,
-				currentCrm.practiceAttendance,
-				currentCrm.isOdsReport,
-				currentCrm.odsDocumentation,
-				currentCrm.isPrammagangReport,
-				currentCrm.isPrammagangDocumentation,
-			];
-			const count = crmChecks.filter(Boolean).length;
-			fallbackStatus =
-				count === 8
-					? "AMAN"
-					: (count / 8) * 100 > 30
-						? "PROSES"
-						: "BUTUH_PERHATIAN";
+		let odsList: any[] = [];
+		if (currentCrm?.odsDetails) {
+			try {
+				odsList =
+					typeof currentCrm.odsDetails === "string"
+						? JSON.parse(currentCrm.odsDetails)
+						: (currentCrm.odsDetails as any[]);
+			} catch {}
 		}
+		const crmChecks = [
+			Boolean(currentCrm?.isMonitoringParent),
+			Boolean(currentCrm?.isMonitoringIndustry),
+			Boolean(currentCrm?.isVocabComplete),
+			Boolean(currentCrm?.practiceAttendance),
+			Boolean(currentCrm?.isOds1Report || odsList[0]?.isDone),
+			Boolean(currentCrm?.isOds2Report || odsList[1]?.isDone),
+			Boolean(currentCrm?.isOds3Report || odsList[2]?.isDone),
+			Boolean(currentCrm?.isOds4Report || odsList[3]?.isDone),
+			Boolean(currentCrm?.isOds5Report || odsList[4]?.isDone),
+			Boolean(currentCrm?.isPrammagangReport),
+		];
+		const count = crmChecks.filter(Boolean).length;
+		const fallbackStatus: "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
+			count === 10
+				? "AMAN"
+				: (count / 10) * 100 > 30
+					? "PROSES"
+					: "BUTUH_PERHATIAN";
+
+		await db
+			.update(crmData)
+			.set({
+				isAcc: false,
+				accAt: null,
+				accBy: null,
+				status: fallbackStatus,
+			})
+			.where(eq(crmData.studentId, id));
+
+		await invalidateCrmCaches(id);
+
+		return { success: true };
+	})
+	.post("/:id/crm/cancel-acc", async (context) => {
+		const { params, set } = context;
+		const user = (context as any).user;
+		if (!user) {
+			set.status = 401;
+			return {
+				success: false,
+				message: "Sesi login berakhir. Silakan login kembali.",
+			};
+		}
+		if (!hasRole(user, "crm", "superadmin")) {
+			set.status = 403;
+			return {
+				success: false,
+				message:
+					"Akses ditolak: Hanya role CRM dan Superadmin yang diizinkan membatalkan ACC CRM.",
+			};
+		}
+		const id = Number(params.id);
+
+		const currentCrm = await db.query.crmData.findFirst({
+			where: eq(crmData.studentId, id),
+		});
+		let odsList: any[] = [];
+		if (currentCrm?.odsDetails) {
+			try {
+				odsList =
+					typeof currentCrm.odsDetails === "string"
+						? JSON.parse(currentCrm.odsDetails)
+						: (currentCrm.odsDetails as any[]);
+			} catch {}
+		}
+		const crmChecks = [
+			Boolean(currentCrm?.isMonitoringParent),
+			Boolean(currentCrm?.isMonitoringIndustry),
+			Boolean(currentCrm?.isVocabComplete),
+			Boolean(currentCrm?.practiceAttendance),
+			Boolean(currentCrm?.isOds1Report || odsList[0]?.isDone),
+			Boolean(currentCrm?.isOds2Report || odsList[1]?.isDone),
+			Boolean(currentCrm?.isOds3Report || odsList[2]?.isDone),
+			Boolean(currentCrm?.isOds4Report || odsList[3]?.isDone),
+			Boolean(currentCrm?.isOds5Report || odsList[4]?.isDone),
+			Boolean(currentCrm?.isPrammagangReport),
+		];
+		const count = crmChecks.filter(Boolean).length;
+		const fallbackStatus: "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
+			count === 10
+				? "AMAN"
+				: (count / 10) * 100 > 30
+					? "PROSES"
+					: "BUTUH_PERHATIAN";
 
 		await db
 			.update(crmData)
@@ -605,7 +729,17 @@ export const crmRoutes = new Elysia()
 
 			// Auto check corresponding CRM flag
 			const flagMap: Record<string, string> = {
-				ods_report: "isOdsReport",
+				ods_report: "isOds1Report",
+				ods_1_report: "isOds1Report",
+				ods_1: "isOds1Report",
+				ods_2_report: "isOds2Report",
+				ods_2: "isOds2Report",
+				ods_3_report: "isOds3Report",
+				ods_3: "isOds3Report",
+				ods_4_report: "isOds4Report",
+				ods_4: "isOds4Report",
+				ods_5_report: "isOds5Report",
+				ods_5: "isOds5Report",
 				ods_documentation: "odsDocumentation",
 				pramagang_report: "isPrammagangReport",
 				pramagang_documentation: "isPrammagangDocumentation",
@@ -616,6 +750,36 @@ export const crmRoutes = new Elysia()
 					.set({ [flagMap[documentKey]]: true, updatedAt: new Date() })
 					.where(eq(crmData.studentId, id));
 			}
+
+			// Check all 5 ODS reports to update isOdsReport
+			const allCrmDocs = await db.query.crmDocuments.findMany({
+				where: eq(crmDocuments.studentId, id),
+			});
+			const has1 = allCrmDocs.some(
+				(d) =>
+					d.documentKey === "ods_1_report" ||
+					d.documentKey === "ods_1" ||
+					d.documentKey === "ods_report",
+			);
+			const has2 = allCrmDocs.some(
+				(d) => d.documentKey === "ods_2_report" || d.documentKey === "ods_2",
+			);
+			const has3 = allCrmDocs.some(
+				(d) => d.documentKey === "ods_3_report" || d.documentKey === "ods_3",
+			);
+			const has4 = allCrmDocs.some(
+				(d) => d.documentKey === "ods_4_report" || d.documentKey === "ods_4",
+			);
+			const has5 = allCrmDocs.some(
+				(d) => d.documentKey === "ods_5_report" || d.documentKey === "ods_5",
+			);
+			await db
+				.update(crmData)
+				.set({
+					isOdsReport: has1 && has2 && has3 && has4 && has5,
+					updatedAt: new Date(),
+				})
+				.where(eq(crmData.studentId, id));
 
 			await invalidateCrmCaches(id);
 
@@ -655,7 +819,7 @@ export const crmRoutes = new Elysia()
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (!hasRole(user, "crm")) {
+		if (!hasRole(user, "crm", "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -674,7 +838,7 @@ export const crmRoutes = new Elysia()
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (!hasRole(user, "crm")) {
+		if (!hasRole(user, "crm", "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -703,7 +867,17 @@ export const crmRoutes = new Elysia()
 
 		if (remainingDocs.length === 0) {
 			const flagMap: Record<string, string> = {
-				ods_report: "isOdsReport",
+				ods_report: "isOds1Report",
+				ods_1_report: "isOds1Report",
+				ods_1: "isOds1Report",
+				ods_2_report: "isOds2Report",
+				ods_2: "isOds2Report",
+				ods_3_report: "isOds3Report",
+				ods_3: "isOds3Report",
+				ods_4_report: "isOds4Report",
+				ods_4: "isOds4Report",
+				ods_5_report: "isOds5Report",
+				ods_5: "isOds5Report",
 				ods_documentation: "odsDocumentation",
 				pramagang_report: "isPrammagangReport",
 				pramagang_documentation: "isPrammagangDocumentation",
@@ -715,6 +889,36 @@ export const crmRoutes = new Elysia()
 					.where(eq(crmData.studentId, id));
 			}
 		}
+
+		// Re-evaluate isOdsReport
+		const allCrmDocs = await db.query.crmDocuments.findMany({
+			where: eq(crmDocuments.studentId, id),
+		});
+		const has1 = allCrmDocs.some(
+			(d) =>
+				d.documentKey === "ods_1_report" ||
+				d.documentKey === "ods_1" ||
+				d.documentKey === "ods_report",
+		);
+		const has2 = allCrmDocs.some(
+			(d) => d.documentKey === "ods_2_report" || d.documentKey === "ods_2",
+		);
+		const has3 = allCrmDocs.some(
+			(d) => d.documentKey === "ods_3_report" || d.documentKey === "ods_3",
+		);
+		const has4 = allCrmDocs.some(
+			(d) => d.documentKey === "ods_4_report" || d.documentKey === "ods_4",
+		);
+		const has5 = allCrmDocs.some(
+			(d) => d.documentKey === "ods_5_report" || d.documentKey === "ods_5",
+		);
+		await db
+			.update(crmData)
+			.set({
+				isOdsReport: has1 && has2 && has3 && has4 && has5,
+				updatedAt: new Date(),
+			})
+			.where(eq(crmData.studentId, id));
 
 		await invalidateCrmCaches(id);
 		return { success: true };

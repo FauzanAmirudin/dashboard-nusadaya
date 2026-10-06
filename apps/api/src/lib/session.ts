@@ -152,23 +152,28 @@ export async function validateAndTouchSession(sessionId: string): Promise<{
 	if (idleDurationMs > idleTimeoutMs) {
 		await invalidateSession(sessionId, session.userId, "idle_timeout");
 
-		// Record idle timeout in audit logs asynchronously
-		try {
-			await db.insert(auditLogs).values({
-				userId: session.userId,
-				action: "auth.idle_timeout",
-				entity: "auth",
-				entityId: session.userId,
-				details: {
-					sessionId,
-					username: session.username,
-					idleMinutes: Math.round(idleDurationMs / 60000),
-					lastActivity: new Date(session.lastActivity).toISOString(),
-					expiredAt: new Date(now).toISOString(),
-				},
-			});
-		} catch (dbErr) {
-			console.error("[Session] Error recording idle timeout audit log:", dbErr);
+		// Record idle timeout in audit logs asynchronously (skip in test environment)
+		if (process.env.NODE_ENV !== "test") {
+			try {
+				await db.insert(auditLogs).values({
+					userId: session.userId,
+					action: "auth.idle_timeout",
+					entity: "auth",
+					entityId: session.userId,
+					details: {
+						sessionId,
+						username: session.username,
+						idleMinutes: Math.round(idleDurationMs / 60000),
+						lastActivity: new Date(session.lastActivity).toISOString(),
+						expiredAt: new Date(now).toISOString(),
+					},
+				});
+			} catch (dbErr) {
+				console.error(
+					"[Session] Error recording idle timeout audit log:",
+					dbErr,
+				);
+			}
 		}
 
 		return { valid: false, reason: "idle_timeout" };
@@ -229,7 +234,7 @@ export async function invalidateSession(
 
 	memorySessions.delete(sessionId);
 
-	if (userId && reason === "user_logout") {
+	if (userId && reason === "user_logout" && process.env.NODE_ENV !== "test") {
 		try {
 			await db.insert(auditLogs).values({
 				userId,

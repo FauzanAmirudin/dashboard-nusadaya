@@ -9,6 +9,7 @@ interface TablePaginationProps {
 	page?: number;
 	totalItems?: number;
 	totalCount?: number;
+	totalPages?: number;
 	pageSize?: number;
 	onPageChange: (page: number) => void;
 	onPageSizeChange?: (size: number) => void;
@@ -21,6 +22,7 @@ export function TablePagination({
 	page,
 	totalItems,
 	totalCount,
+	totalPages: totalPagesProp,
 	pageSize = 20,
 	onPageChange,
 	onPageSizeChange,
@@ -30,9 +32,9 @@ export function TablePagination({
 	const activePage = Math.max(1, currentPage ?? page ?? 1);
 	const count = Math.max(0, totalItems ?? totalCount ?? 0);
 	const size = Math.max(1, pageSize);
-	const totalPages = Math.max(1, Math.ceil(count / size));
+	const totalPages = Math.max(1, totalPagesProp ?? Math.ceil(count / size));
 
-	if (count <= 0) return null;
+	if (count <= 0 && (!totalPagesProp || totalPagesProp <= 1)) return null;
 
 	const startItem = Math.max(1, (activePage - 1) * size + 1);
 	const endItem = Math.min(activePage * size, count);

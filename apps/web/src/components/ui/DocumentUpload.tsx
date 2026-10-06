@@ -38,11 +38,13 @@ interface DocumentUploadProps {
 	documentKey: string;
 	courseId?: number;
 	canEdit: boolean;
+	canDelete?: boolean;
 	onUploadSuccess?: () => void;
 	onDeleteSuccess?: () => void;
 	onUpdate?: () => void;
 	onDocumentsLoaded?: (documents: any[]) => void;
 	hideLabel?: boolean;
+	viewUrlBase?: string;
 }
 
 export function DocumentUpload({
@@ -51,11 +53,13 @@ export function DocumentUpload({
 	documentKey,
 	courseId,
 	canEdit,
+	canDelete = true,
 	onUploadSuccess,
 	onDeleteSuccess,
 	onUpdate,
 	onDocumentsLoaded,
 	hideLabel = false,
+	viewUrlBase,
 }: DocumentUploadProps) {
 	const { token } = useAuthStore();
 	const [isUploading, setIsUploading] = useState(false);
@@ -79,7 +83,23 @@ export function DocumentUpload({
 				if (data.success && data.data) {
 					let docs: any[] = [];
 					if (Array.isArray(data.data)) {
-						docs = data.data.filter((d: any) => d.documentKey === documentKey);
+						docs = data.data.filter((d: any) => {
+							if (d.documentKey === documentKey) return true;
+							if (
+								documentKey === "ods_1_report" &&
+								(d.documentKey === "ods_report" || d.documentKey === "ods_1")
+							)
+								return true;
+							if (documentKey === "ods_2_report" && d.documentKey === "ods_2")
+								return true;
+							if (documentKey === "ods_3_report" && d.documentKey === "ods_3")
+								return true;
+							if (documentKey === "ods_4_report" && d.documentKey === "ods_4")
+								return true;
+							if (documentKey === "ods_5_report" && d.documentKey === "ods_5")
+								return true;
+							return false;
+						});
 					} else {
 						docs = data.data[documentKey] || [];
 					}
@@ -143,7 +163,7 @@ export function DocumentUpload({
 			const data = await res.json();
 			if (data.success) {
 				toast.success("Dokumen berhasil diunggah");
-				fetchDocuments();
+				await fetchDocuments();
 				if (onUploadSuccess) onUploadSuccess();
 				if (onUpdate) onUpdate();
 			} else {
@@ -227,7 +247,9 @@ export function DocumentUpload({
 							title="Review Dokumen"
 							onClick={() =>
 								window.open(
-									`/dashboard/students/${studentId}/documents/${doc.id}?url=${encodeURIComponent(doc.fileUrl)}&name=${encodeURIComponent(doc.fileName)}&token=${token}`,
+									viewUrlBase
+										? `${viewUrlBase}?url=${encodeURIComponent(doc.fileUrl)}&name=${encodeURIComponent(doc.fileName)}&token=${token}`
+										: `/dashboard/students/${studentId}/documents/${doc.id}?url=${encodeURIComponent(doc.fileUrl)}&name=${encodeURIComponent(doc.fileName)}&token=${token}`,
 									"_blank",
 								)
 							}
@@ -235,7 +257,7 @@ export function DocumentUpload({
 							<Eye className="w-3.5 h-3.5" />
 							<span className="hidden sm:inline">Review</span>
 						</Button>
-						{canEdit && (
+						{canEdit && canDelete && (
 							<AlertDialog>
 								<AlertDialogTrigger
 									render={
@@ -272,6 +294,12 @@ export function DocumentUpload({
 					</div>
 				</div>
 			))}
+
+			{documents.length === 0 && !canEdit && (
+				<div className="flex items-center justify-center p-3 rounded-lg border border-dashed border-slate-200 bg-slate-50/50 text-slate-400 text-xs font-medium">
+					Belum ada dokumen yang diunggah
+				</div>
+			)}
 
 			{canEdit && (
 				<div className="relative">

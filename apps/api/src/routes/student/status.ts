@@ -52,6 +52,8 @@ function calculatePanelStatus(
 export const statusRoutes = new Elysia().get(
 	"/:id/progress",
 	async (context) => {
+		context.set.headers["cache-control"] =
+			"no-store, no-cache, must-revalidate";
 		const id = Number(context.params.id);
 
 		// Fetch all data
@@ -76,12 +78,20 @@ export const statusRoutes = new Elysia().get(
 			.select()
 			.from(crmDocuments)
 			.where(eq(crmDocuments.studentId, id));
-		const hasOdsReport =
-			Boolean(crm?.isOdsReport) ||
-			crmDocs.some((d) => d.documentKey === "ods_report");
-		const hasPrammagangReport =
-			Boolean(crm?.isPrammagangReport) ||
-			crmDocs.some((d) => d.documentKey === "pramagang_report");
+		const odsList = Array.isArray(crm?.odsDetails)
+			? (crm.odsDetails as any[])
+			: [];
+		const hasOds1Report =
+			Boolean(crm?.isOds1Report) || Boolean(odsList[0]?.isDone);
+		const hasOds2Report =
+			Boolean(crm?.isOds2Report) || Boolean(odsList[1]?.isDone);
+		const hasOds3Report =
+			Boolean(crm?.isOds3Report) || Boolean(odsList[2]?.isDone);
+		const hasOds4Report =
+			Boolean(crm?.isOds4Report) || Boolean(odsList[3]?.isDone);
+		const hasOds5Report =
+			Boolean(crm?.isOds5Report) || Boolean(odsList[4]?.isDone);
+		const hasPrammagangReport = Boolean(crm?.isPrammagangReport);
 		const [finance] = await db
 			.select()
 			.from(financeData)
@@ -125,7 +135,9 @@ export const statusRoutes = new Elysia().get(
 			{ prop: pmb?.docPassportDepan, name: "Dokumen Paspor Depan" },
 			{ prop: pmb?.docPassportVisa, name: "Dokumen Paspor Visa" },
 			{ prop: pmb?.docSkbm, name: "Dokumen SKBM" },
-			{ prop: pmb?.docMcu, name: "Dokumen MCU" },
+			{ prop: pmb?.docPreMcu, name: "Dokumen Pre-MCU" },
+			{ prop: pmb?.docMcu, name: "Dokumen MCU Full" },
+			{ prop: pmb?.docSla, name: "Dokumen SLA" },
 			{ prop: pmb?.docSertifikasiBahasa, name: "Dokumen Sertifikasi Bahasa" },
 		];
 		const pmbCompleted = pmbItems.filter((i) => i.prop).length;
@@ -150,19 +162,18 @@ export const statusRoutes = new Elysia().get(
 		totalCompleted += pmbCompleted;
 		totalIndicators += 14;
 
-		// 2. CRM (8 Items Total)
+		// 2. CRM (10 Items Total)
 		const crmItems = [
 			{ prop: Boolean(crm?.isMonitoringParent), name: "Monitoring Orang Tua" },
 			{ prop: Boolean(crm?.isMonitoringIndustry), name: "Monitoring Industri" },
 			{ prop: Boolean(crm?.isVocabComplete), name: "Kendali Vocab/Bahasa" },
 			{ prop: Boolean(crm?.practiceAttendance), name: "Presensi Praktik ODS" },
-			{ prop: Boolean(hasOdsReport), name: "Laporan ODS" },
-			{ prop: Boolean(crm?.odsDocumentation), name: "Dokumentasi ODS" },
+			{ prop: Boolean(hasOds1Report), name: "Laporan ODS 1" },
+			{ prop: Boolean(hasOds2Report), name: "Laporan ODS 2" },
+			{ prop: Boolean(hasOds3Report), name: "Laporan ODS 3" },
+			{ prop: Boolean(hasOds4Report), name: "Laporan ODS 4" },
+			{ prop: Boolean(hasOds5Report), name: "Laporan ODS 5" },
 			{ prop: Boolean(hasPrammagangReport), name: "Laporan Pra-Magang" },
-			{
-				prop: Boolean(crm?.isPrammagangDocumentation),
-				name: "Dokumentasi Pra-Magang",
-			},
 		];
 		const crmCompleted = crmItems.filter((i) => i.prop).length;
 		crmItems
@@ -179,12 +190,12 @@ export const statusRoutes = new Elysia().get(
 			id: "crm",
 			name: "CRM",
 			completed: crmCompleted,
-			total: 8,
-			status: calculatePanelStatus(crmCompleted, 8, crm?.isAcc),
+			total: 10,
+			status: calculatePanelStatus(crmCompleted, 10, crm?.isAcc),
 			isAcc: Boolean(crm?.isAcc),
 		});
 		totalCompleted += crmCompleted;
-		totalIndicators += 8;
+		totalIndicators += 10;
 
 		// 3. Finance
 		const isTalangan = finance?.metodePembayaran === "dana_talangan";

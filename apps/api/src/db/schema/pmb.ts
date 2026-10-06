@@ -40,7 +40,7 @@ export const pmbData = pgTable(
 		mitraSponsor: text("mitra_sponsor"),
 		koordinator: text("koordinator"),
 
-		// 10 Dokumen Tambahan PMB Validation Checks
+		// Dokumen Tambahan PMB Validation Checks
 		docKtp: boolean("doc_ktp").default(false),
 		docKk: boolean("doc_kk").default(false),
 		docCv: boolean("doc_cv").default(false),
@@ -49,7 +49,10 @@ export const pmbData = pgTable(
 		docPassportDepan: boolean("doc_passport_depan").default(false),
 		docPassportVisa: boolean("doc_passport_visa").default(false),
 		docSkbm: boolean("doc_skbm").default(false),
+		docPreMcu: boolean("doc_pre_mcu").default(false),
 		docMcu: boolean("doc_mcu").default(false),
+		docBpjs: boolean("doc_bpjs").default(false),
+		docSla: boolean("doc_sla").default(false),
 		docSertifikasiBahasa: boolean("doc_sertifikasi_bahasa").default(false),
 
 		// Finance Integration
@@ -230,6 +233,15 @@ export const pmbFormResponses = pgTable(
 		waliPhone: text("wali_phone"),
 		waliEmail: text("wali_email"),
 		waliGuardianRelation: text("wali_guardian_relation"),
+
+		// Tab 7: Informasi PMB & Referensi
+		period: text("period"),
+		rekomendasi: text("rekomendasi"),
+		timVisit: text("tim_visit"),
+		timSosialisasi: text("tim_sosialisasi"),
+		roReferral: text("ro_referral"),
+		mitraSponsor: text("mitra_sponsor"),
+		koordinator: text("koordinator"),
 
 		// Metadata
 		submittedAt: timestamp("submitted_at").defaultNow().notNull(),

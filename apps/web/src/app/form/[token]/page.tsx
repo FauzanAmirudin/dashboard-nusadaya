@@ -1,11 +1,15 @@
 "use client";
 
 import {
+	AlertCircle,
+	AlertTriangle,
 	ArrowLeft,
+	Building2,
 	CheckCircle2,
 	Copy,
 	Loader2,
 	UploadCloud,
+	XCircle,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -21,6 +25,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { API_URL } from "@/lib/eden";
 import {
 	filterNumeric,
 	filterPhone,
@@ -29,8 +34,6 @@ import {
 	preventNonPhoneKey,
 } from "@/utils/form-validators";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-
 const TABS = [
 	"Keterangan Mahasiswa",
 	"Keterangan Pendidikan",
@@ -38,15 +41,143 @@ const TABS = [
 	"Keterangan Ayah Kandung",
 	"Keterangan Ibu Kandung",
 	"Keterangan Wali",
+	"Informasi PMB & Referensi",
 ];
 
 import { getPeminatanOption, PEMINATAN_OPTIONS } from "@/lib/peminatan";
+
+const mapExistingDataToFormData = (d: any) => {
+	const formatDate = (val: any) => {
+		if (!val) return "";
+		try {
+			const date = new Date(val);
+			if (Number.isNaN(date.getTime())) return "";
+			return date.toISOString().split("T")[0];
+		} catch {
+			return "";
+		}
+	};
+
+	const parseNationality = (val: string | null | undefined) => {
+		if (!val) return { nationality: "Indonesia", nationalityOther: "" };
+		if (val === "Indonesia")
+			return { nationality: "Indonesia", nationalityOther: "" };
+		return { nationality: "Lainnya", nationalityOther: val };
+	};
+
+	const parseClothing = (val: string | null | undefined) => {
+		if (!val) return { clothingSize: "", clothingSizeOther: "" };
+		if (["XS", "S", "M", "L", "XL", "XXL"].includes(val)) {
+			return { clothingSize: val, clothingSizeOther: "" };
+		}
+		return { clothingSize: "Lainnya", clothingSizeOther: val };
+	};
+
+	const natMhs = parseNationality(d.nationality);
+	const natAyah = parseNationality(d.ayahNationality);
+	const natIbu = parseNationality(d.ibuNationality);
+	const natWali = parseNationality(d.waliNationality);
+	const cloth = parseClothing(d.clothingSize);
+
+	return {
+		name: d.name || "",
+		nickname: d.nickname || "",
+		gender: d.gender || "",
+		birthPlace: d.birthPlace || "",
+		birthDate: formatDate(d.birthDate),
+		religion: d.religion || "",
+		nationality: natMhs.nationality,
+		nationalityOther: natMhs.nationalityOther,
+		addressStreet: d.addressStreet || "",
+		addressRt: d.addressRt || "",
+		addressRw: d.addressRw || "",
+		addressNo: d.addressNo || "",
+		addressVillage: d.addressVillage || "",
+		addressDistrict: d.addressDistrict || "",
+		addressCity: d.addressCity || "",
+		addressProvince: d.addressProvince || "",
+		livingWith: d.livingWith || "",
+		phone: d.phone || "",
+		email: d.email || "",
+
+		schoolOrigin: d.schoolOrigin || "",
+		schoolAddress: d.schoolAddress || "",
+		schoolMajor: d.schoolMajor || "",
+		graduationYear: d.graduationYear ? String(d.graduationYear) : "",
+		program: d.program || "",
+		subProgram: d.subProgram || "",
+		classType: d.classType || "",
+		academicYear: d.academicYear || "",
+		cohort: d.batch ? String(d.batch) : "14",
+
+		bloodType: d.bloodType || "",
+		diseaseHistory: d.diseaseHistory || "",
+		congenitalDisease: d.congenitalDisease || "",
+		height: d.height ? String(d.height) : "",
+		weight: d.weight ? String(d.weight) : "",
+		clothingSize: cloth.clothingSize,
+		clothingSizeOther: cloth.clothingSizeOther,
+
+		ayahName: d.ayahName || "",
+		ayahBirthPlace: d.ayahBirthPlace || "",
+		ayahBirthDate: formatDate(d.ayahBirthDate),
+		ayahReligion: d.ayahReligion || "",
+		ayahNationality: natAyah.nationality,
+		ayahNationalityOther: natAyah.nationalityOther,
+		ayahEducation: d.ayahEducation || "",
+		ayahJob: d.ayahJob || "",
+		ayahAddress: d.ayahAddress || "",
+		ayahPhone: d.ayahPhone || "",
+		ayahEmail: d.ayahEmail || "",
+		ayahStatus: d.ayahStatus || "Hidup",
+
+		ibuName: d.ibuName || "",
+		ibuBirthPlace: d.ibuBirthPlace || "",
+		ibuBirthDate: formatDate(d.ibuBirthDate),
+		ibuReligion: d.ibuReligion || "",
+		ibuNationality: natIbu.nationality,
+		ibuNationalityOther: natIbu.nationalityOther,
+		ibuEducation: d.ibuEducation || "",
+		ibuJob: d.ibuJob || "",
+		ibuAddress: d.ibuAddress || "",
+		ibuPhone: d.ibuPhone || "",
+		ibuEmail: d.ibuEmail || "",
+		ibuStatus: d.ibuStatus || "Hidup",
+
+		waliName: d.waliName || "",
+		waliBirthPlace: d.waliBirthPlace || "",
+		waliBirthDate: formatDate(d.waliBirthDate),
+		waliReligion: d.waliReligion || "",
+		waliNationality: natWali.nationality,
+		waliNationalityOther: natWali.nationalityOther,
+		waliEducation: d.waliEducation || "",
+		waliJob: d.waliJob || "",
+		waliAddress: d.waliAddress || "",
+		waliPhone: d.waliPhone || "",
+		waliEmail: d.waliEmail || "",
+		waliGuardianRelation: d.waliGuardianRelation || "",
+
+		// Tab 7: Informasi PMB & Referensi
+		period: d.period || "",
+		rekomendasi: d.rekomendasi || "",
+		timVisit: d.timVisit || "",
+		timSosialisasi: d.timSosialisasi || "",
+		roReferral: d.roReferral || "",
+		mitraSponsor: d.mitraSponsor || "",
+		koordinator: d.koordinator || "",
+	};
+};
 
 export default function FormMahasiswaPublic() {
 	const params = useParams();
 	const token = (params?.token as string) || "";
 	const [isValidating, setIsValidating] = useState(true);
 	const [isValidToken, setIsValidToken] = useState(false);
+	const [isApprovedMessage, setIsApprovedMessage] = useState(false);
+	const [responseStatus, setResponseStatus] = useState<
+		"PENDING" | "REJECTED" | "APPROVED" | null
+	>(null);
+	const [rejectionNotes, setRejectionNotes] = useState<string | null>(null);
 	const [isSubmitted, setIsSubmitted] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const [currentTab, setCurrentTab] = useState(0);
@@ -137,6 +268,15 @@ export default function FormMahasiswaPublic() {
 		waliPhone: "",
 		waliEmail: "",
 		waliGuardianRelation: "",
+
+		// Tab 7: Informasi PMB & Referensi
+		period: "",
+		rekomendasi: "",
+		timVisit: "",
+		timSosialisasi: "",
+		roReferral: "",
+		mitraSponsor: "",
+		koordinator: "",
 	});
 
 	// Validasi Token
@@ -145,17 +285,37 @@ export default function FormMahasiswaPublic() {
 		const validate = async () => {
 			try {
 				const res = await fetch(`${API_URL}/form/${token}`);
-				if (!res.ok) {
+				const data = await res.json();
+				if (!res.ok || !data.valid) {
+					if (
+						data.isApproved ||
+						data.message?.toLowerCase().includes("disetujui")
+					) {
+						setIsApprovedMessage(true);
+					}
 					setIsValidToken(false);
 					setIsValidating(false);
 					return;
 				}
-				const data = await res.json();
-				if (data.valid) {
-					setIsValidToken(true);
+
+				setIsValidToken(true);
+				if (data.responseStatus) {
+					setResponseStatus(data.responseStatus);
+				}
+				if (data.rejectionNotes) {
+					setRejectionNotes(data.rejectionNotes);
+				}
+
+				if (data.existingData) {
+					const mapped = mapExistingDataToFormData(data.existingData);
+					setFormData(mapped);
+					if (data.existingData.profilePhotoUrl) {
+						setPreviewUrl(data.existingData.profilePhotoUrl);
+					}
 				}
 			} catch (e) {
 				console.error(e);
+				setIsValidToken(false);
 			} finally {
 				setIsValidating(false);
 			}
@@ -474,7 +634,11 @@ export default function FormMahasiswaPublic() {
 			const data = await res.json();
 			if (data.success) {
 				toast.dismiss();
-				toast.success("Formulir berhasil dikirim!");
+				if (responseStatus === "PENDING" || responseStatus === "REJECTED") {
+					toast.success("Perubahan data formulir berhasil disimpan!");
+				} else {
+					toast.success("Formulir pendaftaran berhasil dikirim!");
+				}
 				setIsSubmitted(true);
 			} else {
 				throw new Error(data.message || "Gagal mengirim formulir");
@@ -499,19 +663,47 @@ export default function FormMahasiswaPublic() {
 	}
 
 	if (!isValidToken && !isSubmitted) {
+		if (isApprovedMessage) {
+			return (
+				<div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+					<div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 max-w-md w-full text-center">
+						<div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+							<CheckCircle2 className="w-8 h-8" />
+						</div>
+						<h1 className="text-xl font-bold text-slate-800 mb-2">
+							Pendaftaran Telah Disetujui
+						</h1>
+						<p className="text-slate-500 mb-6">
+							Pendaftaran Anda telah di-ACC dan diproses ke dalam sistem
+							akademik Nusadaya Academy. Tautan formulir ini sudah tidak dapat
+							diubah lagi.
+						</p>
+						<Button
+							onClick={() =>
+								(window.location.href = "https://nusadayaacademy.com")
+							}
+							className="w-full bg-[#0517B0] hover:bg-blue-800"
+						>
+							Kembali ke Beranda
+						</Button>
+					</div>
+				</div>
+			);
+		}
+
 		return (
 			<div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
 				<div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 max-w-md w-full text-center">
 					<div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
-						<CheckCircle2 className="w-8 h-8" />
+						<XCircle className="w-8 h-8" />
 					</div>
 					<h1 className="text-xl font-bold text-slate-800 mb-2">
 						Tautan Tidak Berlaku
 					</h1>
 					<p className="text-slate-500">
-						Tautan formulir ini sudah tidak berlaku atau telah digunakan
-						sebelumnya. Silakan hubungi admin PMB Nusadaya Academy untuk
-						mendapatkan tautan baru.
+						Tautan formulir ini sudah tidak berlaku atau tidak ditemukan.
+						Silakan hubungi admin PMB Nusadaya Academy untuk mendapatkan tautan
+						baru.
 					</p>
 				</div>
 			</div>
@@ -526,11 +718,14 @@ export default function FormMahasiswaPublic() {
 						<CheckCircle2 className="w-8 h-8" />
 					</div>
 					<h1 className="text-xl font-bold text-slate-800 mb-2">
-						Pendaftaran Berhasil!
+						{responseStatus === "PENDING" || responseStatus === "REJECTED"
+							? "Pembaruan Berhasil Dikirim!"
+							: "Pendaftaran Berhasil!"}
 					</h1>
 					<p className="text-slate-500 mb-6">
-						Terima kasih telah mengisi formulir pendaftaran Nusadaya Academy.
-						Tim PMB kami akan segera menghubungi Anda.
+						{responseStatus === "PENDING" || responseStatus === "REJECTED"
+							? "Terima kasih telah memperbarui data formulir pendaftaran. Tim PMB kami akan meninjau perubahan Anda."
+							: "Terima kasih telah mengisi formulir pendaftaran Nusadaya Academy. Tim PMB kami akan segera menghubungi Anda."}
 					</p>
 					<Button
 						onClick={() =>
@@ -559,6 +754,38 @@ export default function FormMahasiswaPublic() {
 				</div>
 				<div className="text-sm text-slate-500 font-medium">Formulir PMB</div>
 			</div>
+
+			{/* Status Banner */}
+			{responseStatus === "PENDING" && (
+				<div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3 items-start">
+					<AlertCircle className="w-5 h-5 text-[#0517B0] shrink-0 mt-0.5" />
+					<div>
+						<h4 className="font-semibold text-blue-900 text-sm">
+							Status: Menunggu Peninjauan Admin PMB
+						</h4>
+						<p className="text-sm text-blue-800 mt-0.5">
+							Data formulir Anda telah tersimpan sebelumnya dan sedang dalam
+							proses peninjauan. Anda masih dapat melengkapi atau mengoreksi
+							data ini sebelum disetujui secara resmi oleh tim PMB.
+						</p>
+					</div>
+				</div>
+			)}
+
+			{responseStatus === "REJECTED" && (
+				<div className="mb-6 bg-rose-50 border border-rose-200 rounded-xl p-4 flex gap-3 items-start">
+					<AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+					<div>
+						<h4 className="font-semibold text-rose-900 text-sm">
+							Catatan Revisi dari Admin PMB:
+						</h4>
+						<p className="text-sm text-rose-800 mt-0.5 font-medium">
+							{rejectionNotes ||
+								"Mohon lengkapi atau perbaiki data Anda sesuai arahan admin PMB lalu kirim ulang formulir."}
+						</p>
+					</div>
+				</div>
+			)}
 
 			{/* Form Header */}
 			<div className="mb-8">
@@ -1801,6 +2028,119 @@ export default function FormMahasiswaPublic() {
 									placeholder="Alamat lengkap wali"
 									value={formData.waliAddress}
 									onChange={(e) => updateData("waliAddress", e.target.value)}
+								/>
+							</div>
+						</div>
+					</div>
+				)}
+
+				{/* TAB 7: Informasi PMB & Referensi */}
+				{currentTab === 6 && (
+					<div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+						<div className="flex items-center justify-between border-b pb-2">
+							<h3 className="font-semibold text-lg flex items-center gap-2 text-slate-800">
+								<Building2 className="w-5 h-5 text-[#0517B0]" />
+								Informasi PMB & Referensi
+							</h3>
+							<span className="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-[#0517B0] rounded-md border border-blue-100">
+								PMB
+							</span>
+						</div>
+
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+							<div className="space-y-2">
+								<Label>Negara Tujuan</Label>
+								<Input
+									readOnly
+									value={
+										formData.subProgram === "Malaysia-Hospitality"
+											? "Malaysia"
+											: formData.subProgram === "Taiwan-Hospitality"
+												? "Taiwan"
+												: formData.subProgram === "Timur tengah-Barista"
+													? "Timur Tengah"
+													: "Indonesia"
+									}
+									className="bg-slate-50 font-medium text-slate-700 cursor-not-allowed"
+								/>
+								<p className="text-[11px] text-slate-400">
+									Otomatis disesuaikan dengan pilihan Peminatan di Keterangan
+									Pendidikan
+								</p>
+							</div>
+
+							<div className="space-y-2">
+								<Label>Periode Keberangkatan</Label>
+								<Input
+									placeholder="Contoh: 2026/2027 atau Batch 1"
+									value={formData.period}
+									onChange={(e) => updateData("period", e.target.value)}
+								/>
+							</div>
+
+							<div className="space-y-2">
+								<Label>Rekomendasi</Label>
+								<Select
+									value={formData.rekomendasi}
+									onValueChange={(v) => updateData("rekomendasi", v)}
+								>
+									<SelectTrigger>
+										<SelectValue placeholder="Pilih Jenis Rekomendasi" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="Pendamping">Pendamping</SelectItem>
+										<SelectItem value="MoU Sekolah">MoU Sekolah</SelectItem>
+										<SelectItem value="BKK">BKK</SelectItem>
+										<SelectItem value="FKKS">FKKS</SelectItem>
+										<SelectItem value="RO Alumni">RO Alumni</SelectItem>
+										<SelectItem value="Staff/Team">Staff/Team</SelectItem>
+										<SelectItem value="Lainnya">Lainnya</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+
+							<div className="space-y-2">
+								<Label>Tim Visit</Label>
+								<Input
+									placeholder="Nama tim visit (jika ada)"
+									value={formData.timVisit}
+									onChange={(e) => updateData("timVisit", e.target.value)}
+								/>
+							</div>
+
+							<div className="space-y-2">
+								<Label>Tim Sosialisasi</Label>
+								<Input
+									placeholder="Nama tim sosialisasi (jika ada)"
+									value={formData.timSosialisasi}
+									onChange={(e) => updateData("timSosialisasi", e.target.value)}
+								/>
+							</div>
+
+							<div className="space-y-2">
+								<Label>RO Referral</Label>
+								<Input
+									placeholder="Nama RO Referral (jika ada)"
+									value={formData.roReferral}
+									onChange={(e) => updateData("roReferral", e.target.value)}
+								/>
+							</div>
+
+							<div className="space-y-2">
+								<Label>Mitra Sponsor</Label>
+								<Input
+									placeholder="Nama mitra sponsor (jika ada)"
+									value={formData.mitraSponsor}
+									onChange={(e) => updateData("mitraSponsor", e.target.value)}
+								/>
+							</div>
+
+							<div className="space-y-2">
+								<Label>Koordinator</Label>
+								<Input
+									placeholder="Nama koordinator (jika ada)"
+									value={formData.koordinator}
+									onChange={(e) => updateData("koordinator", e.target.value)}
 								/>
 							</div>
 						</div>

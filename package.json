@@ -9,6 +9,7 @@
 		"dev": "bun --filter '*' --parallel dev",
 		"build": "bun --filter web build",
 		"start": "bun --filter '*' --parallel start",
+		"test": "bun --filter '*' test",
 		"prepare": "husky"
 	},
 	"devDependencies": {

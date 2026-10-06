@@ -40,20 +40,6 @@ export const PEMINATAN_OPTIONS: PeminatanOption[] = [
 		alt: "ID",
 		countryName: "Indonesia",
 	},
-	{
-		value: "Jepang-Hospitality",
-		label: "Jepang-Hospitality",
-		flag: "https://flagcdn.com/w40/jp.png",
-		alt: "JP",
-		countryName: "Jepang",
-	},
-	{
-		value: "Jerman-Hospitality",
-		label: "Jerman-Hospitality",
-		flag: "https://flagcdn.com/w40/de.png",
-		alt: "DE",
-		countryName: "Jerman",
-	},
 ];
 
 export const COUNTRY_FLAG_MAP: Record<
@@ -78,67 +64,27 @@ export const COUNTRY_FLAG_MAP: Record<
 	saudi: {
 		flag: "https://flagcdn.com/w40/sa.png",
 		alt: "SA",
-		countryName: "Arab Saudi",
+		countryName: "Timur Tengah",
 	},
 	barista: {
 		flag: "https://flagcdn.com/w40/sa.png",
 		alt: "SA",
 		countryName: "Timur Tengah",
 	},
-	indonesia: {
-		flag: "https://flagcdn.com/w40/id.png",
-		alt: "ID",
-		countryName: "Indonesia",
-	},
-	jepang: {
-		flag: "https://flagcdn.com/w40/jp.png",
-		alt: "JP",
-		countryName: "Jepang",
-	},
-	japan: {
-		flag: "https://flagcdn.com/w40/jp.png",
-		alt: "JP",
-		countryName: "Jepang",
-	},
-	jerman: {
-		flag: "https://flagcdn.com/w40/de.png",
-		alt: "DE",
-		countryName: "Jerman",
-	},
-	germany: {
-		flag: "https://flagcdn.com/w40/de.png",
-		alt: "DE",
-		countryName: "Jerman",
-	},
-	korea: {
-		flag: "https://flagcdn.com/w40/kr.png",
-		alt: "KR",
-		countryName: "Korea Selatan",
-	},
-	singapura: {
-		flag: "https://flagcdn.com/w40/sg.png",
-		alt: "SG",
-		countryName: "Singapura",
-	},
-	singapore: {
-		flag: "https://flagcdn.com/w40/sg.png",
-		alt: "SG",
-		countryName: "Singapura",
-	},
-	australia: {
-		flag: "https://flagcdn.com/w40/au.png",
-		alt: "AU",
-		countryName: "Australia",
-	},
 	dubai: {
 		flag: "https://flagcdn.com/w40/ae.png",
 		alt: "AE",
-		countryName: "Dubai (UAE)",
+		countryName: "Timur Tengah",
 	},
 	uae: {
 		flag: "https://flagcdn.com/w40/ae.png",
 		alt: "AE",
-		countryName: "Uni Emirat Arab",
+		countryName: "Timur Tengah",
+	},
+	indonesia: {
+		flag: "https://flagcdn.com/w40/id.png",
+		alt: "ID",
+		countryName: "Indonesia",
 	},
 };
 

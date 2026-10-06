@@ -13,9 +13,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { getToken } from "@/lib/eden";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+import { API_URL, getToken } from "@/lib/eden";
 
 export function TabRespons() {
 	const router = useRouter();
@@ -24,14 +22,18 @@ export function TabRespons() {
 
 	const fetchResponses = async () => {
 		try {
+			const token = getToken();
+			const headers: Record<string, string> = {};
+			if (token) {
+				headers.Authorization = `Bearer ${token}`;
+			}
 			const res = await fetch(`${API_URL}/pmb/form-responses`, {
-				headers: {
-					Authorization: `Bearer ${getToken()}`,
-				},
+				headers,
+				credentials: "include",
 			});
 			const data = await res.json();
 			if (data.success) {
-				setResponses(data.data);
+				setResponses(data.data || []);
 			}
 		} catch (error) {
 			console.error("Failed to fetch responses", error);

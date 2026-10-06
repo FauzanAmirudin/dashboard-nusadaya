@@ -838,7 +838,7 @@ export default function MataKuliahPage() {
 												<span>Semua Peminatan (Mata Kuliah Umum)</span>
 											</div>
 										</SelectItem>
-										{PEMINATAN_OPTIONS.slice(0, 4).map((item) => (
+										{PEMINATAN_OPTIONS.map((item) => (
 											<SelectItem key={item.value} value={item.value}>
 												<div className="flex items-center gap-2">
 													<img

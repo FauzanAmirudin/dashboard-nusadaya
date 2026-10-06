@@ -34,6 +34,11 @@ export const crmData = pgTable(
 		isVocabComplete: boolean("is_vocab_complete").default(false),
 		hasStudyPermit: boolean("has_study_permit").default(false),
 		isOdsReport: boolean("is_ods_report").default(false),
+		isOds1Report: boolean("is_ods_1_report").default(false),
+		isOds2Report: boolean("is_ods_2_report").default(false),
+		isOds3Report: boolean("is_ods_3_report").default(false),
+		isOds4Report: boolean("is_ods_4_report").default(false),
+		isOds5Report: boolean("is_ods_5_report").default(false),
 		isPrammagangReport: boolean("is_pramagang_report").default(false),
 		isPrammagangDocumentation: boolean("is_pramagang_documentation").default(
 			false,

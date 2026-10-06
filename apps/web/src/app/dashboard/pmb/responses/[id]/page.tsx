@@ -2,6 +2,7 @@
 
 import {
 	ArrowLeft,
+	Building2,
 	CheckCircle2,
 	FileText,
 	Loader2,
@@ -21,9 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { PeminatanBadge } from "@/components/ui/PeminatanBadge";
 import { Textarea } from "@/components/ui/textarea";
-import { getToken } from "@/lib/eden";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+import { API_URL, getToken } from "@/lib/eden";
 
 export default function ResponseDetailPage() {
 	const params = useParams();
@@ -40,10 +39,14 @@ export default function ResponseDetailPage() {
 
 	const fetchData = async () => {
 		try {
+			const token = getToken();
+			const headers: Record<string, string> = {};
+			if (token) {
+				headers.Authorization = `Bearer ${token}`;
+			}
 			const res = await fetch(`${API_URL}/pmb/form-responses/${id}`, {
-				headers: {
-					Authorization: `Bearer ${getToken()}`,
-				},
+				headers,
+				credentials: "include",
 			});
 			const result = await res.json();
 			if (result.success) {
@@ -69,12 +72,17 @@ export default function ResponseDetailPage() {
 	const handleApprove = async () => {
 		setIsProcessing(true);
 		try {
+			const token = getToken();
+			const headers: Record<string, string> = {
+				"Content-Type": "application/json",
+			};
+			if (token) {
+				headers.Authorization = `Bearer ${token}`;
+			}
 			const res = await fetch(`${API_URL}/pmb/form-responses/${id}/approve`, {
 				method: "PATCH",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${getToken()}`,
-				},
+				headers,
+				credentials: "include",
 			});
 			const result = await res.json();
 			if (result.success) {
@@ -99,12 +107,17 @@ export default function ResponseDetailPage() {
 
 		setIsProcessing(true);
 		try {
+			const token = getToken();
+			const headers: Record<string, string> = {
+				"Content-Type": "application/json",
+			};
+			if (token) {
+				headers.Authorization = `Bearer ${token}`;
+			}
 			const res = await fetch(`${API_URL}/pmb/form-responses/${id}/reject`, {
 				method: "PATCH",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${getToken()}`,
-				},
+				headers,
+				credentials: "include",
 				body: JSON.stringify({ rejectionNotes }),
 			});
 			const result = await res.json();
@@ -216,7 +229,6 @@ export default function ResponseDetailPage() {
 					</h3>
 					{data.profilePhotoUrl && (
 						<div className="flex justify-center py-4">
-							{/* biome-ignore lint/performance/noImgElement: External dynamic image */}
 							<img
 								src={data.profilePhotoUrl}
 								alt="Foto Profil"
@@ -500,6 +512,77 @@ export default function ResponseDetailPage() {
 						<span className="col-span-2 font-medium">
 							{data.waliAddress || "-"}
 						</span>
+					</div>
+				</div>
+
+				{/* Tab 7: Informasi PMB & Referensi */}
+				<div className="bg-white border rounded-xl p-6 shadow-sm space-y-4 md:col-span-2">
+					<div className="flex items-center justify-between border-b pb-2">
+						<h3 className="font-semibold text-lg text-[#0517B0] flex items-center gap-2">
+							<Building2 className="w-5 h-5" /> Informasi PMB & Referensi
+						</h3>
+						<Badge
+							variant="outline"
+							className="text-[10px] font-semibold text-slate-500 bg-white"
+						>
+							PMB
+						</Badge>
+					</div>
+					<div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+						<div className="grid grid-cols-3 gap-y-3">
+							<span className="text-slate-500">Status Mahasiswa</span>
+							<span className="col-span-2 font-medium">
+								Calon Mahasiswa (Aktif)
+							</span>
+
+							<span className="text-slate-500">Negara Tujuan</span>
+							<span className="col-span-2 font-medium">
+								{data.subProgram === "Malaysia-Hospitality"
+									? "Malaysia"
+									: data.subProgram === "Taiwan-Hospitality"
+										? "Taiwan"
+										: data.subProgram === "Timur tengah-Barista"
+											? "Timur Tengah"
+											: "Indonesia"}
+							</span>
+
+							<span className="text-slate-500">Periode Keberangkatan</span>
+							<span className="col-span-2 font-medium">
+								{data.period || "-"}
+							</span>
+
+							<span className="text-slate-500">Rekomendasi</span>
+							<span className="col-span-2 font-medium">
+								{data.rekomendasi || "-"}
+							</span>
+						</div>
+
+						<div className="grid grid-cols-3 gap-y-3">
+							<span className="text-slate-500">Tim Visit</span>
+							<span className="col-span-2 font-medium">
+								{data.timVisit || "-"}
+							</span>
+
+							<span className="text-slate-500">Tim Sosialisasi</span>
+							<span className="col-span-2 font-medium">
+								{data.timSosialisasi || "-"}
+							</span>
+
+							<span className="text-slate-500">RO Referral</span>
+							<span className="col-span-2 font-medium">
+								{data.roReferral || "-"}
+							</span>
+
+							<span className="text-slate-500">Mitra Sponsor</span>
+							<span className="col-span-2 font-medium">
+								{data.mitraSponsor || "-"}
+							</span>
+
+							<span className="text-slate-500">Koordinator</span>
+							<span className="col-span-2 font-medium">
+								{data.koordinator || "-"}
+							</span>
+						</div>
 					</div>
 				</div>
 			</div>

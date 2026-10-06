@@ -110,8 +110,13 @@ const app = new Elysia()
 		let token: string | null = null;
 		// 1. Authorization: Bearer <token> header (used for cross-origin dev requests)
 		const authHeader = request.headers.get("authorization");
-		if (authHeader?.startsWith("Bearer ")) {
-			token = authHeader.slice(7);
+		if (
+			authHeader?.startsWith("Bearer ") &&
+			authHeader.slice(7) !== "null" &&
+			authHeader.slice(7) !== "undefined" &&
+			authHeader.slice(7).trim() !== ""
+		) {
+			token = authHeader.slice(7).trim();
 		} else if (auth?.value) {
 			// 2. Fallback: httpOnly cookie (same-origin)
 			token = auth.value as string;

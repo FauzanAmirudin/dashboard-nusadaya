@@ -50,6 +50,7 @@ import { hasRole, useAuthStore } from "@/store";
 import { formatDeviceDateTime } from "@/utils/format";
 import type { AssessmentRecord } from "./akademik/assessment/AssessmentFormCard";
 import { AssessmentFormCard } from "./akademik/assessment/AssessmentFormCard";
+import { TabDataMahasiswa } from "./akademik/TabDataMahasiswa";
 import { TabManajemenMahasiswa } from "./akademik/TabManajemenMahasiswa";
 
 interface DocFile {
@@ -65,10 +66,19 @@ interface DocFile {
 
 interface AkademikPanelProps {
 	studentId: number;
+	studentData?: {
+		nim?: string | null;
+		studentStatus?: string | null;
+		paId?: number | null;
+	};
 	onUpdate: () => void;
 }
 
-export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
+export function AkademikPanel({
+	studentId,
+	studentData,
+	onUpdate,
+}: AkademikPanelProps) {
 	const { user, token } = useAuthStore();
 	const isAkademikAdmin = hasRole(user, "akademik");
 	const isSuperadmin = hasRole(user, "superadmin");
@@ -429,6 +439,12 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 				{/* TABS NAVIGATION */}
 				<div className="flex space-x-2 border-b border-slate-200 mb-6">
 					<button
+						onClick={() => setActiveTab("data-mahasiswa")}
+						className={`px-4 py-2 font-medium text-sm ${activeTab === "data-mahasiswa" ? "border-b-2 border-[#0517B0] text-[#0517B0]" : "text-slate-500 hover:text-slate-700"}`}
+					>
+						Data Mahasiswa (Status & PA)
+					</button>
+					<button
 						onClick={() => setActiveTab("dokumen")}
 						className={`px-4 py-2 font-medium text-sm ${activeTab === "dokumen" ? "border-b-2 border-[#0517B0] text-[#0517B0]" : "text-slate-500 hover:text-slate-700"}`}
 					>
@@ -448,6 +464,17 @@ export function AkademikPanel({ studentId, onUpdate }: AkademikPanelProps) {
 						Assessment Pra-keberangkatan
 					</button>
 				</div>
+
+				{activeTab === "data-mahasiswa" && (
+					<div className="space-y-6">
+						<TabDataMahasiswa
+							studentId={studentId}
+							studentData={studentData}
+							canEdit={canEdit}
+							onUpdate={onUpdate}
+						/>
+					</div>
+				)}
 
 				{activeTab === "dokumen" && (
 					<div className="space-y-6">
