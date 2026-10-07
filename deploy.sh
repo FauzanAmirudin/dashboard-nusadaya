@@ -137,16 +137,16 @@ setup_env() {
         DB_PASS=$(openssl rand -hex 16 2>/dev/null || date +%s%N | sha256sum | head -c 32)
         JWT_SEC=$(openssl rand -hex 24 2>/dev/null || date +%s%N | sha256sum | head -c 48)
 
-        sed -i "s/POSTGRES_PASSWORD=ganti_dengan_password_db_yang_kuat/POSTGRES_PASSWORD=${DB_PASS}/g" .env
-        sed -i "s/ganti_dengan_password_db_yang_kuat/${DB_PASS}/g" .env
-        sed -i "s/JWT_SECRET=ganti_dengan_jwt_secret_acak_minimal_32_karakter/JWT_SECRET=${JWT_SEC}/g" .env
+        sed -i "s/POSTGRES_PASSWORD=your_secure_database_password/POSTGRES_PASSWORD=${DB_PASS}/g" .env
+        sed -i "s/your_secure_database_password/${DB_PASS}/g" .env
+        sed -i "s/JWT_SECRET=your_secure_jwt_secret_key_minimum_32_characters/JWT_SECRET=${JWT_SEC}/g" .env
 
-        PUBLIC_IP=$(curl -s -4 ifconfig.me || curl -s -4 icanhazip.com || echo "76.13.195.74")
+        PUBLIC_IP=$(curl -s -4 --max-time 3 ifconfig.me 2>/dev/null || curl -s -4 --max-time 3 icanhazip.com 2>/dev/null || echo "127.0.0.1")
 
         echo ""
         echo -e "${YELLOW}------------------------------------------------------------${NC}"
         echo -e "${YELLOW}KONFIGURASI ALAMAT AKSES (DOMAIN ATAU IP)${NC}"
-        echo -e "${YELLOW}Domain terdaftar: ${CYAN}onedata-nusadaya.com${NC} (IP VPS: ${CYAN}${PUBLIC_IP}${NC})"
+        echo -e "${YELLOW}Domain terdaftar: ${CYAN}onedata-nusadaya.com${NC} (IP VPS terdeteksi: ${CYAN}${PUBLIC_IP}${NC})"
         echo -e "${YELLOW}------------------------------------------------------------${NC}"
         read -p "Gunakan domain onedata-nusadaya.com? (Y/n): " USE_DOMAIN
         USE_DOMAIN_OPT=${USE_DOMAIN:-"Y"}
@@ -201,6 +201,7 @@ start_containers() {
     }
 
     echo ""
+    log_warn "PERINGATAN SEEDER: Database seeder akan membuat akun demo default ('superadmin'/'password')."
     read -p "Apakah Anda ingin menjalankan seed data default/pengguna awal? (y/N): " RUN_SEED
     if [[ "$RUN_SEED" =~ ^[Yy]$ ]]; then
         log_info "Menjalankan database seeder..."
@@ -273,7 +274,7 @@ cmd_ssl() {
 
     log_info "Meminta sertifikat SSL Let's Encrypt untuk $DOMAIN, www.$DOMAIN, dan $API_DOMAIN..."
     certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" -d "$API_DOMAIN" --non-interactive --agree-tos -m "$CERT_EMAIL" --redirect || {
-        log_warn "Certbot belum berhasil otomatis. Pastikan DNS A record sudah mengarah ke 76.13.195.74."
+        log_warn "Certbot belum berhasil otomatis. Pastikan DNS A record sudah mengarah ke IP publik VPS server ini."
         log_info "Jalankan './deploy.sh ssl' kembali setelah DNS terpropagasi."
         exit 1
     }

@@ -19,6 +19,8 @@ import {
 	invalidateSession,
 	validateAndTouchSession,
 } from "./lib/session";
+// Auth Middleware & Security
+import { JWT_SECRET } from "./middleware/auth";
 import { backupModule } from "./modules/backup";
 import { exportModule } from "./modules/export";
 // Modul Storage Baru
@@ -47,9 +49,6 @@ import { startExportWorker } from "./workers/export.worker";
 import { startFileWorker } from "./workers/file.worker";
 import { startPdfWorker } from "./workers/pdf.worker";
 import { startScheduledWorker } from "./workers/scheduled.worker";
-
-const JWT_SECRET =
-	process.env.JWT_SECRET || "super_secret_jwt_key_nusadaya_2026";
 
 const app = new Elysia()
 	.use(

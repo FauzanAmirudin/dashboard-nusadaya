@@ -3,8 +3,32 @@ import { jwt } from "@elysiajs/jwt";
 import { Elysia } from "elysia";
 import { validateAndTouchSession } from "../lib/session";
 
-const JWT_SECRET =
-	process.env.JWT_SECRET || "super_secret_jwt_key_nusadaya_2026";
+const isProduction = process.env.NODE_ENV === "production";
+const INSECURE_DEFAULT_SECRETS = new Set([
+	"super_secret_jwt_key_nusadaya_2026",
+	"secretkey",
+	"secret",
+	"ganti_dengan_jwt_secret_acak_minimal_32_karakter",
+	"your_secure_jwt_secret_key_minimum_32_characters",
+]);
+
+let resolvedJwtSecret = process.env.JWT_SECRET;
+
+if (isProduction) {
+	if (
+		!resolvedJwtSecret ||
+		INSECURE_DEFAULT_SECRETS.has(resolvedJwtSecret) ||
+		resolvedJwtSecret.length < 32
+	) {
+		throw new Error(
+			"[SECURITY CRITICAL] Server refusing to start in production: JWT_SECRET environment variable must be set to a secure random string (at least 32 characters) and cannot use default/demo keys.",
+		);
+	}
+} else if (!resolvedJwtSecret) {
+	resolvedJwtSecret = "dev_secret_key_nusadaya_local_only_not_for_prod_2026";
+}
+
+const JWT_SECRET: string = resolvedJwtSecret;
 
 // Export JWT_SECRET for reuse
 export { JWT_SECRET };

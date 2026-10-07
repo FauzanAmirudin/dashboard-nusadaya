@@ -36,7 +36,7 @@ services:
       - "127.0.0.1:3001:3001"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-nusadaya}
-      - JWT_SECRET=${JWT_SECRET:-super_secret_jwt_key_nusadaya_2026}
+      - JWT_SECRET=${JWT_SECRET}
       - REDIS_URL=redis://redis:6379
       - TZ=${TZ:-Asia/Jakarta}
       # Connection pool & cache configuration
