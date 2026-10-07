@@ -32,6 +32,42 @@ export async function ensureDatabaseSchema() {
 			SET roles = jsonb_build_array(role) 
 			WHERE roles IS NULL OR jsonb_array_length(roles) = 0;
 		`;
+
+		// Otomatis sinkronisasi email superadmin untuk otentikasi OTP email
+		const superadminEmail = (
+			process.env.SUPERADMIN_EMAIL || "onedatanusadaya@gmail.com"
+		)
+			.trim()
+			.toLowerCase();
+
+		const existingSuperadmin = await client`
+			SELECT id FROM users WHERE username = 'superadmin' LIMIT 1;
+		`;
+
+		if (existingSuperadmin.length > 0) {
+			await client`
+				UPDATE users 
+				SET email = ${superadminEmail} 
+				WHERE username = 'superadmin' AND (email IS NULL OR LOWER(email) != ${superadminEmail});
+			`;
+		} else {
+			const passHash = await Bun.password.hash("password");
+			await client`
+				INSERT INTO users (username, password_hash, full_name, role, roles, email)
+				VALUES ('superadmin', ${passHash}, 'Superadmin Nusadaya', 'superadmin', '["superadmin"]'::jsonb, ${superadminEmail})
+				ON CONFLICT DO NOTHING;
+			`;
+		}
+
+		// Lengkapi email staf demo bawaan yang masih kosong agar siap login via email
+		await client.unsafe(`
+			UPDATE users SET email = 'pmb@nusadaya.ac.id' WHERE username = 'pmb' AND email IS NULL;
+			UPDATE users SET email = 'crm@nusadaya.ac.id' WHERE username = 'crm' AND email IS NULL;
+			UPDATE users SET email = 'finance@nusadaya.ac.id' WHERE username = 'finance' AND email IS NULL;
+			UPDATE users SET email = 'akademik@nusadaya.ac.id' WHERE username = 'akademik' AND email IS NULL;
+			UPDATE users SET email = 'pa@nusadaya.ac.id' WHERE username = 'pa' AND email IS NULL;
+			UPDATE users SET email = 'magang@nusadaya.ac.id' WHERE username = 'magang' AND email IS NULL;
+		`);
 		await client.unsafe(`
 			DO $$
 			BEGIN

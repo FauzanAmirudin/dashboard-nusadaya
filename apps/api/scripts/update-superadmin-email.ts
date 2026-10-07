@@ -13,22 +13,36 @@ async function main() {
 		where: eq(users.username, "superadmin"),
 	});
 
-	if (!existing) {
-		console.error("Akun superadmin belum ditemukan di database!");
-		process.exit(1);
+	if (existing) {
+		await db
+			.update(users)
+			.set({
+				email: targetEmail,
+				updatedAt: new Date(),
+			})
+			.where(eq(users.id, existing.id));
+
+		console.log(
+			`✅ Sukses! Akun superadmin yang ada (ID: ${existing.id}) sekarang terhubung ke email: ${targetEmail}`,
+		);
+	} else {
+		const passwordHash = await Bun.password.hash("password");
+		const [newUser] = await db
+			.insert(users)
+			.values({
+				username: "superadmin",
+				passwordHash,
+				fullName: "Superadmin Nusadaya",
+				role: "superadmin",
+				roles: ["superadmin"],
+				email: targetEmail,
+			})
+			.returning();
+
+		console.log(
+			`✅ Sukses! Akun superadmin baru (ID: ${newUser.id}) berhasil dibuat dengan email: ${targetEmail}`,
+		);
 	}
-
-	await db
-		.update(users)
-		.set({
-			email: targetEmail,
-			updatedAt: new Date(),
-		})
-		.where(eq(users.id, existing.id));
-
-	console.log(
-		`✅ Sukses! Akun superadmin (ID: ${existing.id}) sekarang memiliki email: ${targetEmail}`,
-	);
 	process.exit(0);
 }
 
