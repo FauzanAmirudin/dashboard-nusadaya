@@ -64,7 +64,7 @@ function CredentialsForm({
 						id="email"
 						name="email"
 						type="email"
-						placeholder="onedatanusadaya@gmail.com"
+						placeholder="nama@email.com"
 						value={email}
 						onChange={(e) => setEmail(e.target.value)}
 						required
