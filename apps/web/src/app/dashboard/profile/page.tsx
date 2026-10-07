@@ -13,6 +13,7 @@ import {
 	Phone,
 	Save,
 	Shield,
+	ShieldAlert,
 	ShieldCheck,
 	Trash2,
 	User,
@@ -31,6 +32,14 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -120,6 +129,10 @@ export default function ProfilePage() {
 	const [isSavingProfile, setIsSavingProfile] = useState(false);
 	const [uploadingPhoto, setUploadingPhoto] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+
+	// Email Change Protection State (T7.2)
+	const [isEmailChangeModalOpen, setIsEmailChangeModalOpen] = useState(false);
+	const [emailVerifyPassword, setEmailVerifyPassword] = useState("");
 
 	// Password Form State
 	const [passwordForm, setPasswordForm] = useState({
@@ -233,18 +246,8 @@ export default function ProfilePage() {
 		}
 	};
 
-	// Handle Save Profile
-	const handleSaveProfile = async (e: React.FormEvent) => {
-		e.preventDefault();
-		if (!profileForm.fullName.trim()) {
-			toast.error("Nama lengkap wajib diisi.");
-			return;
-		}
-		if (!profileForm.username.trim()) {
-			toast.error("Username wajib diisi.");
-			return;
-		}
-
+	// Eksekusi update profile ke backend
+	const executeProfileUpdate = async (currentPassword?: string) => {
 		try {
 			setIsSavingProfile(true);
 			const { data, error } = await api.auth.profile.put({
@@ -253,6 +256,7 @@ export default function ProfilePage() {
 				email: profileForm.email.trim() || undefined,
 				phone: profileForm.phone.trim() || undefined,
 				profilePhotoUrl: profileForm.profilePhotoUrl || undefined,
+				currentPassword,
 			});
 
 			if (error) {
@@ -261,7 +265,7 @@ export default function ProfilePage() {
 					(error as any)?.message ||
 					"Gagal memperbarui profil";
 				toast.error(errMsg);
-				return;
+				return false;
 			}
 
 			const resData = data as any;
@@ -276,13 +280,43 @@ export default function ProfilePage() {
 					role: resData.data.role,
 					roles: resData.data.roles,
 				});
+				setIsEmailChangeModalOpen(false);
+				setEmailVerifyPassword("");
+				return true;
 			}
+			return false;
 		} catch (err: any) {
 			console.error("Save profile error:", err);
 			toast.error(err?.message || "Gagal memperbarui data profil.");
+			return false;
 		} finally {
 			setIsSavingProfile(false);
 		}
+	};
+
+	// Handle Save Profile
+	const handleSaveProfile = async (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!profileForm.fullName.trim()) {
+			toast.error("Nama lengkap wajib diisi.");
+			return;
+		}
+		if (!profileForm.username.trim()) {
+			toast.error("Username wajib diisi.");
+			return;
+		}
+
+		// Jika alamat email diubah, minta verifikasi password saat ini (T7.2)
+		const isEmailChanged =
+			profileForm.email.trim().toLowerCase() !==
+			(user?.email || "").trim().toLowerCase();
+		if (isEmailChanged) {
+			setEmailVerifyPassword("");
+			setIsEmailChangeModalOpen(true);
+			return;
+		}
+
+		await executeProfileUpdate();
 	};
 
 	// Handle Change Password
@@ -888,6 +922,77 @@ export default function ProfilePage() {
 					</Tabs>
 				</div>
 			</div>
+
+			{/* Modal Konfirmasi Kata Sandi untuk Perubahan Email (T7.2) */}
+			<Dialog
+				open={isEmailChangeModalOpen}
+				onOpenChange={setIsEmailChangeModalOpen}
+			>
+				<DialogContent className="max-w-md bg-white p-6 rounded-2xl shadow-xl">
+					<DialogHeader>
+						<DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+							<ShieldAlert className="w-5 h-5 text-amber-500" />
+							Konfirmasi Perubahan Email
+						</DialogTitle>
+						<DialogDescription className="text-xs text-slate-500">
+							Mengubah alamat email memengaruhi pengiriman kode OTP verifikasi
+							(2FA). Demi keamanan akun Anda, silakan masukkan kata sandi saat
+							ini.
+						</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-3 py-2">
+						<div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-600 space-y-1">
+							<div>
+								Email Baru:{" "}
+								<strong className="text-slate-900 font-mono">
+									{profileForm.email.trim() || "(Dikosongkan)"}
+								</strong>
+							</div>
+						</div>
+						<div className="space-y-1.5">
+							<Label className="text-xs font-semibold text-slate-700">
+								Kata Sandi Saat Ini <span className="text-red-500">*</span>
+							</Label>
+							<Input
+								type="password"
+								value={emailVerifyPassword}
+								onChange={(e) => setEmailVerifyPassword(e.target.value)}
+								placeholder="Masukkan kata sandi saat ini..."
+								className="h-10 text-xs bg-slate-50 focus:bg-white"
+								autoFocus
+								onKeyDown={(e) => {
+									if (e.key === "Enter" && emailVerifyPassword) {
+										executeProfileUpdate(emailVerifyPassword);
+									}
+								}}
+							/>
+						</div>
+					</div>
+					<DialogFooter className="mt-4 gap-2">
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => setIsEmailChangeModalOpen(false)}
+							className="text-xs"
+						>
+							Batal
+						</Button>
+						<Button
+							type="button"
+							size="sm"
+							disabled={!emailVerifyPassword || isSavingProfile}
+							onClick={() => executeProfileUpdate(emailVerifyPassword)}
+							className="text-xs bg-[#0517B0] hover:bg-blue-800 text-white font-bold"
+						>
+							{isSavingProfile ? (
+								<Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+							) : null}
+							Verifikasi & Terapkan
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

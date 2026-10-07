@@ -25,6 +25,9 @@ export async function ensureDatabaseSchema() {
 			ADD COLUMN IF NOT EXISTS roles JSONB DEFAULT '[]'::jsonb;
 		`;
 		await client`
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users (LOWER(email)) WHERE email IS NOT NULL;
+		`;
+		await client`
 			UPDATE users 
 			SET roles = jsonb_build_array(role) 
 			WHERE roles IS NULL OR jsonb_array_length(roles) = 0;

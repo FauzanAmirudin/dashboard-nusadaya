@@ -252,3 +252,47 @@ export async function invalidateSession(
 		}
 	}
 }
+
+/**
+ * Invalidate all sessions of a specific user (e.g. password change, admin revoke)
+ */
+export async function invalidateAllUserSessions(
+	userId: number,
+	reason: string = "revoked",
+): Promise<void> {
+	if (!userId) return;
+
+	for (const [sId, sData] of memorySessions.entries()) {
+		if (sData.userId === userId) {
+			memorySessions.delete(sId);
+		}
+	}
+
+	if (isRedisReady()) {
+		try {
+			const stream = redis.scanStream({
+				match: "session:*",
+				count: 50,
+			});
+
+			stream.on("data", async (keys: string[]) => {
+				for (const k of keys) {
+					try {
+						const raw = await redis.get(k);
+						if (raw) {
+							const parsed = JSON.parse(raw);
+							if (parsed.userId === userId) {
+								await redis.del(k);
+							}
+						}
+					} catch {}
+				}
+			});
+		} catch (err) {
+			console.warn(
+				"[Session] Error invalidating all user sessions in Redis:",
+				err,
+			);
+		}
+	}
+}

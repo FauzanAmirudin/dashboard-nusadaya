@@ -1,8 +1,11 @@
 import { and, eq, inArray, not } from "drizzle-orm";
 import { Elysia, t } from "elysia";
+import { OTP_CONFIG } from "../config/otp.config";
 import { db } from "../db";
-import { users } from "../db/schema";
+import { auditLogs, users } from "../db/schema";
+import { normalizeEmail } from "../lib/normalize";
 import { hasRole } from "../lib/permissions";
+import { invalidateAllUserSessions } from "../lib/session";
 
 export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 	.derive((context) => {
@@ -78,13 +81,36 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 				return { success: false, message: "Username sudah terdaftar" };
 			}
 
-			const passwordHash = await Bun.password.hash(input.password);
-
 			const userRoles =
 				input.roles && Array.isArray(input.roles) && input.roles.length > 0
 					? input.roles
 					: [input.role];
 			const primaryRole = input.role || userRoles[0];
+
+			const normalizedEmail = normalizeEmail(input.email);
+			const isStaff = OTP_CONFIG.ENFORCED_ROLES.includes(primaryRole);
+			if (isStaff && !normalizedEmail) {
+				set.status = 400;
+				return {
+					success: false,
+					message: `Akun dengan role ${primaryRole.toUpperCase()} wajib memiliki alamat email untuk verifikasi login OTP.`,
+				};
+			}
+
+			if (normalizedEmail) {
+				const existingEmailUser = await db.query.users.findFirst({
+					where: eq(users.email, normalizedEmail),
+				});
+				if (existingEmailUser) {
+					set.status = 400;
+					return {
+						success: false,
+						message: "Alamat email ini sudah terdaftar untuk akun lain.",
+					};
+				}
+			}
+
+			const passwordHash = await Bun.password.hash(input.password);
 
 			const [newUser] = await db
 				.insert(users)
@@ -94,7 +120,7 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 					fullName: input.fullName,
 					role: primaryRole,
 					roles: userRoles,
-					email: input.email || null,
+					email: normalizedEmail,
 					phone: input.phone || null,
 					profilePhotoUrl: input.profilePhotoUrl || null,
 				})
@@ -190,6 +216,32 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 						? userRoles[0]
 						: targetUser.role;
 
+			const newEmail =
+				input.email !== undefined
+					? normalizeEmail(input.email)
+					: targetUser.email;
+			const isStaff = OTP_CONFIG.ENFORCED_ROLES.includes(primaryRole);
+			if (isStaff && !newEmail) {
+				set.status = 400;
+				return {
+					success: false,
+					message: `Akun staf dengan role ${primaryRole.toUpperCase()} wajib memiliki alamat email untuk verifikasi login OTP.`,
+				};
+			}
+
+			if (newEmail && newEmail !== targetUser.email) {
+				const existingEmailUser = await db.query.users.findFirst({
+					where: eq(users.email, newEmail),
+				});
+				if (existingEmailUser && existingEmailUser.id !== targetUser.id) {
+					set.status = 400;
+					return {
+						success: false,
+						message: "Alamat email ini sudah digunakan oleh akun lain.",
+					};
+				}
+			}
+
 			const updateData: any = {
 				fullName:
 					input.fullName !== undefined ? input.fullName : targetUser.fullName,
@@ -197,7 +249,7 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 					input.username !== undefined ? input.username : targetUser.username,
 				role: primaryRole,
 				roles: userRoles,
-				email: input.email !== undefined ? input.email : targetUser.email,
+				email: newEmail,
 				phone: input.phone !== undefined ? input.phone : targetUser.phone,
 				profilePhotoUrl:
 					input.profilePhotoUrl !== undefined
@@ -205,6 +257,9 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 						: targetUser.profilePhotoUrl,
 				updatedAt: new Date(),
 			};
+
+			const emailChanged = newEmail !== targetUser.email;
+			const passwordChanged = !!input.password;
 
 			if (input.password) {
 				updateData.passwordHash = await Bun.password.hash(input.password);
@@ -221,6 +276,28 @@ export const usersRoutes = new Elysia({ prefix: "/manage-users" })
 					role: users.role,
 					roles: users.roles,
 				});
+
+			// Cabut seluruh sesi aktif akun jika kredensial / email diubah oleh admin (T7.5)
+			if (emailChanged || passwordChanged) {
+				await invalidateAllUserSessions(id, "admin_credential_updated");
+			}
+
+			try {
+				await db.insert(auditLogs).values({
+					userId: user.id,
+					action: "user.updated_by_admin",
+					entity: "users",
+					entityId: id,
+					details: {
+						targetUsername: targetUser.username,
+						emailChanged,
+						passwordChanged,
+						timestamp: new Date().toISOString(),
+					},
+				});
+			} catch (auditErr) {
+				console.error("[Users] Audit log error:", auditErr);
+			}
 
 			return { success: true, data: updatedUser };
 		},

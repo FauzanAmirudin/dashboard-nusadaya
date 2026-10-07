@@ -66,10 +66,13 @@ async function seed() {
 	const passwordHash = await Bun.password.hash(password);
 
 	const demoAccounts = [
+		// PERINGATAN: File seed ini HANYA untuk environment lokal / development.
+		// Jangan dijalankan di produksi karena menjalankan TRUNCATE pada tabel.
 		{
 			username: "superadmin",
-			fullName: "Demo Superadmin",
+			fullName: "Superadmin Nusadaya",
 			role: "superadmin" as const,
+			email: "onedatanusadaya@gmail.com",
 		},
 		{ username: "pmb", fullName: "Divisi PMB", role: "pmb" as const },
 		{ username: "crm", fullName: "Divisi CRM", role: "crm" as const },

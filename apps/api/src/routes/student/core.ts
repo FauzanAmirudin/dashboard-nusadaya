@@ -92,11 +92,18 @@ export async function createStudentPipeline(body: any, userId: number) {
 		}
 	}
 	if (body.email) {
+		const cleanEmail = body.email.trim().toLowerCase();
 		const existingEmail = await db.query.students.findFirst({
 			where: eq(students.email, body.email),
 		});
 		if (existingEmail) {
-			throw new Error("Email sudah terdaftar");
+			throw new Error("Email sudah terdaftar pada data mahasiswa");
+		}
+		const existingUserEmail = await db.query.users.findFirst({
+			where: eq(users.email, cleanEmail),
+		});
+		if (existingUserEmail) {
+			throw new Error("Email sudah terdaftar pada akun pengguna lain");
 		}
 	}
 

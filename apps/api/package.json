@@ -9,7 +9,9 @@
 		"db:push": "bunx drizzle-kit push",
 		"db:studio": "bunx drizzle-kit studio",
 		"seed": "bun run seed.ts",
-		"seed:batch": "bun run scripts/seed-users-batch.ts"
+		"seed:batch": "bun run scripts/seed-users-batch.ts",
+		"update:superadmin-email": "bun run scripts/update-superadmin-email.ts",
+		"audit:emails": "bun run scripts/audit-user-emails.ts"
 	},
 	"dependencies": {
 		"@elysiajs/cookie": "latest",
@@ -21,6 +23,7 @@
 		"elysia": "latest",
 		"ioredis": "^6.0.0",
 		"postgres": "latest",
+		"resend": "^6.32.1",
 		"ulidx": "^2.4.1"
 	},
 	"devDependencies": {

@@ -20,7 +20,7 @@ export const users = pgTable("users", {
 	fullName: text("full_name").notNull(),
 	role: roleEnum("role").notNull(),
 	roles: jsonb("roles").$type<string[]>().default([]),
-	email: text("email"),
+	email: text("email").unique(),
 	phone: text("phone"),
 	profilePhotoUrl: text("profile_photo_url"),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
