@@ -293,8 +293,14 @@ function LoginForm() {
 		setIsLocked(false);
 
 		const cleanEmail = email.trim();
-		if (!cleanEmail || !cleanEmail.includes("@")) {
-			setError("Silakan masukkan alamat email atau Gmail yang valid.");
+		if (!cleanEmail) {
+			setError("Silakan masukkan alamat email atau Gmail Anda.");
+			return;
+		}
+		if (!cleanEmail.includes("@")) {
+			setError(
+				"Alamat email tidak valid. Login harus menggunakan email (contoh: user@gmail.com), bukan username.",
+			);
 			return;
 		}
 
@@ -303,8 +309,9 @@ function LoginForm() {
 		try {
 			const res = await api.auth.login.post({
 				email: cleanEmail,
+				username: cleanEmail,
 				password,
-			});
+			} as any);
 
 			const resData = res.data as any;
 			const resError = (res.error?.value as any) || resData;
@@ -332,9 +339,24 @@ function LoginForm() {
 			}
 
 			if (res.error || !resData?.success) {
-				setError(
-					resError?.message || resData?.message || "Email atau password salah.",
-				);
+				const rawMsg = resError?.message || resData?.message;
+				let displayMsg = "Email atau password salah.";
+				if (typeof rawMsg === "string") {
+					if (rawMsg.trim().startsWith("{")) {
+						try {
+							const parsed = JSON.parse(rawMsg);
+							displayMsg =
+								parsed?.summary ||
+								parsed?.message ||
+								"Format data login tidak valid.";
+						} catch {
+							displayMsg = rawMsg;
+						}
+					} else {
+						displayMsg = rawMsg;
+					}
+				}
+				setError(displayMsg);
 				return;
 			}
 

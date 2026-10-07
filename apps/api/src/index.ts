@@ -178,9 +178,24 @@ const app = new Elysia()
 		}
 		if ((code as string) === "VALIDATION") {
 			set.status = 400;
+			let cleanMsg = "Data input tidak valid";
+			try {
+				const raw = (error as any)?.message;
+				if (typeof raw === "string" && raw.trim().startsWith("{")) {
+					const parsed = JSON.parse(raw);
+					cleanMsg =
+						parsed?.summary ||
+						parsed?.message ||
+						"Format input data tidak valid";
+				} else if (typeof raw === "string") {
+					cleanMsg = raw;
+				}
+			} catch {
+				cleanMsg = "Data input tidak valid";
+			}
 			return {
 				success: false,
-				message: (error as any)?.message || "Data input tidak valid",
+				message: cleanMsg,
 			};
 		}
 		if ((code as string) === "PARSE") {
