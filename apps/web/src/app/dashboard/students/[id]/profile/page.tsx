@@ -63,6 +63,7 @@ export default function StudentProfilePage() {
 	const [health, setHealth] = useState<any>(null);
 	const [parents, setParents] = useState<any[]>([]);
 	const [paUsers, setPaUsers] = useState<any[]>([]);
+	const [friendContacts, setFriendContacts] = useState<any[]>([]);
 
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -198,22 +199,31 @@ export default function StudentProfilePage() {
 		if (!id) return;
 		try {
 			setIsLoading(true);
-			const [studentRes, healthRes, parentsRes] = await Promise.all([
-				api.students[id as string].get(),
-				api.students[id as string].health.get(),
-				api.students[id as string].parents.get(),
-			]);
+			const [studentRes, healthRes, parentsRes, friendsRes] = await Promise.all(
+				[
+					api.students[id as string].get(),
+					api.students[id as string].health.get(),
+					api.students[id as string].parents.get(),
+					fetch(`${API_URL}/students/${id}/friend-contacts`, {
+						headers: { Authorization: `Bearer ${getToken()}` },
+					})
+						.then((r) => r.json())
+						.catch(() => ({ data: [] })),
+				],
+			);
 
 			if (studentRes.data?.success && studentRes.data.data?.student) {
 				const std = studentRes.data.data.student;
 				const pmbDataObj = studentRes.data.data.pmb;
 				const healthDataObj = healthRes.data?.data;
 				const parentsList = parentsRes.data?.data || [];
+				const friendsList = friendsRes?.data || [];
 
 				setStudent(std);
 				setPmb(pmbDataObj || null);
 				setHealth(healthDataObj || null);
 				setParents(parentsList);
+				setFriendContacts(Array.isArray(friendsList) ? friendsList : []);
 
 				if (std.profilePhotoUrl) {
 					setPreviewUrl(
@@ -1308,6 +1318,108 @@ export default function StudentProfilePage() {
 							</div>
 						</CardContent>
 					</Card>
+
+					{/* Card 6: Kontak Darurat & Rekan Kawan (Task N-4 & N-5) */}
+					<Card className="shadow-2xs border-slate-200/90 bg-white lg:col-span-2">
+						<CardHeader className="py-3.5 px-5 bg-slate-50/80 border-b border-slate-100 flex flex-row items-center justify-between">
+							<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+								<Phone className="w-4 h-4 text-[#0517B0]" />
+								Kontak Darurat & Rekan Kawan (Prospek)
+							</CardTitle>
+							<Badge
+								variant="outline"
+								className="text-[10px] font-semibold text-slate-500 bg-white"
+							>
+								Kontak Penting
+							</Badge>
+						</CardHeader>
+						<CardContent className="p-5 space-y-6">
+							{/* Section Kontak Darurat */}
+							<div>
+								<h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3 flex items-center gap-1.5">
+									<HeartPulse className="w-3.5 h-3.5 text-rose-500" /> Kontak
+									Darurat Mahasiswa
+								</h4>
+								<div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 border border-slate-200/80 rounded-xl text-xs">
+									<div>
+										<span className="text-slate-400 block text-[10px]">
+											Nama Lengkap
+										</span>
+										<span className="font-semibold text-slate-800">
+											{student.emergencyContactName || "-"}
+										</span>
+									</div>
+									<div>
+										<span className="text-slate-400 block text-[10px]">
+											Nomor WhatsApp
+										</span>
+										<span className="font-mono font-semibold text-slate-800">
+											{student.emergencyContactPhone || "-"}
+										</span>
+									</div>
+									<div>
+										<span className="text-slate-400 block text-[10px]">
+											Hubungan
+										</span>
+										<span className="font-semibold text-slate-800">
+											{student.emergencyContactRelation || "-"}
+										</span>
+									</div>
+								</div>
+							</div>
+
+							{/* Section Kontak Kawan */}
+							<div>
+								<h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3 flex items-center gap-1.5">
+									<Users className="w-3.5 h-3.5 text-[#0517B0]" /> Daftar Nomor
+									Kawan (5 Kontak Prospek)
+								</h4>
+								{friendContacts.length > 0 ? (
+									<div className="border border-slate-200/80 rounded-xl overflow-hidden">
+										<table className="w-full text-xs">
+											<thead className="bg-slate-50 border-b border-slate-200/80 text-[11px] font-semibold text-slate-600">
+												<tr>
+													<th className="py-2.5 px-4 text-left">No</th>
+													<th className="py-2.5 px-4 text-left">Nama Rekan</th>
+													<th className="py-2.5 px-4 text-left">
+														Nomor WhatsApp
+													</th>
+													<th className="py-2.5 px-4 text-left">
+														Asal Sekolah / Hubungan
+													</th>
+												</tr>
+											</thead>
+											<tbody className="divide-y divide-slate-100 text-slate-700">
+												{friendContacts.map((friend: any, index: number) => (
+													<tr
+														key={friend.id || index}
+														className="hover:bg-slate-50/50"
+													>
+														<td className="py-2.5 px-4 font-mono text-[11px] text-slate-400">
+															{index + 1}
+														</td>
+														<td className="py-2.5 px-4 font-semibold text-slate-800">
+															{friend.name || "-"}
+														</td>
+														<td className="py-2.5 px-4 font-mono">
+															{friend.phone || "-"}
+														</td>
+														<td className="py-2.5 px-4">
+															{friend.schoolOrRelation || "-"}
+														</td>
+													</tr>
+												))}
+											</tbody>
+										</table>
+									</div>
+								) : (
+									<p className="text-xs text-slate-400 italic bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-center">
+										Belum ada daftar kontak kawan yang tercatat.
+									</p>
+								)}
+							</div>
+						</CardContent>
+					</Card>
 				</div>
 			) : (
 				/* ========================================================================= */
@@ -2336,49 +2448,87 @@ export default function StudentProfilePage() {
 						</CardHeader>
 						<CardContent className="p-5 space-y-4">
 							<div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-								<div>
-									<Label className="text-xs font-semibold">
-										Status Mahasiswa
-									</Label>
-									<Select
-										value={formData.studentStatus}
-										onValueChange={(val) => updateData("studentStatus", val)}
-									>
-										<SelectTrigger className="h-9 text-xs mt-1">
-											<SelectValue placeholder="Pilih Status" />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="aktif">Aktif</SelectItem>
-											<SelectItem value="cuti">Cuti</SelectItem>
-											<SelectItem value="lulus">Lulus</SelectItem>
-											<SelectItem value="keluar">Keluar</SelectItem>
-											<SelectItem value="drop_out">Drop Out</SelectItem>
-											<SelectItem value="non_aktif">Non Aktif</SelectItem>
-										</SelectContent>
-									</Select>
-								</div>
+								{(() => {
+									const isAcademic =
+										user?.role === "akademik" || user?.role === "superadmin";
 
-								<div>
-									<Label className="text-xs font-semibold">
-										Dosen Pembimbing Akademik (PA)
-									</Label>
-									<Select
-										value={formData.paId}
-										onValueChange={(val) => updateData("paId", val)}
-									>
-										<SelectTrigger className="h-9 text-xs mt-1">
-											<SelectValue placeholder="Pilih Dosen PA" />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="">Belum Ditentukan</SelectItem>
-											{paUsers.map((pa) => (
-												<SelectItem key={pa.id} value={pa.id.toString()}>
-													{pa.fullName}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</div>
+									return (
+										<>
+											<div>
+												<div className="flex items-center justify-between">
+													<Label className="text-xs font-semibold">
+														Status Mahasiswa
+													</Label>
+													{!isAcademic && (
+														<span className="text-[10px] text-amber-600 font-medium">
+															Panel Akademik
+														</span>
+													)}
+												</div>
+												<Select
+													value={formData.studentStatus}
+													onValueChange={(val) =>
+														updateData("studentStatus", val)
+													}
+													disabled={!isAcademic}
+												>
+													<SelectTrigger className="h-9 text-xs mt-1 disabled:bg-slate-100 disabled:text-slate-500">
+														<SelectValue placeholder="Pilih Status" />
+													</SelectTrigger>
+													<SelectContent>
+														<SelectItem value="aktif">Aktif</SelectItem>
+														<SelectItem value="cuti">Cuti</SelectItem>
+														<SelectItem value="lulus">Lulus</SelectItem>
+														<SelectItem value="keluar">Keluar</SelectItem>
+														<SelectItem value="drop_out">Drop Out</SelectItem>
+														<SelectItem value="non_aktif">Non Aktif</SelectItem>
+													</SelectContent>
+												</Select>
+												{!isAcademic && (
+													<p className="text-[10px] text-slate-400 mt-1">
+														Status mahasiswa hanya dapat diubah di Panel
+														Akademik.
+													</p>
+												)}
+											</div>
+
+											<div>
+												<div className="flex items-center justify-between">
+													<Label className="text-xs font-semibold">
+														Dosen Pembimbing Akademik (PA)
+													</Label>
+													{!isAcademic && (
+														<span className="text-[10px] text-amber-600 font-medium">
+															Panel Akademik
+														</span>
+													)}
+												</div>
+												<Select
+													value={formData.paId}
+													onValueChange={(val) => updateData("paId", val)}
+													disabled={!isAcademic}
+												>
+													<SelectTrigger className="h-9 text-xs mt-1 disabled:bg-slate-100 disabled:text-slate-500">
+														<SelectValue placeholder="Pilih Dosen PA" />
+													</SelectTrigger>
+													<SelectContent>
+														<SelectItem value="">Belum Ditentukan</SelectItem>
+														{paUsers.map((pa) => (
+															<SelectItem key={pa.id} value={pa.id.toString()}>
+																{pa.fullName}
+															</SelectItem>
+														))}
+													</SelectContent>
+												</Select>
+												{!isAcademic && (
+													<p className="text-[10px] text-slate-400 mt-1">
+														Penugasan PA hanya dapat diubah di Panel Akademik.
+													</p>
+												)}
+											</div>
+										</>
+									);
+								})()}
 
 								<div>
 									<Label className="text-xs font-semibold">Negara Tujuan</Label>

@@ -7,6 +7,7 @@ import {
 	ChevronDown,
 	ClipboardCheck,
 	ClipboardList,
+	Coins,
 	DatabaseBackup,
 	GraduationCap,
 	HeartHandshake,
@@ -82,13 +83,13 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 		icon: ClipboardList,
 		label: "Panel PMB",
 		href: "/dashboard/pmb",
-		roles: ["superadmin"],
+		roles: ["superadmin", "pmb"],
 	},
 	{
 		icon: PhoneCall,
 		label: "Panel CRM",
 		href: "/dashboard/crm",
-		roles: ["superadmin"],
+		roles: ["superadmin", "crm"],
 	},
 	{
 		icon: Wallet,
@@ -187,6 +188,12 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 		label: "Pengelolaan Pengguna",
 		href: "/dashboard/users",
 		roles: ["superadmin", "akademik"],
+	},
+	{
+		icon: Coins,
+		label: "Standar Biaya Program",
+		href: "/dashboard/settings/program-fees",
+		roles: ["superadmin"],
 	},
 	{
 		icon: DatabaseBackup,

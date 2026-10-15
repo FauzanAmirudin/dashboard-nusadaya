@@ -211,6 +211,7 @@ export const feeShareRecipients = pgTable(
 			.notNull(),
 		namaReferral: text("nama_referral").notNull(),
 		kategori: text("kategori").notNull(), // "Mitra" | "Koordinator" | "Tim Visit" | "Sekolah" | "BKK/FKKS" | "Tim Nusadaya"
+		namaInstitusi: text("nama_institusi"), // Asal Sekolah / Nama BKK / Mitra
 		noRekening: text("no_rekening"),
 		namaBank: text("nama_bank"),
 		noHp: text("no_hp"),
@@ -223,6 +224,23 @@ export const feeShareRecipients = pgTable(
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
 	(t) => [index("idx_fee_share_recipients_student_id").on(t.studentId)],
+);
+
+// 5b. Master Program Fee Defaults (Pagu Biaya Pendidikan per Program)
+export const programFeeDefaults = pgTable(
+	"program_fee_defaults",
+	{
+		id: serial("id").primaryKey(),
+		subProgram: text("sub_program").unique().notNull(),
+		defaultTotalBiaya: integer("default_total_biaya").default(0),
+		defaultRegistrasi: integer("default_registrasi").default(0),
+		defaultPerSemester: integer("default_per_semester").default(0),
+		defaultInterview: integer("default_interview").default(0),
+		defaultKeberangkatan: integer("default_keberangkatan").default(0),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(t) => [index("idx_program_fee_defaults_sub_program").on(t.subProgram)],
 );
 
 export const practicesBudgetRequests = pgTable(

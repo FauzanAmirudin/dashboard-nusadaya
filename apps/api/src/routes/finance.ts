@@ -313,7 +313,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 				noRekening: body.noRekening,
 				namaBank: body.namaBank,
 				noHp: body.noHp,
-				nominalFee: 0,
+				nominalFee: body.nominalFee || 0,
 				statusPencairan: "belum_dibayarkan",
 				createdBy: user.id,
 			});
@@ -326,6 +326,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 				noRekening: t.String(),
 				namaBank: t.String(),
 				noHp: t.String(),
+				nominalFee: t.Optional(t.Number()),
 			}),
 		},
 	)

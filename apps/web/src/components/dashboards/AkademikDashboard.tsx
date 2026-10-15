@@ -70,6 +70,7 @@ export function AkademikDashboard({
 }: any) {
 	const router = useRouter();
 	const [selectedCohort, setSelectedCohort] = useState<string>("all");
+	const [selectedRombel, setSelectedRombel] = useState<string>("all");
 	const [selectedStatus, setSelectedStatus] = useState<string>("all");
 	const [localSearch, setLocalSearch] = useState(searchQuery || "");
 	const [currentPage, setCurrentPage] = useState(1);
@@ -89,6 +90,23 @@ export function AkademikDashboard({
 			if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numB - numA;
 			return b.localeCompare(a);
 		});
+	}, [data]);
+
+	// Available rombels dynamically derived strictly from student data
+	const availableRombels = useMemo(() => {
+		const rombels = new Set<string>();
+		if (data && data.length > 0) {
+			data.forEach((s: any) => {
+				if (s.student?.rombel) {
+					rombels.add(s.student.rombel.trim());
+				}
+			});
+		}
+		if (rombels.size === 0) {
+			rombels.add("Kelas A");
+			rombels.add("Kelas B");
+		}
+		return Array.from(rombels).sort();
 	}, [data]);
 
 	// Filter by cohort first for reactive KPI
@@ -136,7 +154,8 @@ export function AkademikDashboard({
 				(s.student?.program || "").toLowerCase().includes(q) ||
 				(s.student?.subProgram || "").toLowerCase().includes(q) ||
 				(s.student?.destinationCountry || "").toLowerCase().includes(q) ||
-				(s.student?.phone || "").toLowerCase().includes(q);
+				(s.student?.phone || "").toLowerCase().includes(q) ||
+				(s.student?.rombel || "").toLowerCase().includes(q);
 
 			const academicStatus = normalizeStatus(
 				s.academic?.status,
@@ -150,14 +169,19 @@ export function AkademikDashboard({
 			if (selectedStatus === "butuh_perhatian")
 				matchStatus = academicStatus === "BUTUH_PERHATIAN";
 
-			return matchSearch && matchStatus;
+			const studentRombel = (s.student?.rombel || "Kelas A").trim();
+			const matchRombel =
+				selectedRombel === "all" ||
+				studentRombel.toLowerCase() === selectedRombel.toLowerCase();
+
+			return matchSearch && matchStatus && matchRombel;
 		});
-	}, [cohortData, localSearch, searchQuery, selectedStatus]);
+	}, [cohortData, localSearch, searchQuery, selectedStatus, selectedRombel]);
 
 	// Reset page on filter changes
 	useEffect(() => {
 		setCurrentPage(1);
-	}, [selectedCohort, selectedStatus, localSearch]);
+	}, [selectedCohort, selectedRombel, selectedStatus, localSearch]);
 
 	const paginatedData = useMemo(() => {
 		const start = (currentPage - 1) * pageSize;
@@ -206,6 +230,7 @@ export function AkademikDashboard({
 				NIM: s.student?.nim || "-",
 				"Nama Mahasiswa": s.student?.name || "-",
 				Angkatan: s.student?.cohort ? `Angkatan ${s.student.cohort}` : "-",
+				Rombel: s.student?.rombel || "Kelas A",
 				"Tahun Ajaran": s.student?.academicYear || s.student?.period || "-",
 				Peminatan:
 					s.student?.subProgram ||
@@ -359,6 +384,25 @@ export function AkademikDashboard({
 						</Select>
 
 						<Select
+							value={selectedRombel}
+							onValueChange={(val) => setSelectedRombel(val || "all")}
+						>
+							<SelectTrigger className="w-[130px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Semua Rombel">
+									{selectedRombel === "all" ? "Semua Rombel" : selectedRombel}
+								</SelectValue>
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">Semua Rombel</SelectItem>
+								{availableRombels.map((rombel) => (
+									<SelectItem key={rombel} value={rombel}>
+										{rombel}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+
+						<Select
 							value={selectedStatus}
 							onValueChange={(val) => setSelectedStatus(val || "all")}
 						>
@@ -388,6 +432,7 @@ export function AkademikDashboard({
 						{((searchQuery !== undefined ? searchQuery : localSearch).trim() !==
 							"" ||
 							selectedCohort !== "all" ||
+							selectedRombel !== "all" ||
 							selectedStatus !== "all") && (
 							<Button
 								variant="outline"
@@ -396,6 +441,7 @@ export function AkademikDashboard({
 									setLocalSearch("");
 									setSearchQuery?.("");
 									setSelectedCohort("all");
+									setSelectedRombel("all");
 									setSelectedStatus("all");
 								}}
 								className="h-9 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors"
@@ -415,8 +461,8 @@ export function AkademikDashboard({
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs min-w-[180px]">
 										Nama Mahasiswa & NIM
 									</TableHead>
-									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
-										Angkatan
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-32">
+										Angkatan & Rombel
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-32">
 										Tahun Ajaran
@@ -466,16 +512,24 @@ export function AkademikDashboard({
 												</div>
 											</TableCell>
 
-											{/* Angkatan */}
+											{/* Angkatan & Rombel */}
 											<TableCell className="text-center">
-												<Badge
-													variant="outline"
-													className="text-xs font-bold text-slate-700 bg-slate-50 border-slate-200 px-2 py-0.5"
-												>
-													{s.student.cohort
-														? `Angkatan ${s.student.cohort}`
-														: "-"}
-												</Badge>
+												<div className="flex flex-col items-center gap-1">
+													<Badge
+														variant="outline"
+														className="text-xs font-bold text-slate-700 bg-slate-50 border-slate-200 px-2 py-0.5"
+													>
+														{s.student.cohort
+															? `Angkatan ${s.student.cohort}`
+															: "-"}
+													</Badge>
+													<Badge
+														variant="secondary"
+														className="text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-2 py-0"
+													>
+														{s.student.rombel || "Kelas A"}
+													</Badge>
+												</div>
 											</TableCell>
 
 											{/* Tahun Ajaran */}

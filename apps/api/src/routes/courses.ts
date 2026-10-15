@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
 import {
@@ -30,7 +30,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			return { success: false, message: "Unauthorized" };
 		}
 
-		const { cohort, type, peminatan } = query || {};
+		const { cohort, type, peminatan, rombel } = query || {};
 
 		const conditions = [];
 
@@ -41,6 +41,8 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 
 		if (cohort)
 			conditions.push(eq(courses.cohort, parseInt(cohort as string, 10)));
+		if (rombel && rombel !== "all")
+			conditions.push(eq(courses.rombel, rombel as string));
 		if (type && type !== "all")
 			conditions.push(eq(courses.type, type as "teori" | "praktik"));
 		if (peminatan && peminatan !== "all")
@@ -70,24 +72,36 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			}
 
 			const input = body as any;
+			const targetRombel = (input.rombel || "Kelas A").trim();
+			const cohortNum = parseInt(input.cohort, 10);
+			const sksNum = input.sks ? Number(input.sks) : 2;
 
-			// Validation
+			// Validation: allow same code across cohorts or across different rombels (Multi-Kelas Paralel)
 			const existingCourse = await db.query.courses.findFirst({
-				where: eq(courses.code, input.code),
+				where: and(
+					eq(courses.code, input.code.trim()),
+					eq(courses.cohort, cohortNum),
+					eq(courses.rombel, targetRombel),
+				),
 			});
 			if (existingCourse) {
 				set.status = 400;
-				return { success: false, message: "Kode mata kuliah sudah ada" };
+				return {
+					success: false,
+					message: `Mata kuliah dengan kode '${input.code}' untuk Angkatan ${cohortNum} (${targetRombel}) sudah ada.`,
+				};
 			}
 
 			const [newCourse] = await db
 				.insert(courses)
 				.values({
-					code: input.code,
-					name: input.name,
+					code: input.code.trim(),
+					name: input.name.trim(),
+					sks: sksNum,
 					dosenId: input.dosenId,
 					peminatan: input.peminatan || null,
-					cohort: input.cohort,
+					cohort: cohortNum,
+					rombel: targetRombel,
 					type: input.type,
 					createdBy: user.id,
 				})
@@ -150,6 +164,8 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				peminatan: t.Optional(t.String()),
 				cohort: t.Number(),
 				type: t.Enum({ teori: "teori", praktik: "praktik" }),
+				rombel: t.Optional(t.String()),
+				sks: t.Optional(t.Union([t.Number(), t.String()])),
 			}),
 		},
 	)
@@ -191,15 +207,56 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			const id = parseInt(params.id, 10);
 			const input = body as any;
 
+			const current = await db.query.courses.findFirst({
+				where: eq(courses.id, id),
+			});
+
+			if (!current) {
+				set.status = 404;
+				return { success: false, message: "Mata kuliah tidak ditemukan" };
+			}
+
+			const newCode = (input.code ?? current.code).trim();
+			const newCohort =
+				input.cohort !== undefined
+					? parseInt(input.cohort, 10)
+					: current.cohort;
+			const newRombel = (input.rombel ?? current.rombel ?? "Kelas A").trim();
+			const newSks = input.sks !== undefined ? Number(input.sks) : current.sks;
+
+			// Validate duplicate course (code + cohort + rombel) excluding current
+			const existingDuplicate = await db.query.courses.findFirst({
+				where: and(
+					eq(courses.code, newCode),
+					eq(courses.cohort, newCohort),
+					eq(courses.rombel, newRombel),
+					ne(courses.id, id),
+				),
+			});
+
+			if (existingDuplicate) {
+				set.status = 400;
+				return {
+					success: false,
+					message: `Mata kuliah dengan kode '${newCode}' untuk Angkatan ${newCohort} (${newRombel}) sudah ada.`,
+				};
+			}
+
 			const [updated] = await db
 				.update(courses)
 				.set({
-					code: input.code,
-					name: input.name,
-					dosenId: input.dosenId,
-					peminatan: input.peminatan || null,
-					cohort: input.cohort,
-					type: input.type,
+					code: newCode,
+					name: input.name !== undefined ? input.name.trim() : current.name,
+					sks: newSks,
+					dosenId:
+						input.dosenId !== undefined ? input.dosenId : current.dosenId,
+					peminatan:
+						input.peminatan !== undefined
+							? input.peminatan || null
+							: current.peminatan,
+					cohort: newCohort,
+					rombel: newRombel,
+					type: input.type !== undefined ? input.type : current.type,
 					updatedAt: new Date(),
 				})
 				.where(eq(courses.id, id))
@@ -209,12 +266,14 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 		},
 		{
 			body: t.Object({
-				code: t.String(),
-				name: t.String(),
-				dosenId: t.Number(),
+				code: t.Optional(t.String()),
+				name: t.Optional(t.String()),
+				dosenId: t.Optional(t.Number()),
 				peminatan: t.Optional(t.String()),
-				cohort: t.Number(),
-				type: t.Enum({ teori: "teori", praktik: "praktik" }),
+				cohort: t.Optional(t.Number()),
+				type: t.Optional(t.Enum({ teori: "teori", praktik: "praktik" })),
+				rombel: t.Optional(t.String()),
+				sks: t.Optional(t.Union([t.Number(), t.String()])),
 			}),
 		},
 	)

@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import {
 	CheckCircle,
 	CheckCircle2,
@@ -68,6 +69,7 @@ export function PmbPanel({
 	studentData,
 	onUpdate,
 }: PmbPanelProps) {
+	const queryClient = useQueryClient();
 	const { user } = useAuthStore();
 	const isPmbAdmin = hasRole(user, "pmb", "superadmin");
 	const canEdit = isPmbAdmin;
@@ -139,6 +141,27 @@ export function PmbPanel({
 			const res = await api.students[studentId.toString()].pmb.acc.post();
 			if (res.data?.success) {
 				toast.success("Panel PMB berhasil disetujui (ACC)!");
+				queryClient.invalidateQueries({ queryKey: ["students-list"] });
+				queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+				queryClient.invalidateQueries({
+					queryKey: ["student", studentId.toString()],
+				});
+				queryClient.invalidateQueries({
+					queryKey: ["student-detail", studentId.toString()],
+				});
+				window.dispatchEvent(
+					new CustomEvent("student-updated", { detail: { studentId } }),
+				);
+				window.dispatchEvent(
+					new CustomEvent("pmb-progress-sync", { detail: { studentId } }),
+				);
+				try {
+					if (typeof BroadcastChannel !== "undefined") {
+						const channel = new BroadcastChannel("dashboard-realtime-sync");
+						channel.postMessage({ type: "pmb-acc", studentId });
+						channel.close();
+					}
+				} catch {}
 				fetchPmbData();
 				onUpdate();
 			} else {
@@ -158,6 +181,27 @@ export function PmbPanel({
 				await api.students[studentId.toString()].pmb["cancel-acc"].post();
 			if (res.data?.success) {
 				toast.success("Status ACC PMB berhasil dibatalkan");
+				queryClient.invalidateQueries({ queryKey: ["students-list"] });
+				queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+				queryClient.invalidateQueries({
+					queryKey: ["student", studentId.toString()],
+				});
+				queryClient.invalidateQueries({
+					queryKey: ["student-detail", studentId.toString()],
+				});
+				window.dispatchEvent(
+					new CustomEvent("student-updated", { detail: { studentId } }),
+				);
+				window.dispatchEvent(
+					new CustomEvent("pmb-progress-sync", { detail: { studentId } }),
+				);
+				try {
+					if (typeof BroadcastChannel !== "undefined") {
+						const channel = new BroadcastChannel("dashboard-realtime-sync");
+						channel.postMessage({ type: "pmb-cancel-acc", studentId });
+						channel.close();
+					}
+				} catch {}
 				fetchPmbData();
 				onUpdate();
 			} else {
@@ -178,14 +222,14 @@ export function PmbPanel({
 				subtitle="Dikelola oleh: Admin PMB & Superadmin"
 				progressTag={
 					<span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-						Dokumen: {totalRequiredCompleted16}/16 Wajib
+						Dokumen: {totalRequiredCompleted16}/17 Wajib
 					</span>
 				}
 				badge={
 					<PanelStatusBadge
 						isAcc={pmbData?.isAcc}
 						completed={totalRequiredCompleted16}
-						total={16}
+						total={17}
 						size="lg"
 					/>
 				}
@@ -212,7 +256,7 @@ export function PmbPanel({
 						<CheckCircle2 className="w-4 h-4 text-emerald-600" />
 						<span>Dokumen Mahasiswa</span>
 						<span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-200">
-							{totalRequiredCompleted16}/16
+							{totalRequiredCompleted16}/17
 						</span>
 					</TabsTrigger>
 					<TabsTrigger

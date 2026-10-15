@@ -101,6 +101,38 @@ export function SharedDashboardLoader({
 
 	const data = (studentsResult?.data || []) as any[];
 
+	// Real-time synchronization across window events, cross-tab broadcasts, and window focus
+	useEffect(() => {
+		const handleDataSync = () => {
+			refetch();
+		};
+
+		window.addEventListener("student-updated", handleDataSync);
+		window.addEventListener("pmb-progress-sync", handleDataSync);
+		window.addEventListener("crm-progress-sync", handleDataSync);
+		window.addEventListener("focus", handleDataSync);
+
+		let channel: BroadcastChannel | null = null;
+		try {
+			if (typeof BroadcastChannel !== "undefined") {
+				channel = new BroadcastChannel("dashboard-realtime-sync");
+				channel.onmessage = () => {
+					refetch();
+				};
+			}
+		} catch {}
+
+		return () => {
+			window.removeEventListener("student-updated", handleDataSync);
+			window.removeEventListener("pmb-progress-sync", handleDataSync);
+			window.removeEventListener("crm-progress-sync", handleDataSync);
+			window.removeEventListener("focus", handleDataSync);
+			if (channel) {
+				channel.close();
+			}
+		};
+	}, [refetch]);
+
 	useEffect(() => {
 		if (!hasHydrated) return;
 		if (!isAuthenticated) {
@@ -171,6 +203,7 @@ export function SharedDashboardLoader({
 				searchQuery={searchQuery}
 				setSearchQuery={setSearchQuery}
 				user={user}
+				onUpdate={() => refetch()}
 			/>
 		);
 	if (module === "crm")
@@ -180,6 +213,7 @@ export function SharedDashboardLoader({
 				searchQuery={searchQuery}
 				setSearchQuery={setSearchQuery}
 				user={user}
+				onUpdate={() => refetch()}
 			/>
 		);
 	if (module === "akademik")

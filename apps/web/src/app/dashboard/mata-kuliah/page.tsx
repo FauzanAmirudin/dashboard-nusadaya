@@ -11,6 +11,7 @@ import {
 	Search,
 	Settings,
 	Trash2,
+	Users2,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -52,6 +53,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { DEFAULT_ROMBEL_OPTIONS } from "@/constants/rooms";
 import { api } from "@/lib/eden";
 import { getPeminatanOption, PEMINATAN_OPTIONS } from "@/lib/peminatan";
 import { cn } from "@/lib/utils";
@@ -61,6 +63,8 @@ type CourseData = {
 	id: number;
 	code: string;
 	name: string;
+	sks?: number;
+	rombel?: string;
 	dosenId: number;
 	dosen: { id: number; fullName: string };
 	peminatan: string | null;
@@ -82,6 +86,7 @@ export default function MataKuliahPage() {
 	// Filters
 	const [searchQuery, setSearchQuery] = useState("");
 	const [filterCohort, setFilterCohort] = useState<string>("all");
+	const [filterRombel, setFilterRombel] = useState<string>("all");
 	const [filterType, setFilterType] = useState<string>("all");
 	const [filterPeminatan, setFilterPeminatan] = useState<string>("all");
 
@@ -97,6 +102,8 @@ export default function MataKuliahPage() {
 	const initialForm = {
 		code: "",
 		name: "",
+		sks: "2",
+		rombel: "Kelas A",
 		dosenId: "",
 		peminatan: "",
 		cohort: "",
@@ -109,6 +116,7 @@ export default function MataKuliahPage() {
 			const { data, error } = await api.courses.get({
 				$query: {
 					...(filterCohort !== "all" && { cohort: filterCohort }),
+					...(filterRombel !== "all" && { rombel: filterRombel }),
 					...(filterType !== "all" && { type: filterType }),
 					...(filterPeminatan !== "all" && { peminatan: filterPeminatan }),
 				},
@@ -178,11 +186,24 @@ export default function MataKuliahPage() {
 				fetchDosen();
 			}
 		}
-	}, [hasHydrated, user, filterCohort, filterType, filterPeminatan]);
+	}, [
+		hasHydrated,
+		user,
+		filterCohort,
+		filterRombel,
+		filterType,
+		filterPeminatan,
+	]);
 
 	const availableCohorts = useMemo(() => {
 		const fromData = courses.map((c) => c.cohort).filter(Boolean);
 		return Array.from(new Set(fromData)).sort((a, b) => Number(b) - Number(a));
+	}, [courses]);
+
+	const availableRombels = useMemo(() => {
+		const fromData = courses.map((c) => c.rombel).filter(Boolean) as string[];
+		const set = new Set<string>(["Kelas A", "Kelas B", ...fromData]);
+		return Array.from(set).sort();
 	}, [courses]);
 
 	const uniquePeminatan = useMemo(() => {
@@ -208,16 +229,29 @@ export default function MataKuliahPage() {
 
 		setIsSaving(true);
 		try {
+			const sksVal = formData.sks ? parseInt(formData.sks, 10) : 2;
+			const rombelVal = (formData.rombel || "Kelas A").trim();
+
 			if (editingId) {
 				const { data, error } = await api.courses[editingId].patch({
-					code: formData.code,
-					name: formData.name,
+					code: formData.code.trim(),
+					name: formData.name.trim(),
+					sks: sksVal,
+					rombel: rombelVal,
 					dosenId: dosenIdPayload,
 					peminatan: formData.peminatan || undefined,
 					cohort: parseInt(formData.cohort, 10),
 					type: formData.type as "teori" | "praktik",
 				});
-				if (error) throw error;
+				if (error) {
+					const msg =
+						typeof error.value === "object" && (error.value as any)?.message
+							? (error.value as any).message
+							: "Gagal memperbarui data";
+					toast.error(msg);
+					setIsSaving(false);
+					return;
+				}
 				if (data?.success) {
 					toast.success("Mata kuliah berhasil diperbarui");
 					setIsEditOpen(false);
@@ -225,14 +259,24 @@ export default function MataKuliahPage() {
 				}
 			} else {
 				const { data, error } = await api.courses.post({
-					code: formData.code,
-					name: formData.name,
+					code: formData.code.trim(),
+					name: formData.name.trim(),
+					sks: sksVal,
+					rombel: rombelVal,
 					dosenId: dosenIdPayload,
 					peminatan: formData.peminatan || undefined,
 					cohort: parseInt(formData.cohort, 10),
 					type: formData.type as "teori" | "praktik",
 				});
-				if (error) throw error;
+				if (error) {
+					const msg =
+						typeof error.value === "object" && (error.value as any)?.message
+							? (error.value as any).message
+							: "Gagal menambahkan mata kuliah";
+					toast.error(msg);
+					setIsSaving(false);
+					return;
+				}
 				if (data?.success) {
 					toast.success("Mata kuliah berhasil ditambahkan");
 					setIsAddOpen(false);
@@ -273,6 +317,8 @@ export default function MataKuliahPage() {
 		setFormData({
 			code: course.code,
 			name: course.name,
+			sks: course.sks ? course.sks.toString() : "2",
+			rombel: course.rombel || "Kelas A",
 			dosenId: dId,
 			peminatan: course.peminatan || "",
 			cohort: course.cohort ? course.cohort.toString() : "",
@@ -319,12 +365,14 @@ export default function MataKuliahPage() {
 	const isFilterActive =
 		searchQuery.trim() !== "" ||
 		filterCohort !== "all" ||
+		filterRombel !== "all" ||
 		filterType !== "all" ||
 		filterPeminatan !== "all";
 
 	const resetFilters = () => {
 		setSearchQuery("");
 		setFilterCohort("all");
+		setFilterRombel("all");
 		setFilterType("all");
 		setFilterPeminatan("all");
 	};
@@ -409,7 +457,7 @@ export default function MataKuliahPage() {
 								value={filterCohort}
 								onValueChange={(val) => setFilterCohort(val || "all")}
 							>
-								<SelectTrigger className="w-full sm:w-[150px] bg-white h-9 text-xs border-slate-200">
+								<SelectTrigger className="w-full sm:w-[140px] bg-white h-9 text-xs border-slate-200">
 									<SelectValue placeholder="Angkatan">
 										{filterCohort === "all"
 											? "Semua Angkatan"
@@ -427,6 +475,28 @@ export default function MataKuliahPage() {
 											className="text-xs"
 										>
 											Angkatan {cohort}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+
+							{/* Filter Rombel */}
+							<Select
+								value={filterRombel}
+								onValueChange={(val) => setFilterRombel(val || "all")}
+							>
+								<SelectTrigger className="w-full sm:w-[135px] bg-white h-9 text-xs border-slate-200">
+									<SelectValue placeholder="Rombel">
+										{filterRombel === "all" ? "Semua Rombel" : filterRombel}
+									</SelectValue>
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="all" className="text-xs">
+										Semua Rombel
+									</SelectItem>
+									{availableRombels.map((rombel) => (
+										<SelectItem key={rombel} value={rombel} className="text-xs">
+											{rombel}
 										</SelectItem>
 									))}
 								</SelectContent>
@@ -507,7 +577,7 @@ export default function MataKuliahPage() {
 							<TableHeader>
 								<TableRow className="bg-slate-50/80 hover:bg-slate-50/80 border-b border-slate-200">
 									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 w-28 text-xs">
-										Kode
+										Kode & SKS
 									</TableHead>
 									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 min-w-[200px] text-xs">
 										Nama Mata Kuliah
@@ -515,11 +585,11 @@ export default function MataKuliahPage() {
 									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 min-w-[170px] text-xs">
 										Dosen Pengampu
 									</TableHead>
-									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 min-w-[160px] text-xs">
+									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 min-w-[150px] text-xs">
 										Peminatan
 									</TableHead>
-									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 text-center w-28 text-xs">
-										Angkatan
+									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 text-center w-36 text-xs">
+										Angkatan & Rombel
 									</TableHead>
 									<TableHead className="font-semibold text-slate-700 py-3.5 px-4 text-center w-24 text-xs">
 										Jenis
@@ -573,9 +643,14 @@ export default function MataKuliahPage() {
 											className="hover:bg-slate-50/70 border-b border-slate-100 transition-colors"
 										>
 											<TableCell className="py-3.5 px-4">
-												<span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-													{c.code}
-												</span>
+												<div className="flex flex-col gap-1 items-start">
+													<span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+														{c.code}
+													</span>
+													<span className="text-[10px] font-semibold text-slate-500">
+														{c.sks || 2} SKS
+													</span>
+												</div>
 											</TableCell>
 											<TableCell className="py-3.5 px-4 font-bold text-slate-900 text-sm">
 												<Link
@@ -599,12 +674,21 @@ export default function MataKuliahPage() {
 												)}
 											</TableCell>
 											<TableCell className="text-center py-3.5 px-4">
-												<Badge
-													variant="outline"
-													className="bg-slate-50 border-slate-200 text-slate-700 font-bold text-xs px-2.5 py-0.5"
-												>
-													Angkatan {c.cohort}
-												</Badge>
+												<div className="flex flex-col gap-1 items-center justify-center">
+													<Badge
+														variant="outline"
+														className="bg-slate-50 border-slate-200 text-slate-700 font-bold text-xs px-2.5 py-0.5"
+													>
+														Angkatan {c.cohort}
+													</Badge>
+													<Badge
+														variant="outline"
+														className="bg-purple-50 text-purple-700 border-purple-200 text-[10px] font-semibold px-1.5 py-0.5"
+													>
+														<Users2 className="w-2.5 h-2.5 mr-1" />
+														{c.rombel || "Kelas A"}
+													</Badge>
+												</div>
 											</TableCell>
 											<TableCell className="text-center py-3.5 px-4">
 												<Badge
@@ -726,6 +810,24 @@ export default function MataKuliahPage() {
 								/>
 							</div>
 							<div className="space-y-2">
+								<Label>Bobot SKS *</Label>
+								<Input
+									required
+									type="number"
+									min={1}
+									max={10}
+									placeholder="2"
+									className="border border-slate-200"
+									value={formData.sks}
+									onChange={(e) =>
+										setFormData({ ...formData, sks: e.target.value })
+									}
+								/>
+							</div>
+						</div>
+
+						<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+							<div className="space-y-2">
 								<Label>Angkatan *</Label>
 								<Input
 									required
@@ -737,6 +839,39 @@ export default function MataKuliahPage() {
 										setFormData({ ...formData, cohort: e.target.value })
 									}
 								/>
+							</div>
+							<div className="space-y-2">
+								<div className="flex items-center justify-between">
+									<Label>Rombel *</Label>
+									<span className="text-[10px] text-slate-400">
+										Kustom dinamis
+									</span>
+								</div>
+								<Input
+									required
+									placeholder="Cth: Kelas A, Kelas B, Gabungan..."
+									className="border border-slate-200"
+									value={formData.rombel}
+									onChange={(e) =>
+										setFormData({ ...formData, rombel: e.target.value })
+									}
+								/>
+								<div className="flex flex-wrap gap-1 pt-1">
+									{DEFAULT_ROMBEL_OPTIONS.map((opt) => (
+										<button
+											key={opt}
+											type="button"
+											onClick={() => setFormData({ ...formData, rombel: opt })}
+											className={`text-[11px] px-2 py-0.5 rounded-md font-medium transition-colors ${
+												formData.rombel === opt
+													? "bg-[#0517B0] text-white"
+													: "bg-slate-100 text-slate-600 hover:bg-slate-200"
+											}`}
+										>
+											{opt}
+										</button>
+									))}
+								</div>
 							</div>
 						</div>
 

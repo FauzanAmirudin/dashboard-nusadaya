@@ -18,9 +18,9 @@ export function StudentProgress({
 	const [total, setTotal] = useState(0);
 	const [completed, setCompleted] = useState(0);
 
-	// Sync with custom event crm-progress-sync for instantaneous 0ms reactivity
+	// Sync with custom events (crm-progress-sync, pmb-progress-sync) for instantaneous 0ms reactivity
 	useEffect(() => {
-		const handleSync = (e: any) => {
+		const handleCrmSync = (e: any) => {
 			if (e.detail?.studentId === studentId) {
 				if (userRole === "crm" || !userRole) {
 					if (typeof e.detail.completed === "number") {
@@ -36,11 +36,40 @@ export function StudentProgress({
 				}
 			}
 		};
-		window.addEventListener("crm-progress-sync", handleSync as EventListener);
+
+		const handlePmbSync = (e: any) => {
+			if (e.detail?.studentId === studentId) {
+				if (userRole === "pmb" || !userRole) {
+					if (typeof e.detail.completed === "number") {
+						setCompleted((prev) =>
+							prev === e.detail.completed ? prev : e.detail.completed,
+						);
+					}
+					if (typeof e.detail.total === "number") {
+						setTotal((prev) =>
+							prev === e.detail.total ? prev : e.detail.total,
+						);
+					}
+				}
+			}
+		};
+
+		window.addEventListener(
+			"crm-progress-sync",
+			handleCrmSync as EventListener,
+		);
+		window.addEventListener(
+			"pmb-progress-sync",
+			handlePmbSync as EventListener,
+		);
 		return () => {
 			window.removeEventListener(
 				"crm-progress-sync",
-				handleSync as EventListener,
+				handleCrmSync as EventListener,
+			);
+			window.removeEventListener(
+				"pmb-progress-sync",
+				handlePmbSync as EventListener,
 			);
 		};
 	}, [studentId, userRole]);

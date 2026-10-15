@@ -29,7 +29,7 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 	// CLASS SCHEDULES
 	// =========================================================================
 	.get("/class-schedules", async ({ query }) => {
-		const { cohort, dayOfWeek, calendarId } = query;
+		const { cohort, dayOfWeek, calendarId, rombel } = query;
 
 		const conditions = [];
 		if (cohort)
@@ -42,6 +42,8 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 			conditions.push(
 				eq(classSchedules.calendarId, parseInt(calendarId as string, 10)),
 			);
+		if (rombel && rombel !== "all")
+			conditions.push(eq(classSchedules.rombel, rombel as string));
 
 		const data = await db.query.classSchedules.findMany({
 			where: conditions.length > 0 ? and(...conditions) : undefined,
@@ -59,6 +61,8 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 		"/class-schedules",
 		async ({ body, set }) => {
 			const payload = body as any;
+			const targetRombel = (payload.rombel || "Kelas A").trim();
+			const targetRoom = (payload.room || "").trim();
 
 			// Conflict Validation
 			const existingClass = await db.query.classSchedules.findMany({
@@ -71,14 +75,14 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 				where: eq(dutySchedules.dayOfWeek, payload.dayOfWeek),
 			});
 
-			// Check Room Conflict
+			// 1. Check Room Conflict
 			const allRoomSchedules = [
 				...existingClass,
 				...existingPracticum,
 				...existingDuty,
 			].filter(
 				(s) =>
-					s.room === payload.room &&
+					s.room?.trim().toLowerCase() === targetRoom.toLowerCase() &&
 					(!payload.sessionDate ||
 						!s.sessionDate ||
 						payload.sessionDate === s.sessionDate),
@@ -98,12 +102,12 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 					set.status = 400;
 					return {
 						success: false,
-						message: `Konflik Ruangan: Ruang ${payload.room} sudah terpakai pada rentang waktu ini.`,
+						message: `Konflik Ruangan: Ruang '${targetRoom}' sudah terpakai pada rentang waktu ini.`,
 					};
 				}
 			}
 
-			// Check Dosen Conflict
+			// 2. Check Dosen Conflict
 			if (payload.dosenId) {
 				const allDosenSchedules = [
 					...existingClass,
@@ -130,9 +134,45 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 						set.status = 400;
 						return {
 							success: false,
-							message: `Konflik Dosen: Dosen sudah memiliki jadwal mengajar pada rentang waktu ini.`,
+							message: `Konflik Dosen: Dosen pengampu sudah memiliki jadwal mengajar pada rentang waktu ini.`,
 						};
 					}
+				}
+			}
+
+			// 3. Check Rombel / Student Conflict
+			const cohortNum = parseInt(payload.cohort, 10);
+			const allCohortSchedules = [
+				...existingClass,
+				...existingPracticum,
+			].filter(
+				(s) =>
+					s.cohort === cohortNum &&
+					s.rombel &&
+					(s.rombel.trim().toLowerCase() === targetRombel.toLowerCase() ||
+						s.rombel.trim().toLowerCase() === "gabungan" ||
+						targetRombel.toLowerCase() === "gabungan") &&
+					(!payload.sessionDate ||
+						!s.sessionDate ||
+						payload.sessionDate === s.sessionDate),
+			);
+
+			for (const s of allCohortSchedules) {
+				if (
+					s.startTime &&
+					s.endTime &&
+					isTimeOverlap(
+						payload.startTime,
+						payload.endTime,
+						s.startTime,
+						s.endTime,
+					)
+				) {
+					set.status = 400;
+					return {
+						success: false,
+						message: `Konflik Jadwal Rombel: Angkatan ${cohortNum} (${targetRombel}) sudah memiliki perkuliahan '${s.subject}' pada rentang waktu ini.`,
+					};
 				}
 			}
 
@@ -141,8 +181,9 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 				.values({
 					subject: payload.subject,
 					dosenId: payload.dosenId,
-					cohort: parseInt(payload.cohort, 10),
-					room: payload.room,
+					cohort: cohortNum,
+					rombel: targetRombel,
+					room: targetRoom,
 					dayOfWeek: payload.dayOfWeek,
 					sessionDate: payload.sessionDate || null,
 					startTime: payload.startTime,
@@ -161,6 +202,7 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 				subject: t.String(),
 				dosenId: t.Optional(t.Number()),
 				cohort: t.Union([t.String(), t.Number()]),
+				rombel: t.Optional(t.String()),
 				room: t.String(),
 				dayOfWeek: t.String(),
 				sessionDate: t.Optional(t.String()),
@@ -171,18 +213,125 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 			}),
 		},
 	)
-	.patch("/class-schedules/:id", async ({ params, body }) => {
+	.patch("/class-schedules/:id", async ({ params, body, set }) => {
 		const id = parseInt(params.id, 10);
 		const payload = body as any;
 
-		// TODO: Advanced conflict check on update could skip itself, simplified for now
+		const current = await db.query.classSchedules.findFirst({
+			where: eq(classSchedules.id, id),
+		});
+		if (!current) {
+			set.status = 404;
+			return { success: false, message: "Jadwal kelas tidak ditemukan" };
+		}
+
+		const dayOfWeek = payload.dayOfWeek ?? current.dayOfWeek;
+		const startTime = payload.startTime ?? current.startTime;
+		const endTime = payload.endTime ?? current.endTime;
+		const room = (payload.room ?? current.room).trim();
+		const dosenId =
+			payload.dosenId !== undefined ? payload.dosenId : current.dosenId;
+		const cohort =
+			payload.cohort !== undefined
+				? parseInt(payload.cohort, 10)
+				: current.cohort;
+		const rombel = (payload.rombel ?? current.rombel ?? "Kelas A").trim();
+		const sessionDate =
+			payload.sessionDate !== undefined
+				? payload.sessionDate
+				: current.sessionDate;
+
+		// Conflict Validation (excluding self)
+		const existingClass = await db.query.classSchedules.findMany({
+			where: and(
+				eq(classSchedules.dayOfWeek, dayOfWeek),
+				not(eq(classSchedules.id, id)),
+			),
+		});
+		const existingPracticum = await db.query.practicumSchedules.findMany({
+			where: eq(practicumSchedules.dayOfWeek, dayOfWeek),
+		});
+		const existingDuty = await db.query.dutySchedules.findMany({
+			where: eq(dutySchedules.dayOfWeek, dayOfWeek),
+		});
+
+		// 1. Room conflict
+		const allRoomSchedules = [
+			...existingClass,
+			...existingPracticum,
+			...existingDuty,
+		].filter(
+			(s) =>
+				s.room?.trim().toLowerCase() === room.toLowerCase() &&
+				(!sessionDate || !s.sessionDate || sessionDate === s.sessionDate),
+		);
+		for (const s of allRoomSchedules) {
+			if (
+				s.startTime &&
+				s.endTime &&
+				isTimeOverlap(startTime, endTime, s.startTime, s.endTime)
+			) {
+				set.status = 400;
+				return {
+					success: false,
+					message: `Konflik Ruangan: Ruang '${room}' sudah terpakai pada rentang waktu ini.`,
+				};
+			}
+		}
+
+		// 2. Dosen conflict
+		if (dosenId) {
+			const allDosenSchedules = [...existingClass, ...existingPracticum].filter(
+				(s) =>
+					s.dosenId === dosenId &&
+					(!sessionDate || !s.sessionDate || sessionDate === s.sessionDate),
+			);
+			for (const s of allDosenSchedules) {
+				if (
+					s.startTime &&
+					s.endTime &&
+					isTimeOverlap(startTime, endTime, s.startTime, s.endTime)
+				) {
+					set.status = 400;
+					return {
+						success: false,
+						message: `Konflik Dosen: Dosen pengampu sudah memiliki jadwal mengajar pada rentang waktu ini.`,
+					};
+				}
+			}
+		}
+
+		// 3. Rombel conflict
+		const allCohortSchedules = [...existingClass, ...existingPracticum].filter(
+			(s) =>
+				s.cohort === cohort &&
+				s.rombel &&
+				(s.rombel.trim().toLowerCase() === rombel.toLowerCase() ||
+					s.rombel.trim().toLowerCase() === "gabungan" ||
+					rombel.toLowerCase() === "gabungan") &&
+				(!sessionDate || !s.sessionDate || sessionDate === s.sessionDate),
+		);
+		for (const s of allCohortSchedules) {
+			if (
+				s.startTime &&
+				s.endTime &&
+				isTimeOverlap(startTime, endTime, s.startTime, s.endTime)
+			) {
+				set.status = 400;
+				return {
+					success: false,
+					message: `Konflik Jadwal Rombel: Angkatan ${cohort} (${rombel}) sudah memiliki perkuliahan '${s.subject}' pada rentang waktu ini.`,
+				};
+			}
+		}
 
 		const updateData: any = { updatedAt: new Date() };
 		if (payload.subject !== undefined) updateData.subject = payload.subject;
 		if (payload.dosenId !== undefined) updateData.dosenId = payload.dosenId;
 		if (payload.cohort !== undefined)
 			updateData.cohort = parseInt(payload.cohort, 10);
-		if (payload.room !== undefined) updateData.room = payload.room;
+		if (payload.rombel !== undefined) updateData.rombel = rombel;
+		if (payload.room !== undefined) updateData.room = room;
 		if (payload.dayOfWeek !== undefined)
 			updateData.dayOfWeek = payload.dayOfWeek;
 		if (payload.sessionDate !== undefined)
@@ -215,7 +364,7 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 	// PRACTICUM SCHEDULES
 	// =========================================================================
 	.get("/practicum-schedules", async ({ query }) => {
-		const { cohort, dayOfWeek, calendarId } = query;
+		const { cohort, dayOfWeek, calendarId, rombel } = query;
 
 		const conditions = [];
 		if (cohort)
@@ -228,6 +377,8 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 			conditions.push(
 				eq(practicumSchedules.calendarId, parseInt(calendarId as string, 10)),
 			);
+		if (rombel && rombel !== "all")
+			conditions.push(eq(practicumSchedules.rombel, rombel as string));
 
 		const data = await db.query.practicumSchedules.findMany({
 			where: conditions.length > 0 ? and(...conditions) : undefined,
@@ -248,8 +399,10 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 		"/practicum-schedules",
 		async ({ body, set }) => {
 			const payload = body as any;
+			const targetRombel = (payload.rombel || "Kelas A").trim();
+			const targetRoom = (payload.room || "").trim();
 
-			// Conflict Validation (similar logic)
+			// Conflict Validation
 			const existingClass = await db.query.classSchedules.findMany({
 				where: eq(classSchedules.dayOfWeek, payload.dayOfWeek),
 			});
@@ -260,14 +413,14 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 				where: eq(dutySchedules.dayOfWeek, payload.dayOfWeek),
 			});
 
-			// Room check
+			// 1. Room check
 			const allRoomSchedules = [
 				...existingClass,
 				...existingPracticum,
 				...existingDuty,
 			].filter(
 				(s) =>
-					s.room === payload.room &&
+					s.room?.trim().toLowerCase() === targetRoom.toLowerCase() &&
 					(!payload.sessionDate ||
 						!s.sessionDate ||
 						payload.sessionDate === s.sessionDate),
@@ -286,12 +439,12 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 					set.status = 400;
 					return {
 						success: false,
-						message: `Konflik Ruangan: Ruang ${payload.room} sudah terpakai pada rentang waktu ini.`,
+						message: `Konflik Ruangan: Ruang '${targetRoom}' sudah terpakai pada rentang waktu ini.`,
 					};
 				}
 			}
 
-			// Dosen check
+			// 2. Dosen check
 			if (payload.dosenId) {
 				const allDosenSchedules = [
 					...existingClass,
@@ -323,13 +476,50 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 				}
 			}
 
+			// 3. Rombel check
+			const cohortNum = parseInt(payload.cohort, 10);
+			const allCohortSchedules = [
+				...existingClass,
+				...existingPracticum,
+			].filter(
+				(s) =>
+					s.cohort === cohortNum &&
+					s.rombel &&
+					(s.rombel.trim().toLowerCase() === targetRombel.toLowerCase() ||
+						s.rombel.trim().toLowerCase() === "gabungan" ||
+						targetRombel.toLowerCase() === "gabungan") &&
+					(!payload.sessionDate ||
+						!s.sessionDate ||
+						payload.sessionDate === s.sessionDate),
+			);
+
+			for (const s of allCohortSchedules) {
+				if (
+					s.startTime &&
+					s.endTime &&
+					isTimeOverlap(
+						payload.startTime,
+						payload.endTime,
+						s.startTime,
+						s.endTime,
+					)
+				) {
+					set.status = 400;
+					return {
+						success: false,
+						message: `Konflik Jadwal Rombel: Angkatan ${cohortNum} (${targetRombel}) sudah memiliki praktikum/kuliah '${s.subject}' pada rentang waktu ini.`,
+					};
+				}
+			}
+
 			const result = await db
 				.insert(practicumSchedules)
 				.values({
 					subject: payload.subject,
 					dosenId: payload.dosenId,
-					cohort: parseInt(payload.cohort, 10),
-					room: payload.room,
+					cohort: cohortNum,
+					rombel: targetRombel,
+					room: targetRoom,
 					dayOfWeek: payload.dayOfWeek,
 					sessionDate: payload.sessionDate || null,
 					startTime: payload.startTime,
@@ -348,6 +538,7 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 				subject: t.String(),
 				dosenId: t.Optional(t.Number()),
 				cohort: t.Union([t.String(), t.Number()]),
+				rombel: t.Optional(t.String()),
 				room: t.String(),
 				dayOfWeek: t.String(),
 				sessionDate: t.Optional(t.String()),
@@ -358,16 +549,122 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 			}),
 		},
 	)
-	.patch("/practicum-schedules/:id", async ({ params, body }) => {
+	.patch("/practicum-schedules/:id", async ({ params, body, set }) => {
 		const id = parseInt(params.id, 10);
 		const payload = body as any;
+
+		const current = await db.query.practicumSchedules.findFirst({
+			where: eq(practicumSchedules.id, id),
+		});
+		if (!current) {
+			set.status = 404;
+			return { success: false, message: "Jadwal praktikum tidak ditemukan" };
+		}
+
+		const dayOfWeek = payload.dayOfWeek ?? current.dayOfWeek;
+		const startTime = payload.startTime ?? current.startTime;
+		const endTime = payload.endTime ?? current.endTime;
+		const room = (payload.room ?? current.room).trim();
+		const dosenId =
+			payload.dosenId !== undefined ? payload.dosenId : current.dosenId;
+		const cohort =
+			payload.cohort !== undefined
+				? parseInt(payload.cohort, 10)
+				: current.cohort;
+		const rombel = (payload.rombel ?? current.rombel ?? "Kelas A").trim();
+		const sessionDate =
+			payload.sessionDate !== undefined
+				? payload.sessionDate
+				: current.sessionDate;
+
+		// Conflict check
+		const existingClass = await db.query.classSchedules.findMany({
+			where: eq(classSchedules.dayOfWeek, dayOfWeek),
+		});
+		const existingPracticum = await db.query.practicumSchedules.findMany({
+			where: and(
+				eq(practicumSchedules.dayOfWeek, dayOfWeek),
+				not(eq(practicumSchedules.id, id)),
+			),
+		});
+		const existingDuty = await db.query.dutySchedules.findMany({
+			where: eq(dutySchedules.dayOfWeek, dayOfWeek),
+		});
+
+		const allRoomSchedules = [
+			...existingClass,
+			...existingPracticum,
+			...existingDuty,
+		].filter(
+			(s) =>
+				s.room?.trim().toLowerCase() === room.toLowerCase() &&
+				(!sessionDate || !s.sessionDate || sessionDate === s.sessionDate),
+		);
+		for (const s of allRoomSchedules) {
+			if (
+				s.startTime &&
+				s.endTime &&
+				isTimeOverlap(startTime, endTime, s.startTime, s.endTime)
+			) {
+				set.status = 400;
+				return {
+					success: false,
+					message: `Konflik Ruangan: Ruang '${room}' sudah terpakai pada rentang waktu ini.`,
+				};
+			}
+		}
+
+		if (dosenId) {
+			const allDosenSchedules = [...existingClass, ...existingPracticum].filter(
+				(s) =>
+					s.dosenId === dosenId &&
+					(!sessionDate || !s.sessionDate || sessionDate === s.sessionDate),
+			);
+			for (const s of allDosenSchedules) {
+				if (
+					s.startTime &&
+					s.endTime &&
+					isTimeOverlap(startTime, endTime, s.startTime, s.endTime)
+				) {
+					set.status = 400;
+					return {
+						success: false,
+						message: `Konflik Dosen: Dosen sudah memiliki jadwal mengajar pada rentang waktu ini.`,
+					};
+				}
+			}
+		}
+
+		const allCohortSchedules = [...existingClass, ...existingPracticum].filter(
+			(s) =>
+				s.cohort === cohort &&
+				s.rombel &&
+				(s.rombel.trim().toLowerCase() === rombel.toLowerCase() ||
+					s.rombel.trim().toLowerCase() === "gabungan" ||
+					rombel.toLowerCase() === "gabungan") &&
+				(!sessionDate || !s.sessionDate || sessionDate === s.sessionDate),
+		);
+		for (const s of allCohortSchedules) {
+			if (
+				s.startTime &&
+				s.endTime &&
+				isTimeOverlap(startTime, endTime, s.startTime, s.endTime)
+			) {
+				set.status = 400;
+				return {
+					success: false,
+					message: `Konflik Jadwal Rombel: Angkatan ${cohort} (${rombel}) sudah memiliki perkuliahan '${s.subject}' pada rentang waktu ini.`,
+				};
+			}
+		}
 
 		const updateData: any = { updatedAt: new Date() };
 		if (payload.subject !== undefined) updateData.subject = payload.subject;
 		if (payload.dosenId !== undefined) updateData.dosenId = payload.dosenId;
 		if (payload.cohort !== undefined)
 			updateData.cohort = parseInt(payload.cohort, 10);
-		if (payload.room !== undefined) updateData.room = payload.room;
+		if (payload.rombel !== undefined) updateData.rombel = rombel;
+		if (payload.room !== undefined) updateData.room = room;
 		if (payload.dayOfWeek !== undefined)
 			updateData.dayOfWeek = payload.dayOfWeek;
 		if (payload.sessionDate !== undefined)

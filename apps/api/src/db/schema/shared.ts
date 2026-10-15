@@ -61,6 +61,7 @@ export const students = pgTable(
 		schoolMajor: text("school_major"),
 		graduationYear: integer("graduation_year"),
 		classType: text("class_type"), // Online-LMS / Offline
+		rombel: text("rombel").default("Kelas A"), // Rombongan Belajar dinamis, e.g. "Kelas A", "Kelas B"
 		academicYear: text("academic_year"),
 		batch: integer("batch"),
 
@@ -75,6 +76,11 @@ export const students = pgTable(
 		destinationCountry: text("destination_country"),
 		period: text("period"),
 		profilePhotoUrl: text("profile_photo_url"),
+
+		// Kontak Darurat
+		emergencyContactName: text("emergency_contact_name"),
+		emergencyContactPhone: text("emergency_contact_phone"),
+		emergencyContactRelation: text("emergency_contact_relation"),
 
 		overallStatus: statusEnum("overall_status").default("AMAN"),
 		isArchived: boolean("is_archived").default(false),
@@ -140,6 +146,23 @@ export const studentParents = pgTable(
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
 	(t) => [index("idx_student_parents_student_id").on(t.studentId)],
+);
+
+// 2c. Student Friend Contacts (Kawan Prospek PMB & Leads CRM)
+export const studentFriendContacts = pgTable(
+	"student_friend_contacts",
+	{
+		id: serial("id").primaryKey(),
+		studentId: integer("student_id")
+			.references(() => students.id, { onDelete: "cascade" })
+			.notNull(),
+		name: text("name").notNull(),
+		phone: text("phone").notNull(),
+		schoolOrRelation: text("school_or_relation"),
+		followUpStatus: text("follow_up_status").default("Belum Dihubungi"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(t) => [index("idx_student_friend_contacts_student_id").on(t.studentId)],
 );
 
 // 11. Internal Notes

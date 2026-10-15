@@ -121,12 +121,13 @@ export const statusRoutes = new Elysia().get(
 		let totalCompleted = 0;
 		let totalIndicators = 0;
 
-		// 1. PMB (14 Items Total)
+		// 1. PMB (17 Items Total: 5 Berkas Utama + 12 Dokumen Wajib)
 		const pmbItems = [
 			{ prop: pmb?.formReceived, name: "Formulir Pendaftaran" },
 			{ prop: pmb?.documentsComplete, name: "Dokumen Lengkap" },
 			{ prop: pmb?.dataInputted, name: "Data Diinput" },
 			{ prop: pmb?.initialFollowUp, name: "Follow Up Awal" },
+			{ prop: pmb?.pasFoto, name: "Pas Foto (Standar Visa / Formal)" },
 			{ prop: pmb?.docKtp, name: "Dokumen KTP" },
 			{ prop: pmb?.docKk, name: "Dokumen KK" },
 			{ prop: pmb?.docCv, name: "Dokumen CV" },
@@ -155,12 +156,12 @@ export const statusRoutes = new Elysia().get(
 			id: "pmb",
 			name: "PMB",
 			completed: pmbCompleted,
-			total: 14,
-			status: calculatePanelStatus(pmbCompleted, 14, pmb?.isAcc),
+			total: pmbItems.length,
+			status: calculatePanelStatus(pmbCompleted, pmbItems.length, pmb?.isAcc),
 			isAcc: Boolean(pmb?.isAcc),
 		});
 		totalCompleted += pmbCompleted;
-		totalIndicators += 14;
+		totalIndicators += pmbItems.length;
 
 		// 2. CRM (10 Items Total)
 		const crmItems = [

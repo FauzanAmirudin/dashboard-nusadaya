@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, FileText, FolderCheck, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -89,15 +90,15 @@ const ADDITIONAL_DOCS = [
 	{
 		key: "pre_mcu",
 		propKey: "docPreMcu",
-		label: "Pre-Medical Check Up (Pre-MCU)",
-		desc: "Hasil skrining dan pemeriksaan kesehatan awal calon mahasiswa",
+		label: "Pre-Medical Check Up (Pra-MCU Skrining Awal)",
+		desc: "Skrining awal: Tes buta warna Ishihara, bebas tato/tindik, riwayat fisik & operasi",
 		isOptional: false,
 	},
 	{
 		key: "mcu",
 		propKey: "docMcu",
-		label: "Medical Check Up Full (MCU Full)",
-		desc: "Hasil pemeriksaan kesehatan menyeluruh dan bebas penyakit menular",
+		label: "Medical Check Up Full (MCU Lengkap Keberangkatan)",
+		desc: "Pemeriksaan kesehatan klinis & laboratorium menyeluruh sesuai standar magang kerja",
 		isOptional: false,
 	},
 	{
@@ -131,6 +132,7 @@ export function TabChecklist({
 	fetchDocuments,
 	onUpdate,
 }: TabChecklistProps) {
+	const queryClient = useQueryClient();
 	const [loadingItem, setLoadingItem] = useState<string | null>(null);
 
 	const [localChecks, setLocalChecks] = useState<Record<string, boolean>>({
@@ -138,6 +140,7 @@ export function TabChecklist({
 		documentsComplete: !!pmbData?.documentsComplete,
 		dataInputted: !!pmbData?.dataInputted,
 		initialFollowUp: !!pmbData?.initialFollowUp,
+		pasFoto: !!pmbData?.pasFoto,
 		docKtp: !!pmbData?.docKtp,
 		docKk: !!pmbData?.docKk,
 		docCv: !!pmbData?.docCv,
@@ -159,6 +162,7 @@ export function TabChecklist({
 			documentsComplete: !!pmbData?.documentsComplete,
 			dataInputted: !!pmbData?.dataInputted,
 			initialFollowUp: !!pmbData?.initialFollowUp,
+			pasFoto: !!pmbData?.pasFoto,
 			docKtp: !!pmbData?.docKtp,
 			docKk: !!pmbData?.docKk,
 			docCv: !!pmbData?.docCv,
@@ -204,6 +208,13 @@ export function TabChecklist({
 			desc: "Kontak awal dan konfirmasi orang tua/wali selesai",
 			checked: localChecks.initialFollowUp,
 		},
+		{
+			id: "pasFoto",
+			documentKey: "pas_foto",
+			label: "Pas Foto (Standar Visa / Formal)",
+			desc: "Pas foto formal terbaru calon mahasiswa (standar paspor/visa)",
+			checked: localChecks.pasFoto,
+		},
 	];
 
 	const completedMainCount = [
@@ -211,6 +222,7 @@ export function TabChecklist({
 		localChecks.documentsComplete,
 		localChecks.dataInputted,
 		localChecks.initialFollowUp,
+		localChecks.pasFoto,
 	].filter(Boolean).length;
 
 	const requiredDocs = ADDITIONAL_DOCS.filter((d) => !d.isOptional);
@@ -234,6 +246,7 @@ export function TabChecklist({
 			documentsComplete: newState.documentsComplete,
 			dataInputted: newState.dataInputted,
 			initialFollowUp: newState.initialFollowUp,
+			pasFoto: newState.pasFoto,
 			docKtp: newState.docKtp,
 			docKk: newState.docKk,
 			docCv: newState.docCv,
@@ -255,6 +268,52 @@ export function TabChecklist({
 			toast.error("Gagal menyimpan perubahan status checklist");
 		} else {
 			toast.success("Status checklist berhasil disimpan");
+
+			// 1. Invalidate TanStack query cache untuk instant synchronization
+			queryClient.invalidateQueries({ queryKey: ["students-list"] });
+			queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+			queryClient.invalidateQueries({
+				queryKey: ["student", studentId.toString()],
+			});
+			queryClient.invalidateQueries({
+				queryKey: ["student-detail", studentId.toString()],
+			});
+
+			// 2. Hitung progress baru untuk 0ms real-time header sync
+			const updatedMainCompleted = [
+				newState.formReceived,
+				newState.documentsComplete,
+				newState.dataInputted,
+				newState.initialFollowUp,
+				newState.pasFoto,
+			].filter(Boolean).length;
+			const updatedRequiredDocsCompleted = ADDITIONAL_DOCS.filter(
+				(d) => !d.isOptional && newState[d.propKey],
+			).length;
+			const updatedTotal = updatedMainCompleted + updatedRequiredDocsCompleted;
+
+			window.dispatchEvent(
+				new CustomEvent("pmb-progress-sync", {
+					detail: {
+						studentId,
+						completed: updatedTotal,
+						total: 17,
+					},
+				}),
+			);
+			window.dispatchEvent(
+				new CustomEvent("student-updated", { detail: { studentId } }),
+			);
+
+			// 3. Broadcast channel untuk sinkronisasi antar tab browser
+			try {
+				if (typeof BroadcastChannel !== "undefined") {
+					const channel = new BroadcastChannel("dashboard-realtime-sync");
+					channel.postMessage({ type: "pmb-updated", studentId });
+					channel.close();
+				}
+			} catch {}
+
 			onUpdate();
 		}
 		setLoadingItem(null);
@@ -268,7 +327,7 @@ export function TabChecklist({
 					<div>
 						<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
 							<CheckCircle className="w-4 h-4 text-[#0517B0]" />
-							Checklist Kelengkapan Berkas Utama (4)
+							Checklist Kelengkapan Berkas Utama (5)
 						</CardTitle>
 						<p className="text-[11px] text-slate-500 mt-0.5">
 							Tahapan esensial registrasi dan verifikasi berkas awal PMB
@@ -277,12 +336,12 @@ export function TabChecklist({
 					<div className="flex items-center gap-2">
 						<Badge
 							className={`text-xs font-bold px-2.5 py-0.5 ${
-								completedMainCount === 4
+								completedMainCount === 5
 									? "bg-emerald-50 text-emerald-700 border-emerald-200"
 									: "bg-blue-50 text-[#0517B0] border-blue-200"
 							}`}
 						>
-							{completedMainCount}/4 Selesai
+							{completedMainCount}/5 Selesai
 						</Badge>
 					</div>
 				</CardHeader>
@@ -352,6 +411,9 @@ export function TabChecklist({
 										documentKey={item.documentKey}
 										onUploadSuccess={() => {
 											fetchDocuments();
+											if (!item.checked) {
+												handleCheckboxChange(item.id, true);
+											}
 										}}
 										canEdit={canEdit}
 									/>
@@ -472,6 +534,9 @@ export function TabChecklist({
 											documentKey={doc.key}
 											onUploadSuccess={() => {
 												fetchDocuments();
+												if (!isChecked) {
+													handleCheckboxChange(doc.propKey, true);
+												}
 											}}
 											canEdit={canEdit}
 										/>

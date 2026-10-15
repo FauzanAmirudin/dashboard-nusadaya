@@ -10,7 +10,6 @@ import {
 	Megaphone,
 	Plus,
 	Trash2,
-	UploadCloud,
 	Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -66,6 +65,7 @@ interface FeeShareRecipient {
 	studentId: number;
 	kategori: string;
 	namaReferral: string;
+	namaInstitusi?: string | null;
 	noHp: string;
 	noRekening?: string | null;
 	namaBank?: string | null;
@@ -95,6 +95,7 @@ export function TabFeeSharing({
 	const [recipientForm, setRecipientForm] = useState({
 		kategori: "Mitra",
 		namaReferral: "",
+		namaInstitusi: "",
 		noHp: "",
 		noRekening: "",
 		namaBank: "",
@@ -103,7 +104,6 @@ export function TabFeeSharing({
 	});
 
 	const [deletingFeeId, setDeletingFeeId] = useState<number | null>(null);
-	const [uploadingFeeId, setUploadingFeeId] = useState<number | null>(null);
 
 	const fetchFeeShareRecipients = async () => {
 		try {
@@ -131,6 +131,7 @@ export function TabFeeSharing({
 		setRecipientForm({
 			kategori: "Mitra",
 			namaReferral: "",
+			namaInstitusi: "",
 			noHp: "",
 			noRekening: "",
 			namaBank: "",
@@ -145,6 +146,7 @@ export function TabFeeSharing({
 		setRecipientForm({
 			kategori: rec.kategori || "Mitra",
 			namaReferral: rec.namaReferral || "",
+			namaInstitusi: rec.namaInstitusi || "",
 			noHp: rec.noHp || "",
 			noRekening: rec.noRekening || "",
 			namaBank: rec.namaBank || "",
@@ -171,12 +173,16 @@ export function TabFeeSharing({
 			const bodyPayload: any = {
 				kategori: recipientForm.kategori,
 				namaReferral: recipientForm.namaReferral,
+				namaInstitusi: recipientForm.namaInstitusi || undefined,
 				noHp: recipientForm.noHp,
 				noRekening: recipientForm.noRekening || undefined,
 				namaBank: recipientForm.namaBank || undefined,
+				nominalFee: Math.max(
+					0,
+					Math.floor(Number(recipientForm.nominalFee)) || 0,
+				),
 			};
 			if (!isEdit) {
-				bodyPayload.nominalFee = 0;
 				bodyPayload.statusPencairan = "belum_dibayarkan";
 			}
 
@@ -227,43 +233,6 @@ export function TabFeeSharing({
 			toast.error("Terjadi kesalahan jaringan");
 		} finally {
 			setDeletingFeeId(null);
-		}
-	};
-
-	const handleInvoiceUpload = async (recipientId: number, file: File) => {
-		if (!canEdit) return;
-		if (file.type !== "application/pdf") {
-			toast.error("File invoice harus berformat PDF");
-			return;
-		}
-		if (file.size > 5 * 1024 * 1024) {
-			toast.error("Ukuran file maksimal 5MB");
-			return;
-		}
-
-		setUploadingFeeId(recipientId);
-		try {
-			const formData = new FormData();
-			formData.append("file", file);
-
-			const res = await fetch(
-				`${API_URL}/students/${studentId}/pmb/fee-share-recipients/${recipientId}/upload-invoice`,
-				{
-					method: "POST",
-					headers: { Authorization: `Bearer ${getToken()}` },
-					body: formData,
-				},
-			);
-			if (res.ok) {
-				toast.success("File invoice berhasil diunggah");
-				fetchFeeShareRecipients();
-			} else {
-				toast.error("Gagal mengunggah file invoice");
-			}
-		} catch (error) {
-			toast.error("Terjadi kesalahan jaringan");
-		} finally {
-			setUploadingFeeId(null);
 		}
 	};
 
@@ -379,7 +348,7 @@ export function TabFeeSharing({
 									Fee (Nominal)
 								</TableHead>
 								<TableHead className="text-xs font-bold text-slate-700">
-									Invoice (PDF)
+									Bukti Transfer / Dokumen
 								</TableHead>
 								<TableHead className="text-xs font-bold text-slate-700">
 									Status
@@ -416,6 +385,11 @@ export function TabFeeSharing({
 											<div className="font-semibold text-slate-800 text-xs">
 												{rec.namaReferral}
 											</div>
+											{rec.namaInstitusi && (
+												<div className="text-[10px] text-blue-700 font-medium mt-0.5">
+													Institusi: {rec.namaInstitusi}
+												</div>
+											)}
 											{(rec.namaBank || rec.noRekening) && (
 												<div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
 													<CreditCard className="w-3 h-3" />
@@ -431,70 +405,27 @@ export function TabFeeSharing({
 										</TableCell>
 										<TableCell>
 											{rec.invoiceFileUrl ? (
-												<div className="flex items-center gap-1.5">
-													<Button
-														variant="outline"
-														size="sm"
-														className="h-7 text-xs font-medium text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 gap-1.5 cursor-pointer shadow-2xs"
-														title="Review Dokumen Invoice"
-														onClick={() => {
-															const invoiceUrl = `/students/${studentId}/pmb/fee-share-recipients/${rec.id}/invoice`;
-															const invoiceName = `Invoice - ${rec.namaReferral} (${rec.kategori}).pdf`;
-															window.open(
-																`/dashboard/students/${studentId}/documents/${rec.id}?url=${encodeURIComponent(invoiceUrl)}&name=${encodeURIComponent(invoiceName)}&token=${getToken()}`,
-																"_blank",
-															);
-														}}
-													>
-														<Eye className="w-3.5 h-3.5" />
-														<span>Review</span>
-													</Button>
-
-													{canEdit &&
-														rec.statusPencairan !== "sudah_dibayarkan" && (
-															<label
-																className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-amber-600 cursor-pointer border border-dashed border-slate-300 rounded px-2 py-1 bg-slate-50 hover:bg-amber-50/50 transition-colors"
-																title="Ganti Berkas Invoice (PDF)"
-															>
-																{uploadingFeeId === rec.id ? (
-																	<Loader2 className="w-3 h-3 animate-spin" />
-																) : (
-																	<UploadCloud className="w-3 h-3" />
-																)}
-																<span>Ganti</span>
-																<input
-																	type="file"
-																	accept="application/pdf"
-																	className="hidden"
-																	onChange={(e) => {
-																		const file = e.target.files?.[0];
-																		if (file) handleInvoiceUpload(rec.id, file);
-																	}}
-																/>
-															</label>
-														)}
-												</div>
+												<Button
+													variant="outline"
+													size="sm"
+													className="h-7 text-xs font-medium text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 gap-1.5 cursor-pointer shadow-2xs"
+													title="Lihat Bukti Transfer"
+													onClick={() => {
+														const invoiceUrl = `/students/${studentId}/pmb/fee-share-recipients/${rec.id}/invoice`;
+														const invoiceName = `Bukti Transfer - ${rec.namaReferral} (${rec.kategori}).pdf`;
+														window.open(
+															`/dashboard/students/${studentId}/documents/${rec.id}?url=${encodeURIComponent(invoiceUrl)}&name=${encodeURIComponent(invoiceName)}&token=${getToken()}`,
+															"_blank",
+														);
+													}}
+												>
+													<Eye className="w-3.5 h-3.5" />
+													<span>Lihat Bukti</span>
+												</Button>
 											) : (
-												canEdit &&
-												rec.statusPencairan !== "sudah_dibayarkan" && (
-													<label className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-amber-600 cursor-pointer border border-dashed border-slate-300 rounded px-2 py-1 bg-slate-50 hover:bg-amber-50/50 transition-colors">
-														{uploadingFeeId === rec.id ? (
-															<Loader2 className="w-3 h-3 animate-spin" />
-														) : (
-															<UploadCloud className="w-3 h-3" />
-														)}
-														<span className="text-[11px]">Upload PDF</span>
-														<input
-															type="file"
-															accept="application/pdf"
-															className="hidden"
-															onChange={(e) => {
-																const file = e.target.files?.[0];
-																if (file) handleInvoiceUpload(rec.id, file);
-															}}
-														/>
-													</label>
-												)
+												<span className="text-[11px] text-slate-400 italic">
+													Belum diunggah Finance
+												</span>
 											)}
 										</TableCell>
 										<TableCell>
@@ -586,6 +517,23 @@ export function TabFeeSharing({
 
 						<div>
 							<Label className="text-xs font-semibold text-slate-700">
+								Nama Institusi / Asal Referral (Opsional)
+							</Label>
+							<Input
+								value={recipientForm.namaInstitusi}
+								onChange={(e) =>
+									setRecipientForm({
+										...recipientForm,
+										namaInstitusi: e.target.value,
+									})
+								}
+								placeholder="Contoh: SMKN 1 Banyuwangi / BKK Mandiri"
+								className="mt-1 h-9 text-xs"
+							/>
+						</div>
+
+						<div>
+							<Label className="text-xs font-semibold text-slate-700">
 								Nama Penerima / Referral *
 							</Label>
 							<Input
@@ -617,6 +565,40 @@ export function TabFeeSharing({
 								placeholder="Contoh: 08123456789"
 								className="mt-1 h-9 text-xs"
 							/>
+						</div>
+
+						<div>
+							<Label className="text-xs font-semibold text-slate-700">
+								Nominal Fee Disepakati (Rp) *
+							</Label>
+							<div className="relative mt-1">
+								<span className="absolute left-3 top-2 text-xs font-bold text-slate-400">
+									Rp
+								</span>
+								<Input
+									type="text"
+									inputMode="numeric"
+									value={
+										recipientForm.nominalFee === 0 || !recipientForm.nominalFee
+											? ""
+											: recipientForm.nominalFee
+									}
+									onKeyDown={preventNonNumericKey}
+									onChange={(e) => {
+										const val = e.target.value.replace(/[^0-9]/g, "");
+										setRecipientForm({
+											...recipientForm,
+											nominalFee: val ? parseInt(val, 10) : 0,
+										});
+									}}
+									placeholder="Contoh: 2500000"
+									className="pl-9 h-9 text-xs font-semibold"
+								/>
+							</div>
+							<p className="text-[10px] text-slate-500 mt-1">
+								Nominal deal/pagu komisi yang disepakati oleh tim PMB dengan
+								pihak referral (akan dicairkan oleh Finance).
+							</p>
 						</div>
 
 						<div className="grid grid-cols-2 gap-3">

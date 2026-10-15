@@ -94,6 +94,8 @@ type CourseDetail = {
 	id: number;
 	code: string;
 	name: string;
+	sks?: number;
+	rombel?: string;
 	peminatan: string | null;
 	cohort: number;
 	type: string;
@@ -124,6 +126,7 @@ type StudentRecord = {
 	nim: string;
 	name: string;
 	cohort?: number;
+	rombel?: string | null;
 	program?: string;
 	subProgram?: string | null;
 	studentStatus?: string;
@@ -280,6 +283,17 @@ export default function MataKuliahDetailPage() {
 				});
 				if (!sErr && sData?.data) {
 					cohortList = (sData.data as any[]).map((item) => item.student);
+					// Filter students by rombel if course is for a specific rombel
+					if (
+						courseInfo.rombel &&
+						courseInfo.rombel.trim().toLowerCase() !== "gabungan"
+					) {
+						const targetRombel = courseInfo.rombel.trim().toLowerCase();
+						cohortList = cohortList.filter(
+							(s) =>
+								!s.rombel || s.rombel.trim().toLowerCase() === targetRombel,
+						);
+					}
 					cohortList.sort((a, b) => a.name.localeCompare(b.name));
 					setCohortStudents(cohortList);
 				}
@@ -655,6 +669,18 @@ export default function MataKuliahDetailPage() {
 							</h1>
 							<Badge className="bg-blue-50 text-blue-700 border-blue-200 font-semibold">
 								{course.code}
+							</Badge>
+							<Badge
+								variant="outline"
+								className="bg-indigo-50 text-indigo-700 border-indigo-200 font-semibold"
+							>
+								{course.sks || 2} SKS
+							</Badge>
+							<Badge
+								variant="outline"
+								className="bg-purple-50 text-purple-700 border-purple-200 font-semibold"
+							>
+								{course.rombel || "Kelas A"}
 							</Badge>
 							{course.peminatan && (
 								<Badge

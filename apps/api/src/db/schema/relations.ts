@@ -71,11 +71,22 @@ import {
 	backupJobs,
 	files,
 	internalNotes,
+	studentFriendContacts,
 	studentHealth,
 	studentParents,
 	students,
 	users,
 } from "./shared";
+
+export const studentFriendContactsRelations = relations(
+	studentFriendContacts,
+	({ one }) => ({
+		student: one(students, {
+			fields: [studentFriendContacts.studentId],
+			references: [students.id],
+		}),
+	}),
+);
 
 // Finance relations
 export const financeSemestersRelations = relations(

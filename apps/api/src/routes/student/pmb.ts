@@ -15,12 +15,13 @@ import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
 import { hasRole } from "../../lib/permissions";
 import { fileService } from "../../modules/file/service/file.service";
 
-const invalidatePmbCache = async (studentId: number) => {
+export const invalidatePmbCache = async (studentId: number) => {
 	await Promise.all([
 		cacheDel(`cache:student:${studentId}`),
 		cacheInvalidatePattern("cache:students:list:*"),
 		cacheInvalidatePattern("cache:students:*"),
 		cacheInvalidatePattern("cache:mahasiswa:*"),
+		cacheInvalidatePattern("cache:dashboard:*"),
 	]);
 };
 
@@ -44,6 +45,7 @@ export const pmbRoutes = new Elysia()
 					documentsComplete: body.documentsComplete,
 					dataInputted: body.dataInputted,
 					initialFollowUp: body.initialFollowUp,
+					pasFoto: body.pasFoto ?? false,
 					docKtp: body.docKtp ?? false,
 					docKk: body.docKk ?? false,
 					docCv: body.docCv ?? false,
@@ -69,12 +71,13 @@ export const pmbRoutes = new Elysia()
 				})
 				.where(eq(pmbData.studentId, id));
 
-			// Auto-calculate status based on 16 required checklist items (BPJS is optional)
+			// Auto-calculate status based on 17 required checklist items (BPJS is optional)
 			const requiredCheckboxes = [
 				body.formReceived,
 				body.documentsComplete,
 				body.dataInputted,
 				body.initialFollowUp,
+				body.pasFoto,
 				body.docKtp,
 				body.docKk,
 				body.docCv,
@@ -92,14 +95,14 @@ export const pmbRoutes = new Elysia()
 
 			let newStatus: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
 				"BUTUH_PERHATIAN";
-			if (checkedCount === 16) newStatus = "AMAN";
+			if (checkedCount === 17) newStatus = "AMAN";
 			else if (checkedCount >= 6) newStatus = "PROSES";
 
 			await db
 				.update(pmbData)
 				.set({
 					status: newStatus,
-					...(checkedCount < 16
+					...(checkedCount < 17
 						? { isAcc: false, accAt: null, accBy: null }
 						: {}),
 				})
@@ -115,6 +118,7 @@ export const pmbRoutes = new Elysia()
 				documentsComplete: t.Boolean(),
 				dataInputted: t.Boolean(),
 				initialFollowUp: t.Boolean(),
+				pasFoto: t.Optional(t.Boolean()),
 				docKtp: t.Optional(t.Boolean()),
 				docKk: t.Optional(t.Boolean()),
 				docCv: t.Optional(t.Boolean()),
@@ -192,12 +196,13 @@ export const pmbRoutes = new Elysia()
 			where: eq(pmbData.studentId, id),
 		});
 
-		// 16 Required checks (BPJS is optional, so it is omitted from mandatory checks)
+		// 17 Required checks (BPJS is optional, so it is omitted from mandatory checks)
 		const requiredChecks = [
 			currentPmb?.formReceived,
 			currentPmb?.documentsComplete,
 			currentPmb?.dataInputted,
 			currentPmb?.initialFollowUp,
+			currentPmb?.pasFoto,
 			currentPmb?.docKtp,
 			currentPmb?.docKk,
 			currentPmb?.docCv,
@@ -217,7 +222,7 @@ export const pmbRoutes = new Elysia()
 			return {
 				success: false,
 				message:
-					"Semua checklist kelengkapan berkas utama (4) dan dokumen wajib PMB (12) harus selesai divalidasi sebelum melakukan ACC PMB.",
+					"Semua checklist kelengkapan berkas utama (5) dan dokumen wajib PMB (12) harus selesai divalidasi sebelum melakukan ACC PMB.",
 			};
 		}
 
@@ -261,14 +266,16 @@ export const pmbRoutes = new Elysia()
 			currentPmb?.docPassportDepan,
 			currentPmb?.docPassportVisa,
 			currentPmb?.docSkbm,
+			currentPmb?.docPreMcu,
 			currentPmb?.docMcu,
+			currentPmb?.docSla,
 			currentPmb?.docSertifikasiBahasa,
 		];
 		const checkedCount = allChecks.filter(Boolean).length;
 		const newStatus =
-			checkedCount === 14
+			checkedCount === 16
 				? "AMAN"
-				: checkedCount >= 5
+				: checkedCount >= 6
 					? "PROSES"
 					: "BUTUH_PERHATIAN";
 
@@ -643,6 +650,7 @@ export const pmbRoutes = new Elysia()
 					studentId: id,
 					kategori: body.kategori,
 					namaReferral: body.namaReferral,
+					namaInstitusi: body.namaInstitusi || null,
 					noHp: body.noHp,
 					noRekening: body.noRekening || null,
 					namaBank: body.namaBank || null,
@@ -660,6 +668,7 @@ export const pmbRoutes = new Elysia()
 			body: t.Object({
 				kategori: t.String(),
 				namaReferral: t.String(),
+				namaInstitusi: t.Optional(t.String()),
 				noHp: t.String(),
 				noRekening: t.Optional(t.String()),
 				namaBank: t.Optional(t.String()),
@@ -685,6 +694,8 @@ export const pmbRoutes = new Elysia()
 			if (body.kategori !== undefined) updatePayload.kategori = body.kategori;
 			if (body.namaReferral !== undefined)
 				updatePayload.namaReferral = body.namaReferral;
+			if (body.namaInstitusi !== undefined)
+				updatePayload.namaInstitusi = body.namaInstitusi;
 			if (body.noHp !== undefined) updatePayload.noHp = body.noHp;
 			if (body.noRekening !== undefined)
 				updatePayload.noRekening = body.noRekening;
@@ -715,6 +726,7 @@ export const pmbRoutes = new Elysia()
 			body: t.Object({
 				kategori: t.Optional(t.String()),
 				namaReferral: t.Optional(t.String()),
+				namaInstitusi: t.Optional(t.String()),
 				noHp: t.Optional(t.String()),
 				noRekening: t.Optional(t.String()),
 				namaBank: t.Optional(t.String()),
@@ -761,9 +773,13 @@ export const pmbRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!hasRole(user, "pmb", "finance", "superadmin")) {
+			if (!hasRole(user, "finance", "superadmin")) {
 				set.status = 403;
-				return { success: false, message: "Forbidden" };
+				return {
+					success: false,
+					message:
+						"Hanya divisi Finance yang memiliki wewenang mengunggah bukti transfer fee sharing",
+				};
 			}
 
 			const recipientId = parseInt(params.recipientId, 10);

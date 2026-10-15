@@ -573,17 +573,32 @@ export function TabFeeSharing({ studentId, canEdit }: TabFeeSharingProps) {
 												className="hover:bg-slate-50/70 transition-colors border-b border-slate-100"
 											>
 												<TableCell className="py-3">
-													<Badge
-														variant="outline"
-														className={`${styleCfg.bg} ${styleCfg.text} ${styleCfg.border} text-[11px] font-bold px-2 py-0.5`}
-													>
-														{r.kategori}
-													</Badge>
+													<div className="flex flex-col gap-1 items-start">
+														<Badge
+															variant="outline"
+															className={`${styleCfg.bg} ${styleCfg.text} ${styleCfg.border} text-[11px] font-bold px-2 py-0.5`}
+														>
+															{r.kategori}
+														</Badge>
+														{(!r.nominalFee || r.nominalFee === 0) && (
+															<Badge className="bg-amber-100 text-amber-800 border border-amber-300 text-[10px] px-1.5 py-0.5">
+																Baru dari PMB
+															</Badge>
+														)}
+													</div>
 												</TableCell>
 												<TableCell className="py-3">
 													<div className="font-bold text-slate-900 text-xs">
 														{r.namaReferral}
 													</div>
+													{r.namaInstitusi && (
+														<div className="text-[11px] text-blue-700 font-medium mt-0.5">
+															Institusi:{" "}
+															<span className="font-semibold">
+																{r.namaInstitusi}
+															</span>
+														</div>
+													)}
 													{(r.namaBank || r.noRekening) && (
 														<div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5 font-medium">
 															<CreditCard className="w-3 h-3 text-slate-400" />

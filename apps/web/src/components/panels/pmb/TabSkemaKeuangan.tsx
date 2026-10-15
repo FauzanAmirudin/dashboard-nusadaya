@@ -60,6 +60,21 @@ export function TabSkemaKeuangan({
 
 	const [totalBiaya, setTotalBiaya] = useState<number>(initialTotalBiaya);
 	const [financeDetail, setFinanceDetail] = useState<any>(null);
+	const [programDefaults, setProgramDefaults] = useState<any[]>([]);
+
+	const fetchProgramDefaults = async () => {
+		try {
+			const res = await fetch(`${API_URL}/settings/program-fee-defaults`, {
+				headers: { Authorization: `Bearer ${getToken()}` },
+			});
+			if (res.ok) {
+				const json = await res.json();
+				if (json.success) setProgramDefaults(json.data || []);
+			}
+		} catch (e) {
+			console.error("Failed to fetch program defaults", e);
+		}
+	};
 
 	const fetchFinanceData = async () => {
 		try {
@@ -85,6 +100,7 @@ export function TabSkemaKeuangan({
 
 	useEffect(() => {
 		fetchFinanceData();
+		fetchProgramDefaults();
 
 		// Menambahkan event listener agar otomatis fetch saat user kembali ke tab browser ini
 		const handleFocus = () => {
@@ -334,30 +350,84 @@ export function TabSkemaKeuangan({
 				<CardContent className="p-5 space-y-4">
 					<div className="max-w-xl p-4 bg-indigo-50/40 rounded-xl border border-indigo-100 space-y-3">
 						<div>
-							<div className="flex items-center justify-between mb-1">
-								<Label className="text-xs font-bold text-indigo-950 block">
-									Total Biaya Pendidikan Keseluruhan (Rp) *
-								</Label>
-							</div>
-							<div className="relative">
-								<span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
-									Rp
-								</span>
-								<Input
-									type="text"
-									inputMode="numeric"
-									pattern="[0-9]*"
-									maxLength={9}
-									disabled={!isEditing || !canEdit}
-									value={totalBiaya === 0 || !totalBiaya ? "" : totalBiaya}
-									onKeyDown={handleKeyDown}
-									onChange={handleTotalBiayaChange}
-									className={`pl-9 font-bold text-base bg-white h-10 border-indigo-200 focus:border-indigo-500 disabled:bg-slate-100 disabled:text-slate-700 ${
-										inputWarning ? "border-amber-400 ring-1 ring-amber-300" : ""
-									}`}
-									placeholder="Belum diinputkan (Contoh: 25000000)"
-								/>
-							</div>
+							{(() => {
+								const currentSubProgram = pmbData?.subProgram || "";
+								const defaultFeeObj = programDefaults.find(
+									(p) =>
+										p.subProgram?.toLowerCase() ===
+										currentSubProgram.toLowerCase(),
+								);
+								const defaultTotalBiaya = defaultFeeObj?.defaultTotalBiaya ?? 0;
+								const hasMismatch =
+									totalBiaya > 0 &&
+									defaultTotalBiaya > 0 &&
+									totalBiaya !== defaultTotalBiaya;
+
+								return (
+									<>
+										<div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
+											<Label className="text-xs font-bold text-indigo-950 block">
+												Total Biaya Pendidikan Keseluruhan (Rp) *
+											</Label>
+											{defaultTotalBiaya > 0 && (
+												<Badge
+													variant="outline"
+													className="text-[10px] bg-blue-50 text-blue-700 border-blue-200"
+												>
+													Pagu Default: {formatRupiah(defaultTotalBiaya)}
+												</Badge>
+											)}
+										</div>
+
+										<div className="relative">
+											<span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
+												Rp
+											</span>
+											<Input
+												type="text"
+												inputMode="numeric"
+												pattern="[0-9]*"
+												maxLength={9}
+												disabled={!isEditing || !canEdit}
+												value={
+													totalBiaya === 0 || !totalBiaya ? "" : totalBiaya
+												}
+												onKeyDown={handleKeyDown}
+												onChange={handleTotalBiayaChange}
+												className={`pl-9 font-bold text-base bg-white h-10 border-indigo-200 focus:border-indigo-500 disabled:bg-slate-100 disabled:text-slate-700 ${
+													inputWarning
+														? "border-amber-400 ring-1 ring-amber-300"
+														: ""
+												}`}
+												placeholder="Belum diinputkan (Contoh: 25000000)"
+											/>
+										</div>
+
+										{hasMismatch && (
+											<div className="flex items-center justify-between text-xs font-medium text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200 mt-2">
+												<div className="flex items-center gap-1.5">
+													<AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+													<span>
+														Nilai berbeda dari pagu standar program (
+														{formatRupiah(defaultTotalBiaya)})
+													</span>
+												</div>
+												{isEditing && (
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														onClick={() => setTotalBiaya(defaultTotalBiaya)}
+														className="h-6 text-[11px] text-amber-900 underline hover:bg-amber-100 font-semibold"
+													>
+														Gunakan Standar
+													</Button>
+												)}
+											</div>
+										)}
+									</>
+								);
+							})()}
 
 							{inputWarning && (
 								<div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200 mt-1.5 animate-in fade-in">
@@ -423,10 +493,10 @@ export function TabSkemaKeuangan({
 								</h3>
 							</div>
 							{renderStage(
-								"Biaya Registrasi Pendaftaran",
+								"1. Registrasi Awal (DP Masuk)",
 								financeState?.registrasiNominal || 0,
 								!!financeState?.registrasiStatus,
-								"Pendaftaran masuk pertama",
+								"Pendaftaran masuk awal & syarat clearance NIM",
 							)}
 						</div>
 
@@ -456,38 +526,38 @@ export function TabSkemaKeuangan({
 								) : isDanaMandiri ? (
 									<>
 										{renderStage(
-											"Tahap 1 - Semester Lunas",
+											"2. SPP Semester 1",
 											financeState.mandiriSemesterNominal || 0,
 											!!financeState.mandiriSemesterStatus,
-											"Biaya perkuliahan berjalan",
+											"Biaya perkuliahan berjalan (cicilan bulanan)",
 										)}
 										{renderStage(
-											"Tahap 2 - Interview Magang",
+											"3. Kontrak Magang / Suhan",
 											financeState.mandiriInterviewNominal || 0,
 											!!financeState.mandiriInterviewStatus,
-											"Persiapan magang industri",
+											"Biaya turun kontrak kerja & izin Suhan",
 										)}
 										{renderStage(
-											"Tahap 3 - Keberangkatan",
+											"4. Penempatan Magang / Keberangkatan",
 											financeState.mandiriKeberangkatanNominal || 0,
 											!!financeState.mandiriKeberangkatanStatus,
-											"Tahap akhir keberangkatan",
+											"Tahap akhir penempatan & visa magang",
 										)}
 									</>
 								) : isDanaTalangan ? (
 									<>
 										{renderStage(
-											"Tahap 1 - Semester & Interview",
+											"Tahap 1 - Semester & Kontrak/Suhan",
 											financeState.t1SemesterNominalTotal || 0,
 											!!financeState.t1SemesterStatus &&
 												!!financeState.t1InterviewStatus,
-											"Talangan semester & interview",
+											"Talangan perkuliahan & kontrak kerja magang",
 										)}
 										{renderStage(
-											"Tahap 2 - Keberangkatan",
+											"Tahap 2 - Penempatan Magang / Keberangkatan",
 											financeState.t2KeberangkatanNominal || 0,
 											!!financeState.t2KeberangkatanStatus,
-											"Talangan keberangkatan magang",
+											"Talangan visa & tiket keberangkatan magang",
 										)}
 									</>
 								) : null}

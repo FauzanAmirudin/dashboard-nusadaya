@@ -5,6 +5,7 @@ import {
 	masterBusinessParameters,
 	masterEventTypes,
 	masterServiceTags,
+	programFeeDefaults,
 } from "../db/schema";
 
 export const settingsRoutes = new Elysia({ prefix: "/settings" })
@@ -110,4 +111,50 @@ export const settingsRoutes = new Elysia({ prefix: "/settings" })
 			.delete(masterServiceTags)
 			.where(eq(masterServiceTags.id, Number(params.id)));
 		return { success: true };
-	});
+	})
+
+	// Master Program Fee Defaults (Task J-4)
+	.get("/program-fee-defaults", async () => {
+		const data = await db.query.programFeeDefaults.findMany();
+		return { success: true, data };
+	})
+	.patch(
+		"/program-fee-defaults/:subProgram",
+		async ({ params, body, set, user }: any) => {
+			if (user?.role !== "superadmin") {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const subProgram = decodeURIComponent(params.subProgram);
+			const updateData: any = { updatedAt: new Date() };
+			if (body.defaultTotalBiaya !== undefined)
+				updateData.defaultTotalBiaya = Number(body.defaultTotalBiaya);
+			if (body.defaultRegistrasi !== undefined)
+				updateData.defaultRegistrasi = Number(body.defaultRegistrasi);
+			if (body.defaultPerSemester !== undefined)
+				updateData.defaultPerSemester = Number(body.defaultPerSemester);
+			if (body.defaultInterview !== undefined)
+				updateData.defaultInterview = Number(body.defaultInterview);
+			if (body.defaultKeberangkatan !== undefined)
+				updateData.defaultKeberangkatan = Number(body.defaultKeberangkatan);
+
+			await db
+				.update(programFeeDefaults)
+				.set(updateData)
+				.where(eq(programFeeDefaults.subProgram, subProgram));
+
+			return {
+				success: true,
+				message: "Pagu default biaya berhasil diperbarui",
+			};
+		},
+		{
+			body: t.Object({
+				defaultTotalBiaya: t.Optional(t.Number()),
+				defaultRegistrasi: t.Optional(t.Number()),
+				defaultPerSemester: t.Optional(t.Number()),
+				defaultInterview: t.Optional(t.Number()),
+				defaultKeberangkatan: t.Optional(t.Number()),
+			}),
+		},
+	);

@@ -116,6 +116,11 @@ const getPmbChecklist = (pmb: any) => {
 			done: Boolean(pmb?.initialFollowUp),
 			category: "Utama",
 		},
+		{
+			name: "Pas Foto (Standar Visa / Formal)",
+			done: Boolean(pmb?.pasFoto),
+			category: "Utama",
+		},
 		{ name: "KTP", done: Boolean(pmb?.docKtp), category: "Dokumen" },
 		{
 			name: "Kartu Keluarga (KK)",

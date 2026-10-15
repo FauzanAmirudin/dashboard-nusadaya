@@ -105,7 +105,7 @@ export async function processLogin({
 	cookieAuth,
 	set,
 }: {
-	body: { email: string; password: string };
+	body: { email?: string; username?: string; password: string };
 	request: Request;
 	jwt: any;
 	cookieAuth: any;

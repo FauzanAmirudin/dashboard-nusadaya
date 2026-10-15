@@ -8,6 +8,7 @@ export interface StudentListItem {
 		name: string;
 		nickname?: string | null;
 		cohort: number;
+		rombel?: string | null;
 		program: string;
 		subProgram?: string | null;
 		phone?: string | null;
@@ -51,6 +52,7 @@ export interface UseStudentsListParams {
 	page?: number;
 	limit?: number;
 	cohort?: string;
+	rombel?: string;
 	status?: string;
 	search?: string;
 	archived?: boolean;
@@ -63,6 +65,7 @@ export function useStudentsList(params: UseStudentsListParams = {}) {
 		page = 1,
 		limit = 50,
 		cohort,
+		rombel,
 		status,
 		search,
 		archived = false,
@@ -71,6 +74,7 @@ export function useStudentsList(params: UseStudentsListParams = {}) {
 	} = params;
 
 	const cleanCohort = cohort && cohort !== "all" ? cohort : undefined;
+	const cleanRombel = rombel && rombel !== "all" ? rombel : undefined;
 	const cleanStatus = status && status !== "all" ? status : undefined;
 	const cleanSearch = search?.trim() ? search.trim() : undefined;
 
@@ -81,6 +85,7 @@ export function useStudentsList(params: UseStudentsListParams = {}) {
 				page,
 				limit,
 				cohort: cleanCohort,
+				rombel: cleanRombel,
 				status: cleanStatus,
 				search: cleanSearch,
 				archived,
@@ -94,6 +99,7 @@ export function useStudentsList(params: UseStudentsListParams = {}) {
 				archived: archived ? "true" : "false",
 			};
 			if (cleanCohort) queryObj.cohort = cleanCohort;
+			if (cleanRombel) queryObj.rombel = cleanRombel;
 			if (cleanStatus) queryObj.status = cleanStatus;
 			if (cleanSearch) queryObj.search = cleanSearch;
 			if (all) queryObj.all = "true";

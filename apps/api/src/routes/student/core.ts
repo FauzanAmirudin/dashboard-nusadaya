@@ -33,6 +33,8 @@ import {
 	pmbFeeDisbursements,
 	pmbPaymentPlan,
 	postInternshipDocs,
+	programFeeDefaults,
+	studentFriendContacts,
 	studentHealth,
 	studentParents,
 	students,
@@ -131,6 +133,7 @@ export async function createStudentPipeline(body: any, userId: number) {
 			name: body.name,
 			nickname: body.nickname,
 			cohort: body.cohort,
+			rombel: body.rombel || "Kelas A",
 			program: body.program,
 			subProgram: body.subProgram,
 			birthPlace: body.birthPlace,
@@ -161,6 +164,9 @@ export async function createStudentPipeline(body: any, userId: number) {
 			studentStatus: body.studentStatus || "aktif",
 			destinationCountry: body.destinationCountry,
 			period: body.period,
+			emergencyContactName: body.emergencyContactName || null,
+			emergencyContactPhone: body.emergencyContactPhone || null,
+			emergencyContactRelation: body.emergencyContactRelation || null,
 			studentUserId: newUser.id, // Relasi ke akun login
 		})
 		.returning();
@@ -178,25 +184,118 @@ export async function createStudentPipeline(body: any, userId: number) {
 		clothingSize: body.clothingSize,
 	});
 
-	// 5. Insert Student Parents (Ayah, Ibu, Wali)
-	if (body.parents && body.parents.length > 0) {
-		const parentInserts = body.parents.map((p: any) => ({
-			studentId,
-			type: p.type,
-			name: p.name,
-			birthPlace: p.birthPlace,
-			birthDate: p.birthDate ? new Date(p.birthDate) : null,
-			religion: p.religion,
-			nationality: p.nationality,
-			education: p.education,
-			job: p.job,
-			address: p.address,
-			phone: p.phone,
-			email: p.email,
-			status: p.status,
-			guardianRelation: p.guardianRelation,
-		}));
-		await db.insert(studentParents).values(parentInserts);
+	// 5. Insert Student Parents (Ayah, Ibu, Wali) — Support array & fallback flat fields
+	if (body.parents && Array.isArray(body.parents) && body.parents.length > 0) {
+		const parentInserts = body.parents
+			.filter((p: any) => p && p.name)
+			.map((p: any) => ({
+				studentId,
+				type: p.type,
+				name: p.name,
+				birthPlace: p.birthPlace,
+				birthDate: p.birthDate ? new Date(p.birthDate) : null,
+				religion: p.religion,
+				nationality: p.nationality,
+				education: p.education,
+				job: p.job,
+				address: p.address,
+				phone: p.phone,
+				email: p.email,
+				status: p.status || "Hidup",
+				guardianRelation: p.guardianRelation,
+			}));
+		if (parentInserts.length > 0) {
+			await db.insert(studentParents).values(parentInserts);
+		}
+	} else if (body.ayahName || body.ibuName || body.waliName) {
+		const fallbackParents: any[] = [];
+		if (body.ayahName) {
+			fallbackParents.push({
+				studentId,
+				type: "ayah",
+				name: body.ayahName,
+				birthPlace: body.ayahBirthPlace,
+				birthDate: body.ayahBirthDate ? new Date(body.ayahBirthDate) : null,
+				religion: body.ayahReligion,
+				nationality: body.ayahNationality,
+				education: body.ayahEducation,
+				job: body.ayahJob,
+				address: body.ayahAddress,
+				phone: body.ayahPhone,
+				email: body.ayahEmail,
+				status: body.ayahStatus || "Hidup",
+			});
+		}
+		if (body.ibuName) {
+			fallbackParents.push({
+				studentId,
+				type: "ibu",
+				name: body.ibuName,
+				birthPlace: body.ibuBirthPlace,
+				birthDate: body.ibuBirthDate ? new Date(body.ibuBirthDate) : null,
+				religion: body.ibuReligion,
+				nationality: body.ibuNationality,
+				education: body.ibuEducation,
+				job: body.ibuJob,
+				address: body.ibuAddress,
+				phone: body.ibuPhone,
+				email: body.ibuEmail,
+				status: body.ibuStatus || "Hidup",
+			});
+		}
+		if (body.waliName) {
+			fallbackParents.push({
+				studentId,
+				type: "wali",
+				name: body.waliName,
+				birthPlace: body.waliBirthPlace,
+				birthDate: body.waliBirthDate ? new Date(body.waliBirthDate) : null,
+				religion: body.waliReligion,
+				nationality: body.waliNationality,
+				education: body.waliEducation,
+				job: body.waliJob,
+				address: body.waliAddress,
+				phone: body.waliPhone,
+				email: body.waliEmail,
+				guardianRelation: body.waliGuardianRelation,
+			});
+		}
+		if (fallbackParents.length > 0) {
+			await db.insert(studentParents).values(fallbackParents);
+		}
+	}
+
+	// 5b. Insert Student Friend Contacts (Task N-3)
+	if (
+		body.friendContacts &&
+		Array.isArray(body.friendContacts) &&
+		body.friendContacts.length > 0
+	) {
+		const friendInserts = body.friendContacts
+			.filter((f: any) => f && f.name && f.phone)
+			.map((f: any) => ({
+				studentId,
+				name: f.name,
+				phone: f.phone,
+				schoolOrRelation: f.schoolOrRelation || f.school_or_relation || null,
+				followUpStatus: "Belum Dihubungi",
+			}));
+		if (friendInserts.length > 0) {
+			await db.insert(studentFriendContacts).values(friendInserts);
+		}
+	}
+
+	// 5c. Fetch program fee default jika ada (Task J-2)
+	let defaultBiaya = 0;
+	let defaultReg = 0;
+	if (body.subProgram) {
+		const feeDefault = await db.query.programFeeDefaults.findFirst({
+			where: eq(programFeeDefaults.subProgram, body.subProgram),
+		});
+		if (feeDefault) {
+			defaultBiaya = feeDefault.defaultTotalBiaya || 0;
+			defaultReg = feeDefault.defaultRegistrasi || 0;
+		}
 	}
 
 	// 6. Initialize related panels
@@ -209,10 +308,21 @@ export async function createStudentPipeline(body: any, userId: number) {
 			roReferral: body.roReferral,
 			mitraSponsor: body.mitraSponsor,
 			koordinator: body.koordinator,
+			referralCategory: body.referralCategory || null,
+			referralInstitutionName: body.referralInstitutionName || null,
+			referralContactName: body.referralContactName || null,
+			referralContactPhone: body.referralContactPhone || null,
 		}),
-		db.insert(pmbPaymentPlan).values({ studentId }),
+		db.insert(pmbPaymentPlan).values({
+			studentId,
+			totalBiaya: defaultBiaya,
+		}),
 		db.insert(crmData).values({ studentId }),
-		db.insert(financeData).values({ studentId }),
+		db.insert(financeData).values({
+			studentId,
+			totalBiayaPendidikan: defaultBiaya,
+			registrasiNominal: defaultReg,
+		}),
 		db.insert(academicData).values({ studentId }),
 		db.insert(paData).values({ studentId }),
 		db.insert(internshipData).values({ studentId }),
@@ -226,6 +336,48 @@ export async function createStudentPipeline(body: any, userId: number) {
 			})),
 		),
 	]);
+
+	// 6b. Auto-populate fee sharing recipient if referral data exists (Task I-1)
+	if (
+		body.referralCategory ||
+		body.referralContactName ||
+		body.roReferral ||
+		body.mitraSponsor
+	) {
+		const kategoriMap: Record<string, string> = {
+			sekolah: "Sekolah",
+			bkk_fkks: "BKK/FKKS",
+			mitra_sponsor: "Mitra",
+			koordinator_ro: "Koordinator",
+			tim_nusadaya: "Tim Nusadaya",
+		};
+		const resolvedKategori =
+			(body.referralCategory && kategoriMap[body.referralCategory]) ||
+			body.referralCategory ||
+			(body.roReferral
+				? "Koordinator"
+				: body.mitraSponsor
+					? "Mitra"
+					: "Lainnya");
+
+		const namaReferral =
+			body.referralContactName ||
+			body.roReferral ||
+			body.mitraSponsor ||
+			body.referralInstitutionName ||
+			"Referral PMB";
+
+		await db.insert(feeShareRecipients).values({
+			studentId,
+			namaReferral,
+			kategori: resolvedKategori,
+			namaInstitusi: body.referralInstitutionName || null,
+			noHp: body.referralContactPhone || null,
+			nominalFee: 0,
+			statusPencairan: "belum_dibayarkan",
+			createdBy: userId,
+		});
+	}
 
 	// 7. Catat di auditLogs
 	await db.insert(auditLogs).values({
@@ -334,11 +486,14 @@ export const coreRoutes = new Elysia()
 					)!,
 				);
 			}
+			if (query?.rombel && query.rombel !== "all") {
+				conditions.push(eq(students.rombel, query.rombel));
+			}
 
 			const whereClause = and(...conditions);
 
 			// Cache key for pagination & filter combination
-			const cacheKey = `cache:students:list:p${page}:l${limit}:c${cohort || "all"}:s${status || "all"}:q${search || ""}:a${isArchived}`;
+			const cacheKey = `cache:students:list:p${page}:l${limit}:c${cohort || "all"}:r${query?.rombel || "all"}:s${status || "all"}:q${search || ""}:a${isArchived}`;
 
 			const responsePayload = await cacheFetch(
 				cacheKey,
@@ -368,6 +523,7 @@ export const coreRoutes = new Elysia()
 								name: students.name,
 								nickname: students.nickname,
 								cohort: students.cohort,
+								rombel: students.rombel,
 								program: students.program,
 								subProgram: students.subProgram,
 								phone: students.phone,
@@ -392,6 +548,7 @@ export const coreRoutes = new Elysia()
 								documentsComplete: pmbData.documentsComplete,
 								dataInputted: pmbData.dataInputted,
 								initialFollowUp: pmbData.initialFollowUp,
+								pasFoto: pmbData.pasFoto,
 								docKtp: pmbData.docKtp,
 								docKk: pmbData.docKk,
 								docCv: pmbData.docCv,
@@ -678,6 +835,7 @@ export const coreRoutes = new Elysia()
 				batch: t.Optional(t.Number()),
 				academicYear: t.Optional(t.String()),
 				cohort: t.Number(),
+				rombel: t.Optional(t.String()),
 
 				// Tab 3
 				bloodType: t.Optional(t.String()),
@@ -788,6 +946,7 @@ export const coreRoutes = new Elysia()
 					studentStatus: body.studentStatus || "aktif",
 					destinationCountry: body.destinationCountry,
 					period: body.period,
+					...(body.rombel !== undefined ? { rombel: body.rombel } : {}),
 					updatedAt: new Date(),
 				})
 				.where(eq(students.id, id));
@@ -895,6 +1054,7 @@ export const coreRoutes = new Elysia()
 				batch: t.Optional(t.Number()),
 				academicYear: t.Optional(t.String()),
 				cohort: t.Number(),
+				rombel: t.Optional(t.String()),
 
 				// Tab 3
 				bloodType: t.Optional(t.String()),
@@ -979,6 +1139,7 @@ export const coreRoutes = new Elysia()
 				nim: t.Optional(t.String()),
 				name: t.Optional(t.String()),
 				cohort: t.Optional(t.Number()),
+				rombel: t.Optional(t.String()),
 				program: t.Optional(t.String()),
 				subProgram: t.Optional(t.String()),
 				phone: t.Optional(t.String()),
@@ -987,6 +1148,41 @@ export const coreRoutes = new Elysia()
 				studentStatus: t.Optional(t.String()),
 				destinationCountry: t.Optional(t.String()),
 				period: t.Optional(t.String()),
+			}),
+		},
+	)
+	.patch(
+		"/:id/rombel",
+		async ({ params, body, set, user }: any) => {
+			if (!hasRole(user, "superadmin", "akademik")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const id = parseInt(params.id, 10);
+			const targetRombel = (body.rombel || "Kelas A").trim();
+
+			await db
+				.update(students)
+				.set({
+					rombel: targetRombel,
+					updatedAt: new Date(),
+				})
+				.where(eq(students.id, id));
+
+			await Promise.all([
+				cacheDel(`cache:student:${id}`),
+				cacheInvalidatePattern("cache:students:list:*"),
+				cacheInvalidatePattern(`cache:mahasiswa:*`),
+			]);
+
+			return {
+				success: true,
+				message: `Rombel berhasil diubah menjadi ${targetRombel}`,
+			};
+		},
+		{
+			body: t.Object({
+				rombel: t.String(),
 			}),
 		},
 	)
@@ -1321,6 +1517,7 @@ export const coreRoutes = new Elysia()
 					decision,
 					grades,
 					parents,
+					friendContacts,
 				] = await Promise.all([
 					db.query.pmbData.findFirst({
 						where: eq(pmbData.studentId, id),
@@ -1359,6 +1556,9 @@ export const coreRoutes = new Elysia()
 					db.query.studentParents.findMany({
 						where: eq(studentParents.studentId, id),
 					}),
+					db.query.studentFriendContacts.findMany({
+						where: eq(studentFriendContacts.studentId, id),
+					}),
 				]);
 
 				return {
@@ -1372,6 +1572,7 @@ export const coreRoutes = new Elysia()
 					decision,
 					courseGrades: grades,
 					parents,
+					friendContacts,
 				};
 			},
 			CACHE_TTL_DETAIL,
@@ -1421,13 +1622,17 @@ export const coreRoutes = new Elysia()
 			.orderBy(users.fullName);
 		return { success: true, data: paUsers };
 	})
-	// PATCH student status
+	// PATCH student status (Hanya Akademik & Superadmin - Task L-1)
 	.patch(
 		"/:id/student-status",
 		async ({ params, body, set, user }: any) => {
-			if (!hasRole(user, "superadmin", "pmb", "akademik")) {
+			if (!hasRole(user, "superadmin", "akademik")) {
 				set.status = 403;
-				return { success: false, message: "Forbidden" };
+				return {
+					success: false,
+					message:
+						"Hanya Akademik dan Superadmin yang berhak mengubah status mahasiswa",
+				};
 			}
 			const id = parseInt(params.id, 10);
 			await db
@@ -1458,6 +1663,24 @@ export const coreRoutes = new Elysia()
 				return { success: false, message: "Forbidden" };
 			}
 			const id = parseInt(params.id, 10);
+			// Check clearance (PMB ACC & Finance Registrasi Awal Lunas)
+			if (body.nim && !hasRole(user, "superadmin")) {
+				const [pmbRecord, finRecord] = await Promise.all([
+					db.query.pmbData.findFirst({ where: eq(pmbData.studentId, id) }),
+					db.query.financeData.findFirst({
+						where: eq(financeData.studentId, id),
+					}),
+				]);
+				if (!pmbRecord?.isAcc || !finRecord?.registrasiStatus) {
+					set.status = 400;
+					return {
+						success: false,
+						message:
+							"Clearance belum terpenuhi: NIM hanya dapat dirilis setelah berkas PMB disetujui (ACC) dan pembayaran Registrasi Awal lunas di Finance.",
+					};
+				}
+			}
+
 			// Check for duplicate NIM (exclude self)
 			if (body.nim) {
 				const existing = await db.query.students.findFirst({
@@ -1490,13 +1713,17 @@ export const coreRoutes = new Elysia()
 			}),
 		},
 	)
-	// PATCH student PA assignment
+	// PATCH student PA assignment (Hanya Akademik & Superadmin - Task L-2)
 	.patch(
 		"/:id/pa",
 		async ({ params, body, set, user }: any) => {
-			if (!hasRole(user, "superadmin", "pmb", "akademik")) {
+			if (!hasRole(user, "superadmin", "akademik")) {
 				set.status = 403;
-				return { success: false, message: "Forbidden" };
+				return {
+					success: false,
+					message:
+						"Hanya Akademik dan Superadmin yang berhak menentukan Dosen PA",
+				};
 			}
 			const id = parseInt(params.id, 10);
 			await db
@@ -1515,6 +1742,93 @@ export const coreRoutes = new Elysia()
 		{
 			body: t.Object({
 				paId: t.Optional(t.Nullable(t.Number())),
+			}),
+		},
+	)
+	// GET clearance status untuk Gatekeeper Rilis NIM (Task M-1)
+	.get("/:id/clearance-status", async ({ params }: any) => {
+		const id = parseInt(params.id, 10);
+		const [pmb, fin] = await Promise.all([
+			db.query.pmbData.findFirst({
+				where: eq(pmbData.studentId, id),
+				columns: { isAcc: true, status: true },
+			}),
+			db.query.financeData.findFirst({
+				where: eq(financeData.studentId, id),
+				columns: { registrasiStatus: true },
+			}),
+		]);
+
+		const pmbCleared = Boolean(pmb?.isAcc || pmb?.status === "ACC");
+		const financeCleared = Boolean(fin?.registrasiStatus);
+		const canReleaseNim = pmbCleared && financeCleared;
+
+		return {
+			success: true,
+			data: {
+				pmbCleared,
+				financeCleared,
+				canReleaseNim,
+			},
+		};
+	})
+	// GET student friend contacts (Task N-4, P-2)
+	.get("/:id/friend-contacts", async ({ params }: any) => {
+		const id = parseInt(params.id, 10);
+		const contacts = await db.query.studentFriendContacts.findMany({
+			where: eq(studentFriendContacts.studentId, id),
+			orderBy: [desc(studentFriendContacts.createdAt)],
+		});
+		return { success: true, data: contacts };
+	})
+	// POST add friend contact (Task N-2)
+	.post(
+		"/:id/friend-contacts",
+		async ({ params, body, set, user }: any) => {
+			if (!hasRole(user, "superadmin", "pmb", "crm")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const id = parseInt(params.id, 10);
+			const items = Array.isArray(body) ? body : [body];
+			const recordsToInsert = items
+				.filter((i: any) => i && i.name && i.phone)
+				.map((i: any) => ({
+					studentId: id,
+					name: i.name,
+					phone: i.phone,
+					schoolOrRelation: i.schoolOrRelation || null,
+					followUpStatus: i.followUpStatus || "Belum Dihubungi",
+				}));
+
+			if (recordsToInsert.length > 0) {
+				await db.insert(studentFriendContacts).values(recordsToInsert);
+			}
+			return { success: true, message: "Kontak kawan berhasil ditambahkan" };
+		},
+		{
+			body: t.Any(),
+		},
+	)
+	// PATCH update follow-up status per contact (Task P-3)
+	.patch(
+		"/:id/friend-contacts/:contactId",
+		async ({ params, body, set, user }: any) => {
+			if (!hasRole(user, "superadmin", "crm", "pmb")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const contactId = parseInt(params.contactId, 10);
+			await db
+				.update(studentFriendContacts)
+				.set({ followUpStatus: body.followUpStatus })
+				.where(eq(studentFriendContacts.id, contactId));
+
+			return { success: true, message: "Status follow-up berhasil diperbarui" };
+		},
+		{
+			body: t.Object({
+				followUpStatus: t.String(),
 			}),
 		},
 	);

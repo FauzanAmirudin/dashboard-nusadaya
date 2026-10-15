@@ -57,7 +57,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { api } from "@/lib/eden";
+import { api, authFetch } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 import { hasRole, useAuthStore } from "@/store";
 import { calculateProgressStatus, normalizeStatus } from "@/utils/status";
@@ -76,6 +76,7 @@ export function PmbDashboard({
 	searchQuery,
 	setSearchQuery,
 	user,
+	onUpdate,
 }: any) {
 	const router = useRouter();
 	const [activeTab, setActiveTab] = useState("overview");
@@ -83,7 +84,35 @@ export function PmbDashboard({
 	const [selectedStatus, setSelectedStatus] = useState<string>("all");
 	const [localSearch, setLocalSearch] = useState(searchQuery || "");
 	const [currentPage, setCurrentPage] = useState(1);
+	const [pendingFormsCount, setPendingFormsCount] = useState<number | null>(
+		null,
+	);
 	const pageSize = 20;
+
+	useEffect(() => {
+		const handleSync = () => {
+			onUpdate?.();
+		};
+		window.addEventListener("pmb-progress-sync", handleSync);
+		window.addEventListener("student-updated", handleSync);
+		return () => {
+			window.removeEventListener("pmb-progress-sync", handleSync);
+			window.removeEventListener("student-updated", handleSync);
+		};
+	}, [onUpdate]);
+
+	useEffect(() => {
+		const fetchPending = async () => {
+			try {
+				const res = await authFetch("/pmb/form-responses");
+				const resData = await res.json();
+				if (resData.success && Array.isArray(resData.data)) {
+					setPendingFormsCount(resData.data.length);
+				}
+			} catch {}
+		};
+		fetchPending();
+	}, [activeTab]);
 
 	// Available cohorts dynamically derived strictly from student data
 	const availableCohorts = useMemo(() => {
@@ -133,6 +162,11 @@ export function PmbDashboard({
 			{
 				name: "Follow Up Awal",
 				done: Boolean(pmb?.initialFollowUp),
+				category: "Utama",
+			},
+			{
+				name: "Pas Foto (Standar Visa / Formal)",
+				done: Boolean(pmb?.pasFoto),
 				category: "Utama",
 			},
 			{ name: "KTP", done: Boolean(pmb?.docKtp), category: "Dokumen" },
@@ -198,8 +232,8 @@ export function PmbDashboard({
 	};
 
 	const getStudentPmbStatus = (pmb: any) => {
-		const { completed } = getPmbChecklist(pmb);
-		return calculateProgressStatus(completed, 14, pmb?.isAcc);
+		const { completed, total } = getPmbChecklist(pmb);
+		return calculateProgressStatus(completed, total, pmb?.isAcc);
 	};
 
 	// KPI Metrics based on cohortData using standardized 4 categories
@@ -271,7 +305,7 @@ export function PmbDashboard({
 					s.student?.program ||
 					"-",
 				"No. WhatsApp": s.student?.phone || "-",
-				"Progress Checklist": `${checklist.completed}/14 Item (${Math.round((checklist.completed / 14) * 100)}%)`,
+				"Progress Checklist": `${checklist.completed}/${checklist.total} Item (${Math.round((checklist.completed / checklist.total) * 100)}%)`,
 				"Formulir Masuk": s.pmb?.formReceived ? "Sudah" : "Belum",
 				"Berkas Lengkap": s.pmb?.documentsComplete ? "Sudah" : "Belum",
 				"Data Terinput": s.pmb?.dataInputted ? "Sudah" : "Belum",
@@ -452,9 +486,14 @@ export function PmbDashboard({
 					</TabsTrigger>
 					<TabsTrigger
 						value="forms"
-						className="data-[state=active]:bg-[#0517B0] data-[state=active]:text-white text-xs font-semibold px-4 py-2"
+						className="data-[state=active]:bg-[#0517B0] data-[state=active]:text-white text-xs font-semibold px-4 py-2 flex items-center gap-1.5"
 					>
-						Formulir Registrasi Online
+						<span>Formulir Registrasi Online</span>
+						{pendingFormsCount !== null && pendingFormsCount > 0 && (
+							<span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950">
+								{pendingFormsCount} Antrean
+							</span>
+						)}
 					</TabsTrigger>
 				</TabsList>
 
@@ -538,7 +577,7 @@ export function PmbDashboard({
 											Butuh Perhatian
 										</SelectItem>
 										<SelectItem value="lengkap">
-											Checklist Lengkap (14)
+											Checklist Lengkap (17)
 										</SelectItem>
 									</SelectContent>
 								</Select>
@@ -589,7 +628,7 @@ export function PmbDashboard({
 												No. WhatsApp
 											</TableHead>
 											<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
-												Progress (14)
+												Progress (17)
 											</TableHead>
 											<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
 												Status PMB
@@ -601,9 +640,8 @@ export function PmbDashboard({
 									</TableHeader>
 									<TableBody>
 										{paginatedData.map((s: any) => {
-											const { items, completed, isDone } = getPmbChecklist(
-												s.pmb,
-											);
+											const { items, completed, total, isDone } =
+												getPmbChecklist(s.pmb);
 											const status = s.pmb?.status || "PERLU_PERHATIAN";
 											const waUrl = formatWhatsAppUrl(s.student?.phone);
 
@@ -698,7 +736,9 @@ export function PmbDashboard({
 																<TooltipTrigger className="w-full">
 																	<div className="flex flex-col items-center gap-1">
 																		<div className="flex items-center justify-between w-full text-[11px] font-bold text-slate-700 px-1">
-																			<span>{completed}/14 Item</span>
+																			<span>
+																				{completed}/{total} Item
+																			</span>
 																			<span
 																				className={
 																					isDone
@@ -706,7 +746,7 @@ export function PmbDashboard({
 																						: "text-slate-500"
 																				}
 																			>
-																				{Math.round((completed / 14) * 100)}%
+																				{Math.round((completed / total) * 100)}%
 																			</span>
 																		</div>
 																		<div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60">
@@ -714,12 +754,12 @@ export function PmbDashboard({
 																				className={`h-full rounded-full transition-all duration-300 ${
 																					isDone
 																						? "bg-emerald-500"
-																						: completed >= 7
+																						: completed >= 8
 																							? "bg-blue-500"
 																							: "bg-amber-500"
 																				}`}
 																				style={{
-																					width: `${(completed / 14) * 100}%`,
+																					width: `${(completed / total) * 100}%`,
 																				}}
 																			/>
 																		</div>
@@ -728,10 +768,10 @@ export function PmbDashboard({
 																<TooltipContent className="w-64 p-3.5 bg-slate-950 text-white rounded-xl shadow-2xl border border-slate-800 text-xs flex flex-col space-y-2 z-50 max-h-72 overflow-y-auto">
 																	<div className="flex items-center justify-between border-b border-slate-800 pb-1.5 w-full">
 																		<span className="font-bold text-slate-100 text-xs">
-																			Checklist PMB (14):
+																			Checklist PMB ({total}):
 																		</span>
 																		<span className="text-[11px] font-mono text-emerald-400 font-bold">
-																			{completed}/14 Selesai
+																			{completed}/{total} Selesai
 																		</span>
 																	</div>
 																	<div className="flex flex-col space-y-1.5 w-full">
@@ -766,7 +806,7 @@ export function PmbDashboard({
 															status={s.pmb?.status}
 															isAcc={s.pmb?.isAcc}
 															completed={completed}
-															total={14}
+															total={total}
 															size="sm"
 														/>
 													</TableCell>

@@ -108,6 +108,10 @@ export default function PmbPanelMahasiswa() {
 		},
 		{ label: "Input Data Sistem", checked: Boolean(data?.dataInputted) },
 		{ label: "Follow Up Awal", checked: Boolean(data?.initialFollowUp) },
+		{
+			label: "Pas Foto (Standar Visa / Formal)",
+			checked: Boolean(data?.pasFoto),
+		},
 	];
 
 	const docChecklist = [
@@ -143,7 +147,7 @@ export default function PmbPanelMahasiswa() {
 	const mainCompletedCount = mainChecklist.filter((c) => c.checked).length;
 	const docCompletedCount = docChecklist.filter((c) => c.checked).length;
 	const totalCompleted = mainCompletedCount + docCompletedCount;
-	const totalItems = 16;
+	const totalItems = 17;
 	const progressPercentage = (totalCompleted / totalItems) * 100;
 
 	return (
@@ -215,8 +219,8 @@ export default function PmbPanelMahasiswa() {
 								</h3>
 								<p className="text-xs text-slate-500 mt-0.5">
 									{totalCompleted} dari {totalItems} item checklist telah
-									terpenuhi ({mainCompletedCount}/4 Utama • {docCompletedCount}
-									/10 Dokumen)
+									terpenuhi ({mainCompletedCount}/5 Utama • {docCompletedCount}
+									/12 Dokumen)
 								</p>
 							</div>
 							<span className="text-base font-extrabold text-[#0517B0]">
@@ -228,7 +232,7 @@ export default function PmbPanelMahasiswa() {
 							className="h-3 bg-slate-100 mb-6 rounded-full"
 						/>
 
-						{/* 4 Checklist Utama */}
+						{/* 5 Checklist Utama */}
 						<div className="space-y-2 mb-6">
 							<h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
 								1. Validasi Administrasi Utama

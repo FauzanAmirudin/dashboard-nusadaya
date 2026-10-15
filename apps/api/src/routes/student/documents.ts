@@ -38,6 +38,7 @@ import { hasRole } from "../../lib/permissions";
 import { fileService } from "../../modules/file/service/file.service";
 import { invalidateCrmCaches } from "./crm";
 import { invalidateFinanceCaches } from "./finance";
+import { invalidatePmbCache } from "./pmb";
 
 export const documentsRoutes = new Elysia()
 	.get("/:id/:panel/documents", async (context) => {
@@ -304,6 +305,43 @@ export const documentsRoutes = new Elysia()
 				await invalidateCrmCaches(studentId);
 			}
 
+			// Jika panel pmb, update field checklist terkait & invalidate cache
+			if (panel === "pmb") {
+				const pmbDocFieldMap: Record<string, string> = {
+					pas_foto: "pasFoto",
+					ktp: "docKtp",
+					kk: "docKk",
+					cv: "docCv",
+					ijazah: "docIjazah",
+					transkrip: "docTranskrip",
+					passport_depan: "docPassportDepan",
+					passport_visa: "docPassportVisa",
+					skbm: "docSkbm",
+					pre_mcu: "docPreMcu",
+					mcu: "docMcu",
+					bpjs: "docBpjs",
+					sla: "docSla",
+					sertifikasi_bahasa: "docSertifikasiBahasa",
+					form_received: "formReceived",
+					documents_complete: "documentsComplete",
+					data_inputted: "dataInputted",
+					initial_follow_up: "initialFollowUp",
+				};
+
+				const fieldToUpdate = pmbDocFieldMap[documentKey];
+				if (fieldToUpdate) {
+					await db
+						.update(pmbData)
+						.set({
+							[fieldToUpdate]: true,
+							updatedAt: new Date(),
+						} as any)
+						.where(eq(pmbData.studentId, studentId));
+				}
+
+				await invalidatePmbCache(studentId);
+			}
+
 			return { success: true, message: "Dokumen berhasil diunggah", fileUrl };
 		},
 		{
@@ -434,6 +472,10 @@ export const documentsRoutes = new Elysia()
 
 		if (panel === "crm") {
 			await invalidateCrmCaches(studentId);
+		}
+
+		if (panel === "pmb") {
+			await invalidatePmbCache(studentId);
 		}
 
 		return { success: true, message: "Dokumen berhasil dihapus" };

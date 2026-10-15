@@ -1,13 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { authFetch } from "@/lib/eden";
 import { TabFormulir } from "./TabFormulir";
 import { TabRespons } from "./TabRespons";
 import { TabRiwayatRespons } from "./TabRiwayatRespons";
 
 export function FormMahasiswaModule() {
 	const [activeTab, setActiveTab] = useState("formulir");
+	const [pendingCount, setPendingCount] = useState<number | null>(null);
+
+	const fetchPendingCount = async () => {
+		try {
+			const res = await authFetch("/pmb/form-responses");
+			const data = await res.json();
+			if (data.success && Array.isArray(data.data)) {
+				setPendingCount(data.data.length);
+			}
+		} catch {}
+	};
+
+	useEffect(() => {
+		fetchPendingCount();
+	}, [activeTab]);
 
 	return (
 		<div className="space-y-6">
@@ -21,9 +37,14 @@ export function FormMahasiswaModule() {
 					</TabsTrigger>
 					<TabsTrigger
 						value="respons"
-						className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-md px-6"
+						className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-md px-6 flex items-center gap-1.5"
 					>
-						Respons
+						<span>Respons</span>
+						{pendingCount !== null && pendingCount > 0 && (
+							<span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-[#0517B0]">
+								{pendingCount}
+							</span>
+						)}
 					</TabsTrigger>
 					<TabsTrigger
 						value="riwayat"

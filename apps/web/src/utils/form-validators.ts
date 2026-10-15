@@ -232,3 +232,20 @@ export function preventFinanceIntegerKey(
 		toast.warning(`Input angka maksimal ${maxDigits} digit`);
 	}
 }
+
+/**
+ * Validasi nomor telepon Indonesia (awalan 08, 628, atau +628, total digit 10-14).
+ * Mengembalikan pesan error atau null jika valid. (Task E-1)
+ */
+export function validateIndonesianPhone(
+	phone: string | null | undefined,
+	fieldLabel = "Nomor WhatsApp",
+): string | null {
+	if (!phone || phone.trim() === "") return null;
+	const cleaned = phone.trim().replace(/[\s-]/g, "");
+	const regex = /^(\+628|628|08)[0-9]{8,12}$/;
+	if (!regex.test(cleaned)) {
+		return `${fieldLabel} harus nomor Indonesia valid (awalan 08/628/+628, 10–14 digit)`;
+	}
+	return null;
+}

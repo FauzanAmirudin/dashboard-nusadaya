@@ -157,6 +157,11 @@ const getPmbChecklist = (pmb: any) => {
 			done: Boolean(pmb?.initialFollowUp),
 			category: "Utama",
 		},
+		{
+			name: "Pas Foto (Standar Visa / Formal)",
+			done: Boolean(pmb?.pasFoto),
+			category: "Utama",
+		},
 		{ name: "KTP", done: Boolean(pmb?.docKtp), category: "Dokumen" },
 		{
 			name: "Kartu Keluarga (KK)",
@@ -636,7 +641,7 @@ function DivisionStudentsView({
 					subtitle:
 						"Menampilkan semua mahasiswa terdaftar dan progres berkas pendaftaran PMB.",
 					context: "pmb",
-					progressLabel: "Progress PMB (14)",
+					progressLabel: "Progress PMB (16)",
 					getChecklist: (s: StudentData) => getPmbChecklist(s.pmb),
 					getStatus: (s: StudentData) => s.pmb?.status || "PERLU_PERHATIAN",
 					getIsAcc: (s: StudentData) => Boolean(s.pmb?.isAcc),

@@ -8,10 +8,12 @@ import {
 	Loader2,
 	Pencil,
 	Plus,
+	Printer,
 	RotateCcw,
 	Search,
 	Trash2,
 	User,
+	Users2,
 	X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -53,6 +55,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { DEFAULT_ROMBEL_OPTIONS, STANDARDIZED_ROOMS } from "@/constants/rooms";
 import { api } from "@/lib/eden";
 
 const DAYS_OF_WEEK = [
@@ -83,6 +86,7 @@ export function TabJadwalPraktikum({ canEdit }: { canEdit: boolean }) {
 	// Filters
 	const [searchQuery, setSearchQuery] = useState("");
 	const [cohortFilter, setCohortFilter] = useState("all");
+	const [rombelFilter, setRombelFilter] = useState("all");
 	const [dayFilter, setDayFilter] = useState("all");
 
 	// Modal states
@@ -95,6 +99,7 @@ export function TabJadwalPraktikum({ canEdit }: { canEdit: boolean }) {
 		try {
 			const query: any = {};
 			if (cohortFilter !== "all") query.cohort = cohortFilter;
+			if (rombelFilter !== "all") query.rombel = rombelFilter;
 			if (dayFilter !== "all") query.dayOfWeek = dayFilter;
 
 			const { data, error } = await (api as any).scheduling[
@@ -131,7 +136,7 @@ export function TabJadwalPraktikum({ canEdit }: { canEdit: boolean }) {
 
 	useEffect(() => {
 		fetchSchedules();
-	}, [cohortFilter, dayFilter]);
+	}, [cohortFilter, rombelFilter, dayFilter]);
 
 	// Extract unique cohort list dynamically
 	const dynamicCohorts = useMemo(() => {
@@ -142,6 +147,15 @@ export function TabJadwalPraktikum({ canEdit }: { canEdit: boolean }) {
 		return Array.from(cohorts).sort((a, b) => Number(b) - Number(a));
 	}, [schedules]);
 
+	// Extract unique rombel list dynamically
+	const dynamicRombels = useMemo(() => {
+		const rombels = new Set<string>(["Kelas A", "Kelas B"]);
+		schedules.forEach((s) => {
+			if (s.rombel) rombels.add(s.rombel);
+		});
+		return Array.from(rombels).sort();
+	}, [schedules]);
+
 	// Client-side search filter
 	const filteredSchedules = useMemo(() => {
 		if (!searchQuery.trim()) return schedules;
@@ -150,6 +164,7 @@ export function TabJadwalPraktikum({ canEdit }: { canEdit: boolean }) {
 			(s) =>
 				s.subject?.toLowerCase().includes(q) ||
 				s.room?.toLowerCase().includes(q) ||
+				s.rombel?.toLowerCase().includes(q) ||
 				s.dosen?.fullName?.toLowerCase().includes(q) ||
 				s.dosen?.name?.toLowerCase().includes(q) ||
 				s.dayOfWeek?.toLowerCase().includes(q),
@@ -176,12 +191,20 @@ export function TabJadwalPraktikum({ canEdit }: { canEdit: boolean }) {
 	};
 
 	const hasActiveFilters =
-		searchQuery !== "" || cohortFilter !== "all" || dayFilter !== "all";
+		searchQuery !== "" ||
+		cohortFilter !== "all" ||
+		rombelFilter !== "all" ||
+		dayFilter !== "all";
 
 	const resetFilters = () => {
 		setSearchQuery("");
 		setCohortFilter("all");
+		setRombelFilter("all");
 		setDayFilter("all");
+	};
+
+	const handlePrint = () => {
+		window.print();
 	};
 
 	return (
@@ -211,18 +234,29 @@ export function TabJadwalPraktikum({ canEdit }: { canEdit: boolean }) {
 							</div>
 						</div>
 
-						{canEdit && (
+						<div className="flex items-center gap-2 w-full sm:w-auto">
 							<Button
-								onClick={() => {
-									setEditingSchedule(null);
-									setIsModalOpen(true);
-								}}
-								className="bg-[#0517B0] hover:bg-blue-900 text-white rounded-xl shadow-xs text-xs font-semibold px-3.5 py-2 h-9 w-full sm:w-auto"
+								variant="outline"
+								onClick={handlePrint}
+								className="border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold px-3 py-2 h-9"
 							>
-								<Plus className="w-4 h-4 mr-1.5" />
-								Tambah Jadwal Praktikum
+								<Printer className="w-4 h-4 mr-1.5" />
+								Cetak Jadwal
 							</Button>
-						)}
+
+							{canEdit && (
+								<Button
+									onClick={() => {
+										setEditingSchedule(null);
+										setIsModalOpen(true);
+									}}
+									className="bg-[#0517B0] hover:bg-blue-900 text-white rounded-xl shadow-xs text-xs font-semibold px-3.5 py-2 h-9 w-full sm:w-auto"
+								>
+									<Plus className="w-4 h-4 mr-1.5" />
+									Tambah Jadwal Praktikum
+								</Button>
+							)}
+						</div>
 					</div>
 
 					{/* Search and Filters Bar */}
@@ -230,7 +264,7 @@ export function TabJadwalPraktikum({ canEdit }: { canEdit: boolean }) {
 						<div className="relative flex-1 min-w-[220px]">
 							<Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
 							<Input
-								placeholder="Cari mata kuliah praktikum, instruktur, lab..."
+								placeholder="Cari mata kuliah praktikum, instruktur, lab, rombel..."
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
 								className="pl-9 pr-8 h-9 text-xs rounded-xl bg-slate-50/50 border-slate-200 focus:bg-white transition-all"
@@ -246,7 +280,7 @@ export function TabJadwalPraktikum({ canEdit }: { canEdit: boolean }) {
 							)}
 						</div>
 
-						<div className="w-full sm:w-[170px]">
+						<div className="w-full sm:w-[160px]">
 							<Select
 								value={cohortFilter}
 								onValueChange={(val) => setCohortFilter(val || "all")}
@@ -266,6 +300,25 @@ export function TabJadwalPraktikum({ canEdit }: { canEdit: boolean }) {
 						</div>
 
 						<div className="w-full sm:w-[150px]">
+							<Select
+								value={rombelFilter}
+								onValueChange={(val) => setRombelFilter(val || "all")}
+							>
+								<SelectTrigger className="h-9 text-xs rounded-xl bg-slate-50/50 border-slate-200">
+									<SelectValue placeholder="Semua Rombel" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="all">Semua Rombel</SelectItem>
+									{dynamicRombels.map((rombel) => (
+										<SelectItem key={rombel} value={rombel}>
+											{rombel}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="w-full sm:w-[140px]">
 							<Select
 								value={dayFilter}
 								onValueChange={(val) => setDayFilter(val || "all")}
@@ -356,11 +409,11 @@ export function TabJadwalPraktikum({ canEdit }: { canEdit: boolean }) {
 										<TableHead className="text-[11px] font-bold text-slate-600 uppercase tracking-wider py-3">
 											Instruktur / Pengampu
 										</TableHead>
-										<TableHead className="w-[120px] text-[11px] font-bold text-slate-600 uppercase tracking-wider py-3">
-											Angkatan
+										<TableHead className="w-[140px] text-[11px] font-bold text-slate-600 uppercase tracking-wider py-3">
+											Angkatan & Rombel
 										</TableHead>
-										<TableHead className="w-[130px] text-[11px] font-bold text-slate-600 uppercase tracking-wider py-3">
-											Laboratorium
+										<TableHead className="w-[150px] text-[11px] font-bold text-slate-600 uppercase tracking-wider py-3">
+											Laboratorium / Ruang
 										</TableHead>
 										{canEdit && (
 											<TableHead className="w-[100px] text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right pr-5 py-3">
@@ -419,13 +472,22 @@ export function TabJadwalPraktikum({ canEdit }: { canEdit: boolean }) {
 												</TableCell>
 
 												<TableCell className="py-3.5">
-													<Badge
-														variant="outline"
-														className="bg-blue-50/50 text-[#0517B0] border-blue-200/60 text-[11px] font-semibold rounded-lg px-2 py-0.5"
-													>
-														<GraduationCap className="w-3 h-3 mr-1" />
-														Angkatan {s.cohort}
-													</Badge>
+													<div className="flex flex-col gap-1 items-start">
+														<Badge
+															variant="outline"
+															className="bg-blue-50/50 text-[#0517B0] border-blue-200/60 text-[11px] font-semibold rounded-lg px-2 py-0.5"
+														>
+															<GraduationCap className="w-3 h-3 mr-1" />
+															Angkatan {s.cohort}
+														</Badge>
+														<Badge
+															variant="outline"
+															className="bg-purple-50 text-purple-700 border-purple-200/70 text-[10px] font-semibold rounded-md px-1.5 py-0.5"
+														>
+															<Users2 className="w-2.5 h-2.5 mr-1" />
+															{s.rombel || "Kelas A"}
+														</Badge>
+													</div>
 												</TableCell>
 
 												<TableCell className="py-3.5">
@@ -527,11 +589,23 @@ function PracticumScheduleDialog({
 	onSuccess: () => void;
 }) {
 	const [isSaving, setIsSaving] = useState(false);
+	const initialRoom = schedule?.room || "Ruang Kelas 1";
+	const isStandardRoom = (STANDARDIZED_ROOMS as readonly string[]).includes(
+		initialRoom,
+	);
+
+	const [roomType, setRoomType] = useState<string>(
+		isStandardRoom ? initialRoom : "custom",
+	);
+	const [customRoom, setCustomRoom] = useState<string>(
+		isStandardRoom ? "" : initialRoom,
+	);
+
 	const [form, setForm] = useState({
 		subject: schedule?.subject || "",
 		dosenId: schedule?.dosenId?.toString() || "",
 		cohort: schedule?.cohort?.toString() || "",
-		room: schedule?.room || "",
+		rombel: schedule?.rombel || "Kelas A",
 		dayOfWeek: schedule?.dayOfWeek || "",
 		startTime: schedule?.startTime || "",
 		endTime: schedule?.endTime || "",
@@ -539,16 +613,19 @@ function PracticumScheduleDialog({
 	});
 
 	const handleSave = async () => {
+		const targetRoom = roomType === "custom" ? customRoom.trim() : roomType;
+
 		if (
 			!form.subject ||
 			!form.cohort ||
-			!form.room ||
+			!targetRoom ||
+			!form.rombel ||
 			!form.dayOfWeek ||
 			!form.startTime ||
 			!form.endTime
 		) {
 			toast.error(
-				"Mohon lengkapi data wajib (Mata Kuliah Praktik, Angkatan, Ruangan/Lab, Hari, dan Waktu)",
+				"Mohon lengkapi data wajib (Mata Kuliah Praktik, Angkatan, Rombel, Ruangan/Lab, Hari, dan Waktu)",
 			);
 			return;
 		}
@@ -557,6 +634,8 @@ function PracticumScheduleDialog({
 		try {
 			const payload = {
 				...form,
+				room: targetRoom,
+				rombel: form.rombel.trim(),
 				dosenId: form.dosenId ? parseInt(form.dosenId, 10) : undefined,
 			};
 
@@ -571,34 +650,26 @@ function PracticumScheduleDialog({
 					payload,
 				);
 				error = res.error;
-
-				if (error) {
-					const msg =
-						typeof error.value === "object" && (error.value as any)?.message
-							? (error.value as any).message
-							: typeof error.value === "string"
-								? error.value
-								: "Terjadi kesalahan saat menyimpan jadwal praktikum";
-					toast.error(msg);
-					setIsSaving(false);
-					return;
-				}
 			}
 
-			if (!error) {
-				toast.success(
-					schedule
-						? "Jadwal praktikum diperbarui"
-						: "Jadwal praktikum berhasil ditambahkan",
-				);
-				onSuccess();
-			} else {
-				toast.error(
-					schedule
-						? "Gagal memperbarui jadwal praktikum"
-						: "Gagal menambahkan jadwal praktikum",
-				);
+			if (error) {
+				const msg =
+					typeof error.value === "object" && (error.value as any)?.message
+						? (error.value as any).message
+						: typeof error.value === "string"
+							? error.value
+							: "Terjadi kesalahan saat menyimpan jadwal praktikum";
+				toast.error(msg);
+				setIsSaving(false);
+				return;
 			}
+
+			toast.success(
+				schedule
+					? "Jadwal praktikum diperbarui"
+					: "Jadwal praktikum berhasil ditambahkan",
+			);
+			onSuccess();
 		} catch (err: any) {
 			toast.error(err?.message || "Terjadi kesalahan");
 		} finally {
@@ -619,8 +690,8 @@ function PracticumScheduleDialog({
 								{schedule ? "Edit Jadwal Praktikum" : "Tambah Jadwal Praktikum"}
 							</DialogTitle>
 							<p className="text-xs text-slate-500 mt-0.5">
-								Konfigurasi mata kuliah praktik, instruktur, waktu, dan
-								laboratorium
+								Konfigurasi mata kuliah praktik, rombel, waktu, dan standarisasi
+								ruangan
 							</p>
 						</div>
 					</div>
@@ -680,6 +751,78 @@ function PracticumScheduleDialog({
 						/>
 					</div>
 
+					{/* Rombongan Belajar (Rombel) Dynamic Input */}
+					<div className="space-y-1.5 col-span-2 sm:col-span-1">
+						<div className="flex items-center justify-between">
+							<Label className="text-xs font-semibold text-slate-700">
+								Rombel (Rombongan Belajar){" "}
+								<span className="text-rose-500">*</span>
+							</Label>
+							<span className="text-[10px] text-slate-400">
+								Nama kustom dinamis
+							</span>
+						</div>
+						<Input
+							value={form.rombel}
+							onChange={(e) => setForm({ ...form, rombel: e.target.value })}
+							placeholder="Contoh: Kelas A, Kelas B, Gabungan..."
+							className="h-9 text-xs rounded-xl"
+						/>
+						{/* Quick preset pills */}
+						<div className="flex flex-wrap gap-1.5 pt-1">
+							{DEFAULT_ROMBEL_OPTIONS.map((opt) => (
+								<button
+									key={opt}
+									type="button"
+									onClick={() => setForm({ ...form, rombel: opt })}
+									className={`text-[11px] px-2 py-0.5 rounded-md font-medium transition-colors ${
+										form.rombel === opt
+											? "bg-[#0517B0] text-white"
+											: "bg-slate-100 text-slate-600 hover:bg-slate-200"
+									}`}
+								>
+									{opt}
+								</button>
+							))}
+						</div>
+					</div>
+
+					{/* Standarisasi Ruangan / Laboratorium */}
+					<div className="space-y-1.5 col-span-2 sm:col-span-1">
+						<Label className="text-xs font-semibold text-slate-700">
+							Ruangan / Laboratorium <span className="text-rose-500">*</span>
+						</Label>
+						<Select
+							value={roomType}
+							onValueChange={(val) => {
+								setRoomType(val);
+								if (val !== "custom") setCustomRoom("");
+							}}
+						>
+							<SelectTrigger className="h-9 text-xs rounded-xl">
+								<SelectValue placeholder="Pilih Ruang / Lab" />
+							</SelectTrigger>
+							<SelectContent>
+								{STANDARDIZED_ROOMS.map((r) => (
+									<SelectItem key={r} value={r}>
+										{r}
+									</SelectItem>
+								))}
+								<SelectItem value="custom">
+									-- Ruangan Lainnya (Kustom) --
+								</SelectItem>
+							</SelectContent>
+						</Select>
+						{roomType === "custom" && (
+							<Input
+								value={customRoom}
+								onChange={(e) => setCustomRoom(e.target.value)}
+								placeholder="Ketik nama laboratorium / ruangan..."
+								className="h-8 text-xs rounded-lg mt-1.5"
+							/>
+						)}
+					</div>
+
 					<div className="space-y-1.5 col-span-2 sm:col-span-1">
 						<Label className="text-xs font-semibold text-slate-700">
 							Hari <span className="text-rose-500">*</span>
@@ -701,40 +844,31 @@ function PracticumScheduleDialog({
 						</Select>
 					</div>
 
-					<div className="space-y-1.5 col-span-2 sm:col-span-1">
-						<Label className="text-xs font-semibold text-slate-700">
-							Ruang / Laboratorium <span className="text-rose-500">*</span>
-						</Label>
-						<Input
-							value={form.room}
-							onChange={(e) => setForm({ ...form, room: e.target.value })}
-							placeholder="Contoh: Lab Komputer & Multimedia"
-							className="h-9 text-xs rounded-xl"
-						/>
-					</div>
-
-					<div className="space-y-1.5 col-span-1">
-						<Label className="text-xs font-semibold text-slate-700">
-							Jam Mulai <span className="text-rose-500">*</span>
-						</Label>
-						<Input
-							type="time"
-							value={form.startTime}
-							onChange={(e) => setForm({ ...form, startTime: e.target.value })}
-							className="h-9 text-xs rounded-xl"
-						/>
-					</div>
-
-					<div className="space-y-1.5 col-span-1">
-						<Label className="text-xs font-semibold text-slate-700">
-							Jam Selesai <span className="text-rose-500">*</span>
-						</Label>
-						<Input
-							type="time"
-							value={form.endTime}
-							onChange={(e) => setForm({ ...form, endTime: e.target.value })}
-							className="h-9 text-xs rounded-xl"
-						/>
+					<div className="space-y-1.5 col-span-2 sm:col-span-1 grid grid-cols-2 gap-2">
+						<div>
+							<Label className="text-xs font-semibold text-slate-700">
+								Jam Mulai <span className="text-rose-500">*</span>
+							</Label>
+							<Input
+								type="time"
+								value={form.startTime}
+								onChange={(e) =>
+									setForm({ ...form, startTime: e.target.value })
+								}
+								className="h-9 text-xs rounded-xl"
+							/>
+						</div>
+						<div>
+							<Label className="text-xs font-semibold text-slate-700">
+								Jam Selesai <span className="text-rose-500">*</span>
+							</Label>
+							<Input
+								type="time"
+								value={form.endTime}
+								onChange={(e) => setForm({ ...form, endTime: e.target.value })}
+								className="h-9 text-xs rounded-xl"
+							/>
+						</div>
 					</div>
 
 					<div className="space-y-1.5 col-span-2">

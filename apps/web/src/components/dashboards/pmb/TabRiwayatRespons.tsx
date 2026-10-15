@@ -3,6 +3,7 @@
 import { Eye, RotateCcw, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { API_URL, getToken } from "@/lib/eden";
+import { authFetch } from "@/lib/eden";
 
 const MONTHS = [
 	{ value: "1", label: "Januari" },
@@ -50,28 +51,22 @@ export function TabRiwayatRespons() {
 	const fetchHistory = async () => {
 		setIsLoading(true);
 		try {
-			const token = getToken();
-			const headers: Record<string, string> = {};
-			if (token) {
-				headers.Authorization = `Bearer ${token}`;
-			}
 			const query = new URLSearchParams();
 			if (filterMonth) query.append("month", filterMonth);
 			if (filterYear) query.append("year", filterYear);
 
-			const res = await fetch(
-				`${API_URL}/pmb/form-responses/history?${query.toString()}`,
-				{
-					headers,
-					credentials: "include",
-				},
+			const res = await authFetch(
+				`/pmb/form-responses/history?${query.toString()}`,
 			);
 			const data = await res.json();
 			if (data.success) {
 				setHistory(data.data || []);
+			} else {
+				toast.error(data.message || "Gagal memuat riwayat respons");
 			}
 		} catch (error) {
 			console.error("Failed to fetch history", error);
+			toast.error("Terjadi kesalahan jaringan saat memuat riwayat");
 		} finally {
 			setIsLoading(false);
 		}

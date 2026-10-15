@@ -412,12 +412,13 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			}),
 		]);
 
-		// Hitung Progress PMB (14 item: 4 utama + 10 dokumen fisik)
+		// Hitung Progress PMB (17 item: 5 utama + 12 dokumen fisik)
 		const pmbChecklist = [
 			pmb?.formReceived,
 			pmb?.documentsComplete,
 			pmb?.dataInputted,
 			pmb?.initialFollowUp,
+			pmb?.pasFoto,
 			pmb?.docKtp,
 			pmb?.docKk,
 			pmb?.docCv,
@@ -432,7 +433,7 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			pmb?.docSertifikasiBahasa,
 		];
 		const pmbCompleted = pmbChecklist.filter(Boolean).length;
-		const pmbTotal = 16;
+		const pmbTotal = 17;
 		const pmbPercent = Math.round((pmbCompleted / pmbTotal) * 100);
 
 		// Hitung Progress CRM (11 kriteria)

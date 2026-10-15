@@ -15,20 +15,30 @@ import { students, users } from "./shared";
 // MANAJEMEN MATA KULIAH (COURSES)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const courses = pgTable("courses", {
-	id: serial("id").primaryKey(),
-	code: text("code").unique().notNull(),
-	name: text("name").notNull(),
-	dosenId: integer("dosen_id")
-		.references(() => users.id)
-		.notNull(),
-	peminatan: text("peminatan"),
-	cohort: integer("cohort").notNull(),
-	type: courseTypeEnum("type").default("teori").notNull(),
-	createdBy: integer("created_by").references(() => users.id),
-	createdAt: timestamp("created_at").defaultNow().notNull(),
-	updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const courses = pgTable(
+	"courses",
+	{
+		id: serial("id").primaryKey(),
+		code: text("code").notNull(),
+		name: text("name").notNull(),
+		sks: integer("sks").default(2).notNull(),
+		dosenId: integer("dosen_id")
+			.references(() => users.id)
+			.notNull(),
+		peminatan: text("peminatan"),
+		cohort: integer("cohort").notNull(),
+		rombel: text("rombel").default("Kelas A").notNull(),
+		type: courseTypeEnum("type").default("teori").notNull(),
+		createdBy: integer("created_by").references(() => users.id),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(t) => [
+		index("idx_courses_cohort").on(t.cohort),
+		index("idx_courses_dosen_id").on(t.dosenId),
+		index("idx_courses_code_cohort_rombel").on(t.code, t.cohort, t.rombel),
+	],
+);
 
 export const courseMeetings = pgTable("course_meetings", {
 	id: serial("id").primaryKey(),

@@ -139,18 +139,19 @@ describe("Tahap 3 — Panel Business Logic", () => {
 	// PANEL: PMB (Tasks 3.3 & 3.4)
 	// ============================================================
 	describe("Panel PMB (PmbPanel)", () => {
-		describe("Task 3.3 — PMB Checklist Completion Count (16 Item Wajib)", () => {
-			it("should count mainCompletedCount = 4 when all 4 main items are true", () => {
+		describe("Task 3.3 — PMB Checklist Completion Count (17 Item Wajib)", () => {
+			it("should count mainCompletedCount = 5 when all 5 main items are true", () => {
 				const pmbData = {
 					formReceived: true,
 					documentsComplete: true,
 					dataInputted: true,
 					initialFollowUp: true,
+					pasFoto: true,
 				};
 				const result = calculatePmbChecklist(pmbData);
-				expect(result.mainCompletedCount).toBe(4);
+				expect(result.mainCompletedCount).toBe(5);
 				expect(result.requiredDocsCompletedCount).toBe(0);
-				expect(result.totalRequiredCompleted16).toBe(4);
+				expect(result.totalRequiredCompleted).toBe(5);
 				expect(result.isAllChecklistDone).toBe(false);
 			});
 
@@ -172,16 +173,17 @@ describe("Tahap 3 — Panel Business Logic", () => {
 				const result = calculatePmbChecklist(pmbData);
 				expect(result.requiredDocsCompletedCount).toBe(12);
 				expect(result.mainCompletedCount).toBe(0);
-				expect(result.totalRequiredCompleted16).toBe(12);
+				expect(result.totalRequiredCompleted).toBe(12);
 				expect(result.isAllChecklistDone).toBe(false);
 			});
 
-			it("should return 16/16 and isAllChecklistDone = true when all items are complete", () => {
+			it("should return 17/17 and isAllChecklistDone = true when all items are complete", () => {
 				const completePmb = {
 					formReceived: true,
 					documentsComplete: true,
 					dataInputted: true,
 					initialFollowUp: true,
+					pasFoto: true,
 					docKtp: true,
 					docKk: true,
 					docCv: true,
@@ -196,16 +198,17 @@ describe("Tahap 3 — Panel Business Logic", () => {
 					docSertifikasiBahasa: true,
 				};
 				const result = calculatePmbChecklist(completePmb);
-				expect(result.totalRequiredCompleted16).toBe(16);
+				expect(result.totalRequiredCompleted).toBe(17);
 				expect(result.isAllChecklistDone).toBe(true);
 			});
 
-			it("should return isAllChecklistDone = false when only 15 of 16 are done", () => {
+			it("should return isAllChecklistDone = false when only 16 of 17 are done", () => {
 				const almostCompletePmb = {
 					formReceived: true,
 					documentsComplete: true,
 					dataInputted: true,
 					initialFollowUp: true,
+					pasFoto: true,
 					docKtp: true,
 					docKk: true,
 					docCv: true,
@@ -220,7 +223,7 @@ describe("Tahap 3 — Panel Business Logic", () => {
 					docSertifikasiBahasa: false, // 1 missing
 				};
 				const result = calculatePmbChecklist(almostCompletePmb);
-				expect(result.totalRequiredCompleted16).toBe(15);
+				expect(result.totalRequiredCompleted).toBe(16);
 				expect(result.isAllChecklistDone).toBe(false);
 			});
 
@@ -239,12 +242,13 @@ describe("Tahap 3 — Panel Business Logic", () => {
 		});
 
 		describe("Task 3.4 — PMB isAllChecklistDone ACC Gate", () => {
-			it("should allow ACC when 16/16 items are completed", () => {
+			it("should allow ACC when 17/17 items are completed", () => {
 				const completePmb = {
 					formReceived: true,
 					documentsComplete: true,
 					dataInputted: true,
 					initialFollowUp: true,
+					pasFoto: true,
 					docKtp: true,
 					docKk: true,
 					docCv: true,
@@ -261,12 +265,13 @@ describe("Tahap 3 — Panel Business Logic", () => {
 				expect(canGivePmbAcc(completePmb)).toBe(true);
 			});
 
-			it("should disable ACC when 15/16 items are completed", () => {
+			it("should disable ACC when 16/17 items are completed", () => {
 				const missingOne = {
 					formReceived: true,
 					documentsComplete: true,
 					dataInputted: true,
 					initialFollowUp: true,
+					pasFoto: true,
 					docKtp: true,
 					docKk: true,
 					docCv: true,
@@ -283,7 +288,7 @@ describe("Tahap 3 — Panel Business Logic", () => {
 				expect(canGivePmbAcc(missingOne)).toBe(false);
 			});
 
-			it("should disable ACC when 0/16 items are completed", () => {
+			it("should disable ACC when 0/17 items are completed", () => {
 				expect(canGivePmbAcc({})).toBe(false);
 			});
 		});

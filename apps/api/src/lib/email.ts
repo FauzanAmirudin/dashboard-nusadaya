@@ -57,16 +57,31 @@ export async function sendOtpEmail({
 		return { success: false, error: "Alamat email penerima tidak valid" };
 	}
 
-	// Fallback dev jika API Key belum diset
-	if (!resend) {
-		if (isProduction) {
-			return {
-				success: false,
-				error: "Layanan email belum dikonfigurasi di server.",
-			};
+	// KHUSUS LOKAL / DEVELOPMENT: Cetak kode OTP langsung ke console terminal
+	if (!isProduction) {
+		console.log("\n=======================================================");
+		console.log("🔐 [LOCAL DEV] KODE VERIFIKASI OTP NUSADAYA ONEDATA");
+		console.log(`📧 Akun / Email: ${cleanRecipient} (${name})`);
+		console.log(`🔑 KODE OTP    : >>> ${otpCode} <<<`);
+		console.log(`⏰ Masa Berlaku: ${expiresInMinutes} menit`);
+		console.log(`🌐 Request IP  : ${requestIp || "127.0.0.1"}`);
+		console.log("=======================================================\n");
+
+		if (userId) {
+			try {
+				await recordEmailSent(userId);
+			} catch (_) {}
 		}
-		console.warn(`[DEV ONLY] Email mock ke ${cleanRecipient}: OTP=${otpCode}`);
-		return { success: true, id: "mock-resend-dev-id" };
+
+		return { success: true, id: `local-dev-otp-${Date.now()}` };
+	}
+
+	// ENVIRONMENT PRODUCTION: Wajib kirim email fisik via Resend
+	if (!resend) {
+		return {
+			success: false,
+			error: "Layanan email belum dikonfigurasi di server.",
+		};
 	}
 
 	const currentTime = new Date().toLocaleString("id-ID", {

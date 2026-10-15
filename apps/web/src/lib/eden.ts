@@ -96,3 +96,60 @@ export const api = edenTreaty<App>(API_URL, {
 		}
 	}) as unknown as typeof fetch,
 });
+
+// Export universal authenticated fetch helper
+export async function authFetch(
+	urlOrPath: string,
+	options: RequestInit = {},
+): Promise<Response> {
+	const rawUrl = urlOrPath.startsWith("http")
+		? urlOrPath
+		: `${API_URL}${urlOrPath.startsWith("/") ? "" : "/"}${urlOrPath}`;
+	const finalUrl = cleanUrl(rawUrl);
+
+	const token = getToken();
+	const headers = new Headers(options.headers || {});
+	if (token && !headers.has("Authorization")) {
+		headers.set("Authorization", `Bearer ${token}`);
+	}
+
+	try {
+		const res = await fetch(finalUrl, {
+			...options,
+			headers,
+			credentials: options.credentials || "include",
+		});
+
+		// Tangani 401 Unauthorized / Idle Timeout dari backend
+		if (res.status === 401) {
+			if (typeof window !== "undefined") {
+				try {
+					const cloned = res.clone();
+					const body = await cloned.json();
+					if (body?.code === "IDLE_TIMEOUT") {
+						localStorage.removeItem("auth-storage");
+						try {
+							const channel = new BroadcastChannel("nusadaya_session_channel");
+							channel.postMessage({ type: "IDLE_TIMEOUT" });
+							channel.close();
+						} catch {}
+						if (!window.location.pathname.includes("/login")) {
+							window.location.href = "/login?reason=idle";
+						}
+						return res;
+					}
+				} catch {}
+				// 401 umum (token invalid / missing)
+				localStorage.removeItem("auth-storage");
+				if (!window.location.pathname.includes("/login")) {
+					window.location.href = "/login";
+				}
+			}
+		}
+
+		return res;
+	} catch (err: any) {
+		console.warn("[authFetch] Failed to reach server:", err?.message || err);
+		throw err;
+	}
+}

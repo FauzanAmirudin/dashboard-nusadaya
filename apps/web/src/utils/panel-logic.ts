@@ -75,6 +75,8 @@ export function calculatePmbChecklist(pmbData: any): {
 	mainCompletedCount: number;
 	requiredDocsCompletedCount: number;
 	totalRequiredCompleted16: number;
+	totalRequiredCompleted17: number;
+	totalRequiredCompleted: number;
 	isAllChecklistDone: boolean;
 } {
 	if (!pmbData) {
@@ -82,6 +84,8 @@ export function calculatePmbChecklist(pmbData: any): {
 			mainCompletedCount: 0,
 			requiredDocsCompletedCount: 0,
 			totalRequiredCompleted16: 0,
+			totalRequiredCompleted17: 0,
+			totalRequiredCompleted: 0,
 			isAllChecklistDone: false,
 		};
 	}
@@ -91,6 +95,7 @@ export function calculatePmbChecklist(pmbData: any): {
 		Boolean(pmbData.documentsComplete),
 		Boolean(pmbData.dataInputted),
 		Boolean(pmbData.initialFollowUp),
+		Boolean(pmbData.pasFoto),
 	];
 
 	const requiredDocsChecklist = PMB_REQUIRED_DOC_KEYS.map((key) =>
@@ -100,14 +105,16 @@ export function calculatePmbChecklist(pmbData: any): {
 	const mainCompletedCount = mainChecklist.filter(Boolean).length;
 	const requiredDocsCompletedCount =
 		requiredDocsChecklist.filter(Boolean).length;
-	const totalRequiredCompleted16 =
+	const totalRequiredCompleted =
 		mainCompletedCount + requiredDocsCompletedCount;
 
 	return {
 		mainCompletedCount,
 		requiredDocsCompletedCount,
-		totalRequiredCompleted16,
-		isAllChecklistDone: totalRequiredCompleted16 === 16,
+		totalRequiredCompleted16: totalRequiredCompleted,
+		totalRequiredCompleted17: totalRequiredCompleted,
+		totalRequiredCompleted,
+		isAllChecklistDone: totalRequiredCompleted === 17,
 	};
 }
 

@@ -5,6 +5,55 @@ import { pmbFormResponses, pmbFormTokens, students, users } from "../db/schema";
 import { hasRole } from "../lib/permissions";
 import { createStudentPipeline } from "./student/core";
 
+// Helper Auth Guard PMB Admin
+function checkPmbAdminAuth(context: any): {
+	authorized: boolean;
+	user?: any;
+	response?: { success: boolean; code: string; message: string };
+} {
+	const user = context.user;
+	if (!user) {
+		context.set.status = 401;
+		if (context.sessionStatus === "idle_timeout") {
+			return {
+				authorized: false,
+				response: {
+					success: false,
+					code: "IDLE_TIMEOUT",
+					message:
+						"Sesi Anda telah berakhir karena tidak ada aktivitas (idle timeout). Silakan login kembali.",
+				},
+			};
+		}
+		return {
+			authorized: false,
+			response: {
+				success: false,
+				code: "UNAUTHORIZED",
+				message: "Autentikasi diperlukan. Silakan login terlebih dahulu.",
+			},
+		};
+	}
+
+	if (!hasRole(user, "pmb", "superadmin")) {
+		context.set.status = 403;
+		const userRoleStr =
+			user.roles && Array.isArray(user.roles)
+				? user.roles.join(", ")
+				: user.role || "unknown";
+		return {
+			authorized: false,
+			response: {
+				success: false,
+				code: "FORBIDDEN",
+				message: `Akses ditolak: Akun '${user.username || "Pengguna"}' (role: ${userRoleStr}) tidak memiliki izin akses modul PMB. Harap gunakan akun staf PMB atau Superadmin.`,
+			},
+		};
+	}
+
+	return { authorized: true, user };
+}
+
 export const formRegisterRoutes = new Elysia()
 	// 1. PUBLIC: Validate Token
 	.get("/form/:token", async ({ params, set }) => {
@@ -35,6 +84,8 @@ export const formRegisterRoutes = new Elysia()
 			existingData: tokenRecord.response || null,
 			responseStatus: tokenRecord.response?.status || null,
 			rejectionNotes: tokenRecord.response?.rejectionNotes || null,
+			rejectedTabs: tokenRecord.response?.rejectedTabs || [],
+			rejectedFields: tokenRecord.response?.rejectedFields || [],
 		};
 	})
 	// 2. PUBLIC: Submit Form
@@ -77,6 +128,14 @@ export const formRegisterRoutes = new Elysia()
 			if (insertData.height) insertData.height = Number(insertData.height);
 			if (insertData.weight) insertData.weight = Number(insertData.weight);
 
+			if (typeof insertData.friendContacts === "string") {
+				try {
+					insertData.friendContacts = JSON.parse(insertData.friendContacts);
+				} catch {
+					insertData.friendContacts = [];
+				}
+			}
+
 			// Save / Update Response
 			if (tokenRecord.response) {
 				await db
@@ -86,6 +145,8 @@ export const formRegisterRoutes = new Elysia()
 						status: "PENDING",
 						submittedAt: new Date(),
 						rejectionNotes: null,
+						rejectedTabs: [],
+						rejectedFields: [],
 						processedAt: null,
 						processedBy: null,
 					})
@@ -134,7 +195,7 @@ export const formRegisterRoutes = new Elysia()
 				batch: t.Optional(t.Any()),
 				academicYear: t.Optional(t.String()),
 
-				// Tab 3
+				// Tab 3: Kesehatan & Pra-MCU
 				bloodType: t.Optional(t.String()),
 				diseaseHistory: t.Optional(t.String()),
 				congenitalDisease: t.Optional(t.String()),
@@ -189,16 +250,26 @@ export const formRegisterRoutes = new Elysia()
 				roReferral: t.Optional(t.String()),
 				mitraSponsor: t.Optional(t.String()),
 				koordinator: t.Optional(t.String()),
+				referralCategory: t.Optional(t.String()),
+				referralInstitutionName: t.Optional(t.String()),
+				referralContactName: t.Optional(t.String()),
+				referralContactPhone: t.Optional(t.String()),
+
+				// Tab 8: Kontak Darurat & Kontak Kawan
+				emergencyContactName: t.Optional(t.String()),
+				emergencyContactPhone: t.Optional(t.String()),
+				emergencyContactRelation: t.Optional(t.String()),
+				recommendedBy: t.Optional(t.String()),
+				recommenderName: t.Optional(t.String()),
+				friendContacts: t.Optional(t.Any()),
 			}),
 		},
 	)
 	// 3. ADMIN: Generate Token
 	.post("/pmb/form-tokens", async (context) => {
-		const user = (context as any).user;
-		if (!hasRole(user, "pmb", "superadmin")) {
-			context.set.status = 403;
-			return { success: false, message: "Forbidden" };
-		}
+		const auth = checkPmbAdminAuth(context);
+		if (!auth.authorized) return auth.response;
+		const user = auth.user;
 
 		const token = crypto.randomUUID();
 		await db.insert(pmbFormTokens).values({
@@ -210,17 +281,21 @@ export const formRegisterRoutes = new Elysia()
 	})
 	// 4. ADMIN: Get Tokens List
 	.get("/pmb/form-tokens", async (context) => {
-		const user = (context as any).user;
-		if (!hasRole(user, "pmb", "superadmin")) {
-			context.set.status = 403;
-			return { success: false, message: "Forbidden" };
-		}
+		const auth = checkPmbAdminAuth(context);
+		if (!auth.authorized) return auth.response;
 
 		const tokens = await db.query.pmbFormTokens.findMany({
 			with: {
 				creator: { columns: { fullName: true } },
 				response: {
-					columns: { name: true, status: true, rejectionNotes: true },
+					columns: {
+						id: true,
+						name: true,
+						status: true,
+						rejectionNotes: true,
+						rejectedTabs: true,
+						rejectedFields: true,
+					},
 				},
 			},
 			orderBy: [desc(pmbFormTokens.createdAt)],
@@ -229,11 +304,8 @@ export const formRegisterRoutes = new Elysia()
 	})
 	// 5. ADMIN: Get Pending Responses
 	.get("/pmb/form-responses", async (context) => {
-		const user = (context as any).user;
-		if (!hasRole(user, "pmb", "superadmin")) {
-			context.set.status = 403;
-			return { success: false, message: "Forbidden" };
-		}
+		const auth = checkPmbAdminAuth(context);
+		if (!auth.authorized) return auth.response;
 
 		const responses = await db.query.pmbFormResponses.findMany({
 			where: eq(pmbFormResponses.status, "PENDING"),
@@ -245,12 +317,10 @@ export const formRegisterRoutes = new Elysia()
 	.get(
 		"/pmb/form-responses/history",
 		async (context) => {
-			const { query, set } = context;
-			const user = (context as any).user;
-			if (!hasRole(user, "pmb", "superadmin")) {
-				set.status = 403;
-				return { success: false, message: "Forbidden" };
-			}
+			const auth = checkPmbAdminAuth(context);
+			if (!auth.authorized) return auth.response;
+
+			const { query } = context;
 
 			const conditions: any[] = [];
 
@@ -302,12 +372,10 @@ export const formRegisterRoutes = new Elysia()
 	)
 	// 7. ADMIN: Get single response detail
 	.get("/pmb/form-responses/:id", async (context) => {
+		const auth = checkPmbAdminAuth(context);
+		if (!auth.authorized) return auth.response;
+
 		const { params, set } = context;
-		const user = (context as any).user;
-		if (!hasRole(user, "pmb", "superadmin")) {
-			set.status = 403;
-			return { success: false, message: "Forbidden" };
-		}
 		const id = parseInt(params.id, 10);
 		const response = await db.query.pmbFormResponses.findFirst({
 			where: eq(pmbFormResponses.id, id),
@@ -321,16 +389,15 @@ export const formRegisterRoutes = new Elysia()
 		}
 		return { success: true, data: response };
 	})
-	// 8. ADMIN: Reject Response
+	// 8. ADMIN: Reject Response (Sistem Revisi Bertarget - Task G-2 & G-3)
 	.patch(
 		"/pmb/form-responses/:id/reject",
 		async (context) => {
-			const { params, body, set } = context;
-			const user = (context as any).user;
-			if (!hasRole(user, "pmb", "superadmin")) {
-				set.status = 403;
-				return { success: false, message: "Forbidden" };
-			}
+			const auth = checkPmbAdminAuth(context);
+			if (!auth.authorized) return auth.response;
+			const user = auth.user;
+
+			const { params, body } = context;
 			const id = parseInt(params.id, 10);
 
 			await db
@@ -338,6 +405,8 @@ export const formRegisterRoutes = new Elysia()
 				.set({
 					status: "REJECTED",
 					rejectionNotes: body.rejectionNotes,
+					rejectedTabs: body.rejectedTabs || [],
+					rejectedFields: body.rejectedFields || [],
 					processedAt: new Date(),
 					processedBy: user.id,
 				})
@@ -348,17 +417,27 @@ export const formRegisterRoutes = new Elysia()
 		{
 			body: t.Object({
 				rejectionNotes: t.String(),
+				rejectedTabs: t.Optional(t.Array(t.Number())),
+				rejectedFields: t.Optional(
+					t.Array(
+						t.Object({
+							fieldKey: t.String(),
+							fieldLabel: t.String(),
+							tabIndex: t.Number(),
+							reason: t.Optional(t.String()),
+						}),
+					),
+				),
 			}),
 		},
 	)
 	// 9. ADMIN: Approve Response
 	.patch("/pmb/form-responses/:id/approve", async (context) => {
+		const auth = checkPmbAdminAuth(context);
+		if (!auth.authorized) return auth.response;
+		const user = auth.user;
+
 		const { params, set } = context;
-		const user = (context as any).user;
-		if (!hasRole(user, "pmb", "superadmin")) {
-			set.status = 403;
-			return { success: false, message: "Forbidden" };
-		}
 		const id = parseInt(params.id, 10);
 
 		const response = await db.query.pmbFormResponses.findFirst({
@@ -371,6 +450,63 @@ export const formRegisterRoutes = new Elysia()
 		}
 
 		try {
+			// Susun payload parents (Task B-2)
+			const parents: any[] = [];
+			if (response.ayahName) {
+				parents.push({
+					type: "ayah",
+					name: response.ayahName,
+					birthPlace: response.ayahBirthPlace,
+					birthDate: response.ayahBirthDate
+						? new Date(response.ayahBirthDate)
+						: null,
+					religion: response.ayahReligion,
+					nationality: response.ayahNationality,
+					education: response.ayahEducation,
+					job: response.ayahJob,
+					address: response.ayahAddress,
+					phone: response.ayahPhone,
+					email: response.ayahEmail,
+					status: response.ayahStatus || "Hidup",
+				});
+			}
+			if (response.ibuName) {
+				parents.push({
+					type: "ibu",
+					name: response.ibuName,
+					birthPlace: response.ibuBirthPlace,
+					birthDate: response.ibuBirthDate
+						? new Date(response.ibuBirthDate)
+						: null,
+					religion: response.ibuReligion,
+					nationality: response.ibuNationality,
+					education: response.ibuEducation,
+					job: response.ibuJob,
+					address: response.ibuAddress,
+					phone: response.ibuPhone,
+					email: response.ibuEmail,
+					status: response.ibuStatus || "Hidup",
+				});
+			}
+			if (response.waliName) {
+				parents.push({
+					type: "wali",
+					name: response.waliName,
+					birthPlace: response.waliBirthPlace,
+					birthDate: response.waliBirthDate
+						? new Date(response.waliBirthDate)
+						: null,
+					religion: response.waliReligion,
+					nationality: response.waliNationality,
+					education: response.waliEducation,
+					job: response.waliJob,
+					address: response.waliAddress,
+					phone: response.waliPhone,
+					email: response.waliEmail,
+					guardianRelation: response.waliGuardianRelation,
+				});
+			}
+
 			// Convert payload back to match what `createStudentPipeline` expects
 			const studentPayload = {
 				name: response.name,
@@ -393,6 +529,7 @@ export const formRegisterRoutes = new Elysia()
 				livingWith: response.livingWith,
 				phone: response.phone,
 				email: response.email,
+				profilePhotoUrl: response.profilePhotoUrl,
 
 				schoolOrigin: response.schoolOrigin,
 				schoolAddress: response.schoolAddress,
@@ -428,6 +565,10 @@ export const formRegisterRoutes = new Elysia()
 				weight: response.weight ? Number(response.weight) : undefined,
 				clothingSize: response.clothingSize,
 
+				// Parents array (Task B-2)
+				parents,
+
+				// Ayah, Ibu, Wali flat fields (fallback)
 				ayahName: response.ayahName,
 				ayahBirthPlace: response.ayahBirthPlace,
 				ayahBirthDate: response.ayahBirthDate
@@ -470,7 +611,7 @@ export const formRegisterRoutes = new Elysia()
 				waliEmail: response.waliEmail,
 				waliGuardianRelation: response.waliGuardianRelation,
 
-				// PMB & Referensi
+				// PMB & Referensi Terstruktur (Task I-1 & I-2)
 				period: response.period || undefined,
 				rekomendasi: response.rekomendasi || undefined,
 				timVisit: response.timVisit || undefined,
@@ -478,6 +619,17 @@ export const formRegisterRoutes = new Elysia()
 				roReferral: response.roReferral || undefined,
 				mitraSponsor: response.mitraSponsor || undefined,
 				koordinator: response.koordinator || undefined,
+				referralCategory: response.referralCategory || undefined,
+				referralInstitutionName: response.referralInstitutionName || undefined,
+				referralContactName: response.referralContactName || undefined,
+				referralContactPhone: response.referralContactPhone || undefined,
+
+				// Kontak Darurat & Kawan (Task N-1 & N-3)
+				emergencyContactName: response.emergencyContactName || undefined,
+				emergencyContactPhone: response.emergencyContactPhone || undefined,
+				emergencyContactRelation:
+					response.emergencyContactRelation || undefined,
+				friendContacts: response.friendContacts || [],
 
 				studentStatus: "aktif",
 			};
@@ -513,12 +665,10 @@ export const formRegisterRoutes = new Elysia()
 	})
 	// 10. ADMIN: Delete Form Token
 	.delete("/pmb/form-tokens/:id", async (context) => {
+		const auth = checkPmbAdminAuth(context);
+		if (!auth.authorized) return auth.response;
+
 		const { params, set } = context;
-		const user = (context as any).user;
-		if (!hasRole(user, "pmb", "superadmin")) {
-			set.status = 403;
-			return { success: false, message: "Forbidden" };
-		}
 		const id = parseInt(params.id, 10);
 		const token = await db.query.pmbFormTokens.findFirst({
 			where: eq(pmbFormTokens.id, id),

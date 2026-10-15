@@ -797,8 +797,10 @@ export default function AddStudentPage() {
 									}
 								/>
 								<p className="text-xs text-slate-400">
-									NIM ini juga akan menjadi username login mahasiswa. Jika
-									dikosongkan, username menggunakan Email.
+									Opsional. Sesuai standarisasi OneData, NIM resmi dirilis
+									setelah berkas PMB disetujui (ACC) dan pembayaran Registrasi
+									Awal lunas di Finance. Jika dikosongkan, username login akun
+									mahasiswa menggunakan Email.
 								</p>
 							</div>
 							<div className="space-y-2">

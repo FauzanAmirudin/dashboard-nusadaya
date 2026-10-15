@@ -3,6 +3,7 @@ import {
 	decimal,
 	index,
 	integer,
+	jsonb,
 	pgTable,
 	serial,
 	text,
@@ -25,6 +26,7 @@ export const pmbData = pgTable(
 		documentsComplete: boolean("documents_complete").default(false),
 		dataInputted: boolean("data_inputted").default(false),
 		initialFollowUp: boolean("initial_follow_up").default(false),
+		pasFoto: boolean("pas_foto").default(false),
 		isGapYear: boolean("is_gap_year").default(false),
 		notes: text("notes"),
 		isAcc: boolean("is_acc").default(false),
@@ -39,6 +41,12 @@ export const pmbData = pgTable(
 		roReferral: text("ro_referral"),
 		mitraSponsor: text("mitra_sponsor"),
 		koordinator: text("koordinator"),
+
+		// Referral Terstruktur (Baru)
+		referralCategory: text("referral_category"),
+		referralInstitutionName: text("referral_institution_name"),
+		referralContactName: text("referral_contact_name"),
+		referralContactPhone: text("referral_contact_phone"),
 
 		// Dokumen Tambahan PMB Validation Checks
 		docKtp: boolean("doc_ktp").default(false),
@@ -194,6 +202,12 @@ export const pmbFormResponses = pgTable(
 		height: decimal("height", { precision: 5, scale: 2 }),
 		weight: decimal("weight", { precision: 5, scale: 2 }),
 		clothingSize: text("clothing_size"),
+		colorBlindTest: text("color_blind_test"),
+		hasTattoo: boolean("has_tattoo").default(false),
+		hasPiercingNonStandard: boolean("has_piercing_non_standard").default(false),
+		hasMajorSurgeryHistory: boolean("has_major_surgery_history").default(false),
+		hasChronicDisease: boolean("has_chronic_disease").default(false),
+		mcuConsentAgreed: boolean("mcu_consent_agreed").default(false),
 
 		// Tab 4: Ayah
 		ayahName: text("ayah_name"),
@@ -242,8 +256,33 @@ export const pmbFormResponses = pgTable(
 		roReferral: text("ro_referral"),
 		mitraSponsor: text("mitra_sponsor"),
 		koordinator: text("koordinator"),
+		referralCategory: text("referral_category"),
+		referralInstitutionName: text("referral_institution_name"),
+		referralContactName: text("referral_contact_name"),
+		referralContactPhone: text("referral_contact_phone"),
 
-		// Metadata
+		// Tab 8: Kontak Darurat & Kawan
+		emergencyContactName: text("emergency_contact_name"),
+		emergencyContactPhone: text("emergency_contact_phone"),
+		emergencyContactRelation: text("emergency_contact_relation"),
+		recommendedBy: text("recommended_by"),
+		recommenderName: text("recommender_name"),
+		friendContacts: jsonb("friend_contacts")
+			.$type<Array<{ name: string; phone: string; schoolOrRelation: string }>>()
+			.default([]),
+
+		// Metadata & Evaluasi
+		rejectedTabs: jsonb("rejected_tabs").$type<number[]>().default([]),
+		rejectedFields: jsonb("rejected_fields")
+			.$type<
+				Array<{
+					fieldKey: string;
+					fieldLabel: string;
+					tabIndex: number;
+					reason?: string;
+				}>
+			>()
+			.default([]),
 		submittedAt: timestamp("submitted_at").defaultNow().notNull(),
 		processedAt: timestamp("processed_at"),
 		processedBy: integer("processed_by").references(() => users.id),
