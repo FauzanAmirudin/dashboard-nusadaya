@@ -114,8 +114,9 @@ export default function RekapMataKuliahDetailPage() {
 			const { data: mData, error: mErr } =
 				await api.courses[courseId].meetings.get();
 			if (!mErr && mData?.success) {
-				const meets = (mData.data as any[]) || [];
-				// Sort: PKKMB (-1), Beginning (0), 1..16
+				const meets = ((mData.data as any[]) || []).filter(
+					(m: any) => m.meetingNumber >= 1 && m.meetingNumber <= 16,
+				);
 				meets.sort((a, b) => (a.meetingNumber ?? 0) - (b.meetingNumber ?? 0));
 				setMeetings(meets);
 			}
@@ -201,7 +202,7 @@ export default function RekapMataKuliahDetailPage() {
 				if (practicalScore !== null) validPracticalScores.push(practicalScore);
 			});
 
-			const totalMeetings = meetings.length || 18;
+			const totalMeetings = 16;
 			const attendanceRate = Math.min(
 				100,
 				Math.round((presentCount / totalMeetings) * 100),
@@ -298,27 +299,33 @@ export default function RekapMataKuliahDetailPage() {
 			meetings.forEach((m) => {
 				const mRes = item.meetingResults[m.id];
 				const label =
-					m.meetingType === "pkkmb"
-						? "PKKMB"
-						: m.meetingType === "beginning"
-							? "Beginning Class"
-							: m.meetingType === "uts"
-								? "UTS (P8)"
-								: m.meetingType === "uas"
-									? "UAS (P16)"
-									: `P${m.meetingNumber}`;
+					m.meetingType === "uts" || m.meetingNumber === 8
+						? "UTS (P8)"
+						: m.meetingType === "uas" || m.meetingNumber === 16
+							? "UAS (P16)"
+							: `P${m.meetingNumber}`;
 
 				const statusText = mRes?.status ? mRes.status.toUpperCase() : "-";
 				const tScore = mRes?.theoryScore !== null ? mRes?.theoryScore : "-";
 				const pScore =
 					mRes?.practicalScore !== null ? mRes?.practicalScore : "-";
 
+				const isExam =
+					m.meetingType === "uts" ||
+					m.meetingType === "uas" ||
+					m.meetingNumber === 8 ||
+					m.meetingNumber === 16;
+
 				row[`${label} (Presensi)`] = statusText;
-				if (m.sessionType === "teori" || m.sessionType === "keduanya") {
-					row[`${label} (Teori)`] = tScore;
-				}
-				if (m.sessionType === "praktik" || m.sessionType === "keduanya") {
-					row[`${label} (Praktik)`] = pScore;
+				if (isExam) {
+					row[`${label} (Nilai Ujian)`] = tScore;
+				} else {
+					if (m.sessionType === "teori" || m.sessionType === "keduanya") {
+						row[`${label} (Teori)`] = tScore;
+					}
+					if (m.sessionType === "praktik" || m.sessionType === "keduanya") {
+						row[`${label} (Praktik)`] = pScore;
+					}
 				}
 			});
 
@@ -584,35 +591,22 @@ export default function RekapMataKuliahDetailPage() {
 
 											{/* Meeting Headers */}
 											{meetings.map((m) => {
-												const isPkkmb =
-													m.meetingType === "pkkmb" || m.meetingNumber === -1;
-												const isBc =
-													m.meetingType === "beginning" ||
-													m.meetingNumber === 0;
 												const isUts =
 													m.meetingType === "uts" || m.meetingNumber === 8;
 												const isUas =
 													m.meetingType === "uas" || m.meetingNumber === 16;
 
-												const badgeColor = isPkkmb
-													? "bg-indigo-100 text-indigo-800 border-indigo-200"
-													: isBc
-														? "bg-teal-100 text-teal-800 border-teal-200"
-														: isUts
-															? "bg-amber-100 text-amber-800 border-amber-300"
-															: isUas
-																? "bg-purple-100 text-purple-800 border-purple-300"
-																: "bg-blue-50 text-blue-700 border-blue-200";
+												const badgeColor = isUts
+													? "bg-amber-100 text-amber-800 border-amber-300"
+													: isUas
+														? "bg-purple-100 text-purple-800 border-purple-300"
+														: "bg-blue-50 text-blue-700 border-blue-200";
 
-												const shortLabel = isPkkmb
-													? "PKKMB"
-													: isBc
-														? "BC"
-														: isUts
-															? "UTS"
-															: isUas
-																? "UAS"
-																: `P${m.meetingNumber}`;
+												const shortLabel = isUts
+													? "UTS"
+													: isUas
+														? "UAS"
+														: `P${m.meetingNumber}`;
 
 												return (
 													<TableHead

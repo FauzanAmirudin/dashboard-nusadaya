@@ -158,6 +158,12 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 				icon: Sparkles,
 			},
 			{
+				label: "Kepatuhan Baris Pagi",
+				href: "/dashboard/baris-pagi",
+				roles: ["superadmin", "akademik"],
+				icon: ShieldCheck,
+			},
+			{
 				label: "Manajemen PA",
 				href: "/dashboard/akademik/pa",
 				roles: ["superadmin", "akademik"],

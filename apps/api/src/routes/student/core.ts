@@ -777,6 +777,7 @@ export const coreRoutes = new Elysia()
 					page: t.Optional(t.String()),
 					limit: t.Optional(t.String()),
 					cohort: t.Optional(t.String()),
+					rombel: t.Optional(t.String()),
 					status: t.Optional(t.String()),
 					search: t.Optional(t.String()),
 					archived: t.Optional(t.String()),
@@ -1483,6 +1484,24 @@ export const coreRoutes = new Elysia()
 			success: true,
 			message: "Berhasil menghapus mahasiswa beserta seluruh data terkait",
 		};
+	})
+	.get("/cohorts", async () => {
+		const cohortsResult = await db
+			.selectDistinct({ cohort: students.cohort })
+			.from(students)
+			.where(
+				and(
+					eq(students.isArchived, false),
+					sql`${students.cohort} IS NOT NULL`,
+				),
+			)
+			.orderBy(sql`${students.cohort} desc`);
+
+		const cohortList = cohortsResult
+			.map((c) => c.cohort)
+			.filter((c): c is number => typeof c === "number" && !Number.isNaN(c));
+
+		return { success: true, data: cohortList };
 	})
 	.get("/:id", async ({ params, set }) => {
 		const id = parseInt(params.id, 10);

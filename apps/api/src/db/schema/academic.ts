@@ -45,6 +45,9 @@ export const academicData = pgTable(
 		attendancePramagangPresent: integer("attendance_pramagang_present").default(
 			0,
 		),
+		attendanceBarisTotal: integer("attendance_baris_total").default(0),
+		attendanceBarisPresent: integer("attendance_baris_present").default(0), // Tepat waktu (<= 06.22)
+		attendanceBarisLate: integer("attendance_baris_late").default(0), // Terlambat (> 06.22)
 
 		isAcc: boolean("is_acc").default(false),
 		accAt: timestamp("acc_at"),

@@ -93,6 +93,7 @@ type StudentData = {
 		studentStatus?: string | null;
 		profilePhotoUrl?: string | null;
 		paId?: number | null;
+		rombel?: string | null;
 	};
 	pmb: any | null;
 	crm: any | null;
@@ -603,6 +604,7 @@ function DivisionStudentsView({
 	const queryClient = useQueryClient();
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCohort, setSelectedCohort] = useState<string>("all");
+	const [selectedRombel, setSelectedRombel] = useState<string>("all");
 	const [selectedStatus, setSelectedStatus] = useState<string>("all");
 	const [currentPage, setCurrentPage] = useState(1);
 	const pageSize = 20;
@@ -630,6 +632,21 @@ function DivisionStudentsView({
 			if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numB - numA;
 			return b.localeCompare(a);
 		});
+	}, [baseData]);
+
+	// Rombels derived strictly from student data
+	const availableRombels = useMemo(() => {
+		const rombels = new Set<string>();
+		if (baseData && baseData.length > 0) {
+			baseData.forEach((s: any) => {
+				if (s.student?.rombel) rombels.add(s.student.rombel.trim());
+			});
+		}
+		if (rombels.size === 0) {
+			rombels.add("Kelas A");
+			rombels.add("Kelas B");
+		}
+		return Array.from(rombels).sort();
 	}, [baseData]);
 
 	// Role configuration: title, context tab, checklist resolver
@@ -737,15 +754,26 @@ function DivisionStudentsView({
 			if (selectedStatus === "proses") matchStatus = studentStatus === "PROSES";
 			if (selectedStatus === "butuh_perhatian")
 				matchStatus = studentStatus === "BUTUH_PERHATIAN";
+			const studentRombel = (s.student?.rombel || "Kelas A").trim();
+			const matchRombel =
+				selectedRombel === "all" ||
+				studentRombel.toLowerCase() === selectedRombel.toLowerCase();
 
-			return matchSearch && matchCohort && matchStatus;
+			return matchSearch && matchCohort && matchStatus && matchRombel;
 		});
-	}, [baseData, searchQuery, selectedCohort, selectedStatus, config]);
+	}, [
+		baseData,
+		searchQuery,
+		selectedCohort,
+		selectedRombel,
+		selectedStatus,
+		config,
+	]);
 
 	// Reset page on filter changes
 	useEffect(() => {
 		setCurrentPage(1);
-	}, [selectedCohort, selectedStatus, searchQuery]);
+	}, [selectedCohort, selectedRombel, selectedStatus, searchQuery]);
 
 	const paginatedData = useMemo(() => {
 		const start = (currentPage - 1) * pageSize;
@@ -797,6 +825,7 @@ function DivisionStudentsView({
 					NIM: s.student?.nim || "-",
 					"Nama Mahasiswa": s.student?.name || "-",
 					Angkatan: s.student?.cohort || "-",
+					Rombel: s.student?.rombel || "Kelas A",
 					"Tahun Ajaran": getAcademicYear(s.student),
 					Peminatan: s.student?.subProgram || s.student?.program || "-",
 					"No WhatsApp": s.student?.phone || "-",
@@ -958,6 +987,25 @@ function DivisionStudentsView({
 						</Select>
 
 						<Select
+							value={selectedRombel}
+							onValueChange={(val) => setSelectedRombel(val || "all")}
+						>
+							<SelectTrigger className="w-[130px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Rombel">
+									{selectedRombel === "all" ? "Semua Rombel" : selectedRombel}
+								</SelectValue>
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">Semua Rombel</SelectItem>
+								{availableRombels.map((rombel) => (
+									<SelectItem key={rombel} value={rombel}>
+										{rombel}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+
+						<Select
 							value={selectedStatus}
 							onValueChange={(val) => setSelectedStatus(val || "all")}
 						>
@@ -986,6 +1034,7 @@ function DivisionStudentsView({
 						{/* Reset Button Inline */}
 						{(searchQuery.trim() !== "" ||
 							selectedCohort !== "all" ||
+							selectedRombel !== "all" ||
 							selectedStatus !== "all") && (
 							<Button
 								variant="outline"
@@ -993,6 +1042,7 @@ function DivisionStudentsView({
 								onClick={() => {
 									setSearchQuery("");
 									setSelectedCohort("all");
+									setSelectedRombel("all");
 									setSelectedStatus("all");
 								}}
 								className="h-9 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors"
@@ -1012,8 +1062,8 @@ function DivisionStudentsView({
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
 										Nama Mahasiswa & NIM
 									</TableHead>
-									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
-										Angkatan
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-32">
+										Angkatan & Rombel
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-32">
 										Tahun Ajaran
@@ -1069,14 +1119,22 @@ function DivisionStudentsView({
 											</TableCell>
 
 											<TableCell className="text-center">
-												<Badge
-													variant="outline"
-													className="text-xs font-bold text-slate-700 bg-slate-50 border-slate-200 px-2 py-0.5"
-												>
-													{s.student.cohort
-														? `Angkatan ${s.student.cohort}`
-														: "-"}
-												</Badge>
+												<div className="flex flex-col items-center gap-1">
+													<Badge
+														variant="outline"
+														className="text-xs font-bold text-slate-700 bg-slate-50 border-slate-200 px-2 py-0.5"
+													>
+														{s.student.cohort
+															? `Angkatan ${s.student.cohort}`
+															: "-"}
+													</Badge>
+													<Badge
+														variant="secondary"
+														className="text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-2 py-0"
+													>
+														{s.student.rombel || "Kelas A"}
+													</Badge>
+												</div>
 											</TableCell>
 
 											<TableCell className="text-center font-medium text-xs text-slate-700">
@@ -1266,6 +1324,7 @@ function SuperadminStudentsView({
 	const queryClient = useQueryClient();
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCohort, setSelectedCohort] = useState<string>("all");
+	const [selectedRombel, setSelectedRombel] = useState<string>("all");
 	const [selectedStatus, setSelectedStatus] = useState<string>("all");
 	const [currentPage, setCurrentPage] = useState(1);
 	const pageSize = 20;
@@ -1284,6 +1343,21 @@ function SuperadminStudentsView({
 			if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numB - numA;
 			return b.localeCompare(a);
 		});
+	}, [data]);
+
+	// Rombels derived strictly from student data
+	const availableRombels = useMemo(() => {
+		const rombels = new Set<string>();
+		if (data && data.length > 0) {
+			data.forEach((s: any) => {
+				if (s.student?.rombel) rombels.add(s.student.rombel.trim());
+			});
+		}
+		if (rombels.size === 0) {
+			rombels.add("Kelas A");
+			rombels.add("Kelas B");
+		}
+		return Array.from(rombels).sort();
 	}, [data]);
 
 	// Filtered students by Cohort, Status, and Search
@@ -1315,14 +1389,19 @@ function SuperadminStudentsView({
 					s.decision?.evaluatorDecision === "layak_berangkat" ||
 					s.decision?.isApprovedByDirector === true;
 
-			return matchSearch && matchCohort && matchStatus;
+			const studentRombel = (s.student?.rombel || "Kelas A").trim();
+			const matchRombel =
+				selectedRombel === "all" ||
+				studentRombel.toLowerCase() === selectedRombel.toLowerCase();
+
+			return matchSearch && matchCohort && matchStatus && matchRombel;
 		});
-	}, [data, searchQuery, selectedCohort, selectedStatus]);
+	}, [data, searchQuery, selectedCohort, selectedRombel, selectedStatus]);
 
 	// Reset page on filter changes
 	useEffect(() => {
 		setCurrentPage(1);
-	}, [selectedCohort, selectedStatus, searchQuery]);
+	}, [selectedCohort, selectedRombel, selectedStatus, searchQuery]);
 
 	const paginatedData = useMemo(() => {
 		const start = (currentPage - 1) * pageSize;
@@ -1368,6 +1447,7 @@ function SuperadminStudentsView({
 					"Nama Mahasiswa": s.student.name,
 					"Program Studi": s.student.program,
 					Angkatan: s.student.cohort,
+					Rombel: s.student.rombel || "Kelas A",
 					"Tahun Ajaran": getAcademicYear(s.student),
 					"No HP": s.student.phone || "-",
 					"Progress ACC": `${accCount}/7 Modul`,
@@ -1537,6 +1617,25 @@ function SuperadminStudentsView({
 						</Select>
 
 						<Select
+							value={selectedRombel}
+							onValueChange={(val) => setSelectedRombel(val || "all")}
+						>
+							<SelectTrigger className="w-[130px] h-9 text-xs bg-white border-slate-200">
+								<SelectValue placeholder="Rombel">
+									{selectedRombel === "all" ? "Semua Rombel" : selectedRombel}
+								</SelectValue>
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">Semua Rombel</SelectItem>
+								{availableRombels.map((rombel) => (
+									<SelectItem key={rombel} value={rombel}>
+										{rombel}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+
+						<Select
 							value={selectedStatus}
 							onValueChange={(val) => setSelectedStatus(val || "all")}
 						>
@@ -1568,6 +1667,7 @@ function SuperadminStudentsView({
 						{/* Reset Button Inline */}
 						{(searchQuery.trim() !== "" ||
 							selectedCohort !== "all" ||
+							selectedRombel !== "all" ||
 							selectedStatus !== "all") && (
 							<Button
 								variant="outline"
@@ -1575,6 +1675,7 @@ function SuperadminStudentsView({
 								onClick={() => {
 									setSearchQuery("");
 									setSelectedCohort("all");
+									setSelectedRombel("all");
 									setSelectedStatus("all");
 								}}
 								className="h-9 px-3 text-xs border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 gap-1.5 font-medium transition-colors"
@@ -1594,8 +1695,8 @@ function SuperadminStudentsView({
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs">
 										Nama Mahasiswa & NIM
 									</TableHead>
-									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-28">
-										Angkatan
+									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-32">
+										Angkatan & Rombel
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-32">
 										Tahun Ajaran
@@ -1677,14 +1778,22 @@ function SuperadminStudentsView({
 											</TableCell>
 
 											<TableCell className="text-center">
-												<Badge
-													variant="outline"
-													className="text-xs font-bold text-slate-700 bg-slate-50 border-slate-200 px-2 py-0.5"
-												>
-													{s.student.cohort
-														? `Angkatan ${s.student.cohort}`
-														: "-"}
-												</Badge>
+												<div className="flex flex-col items-center gap-1">
+													<Badge
+														variant="outline"
+														className="text-xs font-bold text-slate-700 bg-slate-50 border-slate-200 px-2 py-0.5"
+													>
+														{s.student.cohort
+															? `Angkatan ${s.student.cohort}`
+															: "-"}
+													</Badge>
+													<Badge
+														variant="secondary"
+														className="text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-2 py-0"
+													>
+														{s.student.rombel || "Kelas A"}
+													</Badge>
+												</div>
 											</TableCell>
 
 											<TableCell className="text-center font-medium text-xs text-slate-700">

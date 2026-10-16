@@ -234,3 +234,5 @@ finance_modification.md
 apps/api/drop_cols.ts
 update-version.md
 *.pdf
+.vscode/
+**/.vscode/

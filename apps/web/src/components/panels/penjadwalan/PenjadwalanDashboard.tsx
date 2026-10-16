@@ -16,7 +16,7 @@ export function PenjadwalanDashboard() {
 	return (
 		<div className="space-y-6">
 			{/* Executive Header Banner */}
-			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
+			<div className="no-print flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
 				<div className="flex items-center gap-3.5">
 					<div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#0517B0] to-blue-600 text-white flex items-center justify-center shadow-2xs ring-4 ring-blue-50 shrink-0">
 						<CalendarDays className="w-5 h-5" />
@@ -43,7 +43,7 @@ export function PenjadwalanDashboard() {
 
 			{/* Subtab Segmented Navigation */}
 			<Tabs defaultValue="kelas" className="w-full space-y-6">
-				<TabsList className="w-full bg-slate-100/90 p-1 rounded-2xl border border-slate-200/60 shadow-2xs grid grid-cols-2 sm:grid-cols-4 gap-1 h-auto">
+				<TabsList className="no-print w-full bg-slate-100/90 p-1 rounded-2xl border border-slate-200/60 shadow-2xs grid grid-cols-2 sm:grid-cols-4 gap-1 h-auto">
 					<TabsTrigger
 						value="kelas"
 						className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-xs rounded-xl py-2.5 px-3 transition-all flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold cursor-pointer"

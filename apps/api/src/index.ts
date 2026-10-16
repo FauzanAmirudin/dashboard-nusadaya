@@ -14,9 +14,13 @@ import { authRoutes } from "./modules/auth";
 validateOtpConfigOnStartup();
 
 import { checkRateLimit } from "./lib/rate-limiter";
+import { redis } from "./lib/redis";
 import {
 	createSession,
 	invalidateSession,
+	isRedisReady,
+	rehydrateDevSession,
+	SESSION_CONFIG,
 	validateAndTouchSession,
 } from "./lib/session";
 
@@ -156,6 +160,50 @@ const app = new Elysia()
 				payload.sessionId,
 			);
 			if (!sessionValidation.valid) {
+				// Resilient dev fallback: jika Redis offline pada lingkungan lokal,
+				// restart watch server menghapus in-memory sessions. Re-hydrate session dari JWT yang valid.
+				if (
+					process.env.NODE_ENV !== "production" &&
+					sessionValidation.reason === "not_found"
+				) {
+					rehydrateDevSession(
+						payload.sessionId,
+						{
+							id: payload.id,
+							username: payload.username,
+							role: payload.role,
+							roles: payload.roles,
+						},
+						{
+							ip: request.headers.get("x-forwarded-for") || undefined,
+							userAgent: request.headers.get("user-agent") || undefined,
+						},
+					);
+					if (isRedisReady()) {
+						redis
+							.set(
+								`session:${payload.sessionId}`,
+								JSON.stringify({
+									sessionId: payload.sessionId,
+									userId: payload.id,
+									username: payload.username,
+									role: payload.role,
+									roles: payload.roles || [payload.role],
+									lastActivity: Date.now(),
+									createdAt: Date.now(),
+								}),
+								"EX",
+								SESSION_CONFIG.MAX_SESSION_TTL_SECONDS,
+							)
+							.catch(() => {});
+					}
+					return {
+						user: payload,
+						sessionStatus: "valid" as const,
+						sessionId: payload.sessionId,
+					};
+				}
+
 				return {
 					user: null,
 					sessionStatus: sessionValidation.reason || "invalid_session",

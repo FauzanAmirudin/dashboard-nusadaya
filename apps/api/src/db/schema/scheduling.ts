@@ -21,6 +21,9 @@ export const classSchedules = pgTable(
 		id: serial("id").primaryKey(),
 		subject: text("subject").notNull(),
 		dosenId: integer("dosen_id").references(() => users.id),
+		dosenPendampingId: integer("dosen_pendamping_id").references(
+			() => users.id,
+		),
 		cohort: integer("cohort").notNull(),
 		rombel: text("rombel").default("Kelas A").notNull(),
 		room: text("room").notNull(),
@@ -36,6 +39,7 @@ export const classSchedules = pgTable(
 	(t) => [
 		index("idx_class_schedules_cohort").on(t.cohort),
 		index("idx_class_schedules_dosen_id").on(t.dosenId),
+		index("idx_class_schedules_dosen_pendamping_id").on(t.dosenPendampingId),
 		index("idx_class_schedules_calendar_id").on(t.calendarId),
 	],
 );
@@ -46,6 +50,9 @@ export const practicumSchedules = pgTable(
 		id: serial("id").primaryKey(),
 		subject: text("subject").notNull(),
 		dosenId: integer("dosen_id").references(() => users.id),
+		dosenPendampingId: integer("dosen_pendamping_id").references(
+			() => users.id,
+		),
 		cohort: integer("cohort").notNull(),
 		rombel: text("rombel").default("Kelas A").notNull(),
 		room: text("room").notNull(),
@@ -61,6 +68,9 @@ export const practicumSchedules = pgTable(
 	(t) => [
 		index("idx_practicum_schedules_cohort").on(t.cohort),
 		index("idx_practicum_schedules_dosen_id").on(t.dosenId),
+		index("idx_practicum_schedules_dosen_pendamping_id").on(
+			t.dosenPendampingId,
+		),
 		index("idx_practicum_schedules_calendar_id").on(t.calendarId),
 	],
 );
@@ -190,5 +200,48 @@ export const pramagangAttendanceRecords = pgTable(
 	(t) => [
 		index("idx_pramagang_attendance_records_student_id").on(t.studentId),
 		index("idx_pramagang_attendance_records_date").on(t.date),
+	],
+);
+
+export const morningAssemblySessions = pgTable(
+	"morning_assembly_sessions",
+	{
+		id: serial("id").primaryKey(),
+		cohort: integer("cohort").notNull(),
+		rombel: text("rombel").default("Semua").notNull(), // "Kelas A" | "Kelas B" | "Semua"
+		sessionDate: date("session_date").notNull(),
+		targetTime: text("target_time").default("06:22").notNull(), // Standar patokan kedatangan 06.22
+		location: text("location").default("Lapangan Utama Kampus").notNull(),
+		notes: text("notes"),
+		createdBy: integer("created_by").references(() => users.id),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(t) => [
+		index("idx_morning_assembly_sessions_cohort").on(t.cohort),
+		index("idx_morning_assembly_sessions_date").on(t.sessionDate),
+	],
+);
+
+export const morningAssemblyRecords = pgTable(
+	"morning_assembly_records",
+	{
+		id: serial("id").primaryKey(),
+		sessionId: integer("session_id")
+			.references(() => morningAssemblySessions.id, { onDelete: "cascade" })
+			.notNull(),
+		studentId: integer("student_id")
+			.references(() => students.id)
+			.notNull(),
+		status: text("status").notNull(), // "hadir" | "terlambat" | "izin" | "sakit" | "alpha"
+		arrivalTime: text("arrival_time"), // Contoh: "06:18" atau "06:31"
+		minutesLate: integer("minutes_late").default(0), // Menit keterlambatan jika > 06.22
+		notes: text("notes"),
+		recordedBy: integer("recorded_by").references(() => users.id),
+		recordedAt: timestamp("recorded_at").defaultNow().notNull(),
+	},
+	(t) => [
+		index("idx_morning_assembly_records_session_id").on(t.sessionId),
+		index("idx_morning_assembly_records_student_id").on(t.studentId),
 	],
 );

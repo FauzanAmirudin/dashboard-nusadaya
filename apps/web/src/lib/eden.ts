@@ -47,7 +47,11 @@ export const api = edenTreaty<App>(API_URL, {
 		}
 		const finalUrl = cleanUrl(url);
 		try {
-			const res = await fetch(finalUrl, { ...options, headers });
+			const res = await fetch(finalUrl, {
+				...options,
+				headers,
+				credentials: "include",
+			});
 
 			// Handle 401 Unauthorized / Idle Timeout from backend
 			if (res.status === 401) {

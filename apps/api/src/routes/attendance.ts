@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
 import {
@@ -7,11 +7,17 @@ import {
 	attendanceSessions,
 	classSchedules,
 	courseGrades,
+	courseMeetingAttendances,
+	courseMeetings,
+	courses,
 	dutySchedules,
+	morningAssemblyRecords,
+	morningAssemblySessions,
 	odsAttendanceRecords,
 	practicumSchedules,
 	pramagangAttendanceRecords,
 	students,
+	users,
 } from "../db/schema";
 import { hasRole } from "../lib/permissions";
 
@@ -297,24 +303,161 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				dosen: {
 					columns: { fullName: true },
 				},
+				course: true,
 			},
 		});
 
-		const records = await db.query.attendanceRecords.findMany({
-			where: eq(attendanceRecords.studentId, studentId),
-			with: {
-				session: true,
-			},
+		const courseIds = grades
+			.map((g) => g.courseId)
+			.filter((id): id is number => typeof id === "number");
+
+		let allMeetings: any[] = [];
+		let allAttendances: any[] = [];
+
+		if (courseIds.length > 0) {
+			allMeetings = await db.query.courseMeetings.findMany({
+				where: and(
+					inArray(courseMeetings.courseId, courseIds),
+					gte(courseMeetings.meetingNumber, 1),
+					lte(courseMeetings.meetingNumber, 16),
+				),
+				orderBy: [asc(courseMeetings.meetingNumber)],
+			});
+
+			const meetingIds = allMeetings.map((m) => m.id);
+			if (meetingIds.length > 0) {
+				allAttendances = await db.query.courseMeetingAttendances.findMany({
+					where: and(
+						inArray(courseMeetingAttendances.meetingId, meetingIds),
+						eq(courseMeetingAttendances.studentId, studentId),
+					),
+				});
+			}
+		}
+
+		const attendanceMap = new Map<number, (typeof allAttendances)[0]>();
+		for (const att of allAttendances) {
+			attendanceMap.set(att.meetingId, att);
+		}
+
+		// Map meetings to each course
+		const enrichedGrades = grades.map((g) => {
+			const cMeetings = allMeetings
+				.filter((m) => m.courseId === g.courseId)
+				.map((m) => {
+					const att = attendanceMap.get(m.id);
+					return {
+						id: m.id,
+						meetingNumber: m.meetingNumber,
+						meetingType: m.meetingType,
+						sessionType: m.sessionType,
+						meetingLabel: m.meetingLabel,
+						description: m.description,
+						meetingDate: m.meetingDate,
+						status: att ? att.status : null,
+						theoryScore: att ? att.theoryScore : null,
+						practicalScore: att ? att.practicalScore : null,
+						notes: att ? att.notes : null,
+					};
+				});
+
+			// Real-time calculation from actual attendances in DB
+			const presentCount = cMeetings.filter((m) => m.status === "hadir").length;
+			const totalMeetings = 16;
+			const attendanceRate = Math.min(
+				100,
+				Math.round((presentCount / totalMeetings) * 100),
+			);
+
+			const validTheories = cMeetings
+				.filter((m) => m.theoryScore !== null && m.theoryScore !== undefined)
+				.map((m) => m.theoryScore as number);
+			const avgTheory =
+				validTheories.length > 0
+					? Math.round(
+							validTheories.reduce((a, b) => a + b, 0) / validTheories.length,
+						)
+					: null;
+
+			const validPracticals = cMeetings
+				.filter(
+					(m) => m.practicalScore !== null && m.practicalScore !== undefined,
+				)
+				.map((m) => m.practicalScore as number);
+			const avgPractical =
+				validPracticals.length > 0
+					? Math.round(
+							validPracticals.reduce((a, b) => a + b, 0) /
+								validPracticals.length,
+						)
+					: null;
+
+			const isPractical = g.course?.type === "praktik";
+			let calculatedGrade: string | null = null;
+			if (avgTheory !== null || avgPractical !== null) {
+				const p = avgPractical ?? avgTheory ?? 0;
+				const t = avgTheory ?? avgPractical ?? 0;
+				const finalScore = isPractical ? Math.round(p * 0.8 + t * 0.2) : t;
+				if (finalScore >= 85) calculatedGrade = "A";
+				else if (finalScore >= 75) calculatedGrade = "B";
+				else if (finalScore >= 65) calculatedGrade = "C";
+				else if (finalScore >= 50) calculatedGrade = "D";
+				else calculatedGrade = "E";
+			}
+
+			const hasActualAttendances = cMeetings.some((m) => m.status !== null);
+			const finalPresent = hasActualAttendances
+				? presentCount
+				: g.attendancePresent || 0;
+			const finalRate = hasActualAttendances
+				? attendanceRate
+				: g.attendanceRate || 0;
+			const finalTheory = hasActualAttendances ? avgTheory : g.theoryScore;
+			const finalPractical = hasActualAttendances
+				? avgPractical
+				: g.practicalScore;
+			const finalGrade = hasActualAttendances ? calculatedGrade : g.grade;
+
+			return {
+				...g,
+				totalMeetings: 16,
+				attendancePresent: finalPresent,
+				attendanceRate: finalRate,
+				theoryScore: finalTheory,
+				practicalScore: finalPractical,
+				grade: finalGrade,
+				meetings: cMeetings,
+			};
 		});
 
-		// Filter only kelas & praktikum
-		const mkRecords = records.filter(
-			(r) =>
-				r.session.sessionType === "kelas" ||
-				r.session.sessionType === "praktikum",
-		);
+		// Backwards-compatible session logs for TabMataKuliah
+		const mkRecords = allMeetings.map((m) => {
+			const att = attendanceMap.get(m.id);
+			const courseObj = grades.find((g) => g.courseId === m.courseId);
+			return {
+				id: att?.id || m.id,
+				meetingId: m.id,
+				studentId,
+				status: att?.status || null,
+				notes: att?.notes || null,
+				theoryScore: att?.theoryScore ?? null,
+				practicalScore: att?.practicalScore ?? null,
+				session: {
+					id: m.id,
+					subject: courseObj?.courseName || "Perkuliahan",
+					sessionDate: m.meetingDate,
+					startTime: "08:00",
+					endTime: "10:00",
+					room: "Ruang Kelas",
+					sessionType: "kelas",
+				},
+			};
+		});
 
-		return { success: true, data: { grades, records: mkRecords } };
+		return {
+			success: true,
+			data: { grades: enrichedGrades, records: mkRecords },
+		};
 	})
 	.patch(
 		"/mahasiswa/:studentId/mata-kuliah/:courseGradeId",
@@ -322,10 +465,18 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			const courseGradeId = parseInt(params.courseGradeId, 10);
 			const payload = body as any;
 			const updateData: any = { updatedAt: new Date() };
+
 			if (payload.attendancePresent !== undefined)
 				updateData.attendancePresent = payload.attendancePresent;
 			if (payload.totalMeetings !== undefined)
 				updateData.totalMeetings = payload.totalMeetings;
+			if (payload.practicalScore !== undefined)
+				updateData.practicalScore = payload.practicalScore;
+			if (payload.theoryScore !== undefined)
+				updateData.theoryScore = payload.theoryScore;
+			if (payload.attitudeNote !== undefined)
+				updateData.attitudeNote = payload.attitudeNote;
+
 			// Auto calculate rate
 			if (
 				payload.attendancePresent !== undefined &&
@@ -339,12 +490,188 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 						: 0;
 				updateData.attendanceRate = rate;
 			}
+
+			// Auto calculate grade if scores provided
+			const existing = await db.query.courseGrades.findFirst({
+				where: eq(courseGrades.id, courseGradeId),
+			});
+
+			const pScore =
+				payload.practicalScore !== undefined
+					? payload.practicalScore
+					: existing?.practicalScore || 0;
+			const tScore =
+				payload.theoryScore !== undefined
+					? payload.theoryScore
+					: existing?.theoryScore || 0;
+
+			if (payload.grade !== undefined) {
+				updateData.grade = payload.grade;
+			} else if (pScore > 0 || tScore > 0) {
+				const finalScore =
+					pScore > 0 && tScore > 0
+						? Math.round(pScore * 0.8 + tScore * 0.2)
+						: pScore || tScore;
+				let displayGrade = "E";
+				if (finalScore >= 85) displayGrade = "A";
+				else if (finalScore >= 75) displayGrade = "B";
+				else if (finalScore >= 65) displayGrade = "C";
+				else if (finalScore >= 50) displayGrade = "D";
+				updateData.grade = displayGrade;
+			}
+
 			const result = await db
 				.update(courseGrades)
 				.set(updateData)
 				.where(eq(courseGrades.id, courseGradeId))
 				.returning();
 			return { success: true, data: result[0] };
+		},
+	)
+	.patch(
+		"/mahasiswa/:studentId/mata-kuliah-meeting/:courseId/:meetingId",
+		async ({ params, body, set }) => {
+			const studentId = parseInt(params.studentId, 10);
+			const courseId = parseInt(params.courseId, 10);
+			const meetingId = parseInt(params.meetingId, 10);
+			const { status, notes, theoryScore, practicalScore } = body as {
+				status: "hadir" | "izin" | "sakit" | "alpha";
+				notes?: string;
+				theoryScore?: number;
+				practicalScore?: number;
+			};
+
+			const meeting = await db.query.courseMeetings.findFirst({
+				where: and(
+					eq(courseMeetings.id, meetingId),
+					eq(courseMeetings.courseId, courseId),
+				),
+			});
+
+			if (!meeting) {
+				set.status = 404;
+				return { success: false, message: "Pertemuan tidak ditemukan" };
+			}
+
+			// Check existing attendance
+			const existing = await db.query.courseMeetingAttendances.findFirst({
+				where: and(
+					eq(courseMeetingAttendances.meetingId, meetingId),
+					eq(courseMeetingAttendances.studentId, studentId),
+				),
+			});
+
+			if (existing) {
+				await db
+					.update(courseMeetingAttendances)
+					.set({
+						status,
+						notes: notes !== undefined ? notes : existing.notes,
+						theoryScore:
+							theoryScore !== undefined ? theoryScore : existing.theoryScore,
+						practicalScore:
+							practicalScore !== undefined
+								? practicalScore
+								: existing.practicalScore,
+						updatedAt: new Date(),
+					})
+					.where(eq(courseMeetingAttendances.id, existing.id));
+			} else {
+				await db.insert(courseMeetingAttendances).values({
+					meetingId,
+					studentId,
+					status,
+					notes: notes || null,
+					theoryScore: theoryScore ?? null,
+					practicalScore: practicalScore ?? null,
+				});
+			}
+
+			// Recalculate aggregates in courseGrades
+			const allCourseMeetings = await db.query.courseMeetings.findMany({
+				where: and(
+					eq(courseMeetings.courseId, courseId),
+					gte(courseMeetings.meetingNumber, 1),
+					lte(courseMeetings.meetingNumber, 16),
+				),
+				columns: { id: true },
+			});
+			const allMeetingIds = allCourseMeetings.map((m) => m.id);
+
+			if (allMeetingIds.length > 0) {
+				const studentAtts = await db.query.courseMeetingAttendances.findMany({
+					where: and(
+						eq(courseMeetingAttendances.studentId, studentId),
+						inArray(courseMeetingAttendances.meetingId, allMeetingIds),
+					),
+				});
+				const presentCount = studentAtts.filter(
+					(a) => a.status === "hadir",
+				).length;
+				const rate = Math.min(100, Math.round((presentCount / 16) * 100));
+
+				// Calculate average scores if meetings have scores
+				const validTheory = studentAtts
+					.filter((a) => a.theoryScore !== null && a.theoryScore !== undefined)
+					.map((a) => a.theoryScore as number);
+				const avgTheory =
+					validTheory.length > 0
+						? Math.round(
+								validTheory.reduce((acc, curr) => acc + curr, 0) /
+									validTheory.length,
+							)
+						: null;
+
+				const validPractical = studentAtts
+					.filter(
+						(a) => a.practicalScore !== null && a.practicalScore !== undefined,
+					)
+					.map((a) => a.practicalScore as number);
+				const avgPractical =
+					validPractical.length > 0
+						? Math.round(
+								validPractical.reduce((acc, curr) => acc + curr, 0) /
+									validPractical.length,
+							)
+						: null;
+
+				const gradeUpdate: any = {
+					attendancePresent: presentCount,
+					totalMeetings: 16,
+					attendanceRate: rate,
+					updatedAt: new Date(),
+				};
+
+				if (avgTheory !== null) gradeUpdate.theoryScore = avgTheory;
+				if (avgPractical !== null) gradeUpdate.practicalScore = avgPractical;
+
+				if (avgTheory !== null || avgPractical !== null) {
+					const p = avgPractical ?? avgTheory ?? 0;
+					const t = avgTheory ?? avgPractical ?? 0;
+					const finalScore = Math.round(p * 0.8 + t * 0.2);
+					let displayGrade = "E";
+					if (finalScore >= 85) displayGrade = "A";
+					else if (finalScore >= 75) displayGrade = "B";
+					else if (finalScore >= 65) displayGrade = "C";
+					else if (finalScore >= 50) displayGrade = "D";
+					gradeUpdate.grade = displayGrade;
+				}
+
+				await db
+					.update(courseGrades)
+					.set(gradeUpdate)
+					.where(
+						and(
+							eq(courseGrades.studentId, studentId),
+							eq(courseGrades.courseId, courseId),
+						),
+					);
+			}
+
+			return {
+				success: true,
+				message: "Presensi sesi kuliah berhasil diperbarui",
+			};
 		},
 	)
 	.get("/mahasiswa/:studentId/piket", async ({ params }) => {
@@ -1034,7 +1361,593 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			await syncAttendanceAggregate(studentId);
 			return { success: true, data: result[0] };
 		},
-	);
+	)
+
+	// =========================================================================
+	// BARIS PAGI MINGGUAN (KEPATUHAN JAM KEDATANGAN 06.22 - AKD-05)
+	// =========================================================================
+	.get("/baris-pagi/sessions", async ({ query }) => {
+		const { cohort, rombel, dateFrom, dateTo } = query;
+		const conditions = [];
+
+		if (cohort && cohort !== "all") {
+			conditions.push(
+				eq(morningAssemblySessions.cohort, parseInt(cohort as string, 10)),
+			);
+		}
+		if (rombel && rombel !== "all" && rombel !== "Semua") {
+			conditions.push(eq(morningAssemblySessions.rombel, rombel as string));
+		}
+		if (dateFrom) {
+			conditions.push(
+				sql`${morningAssemblySessions.sessionDate} >= ${dateFrom}`,
+			);
+		}
+		if (dateTo) {
+			conditions.push(sql`${morningAssemblySessions.sessionDate} <= ${dateTo}`);
+		}
+
+		const sessions = await db.query.morningAssemblySessions.findMany({
+			where: conditions.length > 0 ? and(...conditions) : undefined,
+			orderBy: [desc(morningAssemblySessions.sessionDate)],
+			with: {
+				records: {
+					columns: {
+						id: true,
+						status: true,
+						arrivalTime: true,
+						minutesLate: true,
+					},
+				},
+				creator: { columns: { fullName: true } },
+			},
+		});
+
+		const enriched = sessions.map((s) => {
+			const total = s.records.length;
+			const hadir = s.records.filter((r) => r.status === "hadir").length;
+			const terlambat = s.records.filter(
+				(r) => r.status === "terlambat",
+			).length;
+			const izin = s.records.filter((r) => r.status === "izin").length;
+			const sakit = s.records.filter((r) => r.status === "sakit").length;
+			const alpha = s.records.filter((r) => r.status === "alpha").length;
+			const complianceRate =
+				total > 0 ? Math.round((hadir / total) * 100) : 100;
+
+			return {
+				id: s.id,
+				cohort: s.cohort,
+				rombel: s.rombel,
+				sessionDate: s.sessionDate,
+				targetTime: s.targetTime || "06:22",
+				location: s.location,
+				notes: s.notes,
+				createdBy: s.creator?.fullName || "Petugas",
+				createdAt: s.createdAt,
+				stats: {
+					total,
+					hadir,
+					terlambat,
+					izin,
+					sakit,
+					alpha,
+					complianceRate,
+				},
+			};
+		});
+
+		return { success: true, data: enriched };
+	})
+
+	.get("/baris-pagi/sessions/:id", async ({ params, set }) => {
+		const id = parseInt(params.id, 10);
+		const session = await db.query.morningAssemblySessions.findFirst({
+			where: eq(morningAssemblySessions.id, id),
+			with: {
+				creator: { columns: { fullName: true } },
+			},
+		});
+
+		if (!session) {
+			set.status = 404;
+			return { success: false, message: "Sesi baris pagi tidak ditemukan" };
+		}
+
+		// Fetch all students for this cohort & rombel
+		const studentConds = [
+			eq(students.cohort, session.cohort),
+			eq(students.isArchived, false),
+		];
+		if (session.rombel && session.rombel !== "Semua") {
+			studentConds.push(eq(students.rombel, session.rombel));
+		}
+
+		const cohortStudents = await db.query.students.findMany({
+			where: and(...studentConds),
+			orderBy: [asc(students.name)],
+			columns: { id: true, name: true, nim: true, rombel: true, cohort: true },
+		});
+
+		// Fetch existing records for this session
+		const existingRecords = await db.query.morningAssemblyRecords.findMany({
+			where: eq(morningAssemblyRecords.sessionId, id),
+			with: {
+				recorder: { columns: { fullName: true } },
+			},
+		});
+
+		const recordMap = new Map(existingRecords.map((r) => [r.studentId, r]));
+
+		const members = cohortStudents.map((st) => {
+			const rec = recordMap.get(st.id);
+			return {
+				studentId: st.id,
+				name: st.name,
+				nim: st.nim || "-",
+				rombel: st.rombel || "Kelas A",
+				status: rec ? rec.status : null,
+				arrivalTime: rec ? rec.arrivalTime || "" : "",
+				minutesLate: rec ? rec.minutesLate || 0 : 0,
+				notes: rec ? rec.notes || "" : "",
+				recordId: rec ? rec.id : null,
+				recordedBy: rec?.recorder?.fullName || null,
+				recordedAt: rec?.recordedAt || null,
+			};
+		});
+
+		const total = members.length;
+		const hadir = members.filter((m) => m.status === "hadir").length;
+		const terlambat = members.filter((m) => m.status === "terlambat").length;
+		const izin = members.filter((m) => m.status === "izin").length;
+		const sakit = members.filter((m) => m.status === "sakit").length;
+		const alpha = members.filter((m) => m.status === "alpha").length;
+		const unrecorded = members.filter((m) => !m.status).length;
+
+		return {
+			success: true,
+			data: {
+				session,
+				members,
+				stats: {
+					total,
+					hadir,
+					terlambat,
+					izin,
+					sakit,
+					alpha,
+					unrecorded,
+					complianceRate: total > 0 ? Math.round((hadir / total) * 100) : 100,
+				},
+			},
+		};
+	})
+
+	.post("/baris-pagi/sessions", async ({ body, user, set }) => {
+		const payload = body as {
+			cohort: number | string;
+			rombel?: string;
+			sessionDate: string;
+			targetTime?: string;
+			location?: string;
+			notes?: string;
+		};
+
+		if (!payload.cohort || !payload.sessionDate) {
+			set.status = 400;
+			return {
+				success: false,
+				message: "Angkatan dan Tanggal Sesi wajib diisi",
+			};
+		}
+
+		const cohortNum = parseInt(payload.cohort.toString(), 10);
+		const targetTime = payload.targetTime?.trim() || "06:22";
+		const location = payload.location?.trim() || "Lapangan Utama Kampus";
+
+		const [newSession] = await db
+			.insert(morningAssemblySessions)
+			.values({
+				cohort: cohortNum,
+				rombel: payload.rombel || "Semua",
+				sessionDate: payload.sessionDate,
+				targetTime,
+				location,
+				notes: payload.notes || null,
+				createdBy: user.id,
+			})
+			.returning();
+
+		return {
+			success: true,
+			message: "Sesi baris pagi mingguan berhasil dibuat",
+			data: newSession,
+		};
+	})
+
+	.patch("/baris-pagi/sessions/:id", async ({ params, body, set }) => {
+		const id = parseInt(params.id, 10);
+		const payload = body as any;
+
+		const existing = await db.query.morningAssemblySessions.findFirst({
+			where: eq(morningAssemblySessions.id, id),
+		});
+
+		if (!existing) {
+			set.status = 404;
+			return { success: false, message: "Sesi tidak ditemukan" };
+		}
+
+		const updateData: any = { updatedAt: new Date() };
+		if (payload.targetTime) updateData.targetTime = payload.targetTime;
+		if (payload.location) updateData.location = payload.location;
+		if (payload.notes !== undefined) updateData.notes = payload.notes;
+		if (payload.rombel) updateData.rombel = payload.rombel;
+
+		const [updated] = await db
+			.update(morningAssemblySessions)
+			.set(updateData)
+			.where(eq(morningAssemblySessions.id, id))
+			.returning();
+
+		return { success: true, data: updated };
+	})
+
+	.delete("/baris-pagi/sessions/:id", async ({ params, set }) => {
+		const id = parseInt(params.id, 10);
+
+		// Get affected student IDs before deletion
+		const records = await db.query.morningAssemblyRecords.findMany({
+			where: eq(morningAssemblyRecords.sessionId, id),
+			columns: { studentId: true },
+		});
+		const studentIds = Array.from(new Set(records.map((r) => r.studentId)));
+
+		await db
+			.delete(morningAssemblySessions)
+			.where(eq(morningAssemblySessions.id, id));
+
+		// Recalculate academic data for affected students
+		for (const sId of studentIds) {
+			await syncAttendanceAggregate(sId);
+		}
+
+		return { success: true, message: "Sesi baris pagi berhasil dihapus" };
+	})
+
+	.post(
+		"/baris-pagi/sessions/:id/records",
+		async ({ params, body, user, set }) => {
+			const sessionId = parseInt(params.id, 10);
+			const payload = body as {
+				records: Array<{
+					studentId: number;
+					status?: "hadir" | "terlambat" | "izin" | "sakit" | "alpha";
+					arrivalTime?: string; // Format "HH:mm" misal "06:20" atau "06:35"
+					notes?: string;
+				}>;
+			};
+
+			const session = await db.query.morningAssemblySessions.findFirst({
+				where: eq(morningAssemblySessions.id, sessionId),
+			});
+
+			if (!session) {
+				set.status = 404;
+				return { success: false, message: "Sesi baris pagi tidak ditemukan" };
+			}
+
+			const targetTime = session.targetTime || "06:22";
+
+			// Upsert records
+			const existingRecords = await db.query.morningAssemblyRecords.findMany({
+				where: eq(morningAssemblyRecords.sessionId, sessionId),
+			});
+			const recordMap = new Map(existingRecords.map((r) => [r.studentId, r]));
+			const studentsToSync = new Set<number>();
+
+			for (const item of payload.records || []) {
+				studentsToSync.add(item.studentId);
+				const existing = recordMap.get(item.studentId);
+
+				let finalStatus = item.status || "hadir";
+				let minutesLate = 0;
+
+				// If arrivalTime is provided, perform automatic 06.22 threshold calculation
+				if (item.arrivalTime && item.arrivalTime.includes(":")) {
+					const evalResult = evaluateMorningAssemblyArrival(
+						item.arrivalTime,
+						targetTime,
+					);
+					if (
+						item.status === "hadir" ||
+						item.status === "terlambat" ||
+						!item.status
+					) {
+						finalStatus = evalResult.status;
+						minutesLate = evalResult.minutesLate;
+					}
+				} else if (item.status === "terlambat") {
+					minutesLate = 10; // Default late minutes if no time specified
+				}
+
+				if (existing) {
+					await db
+						.update(morningAssemblyRecords)
+						.set({
+							status: finalStatus,
+							arrivalTime: item.arrivalTime || existing.arrivalTime || null,
+							minutesLate,
+							notes: item.notes !== undefined ? item.notes : existing.notes,
+							recordedBy: user.id,
+							recordedAt: new Date(),
+						})
+						.where(eq(morningAssemblyRecords.id, existing.id));
+				} else {
+					await db.insert(morningAssemblyRecords).values({
+						sessionId,
+						studentId: item.studentId,
+						status: finalStatus,
+						arrivalTime: item.arrivalTime || null,
+						minutesLate,
+						notes: item.notes || null,
+						recordedBy: user.id,
+					});
+				}
+			}
+
+			// Recalculate academic data for affected students
+			for (const sId of studentsToSync) {
+				await syncAttendanceAggregate(sId);
+			}
+
+			return {
+				success: true,
+				message:
+					"Presensi baris pagi mingguan berhasil disimpan & disinkronisasi",
+			};
+		},
+	)
+
+	.get("/baris-pagi/student-summary", async ({ query }) => {
+		const { cohort, rombel, search } = query;
+		const studentConds = [eq(students.isArchived, false)];
+
+		if (cohort && cohort !== "all") {
+			studentConds.push(eq(students.cohort, parseInt(cohort as string, 10)));
+		}
+		if (rombel && rombel !== "all") {
+			studentConds.push(eq(students.rombel, rombel as string));
+		}
+
+		const [allStudents, allAcademicData] = await Promise.all([
+			db.query.students.findMany({
+				where: and(...studentConds),
+				orderBy: [asc(students.name)],
+			}),
+			db.query.academicData.findMany(),
+		]);
+
+		const acadMap = new Map(allAcademicData.map((a) => [a.studentId, a]));
+
+		const mapped = allStudents.map((s) => {
+			const acad = acadMap.get(s.id);
+			const total = acad?.attendanceBarisTotal || 0;
+			const present = acad?.attendanceBarisPresent || 0;
+			const late = acad?.attendanceBarisLate || 0;
+			const complianceRate =
+				total > 0 ? Math.round((present / total) * 100) : 100;
+
+			let statusDisiplin = "DISIPLIN";
+			if (total > 0) {
+				if (complianceRate >= 85) statusDisiplin = "DISIPLIN";
+				else if (complianceRate >= 70) statusDisiplin = "PERLU_PEMBINAAN";
+				else statusDisiplin = "KRITIS";
+			}
+
+			return {
+				id: s.id,
+				nim: s.nim || "-",
+				name: s.name,
+				cohort: s.cohort,
+				rombel: s.rombel || "Kelas A",
+				program: s.program,
+				subProgram: s.subProgram,
+				totalSesi: total,
+				totalTepatWaktu: present,
+				totalTerlambat: late,
+				complianceRate,
+				statusDisiplin,
+			};
+		});
+
+		const filtered = search
+			? mapped.filter((s) => {
+					const q = (search as string).toLowerCase();
+					return (
+						s.name.toLowerCase().includes(q) || s.nim.toLowerCase().includes(q)
+					);
+				})
+			: mapped;
+
+		return { success: true, data: filtered };
+	})
+
+	.get("/mahasiswa/:studentId/baris-pagi", async ({ params }) => {
+		const studentId = parseInt(params.studentId, 10);
+		const records = await db.query.morningAssemblyRecords.findMany({
+			where: eq(morningAssemblyRecords.studentId, studentId),
+			with: {
+				session: true,
+				recorder: { columns: { fullName: true } },
+			},
+			orderBy: (r, { desc }) => [desc(r.id)],
+		});
+
+		const total = records.length;
+		const tepatWaktu = records.filter((r) => r.status === "hadir").length;
+		const terlambat = records.filter((r) => r.status === "terlambat").length;
+		const izin = records.filter((r) => r.status === "izin").length;
+		const sakit = records.filter((r) => r.status === "sakit").length;
+		const alpha = records.filter((r) => r.status === "alpha").length;
+		const complianceRate =
+			total > 0 ? Math.round((tepatWaktu / total) * 100) : 100;
+
+		return {
+			success: true,
+			data: {
+				records,
+				summary: {
+					total,
+					tepatWaktu,
+					terlambat,
+					izin,
+					sakit,
+					alpha,
+					complianceRate,
+				},
+			},
+		};
+	})
+
+	// =========================================================================
+	// MONITORING ALL-SERVICE CONSOLIDATED (PERKULIAHAN + PIKET + BARIS PAGI)
+	// =========================================================================
+	.get("/all-service/summary", async ({ query }) => {
+		const { cohort, rombel, search } = query;
+		const studentConds = [eq(students.isArchived, false)];
+
+		if (cohort && cohort !== "all") {
+			studentConds.push(eq(students.cohort, parseInt(cohort as string, 10)));
+		}
+		if (rombel && rombel !== "all") {
+			studentConds.push(eq(students.rombel, rombel as string));
+		}
+
+		const [allStudents, allGrades, allAcademicData] = await Promise.all([
+			db.query.students.findMany({
+				where: and(...studentConds),
+				orderBy: [asc(students.name)],
+			}),
+			db.query.courseGrades.findMany(),
+			db.query.academicData.findMany(),
+		]);
+
+		const acadMap = new Map(allAcademicData.map((a) => [a.studentId, a]));
+
+		// Group grades by student
+		const gradesMap = new Map<number, typeof allGrades>();
+		for (const g of allGrades) {
+			const list = gradesMap.get(g.studentId) || [];
+			list.push(g);
+			gradesMap.set(g.studentId, list);
+		}
+
+		const consolidated = allStudents.map((s) => {
+			const sGrades = gradesMap.get(s.id) || [];
+			let kuliahTotal = 0;
+			let kuliahHadir = 0;
+			sGrades.forEach((g) => {
+				kuliahTotal += g.totalMeetings || 16;
+				kuliahHadir += g.attendancePresent || 0;
+			});
+			const kuliahRate =
+				kuliahTotal > 0 ? Math.round((kuliahHadir / kuliahTotal) * 100) : 100;
+
+			const acad = acadMap.get(s.id);
+
+			// Piket metrics
+			const piketTotal = acad?.attendancePiketTotal || 0;
+			const piketHadir = acad?.attendancePiketPresent || 0;
+			const piketRate =
+				piketTotal > 0 ? Math.round((piketHadir / piketTotal) * 100) : 100;
+
+			// Baris Pagi metrics (Threshold 06.22)
+			const barisTotal = acad?.attendanceBarisTotal || 0;
+			const barisTepatWaktu = acad?.attendanceBarisPresent || 0;
+			const barisTerlambat = acad?.attendanceBarisLate || 0;
+			const barisRate =
+				barisTotal > 0 ? Math.round((barisTepatWaktu / barisTotal) * 100) : 100;
+
+			// Weighted All-Service Index: 50% Kuliah + 25% Piket + 25% Baris Pagi
+			const allServiceScore = Math.round(
+				kuliahRate * 0.5 + piketRate * 0.25 + barisRate * 0.25,
+			);
+
+			let allServiceStatus: "DISIPLIN" | "PERLU_PEMBINAAN" | "KRITIS" =
+				"DISIPLIN";
+			if (allServiceScore >= 85) allServiceStatus = "DISIPLIN";
+			else if (allServiceScore >= 70) allServiceStatus = "PERLU_PEMBINAAN";
+			else allServiceStatus = "KRITIS";
+
+			return {
+				id: s.id,
+				nim: s.nim || "-",
+				name: s.name,
+				cohort: s.cohort,
+				rombel: s.rombel || "Kelas A",
+				program: s.program,
+				subProgram: s.subProgram,
+				kuliah: {
+					totalMeetings: kuliahTotal,
+					presentCount: kuliahHadir,
+					rate: kuliahRate,
+				},
+				piket: {
+					totalSessions: piketTotal,
+					presentCount: piketHadir,
+					rate: piketRate,
+				},
+				barisPagi: {
+					totalSessions: barisTotal,
+					tepatWaktuCount: barisTepatWaktu,
+					terlambatCount: barisTerlambat,
+					rate: barisRate,
+				},
+				allServiceScore,
+				allServiceStatus,
+			};
+		});
+
+		const filtered = search
+			? consolidated.filter((s) => {
+					const q = (search as string).toLowerCase();
+					return (
+						s.name.toLowerCase().includes(q) || s.nim.toLowerCase().includes(q)
+					);
+				})
+			: consolidated;
+
+		return { success: true, data: filtered };
+	});
+
+// Helper function to evaluate morning assembly arrival against 06.22 threshold
+export function evaluateMorningAssemblyArrival(
+	arrivalTimeStr: string,
+	targetTimeStr: string = "06:22",
+) {
+	if (!arrivalTimeStr || !arrivalTimeStr.includes(":")) {
+		return { status: "hadir" as const, minutesLate: 0, isLate: false };
+	}
+	const [arrH, arrM] = arrivalTimeStr
+		.split(":")
+		.map((v) => parseInt(v, 10) || 0);
+	const [tarH, tarM] = targetTimeStr
+		.split(":")
+		.map((v) => parseInt(v, 10) || 0);
+	const arrMinutes = arrH * 60 + arrM;
+	const tarMinutes = tarH * 60 + tarM;
+
+	if (arrMinutes <= tarMinutes) {
+		return { status: "hadir" as const, minutesLate: 0, isLate: false };
+	} else {
+		return {
+			status: "terlambat" as const,
+			minutesLate: arrMinutes - tarMinutes,
+			isLate: true,
+		};
+	}
+}
 
 // Helper function to sync attendance aggregate for a student
 async function syncAttendanceAggregate(studentId: number) {
@@ -1082,6 +1995,18 @@ async function syncAttendanceAggregate(studentId: number) {
 		(r) => r.status === "hadir" || r.status === "izin",
 	).length;
 
+	// Query Baris Pagi (Threshold 06.22)
+	const barisRecords = await db.query.morningAssemblyRecords.findMany({
+		where: eq(morningAssemblyRecords.studentId, studentId),
+	});
+	const barisTotal = barisRecords.length;
+	const barisTepatWaktu = barisRecords.filter(
+		(r) => r.status === "hadir" || r.status === "izin",
+	).length;
+	const barisTerlambat = barisRecords.filter(
+		(r) => r.status === "terlambat",
+	).length;
+
 	// Check if academicData exists
 	const existingData = await db.query.academicData.findFirst({
 		where: eq(academicData.studentId, studentId),
@@ -1099,6 +2024,9 @@ async function syncAttendanceAggregate(studentId: number) {
 				attendanceOdsPresent: odsHadir,
 				attendancePramagangTotal: pramagangTotal,
 				attendancePramagangPresent: pramagangHadir,
+				attendanceBarisTotal: barisTotal,
+				attendanceBarisPresent: barisTepatWaktu,
+				attendanceBarisLate: barisTerlambat,
 			})
 			.where(eq(academicData.id, existingData.id));
 	} else {
@@ -1112,6 +2040,9 @@ async function syncAttendanceAggregate(studentId: number) {
 			attendanceOdsPresent: odsHadir,
 			attendancePramagangTotal: pramagangTotal,
 			attendancePramagangPresent: pramagangHadir,
+			attendanceBarisTotal: barisTotal,
+			attendanceBarisPresent: barisTepatWaktu,
+			attendanceBarisLate: barisTerlambat,
 		});
 	}
 }

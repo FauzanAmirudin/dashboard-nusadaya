@@ -101,6 +101,32 @@ export async function createSession(
 }
 
 /**
+ * Re-hydrate session in development mode if Redis is offline and memory was wiped during dev restart
+ */
+export function rehydrateDevSession(
+	sessionId: string,
+	user: { id: number; username: string; role: string; roles?: string[] },
+	metadata?: { ip?: string; userAgent?: string },
+): UserSessionData {
+	const now = Date.now();
+	const sessionData: UserSessionData = {
+		sessionId,
+		userId: user.id,
+		username: user.username,
+		role: user.role,
+		roles: user.roles && user.roles.length > 0 ? user.roles : [user.role],
+		lastActivity: now,
+		createdAt: now,
+		ip: metadata?.ip,
+		userAgent: metadata?.userAgent,
+	};
+	memorySessions.set(sessionId, sessionData);
+	return sessionData;
+}
+
+export { isRedisReady } from "./redis";
+
+/**
  * Validate session status, check for idle timeout, and update lastActivity (throttled)
  */
 export async function validateAndTouchSession(sessionId: string): Promise<{

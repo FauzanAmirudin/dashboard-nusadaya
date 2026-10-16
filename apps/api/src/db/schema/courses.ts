@@ -19,12 +19,15 @@ export const courses = pgTable(
 	"courses",
 	{
 		id: serial("id").primaryKey(),
-		code: text("code").notNull(),
+		code: text("code").unique().notNull(),
 		name: text("name").notNull(),
 		sks: integer("sks").default(2).notNull(),
 		dosenId: integer("dosen_id")
 			.references(() => users.id)
 			.notNull(),
+		dosenPendampingId: integer("dosen_pendamping_id").references(
+			() => users.id,
+		),
 		peminatan: text("peminatan"),
 		cohort: integer("cohort").notNull(),
 		rombel: text("rombel").default("Kelas A").notNull(),
@@ -34,9 +37,10 @@ export const courses = pgTable(
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
 	(t) => [
+		unique("courses_code_unique").on(t.code),
 		index("idx_courses_cohort").on(t.cohort),
 		index("idx_courses_dosen_id").on(t.dosenId),
-		index("idx_courses_code_cohort_rombel").on(t.code, t.cohort, t.rombel),
+		index("idx_courses_dosen_pendamping_id").on(t.dosenPendampingId),
 	],
 );
 

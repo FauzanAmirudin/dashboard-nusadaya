@@ -67,6 +67,8 @@ type CourseData = {
 	rombel?: string;
 	dosenId: number;
 	dosen: { id: number; fullName: string };
+	dosenPendampingId?: number | null;
+	dosenPendamping?: { id: number; fullName: string } | null;
 	peminatan: string | null;
 	cohort: number;
 	type: "teori" | "praktik";
@@ -95,6 +97,8 @@ export default function MataKuliahPage() {
 	const [isEditOpen, setIsEditOpen] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [editingId, setEditingId] = useState<number | null>(null);
+	const [registeredCohorts, setRegisteredCohorts] = useState<number[]>([]);
+	const [isCustomRombel, setIsCustomRombel] = useState(false);
 
 	const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 	const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -105,6 +109,7 @@ export default function MataKuliahPage() {
 		sks: "2",
 		rombel: "Kelas A",
 		dosenId: "",
+		dosenPendampingId: "none",
 		peminatan: "",
 		cohort: "",
 		type: "teori",
@@ -126,18 +131,32 @@ export default function MataKuliahPage() {
 				let courseList = data.data as unknown as CourseData[];
 				if (user?.role === "dosen") {
 					courseList = courseList.filter(
-						(c) => c.dosenId === user.id || c.dosen?.id === user.id,
+						(c) =>
+							c.dosenId === user.id ||
+							c.dosen?.id === user.id ||
+							c.dosenPendampingId === user.id ||
+							c.dosenPendamping?.id === user.id,
 					);
 				}
 				setCourses(courseList);
 
 				// Extract any dosens from courses data to ensure dropdown has them
-				const courseDosens = courseList
-					.filter((c) => c.dosen && c.dosen.id)
-					.map((c) => ({
-						id: c.dosen.id,
-						fullName: c.dosen.fullName || `Dosen #${c.dosen.id}`,
-					}));
+				const courseDosens: DosenData[] = [];
+				courseList.forEach((c) => {
+					if (c.dosen && c.dosen.id) {
+						courseDosens.push({
+							id: c.dosen.id,
+							fullName: c.dosen.fullName || `Dosen #${c.dosen.id}`,
+						});
+					}
+					if (c.dosenPendamping && c.dosenPendamping.id) {
+						courseDosens.push({
+							id: c.dosenPendamping.id,
+							fullName:
+								c.dosenPendamping.fullName || `Dosen #${c.dosenPendamping.id}`,
+						});
+					}
+				});
 				if (courseDosens.length > 0) {
 					setDosenList((prev) => {
 						const map = new Map<number, DosenData>();
@@ -156,25 +175,42 @@ export default function MataKuliahPage() {
 
 	const fetchDosen = async () => {
 		try {
-			const res = await fetch("/api/users?role=dosen");
-			if (res.ok) {
-				const json = await res.json();
-				if (json.success && Array.isArray(json.data)) {
-					setDosenList((prev) => {
-						const map = new Map<number, DosenData>();
-						for (const d of prev) map.set(d.id, d);
-						for (const d of json.data) {
-							map.set(d.id, {
-								id: d.id,
-								fullName: d.fullName || d.username || `Dosen #${d.id}`,
-							});
-						}
-						return Array.from(map.values());
-					});
-				}
+			const { data, error } = await (api as any).users.get({
+				$query: { role: "dosen" },
+			});
+			if (!error && data?.data && Array.isArray(data.data)) {
+				setDosenList((prev) => {
+					const map = new Map<number, DosenData>();
+					for (const d of prev) map.set(d.id, d);
+					for (const d of data.data) {
+						map.set(d.id, {
+							id: d.id,
+							fullName: d.fullName || d.username || `Dosen #${d.id}`,
+						});
+					}
+					return Array.from(map.values());
+				});
 			}
 		} catch (err) {
 			console.error("Gagal memuat daftar dosen:", err);
+		}
+	};
+
+	const fetchRegisteredCohorts = async () => {
+		try {
+			const res = await (api as any).students.cohorts.get();
+			if (res.data?.success && Array.isArray(res.data.data)) {
+				setRegisteredCohorts(res.data.data);
+				return;
+			}
+			const summaryRes = await (api as any).dashboard.summary.get({
+				$query: { archived: "false" },
+			});
+			if (summaryRes.data?.data?.cohorts) {
+				setRegisteredCohorts(summaryRes.data.data.cohorts);
+			}
+		} catch (error) {
+			console.error("Error fetching registered cohorts:", error);
 		}
 	};
 
@@ -182,6 +218,7 @@ export default function MataKuliahPage() {
 		if (hasHydrated && user) {
 			setIsLoading(true);
 			fetchCourses();
+			fetchRegisteredCohorts();
 			if (user.role !== "dosen") {
 				fetchDosen();
 			}
@@ -196,15 +233,54 @@ export default function MataKuliahPage() {
 	]);
 
 	const availableCohorts = useMemo(() => {
-		const fromData = courses.map((c) => c.cohort).filter(Boolean);
-		return Array.from(new Set(fromData)).sort((a, b) => Number(b) - Number(a));
-	}, [courses]);
+		const set = new Set<number>();
+		registeredCohorts.forEach((c) => set.add(c));
+		courses.forEach((c) => {
+			if (c.cohort) set.add(c.cohort);
+		});
+		if (set.size === 0) {
+			[16, 15, 14].forEach((c) => set.add(c));
+		}
+		return Array.from(set).sort((a, b) => Number(b) - Number(a));
+	}, [registeredCohorts, courses]);
 
 	const availableRombels = useMemo(() => {
 		const fromData = courses.map((c) => c.rombel).filter(Boolean) as string[];
-		const set = new Set<string>(["Kelas A", "Kelas B", ...fromData]);
+		const set = new Set<string>([
+			"Kelas A",
+			"Kelas B",
+			"Kelas C",
+			"Gabungan",
+			...fromData,
+		]);
 		return Array.from(set).sort();
 	}, [courses]);
+
+	const modalCohorts = useMemo(() => {
+		const set = new Set<number>(availableCohorts);
+		if (formData.cohort) {
+			const num = parseInt(formData.cohort, 10);
+			if (!Number.isNaN(num)) set.add(num);
+		}
+		return Array.from(set).sort((a, b) => Number(b) - Number(a));
+	}, [availableCohorts, formData.cohort]);
+
+	const modalRombels = useMemo(() => {
+		const set = new Set<string>(availableRombels);
+		if (formData.rombel && formData.rombel.trim() && !isCustomRombel) {
+			set.add(formData.rombel.trim());
+		}
+		return Array.from(set);
+	}, [availableRombels, formData.rombel, isCustomRombel]);
+
+	const modalSksOptions = useMemo(() => {
+		const values = ["1", "2", "3", "4", "5", "6"];
+		if (formData.sks && !values.includes(formData.sks)) {
+			values.push(formData.sks);
+			values.sort((a, b) => Number(a) - Number(b));
+		}
+		return values;
+	}, [formData.sks]);
 
 	const uniquePeminatan = useMemo(() => {
 		return Array.from(
@@ -212,10 +288,29 @@ export default function MataKuliahPage() {
 		) as string[];
 	}, [courses]);
 
+	const duplicateCourseCode = useMemo(() => {
+		const clean = formData.code.trim().toUpperCase();
+		if (!clean) return null;
+		return courses.find(
+			(c) => c.code.trim().toUpperCase() === clean && c.id !== editingId,
+		);
+	}, [formData.code, courses, editingId]);
+
 	const handleSave = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!formData.code || !formData.name || !formData.cohort) {
 			toast.error("Mohon lengkapi data yang wajib diisi");
+			return;
+		}
+
+		const cleanCode = formData.code.trim().toUpperCase();
+		const existingDuplicate = courses.find(
+			(c) => c.code.trim().toUpperCase() === cleanCode && c.id !== editingId,
+		);
+		if (existingDuplicate) {
+			toast.error(
+				`Kode mata kuliah '${cleanCode}' sudah digunakan oleh mata kuliah '${existingDuplicate.name}'. Kode mata kuliah harus unik (hanya satu per mata kuliah).`,
+			);
 			return;
 		}
 
@@ -225,6 +320,15 @@ export default function MataKuliahPage() {
 		} else if (!formData.dosenId) {
 			toast.error("Mohon pilih dosen pengampu");
 			return;
+		}
+
+		let dosenPendampingIdPayload: number | null = null;
+		if (formData.dosenPendampingId && formData.dosenPendampingId !== "none") {
+			dosenPendampingIdPayload = parseInt(formData.dosenPendampingId, 10);
+			if (dosenPendampingIdPayload === dosenIdPayload) {
+				toast.error("Dosen pendamping tidak boleh sama dengan dosen utama");
+				return;
+			}
 		}
 
 		setIsSaving(true);
@@ -239,6 +343,7 @@ export default function MataKuliahPage() {
 					sks: sksVal,
 					rombel: rombelVal,
 					dosenId: dosenIdPayload,
+					dosenPendampingId: dosenPendampingIdPayload,
 					peminatan: formData.peminatan || undefined,
 					cohort: parseInt(formData.cohort, 10),
 					type: formData.type as "teori" | "praktik",
@@ -264,6 +369,7 @@ export default function MataKuliahPage() {
 					sks: sksVal,
 					rombel: rombelVal,
 					dosenId: dosenIdPayload,
+					dosenPendampingId: dosenPendampingIdPayload,
 					peminatan: formData.peminatan || undefined,
 					cohort: parseInt(formData.cohort, 10),
 					type: formData.type as "teori" | "praktik",
@@ -313,17 +419,27 @@ export default function MataKuliahPage() {
 			: course.dosen?.id
 				? course.dosen.id.toString()
 				: "";
+		const dpId = course.dosenPendampingId
+			? course.dosenPendampingId.toString()
+			: course.dosenPendamping?.id
+				? course.dosenPendamping.id.toString()
+				: "none";
 
+		const rombelVal = course.rombel || "Kelas A";
 		setFormData({
 			code: course.code,
 			name: course.name,
 			sks: course.sks ? course.sks.toString() : "2",
-			rombel: course.rombel || "Kelas A",
+			rombel: rombelVal,
 			dosenId: dId,
+			dosenPendampingId: dpId,
 			peminatan: course.peminatan || "",
 			cohort: course.cohort ? course.cohort.toString() : "",
 			type: course.type || "teori",
 		});
+		setIsCustomRombel(
+			!(DEFAULT_ROMBEL_OPTIONS as readonly string[]).includes(rombelVal),
+		);
 
 		if (course.dosen && course.dosen.id) {
 			setDosenList((prev) => {
@@ -339,6 +455,22 @@ export default function MataKuliahPage() {
 				return prev;
 			});
 		}
+		if (course.dosenPendamping && course.dosenPendamping.id) {
+			setDosenList((prev) => {
+				if (!prev.some((d) => d.id === course.dosenPendamping?.id)) {
+					return [
+						...prev,
+						{
+							id: course.dosenPendamping!.id,
+							fullName:
+								course.dosenPendamping!.fullName ||
+								`Dosen #${course.dosenPendamping!.id}`,
+						},
+					];
+				}
+				return prev;
+			});
+		}
 		setIsEditOpen(true);
 	};
 
@@ -347,7 +479,9 @@ export default function MataKuliahPage() {
 			if (
 				user?.role === "dosen" &&
 				c.dosenId !== user.id &&
-				c.dosen?.id !== user.id
+				c.dosen?.id !== user.id &&
+				c.dosenPendampingId !== user.id &&
+				c.dosenPendamping?.id !== user.id
 			) {
 				return false;
 			}
@@ -357,6 +491,7 @@ export default function MataKuliahPage() {
 				c.name.toLowerCase().includes(query) ||
 				c.code.toLowerCase().includes(query) ||
 				c.dosen?.fullName?.toLowerCase().includes(query) ||
+				c.dosenPendamping?.fullName?.toLowerCase().includes(query) ||
 				(c.peminatan && c.peminatan.toLowerCase().includes(query))
 			);
 		});
@@ -411,7 +546,14 @@ export default function MataKuliahPage() {
 						<Button
 							size="sm"
 							onClick={() => {
-								setFormData(initialForm);
+								setEditingId(null);
+								setFormData({
+									...initialForm,
+									cohort: availableCohorts[0]
+										? availableCohorts[0].toString()
+										: "16",
+								});
+								setIsCustomRombel(false);
 								setIsAddOpen(true);
 							}}
 							className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold text-xs gap-1.5 h-9 shadow-xs"
@@ -661,9 +803,21 @@ export default function MataKuliahPage() {
 												</Link>
 											</TableCell>
 											<TableCell className="py-3.5 px-4 text-slate-700 text-xs">
-												<div className="flex items-center gap-1.5">
-													<GraduationCap className="w-3.5 h-3.5 text-[#0517B0] shrink-0" />
-													<span>{c.dosen?.fullName || "Belum Ditugaskan"}</span>
+												<div className="flex flex-col gap-1 items-start">
+													<div className="flex items-center gap-1.5">
+														<GraduationCap className="w-3.5 h-3.5 text-[#0517B0] shrink-0" />
+														<span className="font-medium text-slate-800">
+															{c.dosen?.fullName || "Belum Ditugaskan"}
+														</span>
+													</div>
+													{c.dosenPendamping && (
+														<div className="flex items-center gap-1 text-[11px] text-purple-700 bg-purple-50/70 border border-purple-200/60 px-1.5 py-0.5 rounded-md font-medium">
+															<span>+ {c.dosenPendamping.fullName}</span>
+															<span className="text-[10px] text-purple-500 font-normal">
+																(Pendamping)
+															</span>
+														</div>
+													)}
 												</div>
 											</TableCell>
 											<TableCell className="py-3.5 px-4">
@@ -789,81 +943,178 @@ export default function MataKuliahPage() {
 					}
 				}}
 			>
-				<DialogContent className="sm:max-w-[600px]">
+				<DialogContent className="sm:max-w-[620px] rounded-2xl max-h-[90vh] overflow-y-auto">
 					<DialogHeader>
-						<DialogTitle>
-							{isAddOpen ? "Tambah Mata Kuliah Baru" : "Edit Mata Kuliah"}
-						</DialogTitle>
+						<div className="flex items-center gap-3">
+							<div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0517B0] flex items-center justify-center font-bold shadow-2xs shrink-0">
+								<BookOpen className="w-5 h-5" />
+							</div>
+							<div>
+								<DialogTitle className="text-base font-bold text-slate-900">
+									{isAddOpen ? "Tambah Mata Kuliah Baru" : "Edit Mata Kuliah"}
+								</DialogTitle>
+								<p className="text-xs text-slate-500 mt-0.5">
+									Konfigurasi kode, bobot SKS, angkatan, rombongan belajar, dan
+									dosen pengampu
+								</p>
+							</div>
+						</div>
 					</DialogHeader>
-					<form onSubmit={handleSave} className="space-y-4 pt-4">
+
+					<form onSubmit={handleSave} className="space-y-4 pt-3">
 						<div className="grid grid-cols-2 gap-4">
-							<div className="space-y-2">
-								<Label>Kode Mata Kuliah *</Label>
+							<div className="space-y-1.5">
+								<Label className="text-xs font-semibold text-slate-700">
+									Kode Mata Kuliah <span className="text-rose-500">*</span>
+								</Label>
 								<Input
 									required
-									placeholder="Cth: MK-001"
-									className="border border-slate-200"
+									placeholder="Contoh: MK-001"
+									className={cn(
+										"h-9 text-xs rounded-xl border uppercase font-mono font-bold",
+										duplicateCourseCode
+											? "border-rose-400 focus-visible:ring-rose-400 bg-rose-50/40 text-rose-800"
+											: "border-slate-200 bg-white",
+									)}
 									value={formData.code}
 									onChange={(e) =>
-										setFormData({ ...formData, code: e.target.value })
+										setFormData({
+											...formData,
+											code: e.target.value.toUpperCase(),
+										})
 									}
 								/>
+								{duplicateCourseCode && (
+									<p className="text-[11px] text-rose-600 font-medium">
+										⚠️ Kode sudah digunakan oleh: &quot;
+										{duplicateCourseCode.name}&quot;
+									</p>
+								)}
 							</div>
-							<div className="space-y-2">
-								<Label>Bobot SKS *</Label>
-								<Input
-									required
-									type="number"
-									min={1}
-									max={10}
-									placeholder="2"
-									className="border border-slate-200"
-									value={formData.sks}
-									onChange={(e) =>
-										setFormData({ ...formData, sks: e.target.value })
+
+							<div className="space-y-1.5">
+								<Label className="text-xs font-semibold text-slate-700">
+									Bobot SKS <span className="text-rose-500">*</span>
+								</Label>
+								<Select
+									value={formData.sks || "2"}
+									onValueChange={(val) =>
+										setFormData({ ...formData, sks: val || "2" })
 									}
-								/>
+								>
+									<SelectTrigger className="h-9 text-xs rounded-xl border border-slate-200 bg-white">
+										<SelectValue placeholder="Pilih Bobot SKS">
+											{formData.sks ? `${formData.sks} SKS` : "Pilih Bobot SKS"}
+										</SelectValue>
+									</SelectTrigger>
+									<SelectContent>
+										{modalSksOptions.map((sks) => (
+											<SelectItem key={sks} value={sks}>
+												{sks === "2"
+													? "2 SKS (Standar Perkuliahan)"
+													: sks === "3"
+														? "3 SKS"
+														: sks === "4"
+															? "4 SKS (Praktik Intensif)"
+															: sks === "6"
+																? "6 SKS (Proyek Akhir / Magang)"
+																: `${sks} SKS`}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
 							</div>
 						</div>
 
 						<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-							<div className="space-y-2">
-								<Label>Angkatan *</Label>
-								<Input
-									required
-									type="number"
-									placeholder="Cth: 16"
-									className="border border-slate-200"
+							<div className="space-y-1.5">
+								<Label className="text-xs font-semibold text-slate-700">
+									Angkatan <span className="text-rose-500">*</span>
+								</Label>
+								<Select
 									value={formData.cohort}
-									onChange={(e) =>
-										setFormData({ ...formData, cohort: e.target.value })
+									onValueChange={(val) =>
+										setFormData({ ...formData, cohort: val || "" })
 									}
-								/>
+								>
+									<SelectTrigger className="h-9 text-xs rounded-xl border border-slate-200 bg-white">
+										<SelectValue placeholder="Pilih Angkatan">
+											{formData.cohort
+												? `Angkatan ${formData.cohort}`
+												: "Pilih Angkatan"}
+										</SelectValue>
+									</SelectTrigger>
+									<SelectContent>
+										{modalCohorts.map((cohort) => (
+											<SelectItem key={cohort} value={cohort.toString()}>
+												Angkatan {cohort}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
 							</div>
-							<div className="space-y-2">
-								<div className="flex items-center justify-between">
-									<Label>Rombel *</Label>
-									<span className="text-[10px] text-slate-400">
-										Kustom dinamis
-									</span>
-								</div>
-								<Input
-									required
-									placeholder="Cth: Kelas A, Kelas B, Gabungan..."
-									className="border border-slate-200"
-									value={formData.rombel}
-									onChange={(e) =>
-										setFormData({ ...formData, rombel: e.target.value })
-									}
-								/>
-								<div className="flex flex-wrap gap-1 pt-1">
+
+							<div className="space-y-1.5">
+								<Label className="text-xs font-semibold text-slate-700">
+									Rombongan Belajar <span className="text-rose-500">*</span>
+								</Label>
+								<Select
+									value={isCustomRombel ? "custom" : formData.rombel}
+									onValueChange={(val) => {
+										if (val === "custom") {
+											setIsCustomRombel(true);
+										} else {
+											setIsCustomRombel(false);
+											setFormData({ ...formData, rombel: val || "Kelas A" });
+										}
+									}}
+								>
+									<SelectTrigger className="h-9 text-xs rounded-xl border border-slate-200 bg-white">
+										<SelectValue placeholder="Pilih Rombongan Belajar">
+											{isCustomRombel
+												? "Rombongan Belajar Kustom"
+												: formData.rombel || "Pilih Rombongan Belajar"}
+										</SelectValue>
+									</SelectTrigger>
+									<SelectContent>
+										{modalRombels.map((rombel) => (
+											<SelectItem key={rombel} value={rombel}>
+												{rombel}
+											</SelectItem>
+										))}
+										<SelectItem
+											value="custom"
+											className="font-semibold text-[#0517B0]"
+										>
+											+ Input Kustom / Rombel Baru...
+										</SelectItem>
+									</SelectContent>
+								</Select>
+
+								{isCustomRombel && (
+									<Input
+										placeholder="Contoh: Kelas Eksekutif, Kelas Sore..."
+										value={formData.rombel}
+										onChange={(e) =>
+											setFormData({ ...formData, rombel: e.target.value })
+										}
+										className="h-9 text-xs rounded-xl border border-slate-200 mt-1.5"
+										autoFocus
+									/>
+								)}
+
+								{/* Quick Preset Pills */}
+								<div className="flex flex-wrap gap-1.5 pt-1">
 									{DEFAULT_ROMBEL_OPTIONS.map((opt) => (
 										<button
 											key={opt}
 											type="button"
-											onClick={() => setFormData({ ...formData, rombel: opt })}
+											onClick={() => {
+												setIsCustomRombel(false);
+												setFormData({ ...formData, rombel: opt });
+											}}
 											className={`text-[11px] px-2 py-0.5 rounded-md font-medium transition-colors ${
-												formData.rombel === opt
+												formData.rombel === opt && !isCustomRombel
 													? "bg-[#0517B0] text-white"
 													: "bg-slate-100 text-slate-600 hover:bg-slate-200"
 											}`}
@@ -875,12 +1126,14 @@ export default function MataKuliahPage() {
 							</div>
 						</div>
 
-						<div className="space-y-2">
-							<Label>Nama Mata Kuliah *</Label>
+						<div className="space-y-1.5">
+							<Label className="text-xs font-semibold text-slate-700">
+								Nama Mata Kuliah <span className="text-rose-500">*</span>
+							</Label>
 							<Input
 								required
-								placeholder="Cth: Front Office Operation"
-								className="border border-slate-200"
+								placeholder="Contoh: Front Office Operation"
+								className="h-9 text-xs rounded-xl border border-slate-200 font-medium"
 								value={formData.name}
 								onChange={(e) =>
 									setFormData({ ...formData, name: e.target.value })
@@ -889,46 +1142,137 @@ export default function MataKuliahPage() {
 						</div>
 
 						{user?.role !== "dosen" && (
-							<div className="space-y-2">
-								<Label>Dosen Pengampu *</Label>
-								<Select
-									value={formData.dosenId || ""}
-									onValueChange={(val) =>
-										setFormData({ ...formData, dosenId: val || "" })
-									}
-								>
-									<SelectTrigger className="border border-slate-200 bg-white">
-										{formData.dosenId ? (
-											(() => {
-												const selected = dosenList.find(
-													(d) => d.id.toString() === formData.dosenId,
-												);
-												return (
-													<span className="font-medium text-slate-800">
-														{selected?.fullName || `Dosen #${formData.dosenId}`}
-													</span>
-												);
-											})()
-										) : (
-											<span className="text-slate-400">
-												Pilih Dosen Pengampu
+							<>
+								<div className="space-y-1.5">
+									<Label className="text-xs font-semibold text-slate-700">
+										Dosen Pengampu Utama{" "}
+										<span className="text-rose-500">*</span>
+									</Label>
+									<Select
+										value={formData.dosenId || ""}
+										onValueChange={(val) => {
+											const newDosenId = val || "";
+											// If same as pendamping, clear pendamping
+											if (newDosenId === formData.dosenPendampingId) {
+												setFormData({
+													...formData,
+													dosenId: newDosenId,
+													dosenPendampingId: "none",
+												});
+											} else {
+												setFormData({ ...formData, dosenId: newDosenId });
+											}
+										}}
+									>
+										<SelectTrigger className="h-9 text-xs rounded-xl border border-slate-200 bg-white">
+											{formData.dosenId ? (
+												(() => {
+													const selected = dosenList.find(
+														(d) => d.id.toString() === formData.dosenId,
+													);
+													return (
+														<span className="font-medium text-slate-800">
+															{selected?.fullName ||
+																`Dosen #${formData.dosenId}`}
+														</span>
+													);
+												})()
+											) : (
+												<span className="text-slate-400">
+													Pilih Dosen Pengampu Utama
+												</span>
+											)}
+										</SelectTrigger>
+										<SelectContent>
+											{dosenList.map((d) => (
+												<SelectItem key={d.id} value={d.id.toString()}>
+													{d.fullName}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+
+								<div className="space-y-1.5">
+									<div className="flex items-center justify-between">
+										<Label className="text-xs font-semibold text-slate-700">
+											Dosen Pendamping / Team Teaching{" "}
+											<span className="text-[11px] font-normal text-slate-400">
+												(Opsional)
 											</span>
-										)}
-									</SelectTrigger>
-									<SelectContent>
-										{dosenList.map((d) => (
-											<SelectItem key={d.id} value={d.id.toString()}>
-												{d.fullName}
+										</Label>
+										{formData.dosenPendampingId &&
+											formData.dosenPendampingId !== "none" && (
+												<button
+													type="button"
+													onClick={() =>
+														setFormData({
+															...formData,
+															dosenPendampingId: "none",
+														})
+													}
+													className="text-[11px] text-slate-400 hover:text-rose-600 transition-colors"
+												>
+													Hapus Pendamping
+												</button>
+											)}
+									</div>
+									<Select
+										value={formData.dosenPendampingId || "none"}
+										onValueChange={(val) =>
+											setFormData({
+												...formData,
+												dosenPendampingId: val || "none",
+											})
+										}
+									>
+										<SelectTrigger className="h-9 text-xs rounded-xl border border-slate-200 bg-white">
+											{formData.dosenPendampingId &&
+											formData.dosenPendampingId !== "none" ? (
+												(() => {
+													const selected = dosenList.find(
+														(d) =>
+															d.id.toString() === formData.dosenPendampingId,
+													);
+													return (
+														<span className="font-medium text-purple-700">
+															+{" "}
+															{selected?.fullName ||
+																`Dosen #${formData.dosenPendampingId}`}{" "}
+															(Pendamping)
+														</span>
+													);
+												})()
+											) : (
+												<span className="text-slate-400">
+													-- Tidak Ada (Hanya Satu Dosen Pengampu) --
+												</span>
+											)}
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="none">
+												<span className="text-slate-500">
+													-- Tidak Ada (Hanya Satu Dosen Pengampu) --
+												</span>
 											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
+											{dosenList
+												.filter((d) => d.id.toString() !== formData.dosenId)
+												.map((d) => (
+													<SelectItem key={d.id} value={d.id.toString()}>
+														{d.fullName}
+													</SelectItem>
+												))}
+										</SelectContent>
+									</Select>
+								</div>
+							</>
 						)}
 
 						<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-							<div className="space-y-2">
-								<Label>Peminatan</Label>
+							<div className="space-y-1.5">
+								<Label className="text-xs font-semibold text-slate-700">
+									Peminatan
+								</Label>
 								<Select
 									value={formData.peminatan || "all"}
 									onValueChange={(val) =>
@@ -938,7 +1282,7 @@ export default function MataKuliahPage() {
 										})
 									}
 								>
-									<SelectTrigger className="border border-slate-200 bg-white">
+									<SelectTrigger className="h-9 text-xs rounded-xl border border-slate-200 bg-white">
 										{formData.peminatan ? (
 											(() => {
 												const opt =
@@ -988,26 +1332,36 @@ export default function MataKuliahPage() {
 									</SelectContent>
 								</Select>
 							</div>
-							<div className="space-y-2">
-								<Label>Jenis *</Label>
+
+							<div className="space-y-1.5">
+								<Label className="text-xs font-semibold text-slate-700">
+									Jenis Perkuliahan <span className="text-rose-500">*</span>
+								</Label>
 								<Select
 									value={formData.type || "teori"}
 									onValueChange={(val) =>
-										setFormData({ ...formData, type: val || "teori" })
+										setFormData({
+											...formData,
+											type: (val as "teori" | "praktik") || "teori",
+										})
 									}
 								>
-									<SelectTrigger className="border border-slate-200 bg-white">
-										<SelectValue placeholder="Pilih Jenis" />
+									<SelectTrigger className="h-9 text-xs rounded-xl border border-slate-200 bg-white">
+										<SelectValue placeholder="Pilih Jenis Perkuliahan">
+											{formData.type === "praktik"
+												? "Kelas Praktik"
+												: "Kelas Teori"}
+										</SelectValue>
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value="teori">Teori</SelectItem>
-										<SelectItem value="praktik">Praktik</SelectItem>
+										<SelectItem value="teori">Kelas Teori</SelectItem>
+										<SelectItem value="praktik">Kelas Praktik</SelectItem>
 									</SelectContent>
 								</Select>
 							</div>
 						</div>
 
-						<div className="pt-4 flex justify-end gap-2">
+						<div className="pt-4 flex justify-end gap-2 border-t border-slate-100 mt-4">
 							<Button
 								type="button"
 								variant="outline"
@@ -1015,18 +1369,25 @@ export default function MataKuliahPage() {
 									setIsAddOpen(false);
 									setIsEditOpen(false);
 								}}
+								className="h-9 px-4 text-xs rounded-xl font-medium"
 							>
 								Batal
 							</Button>
 							<Button
 								type="submit"
 								disabled={isSaving}
-								className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold"
+								className="h-9 px-4 text-xs rounded-xl font-bold bg-[#0517B0] hover:bg-blue-800 text-white shadow-xs"
 							>
 								{isSaving ? (
-									<Loader2 className="h-4 w-4 animate-spin mr-2" />
-								) : null}
-								Simpan
+									<>
+										<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+										Menyimpan...
+									</>
+								) : editingId ? (
+									"Perbarui Mata Kuliah"
+								) : (
+									"Simpan Mata Kuliah"
+								)}
 							</Button>
 						</div>
 					</form>

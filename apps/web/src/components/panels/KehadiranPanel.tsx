@@ -1,12 +1,15 @@
 "use client";
 
 import {
+	Award,
 	Briefcase,
 	CalendarDays,
 	ClipboardCheck,
 	Compass,
 	GraduationCap,
+	ShieldCheck,
 } from "lucide-react";
+import { TabBarisPagi } from "@/components/panels/kehadiran/detail/TabBarisPagi";
 import { TabMataKuliah } from "@/components/panels/kehadiran/detail/TabMataKuliah";
 import { TabODS } from "@/components/panels/kehadiran/detail/TabODS";
 import { TabPiket } from "@/components/panels/kehadiran/detail/TabPiket";
@@ -41,7 +44,8 @@ export function KehadiranPanel({ studentId }: KehadiranPanelProps) {
 							</Badge>
 						</div>
 						<p className="text-xs text-slate-500 mt-0.5">
-							Monitoring presensi perkuliahan, piket harian, ODS, dan pra-magang
+							Monitoring presensi perkuliahan, piket harian, baris pagi (06.22),
+							ODS, dan pra-magang
 						</p>
 					</div>
 				</div>
@@ -49,7 +53,7 @@ export function KehadiranPanel({ studentId }: KehadiranPanelProps) {
 
 			{/* Subtab Segmented Navigation */}
 			<Tabs defaultValue="mata-kuliah" className="w-full space-y-5">
-				<TabsList className="w-full bg-slate-100/90 p-1 rounded-2xl border border-slate-200/60 shadow-2xs grid grid-cols-2 sm:grid-cols-4 gap-1 h-auto">
+				<TabsList className="w-full bg-slate-100/90 p-1 rounded-2xl border border-slate-200/60 shadow-2xs grid grid-cols-2 sm:grid-cols-5 gap-1 h-auto">
 					<TabsTrigger
 						value="mata-kuliah"
 						className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-xs rounded-xl py-2.5 px-3 transition-all flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold cursor-pointer"
@@ -63,6 +67,13 @@ export function KehadiranPanel({ studentId }: KehadiranPanelProps) {
 					>
 						<CalendarDays className="w-4 h-4 shrink-0" />
 						<span>Piket Harian</span>
+					</TabsTrigger>
+					<TabsTrigger
+						value="baris-pagi"
+						className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-xs rounded-xl py-2.5 px-3 transition-all flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold cursor-pointer"
+					>
+						<ShieldCheck className="w-4 h-4 shrink-0" />
+						<span>Baris Pagi (06.22)</span>
 					</TabsTrigger>
 					<TabsTrigger
 						value="ods"
@@ -92,6 +103,13 @@ export function KehadiranPanel({ studentId }: KehadiranPanelProps) {
 					className="animate-in fade-in-50 duration-200"
 				>
 					<TabPiket studentId={studentId} />
+				</TabsContent>
+
+				<TabsContent
+					value="baris-pagi"
+					className="animate-in fade-in-50 duration-200"
+				>
+					<TabBarisPagi studentId={studentId} />
 				</TabsContent>
 
 				<TabsContent value="ods" className="animate-in fade-in-50 duration-200">

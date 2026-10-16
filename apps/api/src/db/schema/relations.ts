@@ -62,6 +62,8 @@ import {
 	attendanceSessions,
 	classSchedules,
 	dutySchedules,
+	morningAssemblyRecords,
+	morningAssemblySessions,
 	odsAttendanceRecords,
 	practicumSchedules,
 	pramagangAttendanceRecords,
@@ -594,6 +596,10 @@ export const classSchedulesRelations = relations(classSchedules, ({ one }) => ({
 		fields: [classSchedules.dosenId],
 		references: [users.id],
 	}),
+	dosenPendamping: one(users, {
+		fields: [classSchedules.dosenPendampingId],
+		references: [users.id],
+	}),
 	calendar: one(academicCalendars, {
 		fields: [classSchedules.calendarId],
 		references: [academicCalendars.id],
@@ -605,6 +611,10 @@ export const practicumSchedulesRelations = relations(
 	({ one }) => ({
 		dosen: one(users, {
 			fields: [practicumSchedules.dosenId],
+			references: [users.id],
+		}),
+		dosenPendamping: one(users, {
+			fields: [practicumSchedules.dosenPendampingId],
 			references: [users.id],
 		}),
 		calendar: one(academicCalendars, {
@@ -702,6 +712,10 @@ export const coursesRelations = relations(courses, ({ one, many }) => ({
 		fields: [courses.dosenId],
 		references: [users.id],
 	}),
+	dosenPendamping: one(users, {
+		fields: [courses.dosenPendampingId],
+		references: [users.id],
+	}),
 	meetings: many(courseMeetings),
 	enrollments: many(courseEnrollments),
 }));
@@ -756,6 +770,35 @@ export const courseMeetingAttendancesRelations = relations(
 		student: one(students, {
 			fields: [courseMeetingAttendances.studentId],
 			references: [students.id],
+		}),
+	}),
+);
+
+export const morningAssemblySessionsRelations = relations(
+	morningAssemblySessions,
+	({ one, many }) => ({
+		creator: one(users, {
+			fields: [morningAssemblySessions.createdBy],
+			references: [users.id],
+		}),
+		records: many(morningAssemblyRecords),
+	}),
+);
+
+export const morningAssemblyRecordsRelations = relations(
+	morningAssemblyRecords,
+	({ one }) => ({
+		session: one(morningAssemblySessions, {
+			fields: [morningAssemblyRecords.sessionId],
+			references: [morningAssemblySessions.id],
+		}),
+		student: one(students, {
+			fields: [morningAssemblyRecords.studentId],
+			references: [students.id],
+		}),
+		recorder: one(users, {
+			fields: [morningAssemblyRecords.recordedBy],
+			references: [users.id],
 		}),
 	}),
 );

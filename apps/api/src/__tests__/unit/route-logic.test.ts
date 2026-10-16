@@ -461,5 +461,65 @@ describe("Tahap 4 — API Route Logic (Backend)", () => {
 				expect(score).toBe(0);
 			});
 		});
+
+		describe("Task 4.12 — Courses Code Uniqueness Logic", () => {
+			it("should detect duplicate course code case-insensitively", () => {
+				const existingCourses = [
+					{ id: 1, code: "ENG101", name: "Bahasa Inggris" },
+					{ id: 2, code: "FO101", name: "Front Office" },
+				];
+
+				const newCode = "eng101";
+				const isDuplicate = existingCourses.some(
+					(c) => c.code.toLowerCase() === newCode.trim().toLowerCase(),
+				);
+				expect(isDuplicate).toBe(true);
+			});
+
+			it("should allow distinct new course code", () => {
+				const existingCourses = [
+					{ id: 1, code: "ENG101", name: "Bahasa Inggris" },
+					{ id: 2, code: "FO101", name: "Front Office" },
+				];
+
+				const newCode = "BAR101";
+				const isDuplicate = existingCourses.some(
+					(c) => c.code.toLowerCase() === newCode.trim().toLowerCase(),
+				);
+				expect(isDuplicate).toBe(false);
+			});
+
+			it("should allow saving course with its own code when updating", () => {
+				const existingCourses = [
+					{ id: 1, code: "ENG101", name: "Bahasa Inggris" },
+					{ id: 2, code: "FO101", name: "Front Office" },
+				];
+
+				const editingId = 1;
+				const updatedCode = "ENG101";
+				const isDuplicateExcludingSelf = existingCourses.some(
+					(c) =>
+						c.id !== editingId &&
+						c.code.toLowerCase() === updatedCode.trim().toLowerCase(),
+				);
+				expect(isDuplicateExcludingSelf).toBe(false);
+			});
+
+			it("should reject updating course to another existing course code", () => {
+				const existingCourses = [
+					{ id: 1, code: "ENG101", name: "Bahasa Inggris" },
+					{ id: 2, code: "FO101", name: "Front Office" },
+				];
+
+				const editingId = 2;
+				const updatedCode = "ENG101"; // Trying to steal ID 1's code
+				const isDuplicateExcludingSelf = existingCourses.some(
+					(c) =>
+						c.id !== editingId &&
+						c.code.toLowerCase() === updatedCode.trim().toLowerCase(),
+				);
+				expect(isDuplicateExcludingSelf).toBe(true);
+			});
+		});
 	});
 });

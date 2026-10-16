@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
 	Accordion,
@@ -99,7 +99,10 @@ type CourseDetail = {
 	peminatan: string | null;
 	cohort: number;
 	type: string;
+	dosenId?: number;
 	dosen: { id: number; fullName: string };
+	dosenPendampingId?: number | null;
+	dosenPendamping?: { id: number; fullName: string } | null;
 };
 
 type MeetingData = {
@@ -214,6 +217,36 @@ export default function MataKuliahDetailPage() {
 	);
 	const [isSavingInfo, setIsSavingInfo] = useState<number | null>(null);
 
+	// Generate Dates Modal State
+	const [isGenerateDatesOpen, setIsGenerateDatesOpen] = useState(false);
+	const [generateStartDate, setGenerateStartDate] = useState("");
+	const [isGeneratingDates, setIsGeneratingDates] = useState(false);
+
+	// Hitung berapa sesi dari 16 pertemuan yang sudah bertanggal
+	const sessionsWithDateCount = useMemo(() => {
+		return meetings.filter(
+			(m) =>
+				m.meetingNumber >= 1 && m.meetingNumber <= 16 && Boolean(m.meetingDate),
+		).length;
+	}, [meetings]);
+
+	// Pratinjau kalkulasi tanggal untuk dialog
+	const previewDates = useMemo(() => {
+		if (!generateStartDate) return [];
+		const items: { label: string; date: string }[] = [];
+
+		for (let i = 1; i <= 16; i++) {
+			const d = new Date(generateStartDate + "T00:00:00Z");
+			d.setUTCDate(d.getUTCDate() + (i - 1) * 7);
+			const tag = i === 8 ? " (UTS)" : i === 16 ? " (UAS)" : "";
+			items.push({
+				label: `Pertemuan ${i}${tag}`,
+				date: d.toISOString().split("T")[0],
+			});
+		}
+		return items;
+	}, [generateStartDate]);
+
 	const fetchApi = (endpoint: string, options: RequestInit = {}) => {
 		const token = getToken();
 		const headers = new Headers(options.headers || {});
@@ -245,7 +278,9 @@ export default function MataKuliahDetailPage() {
 			const { data: mData, error: mErr } =
 				await api.courses[courseId].meetings.get();
 			if (!mErr && mData?.success) {
-				const meets = (mData.data as any[]) || [];
+				const meets = ((mData.data as any[]) || []).filter(
+					(m: any) => m.meetingNumber >= 1 && m.meetingNumber <= 16,
+				);
 				meets.sort((a, b) => (a.meetingNumber ?? 0) - (b.meetingNumber ?? 0));
 				setMeetings(meets);
 
@@ -513,6 +548,13 @@ export default function MataKuliahDetailPage() {
 	const saveAttendances = async (meetingId: number) => {
 		setIsSavingAttendance(meetingId);
 		try {
+			const targetMeet = meetings.find((m) => m.id === meetingId);
+			const isExamMeet =
+				targetMeet?.meetingType === "uts" ||
+				targetMeet?.meetingType === "uas" ||
+				targetMeet?.meetingNumber === 8 ||
+				targetMeet?.meetingNumber === 16;
+
 			const meetingAtt = attendanceData[meetingId] || {};
 			const payload = students.map((s) => {
 				const entry = meetingAtt[s.id];
@@ -525,10 +567,11 @@ export default function MataKuliahDetailPage() {
 						entry?.theoryScore !== ""
 							? Math.max(0, Math.min(100, Number(entry.theoryScore) || 0))
 							: null,
-					practicalScore:
-						entry?.practicalScore !== undefined &&
-						entry?.practicalScore !== null &&
-						entry?.practicalScore !== ""
+					practicalScore: isExamMeet
+						? null
+						: entry?.practicalScore !== undefined &&
+								entry?.practicalScore !== null &&
+								entry?.practicalScore !== ""
 							? Math.max(0, Math.min(100, Number(entry.practicalScore) || 0))
 							: null,
 					notes: entry?.notes || null,
@@ -552,6 +595,41 @@ export default function MataKuliahDetailPage() {
 		}
 	};
 
+	const handleGenerateDatesSubmit = async () => {
+		if (!generateStartDate) {
+			toast.error("Silakan tentukan tanggal sesi pertama perkuliahan");
+			return;
+		}
+		setIsGeneratingDates(true);
+		try {
+			const res = await fetchApi(
+				`/courses/${courseId}/meetings/generate-dates`,
+				{
+					method: "POST",
+					body: JSON.stringify({
+						startDate: generateStartDate,
+					}),
+				},
+			);
+			const result = await res.json();
+			if (res.ok && result.success) {
+				toast.success(
+					result.message || "Tanggal 16 sesi perkuliahan berhasil digenerate!",
+				);
+				setIsGenerateDatesOpen(false);
+				await fetchData();
+			} else {
+				toast.error(
+					result.message || "Gagal generate tanggal sesi perkuliahan",
+				);
+			}
+		} catch {
+			toast.error("Terjadi kesalahan saat memproses tanggal sesi");
+		} finally {
+			setIsGeneratingDates(false);
+		}
+	};
+
 	const handleExportDetail = () => {
 		if (!course) return;
 
@@ -572,6 +650,10 @@ export default function MataKuliahDetailPage() {
 				Deskripsi: m.description || "-",
 			};
 
+			const isUts = m.meetingType === "uts" || m.meetingNumber === 8;
+			const isUas = m.meetingType === "uas" || m.meetingNumber === 16;
+			const isExam = isUts || isUas;
+
 			if (students.length === 0) {
 				exportData.push(baseRow);
 			} else {
@@ -582,14 +664,24 @@ export default function MataKuliahDetailPage() {
 						NIM: s.nim,
 						Mahasiswa: s.name,
 						Kehadiran: att?.status ? att.status.toUpperCase() : "BELUM DIISI",
-						"Nilai Teori":
-							att?.theoryScore !== null && att?.theoryScore !== undefined
-								? att.theoryScore
-								: "-",
-						"Nilai Praktik":
-							att?.practicalScore !== null && att?.practicalScore !== undefined
-								? att.practicalScore
-								: "-",
+						...(isExam
+							? {
+									[isUts ? "Nilai UTS" : "Nilai UAS"]:
+										att?.theoryScore !== null && att?.theoryScore !== undefined
+											? att.theoryScore
+											: "-",
+								}
+							: {
+									"Nilai Teori":
+										att?.theoryScore !== null && att?.theoryScore !== undefined
+											? att.theoryScore
+											: "-",
+									"Nilai Praktik":
+										att?.practicalScore !== null &&
+										att?.practicalScore !== undefined
+											? att.practicalScore
+											: "-",
+								}),
 						"Catatan Kehadiran": att?.notes || "-",
 					});
 				});
@@ -691,22 +783,41 @@ export default function MataKuliahDetailPage() {
 								</Badge>
 							)}
 						</div>
-						<p className="text-sm text-slate-500 mt-0.5">
-							Dosen Pengampu:{" "}
+						<p className="text-sm text-slate-500 mt-0.5 flex flex-wrap items-center gap-1.5">
+							<span>Dosen Pengampu:</span>
 							<span className="font-semibold text-slate-700">
 								{course.dosen.fullName}
 							</span>
+							{course.dosenPendamping && (
+								<>
+									<span className="text-slate-400">•</span>
+									<span>Dosen Pendamping:</span>
+									<span className="font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200/60 text-xs">
+										+ {course.dosenPendamping.fullName}
+									</span>
+								</>
+							)}
 						</p>
 					</div>
 				</div>
-				<Button
-					variant="outline"
-					onClick={handleExportDetail}
-					className="border-slate-300 text-slate-700 hover:bg-slate-50 shadow-sm"
-				>
-					<Download className="mr-2 h-4 w-4 text-blue-600" /> Export Rekap &
-					Nilai
-				</Button>
+				<div className="flex flex-wrap items-center gap-2">
+					<Button
+						variant="outline"
+						onClick={() => setIsGenerateDatesOpen(true)}
+						className="border-blue-200 text-blue-700 bg-blue-50/50 hover:bg-blue-100 shadow-sm"
+					>
+						<Calendar className="mr-2 h-4 w-4 text-blue-600" />
+						Generate Tanggal Sesi
+					</Button>
+					<Button
+						variant="outline"
+						onClick={handleExportDetail}
+						className="border-slate-300 text-slate-700 hover:bg-slate-50 shadow-sm"
+					>
+						<Download className="mr-2 h-4 w-4 text-blue-600" /> Export Rekap &
+						Nilai
+					</Button>
+				</div>
 			</div>
 
 			{/* Stat Cards */}
@@ -754,11 +865,24 @@ export default function MataKuliahDetailPage() {
 							<Calendar className="h-5 w-5" />
 						</div>
 						<p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
-							Total Sesi
+							Jadwal Sesi 1–16
 						</p>
 						<p className="text-xl font-bold text-slate-800">
-							{meetings.length} Sesi Pertemuan
+							{sessionsWithDateCount} / 16 Sesi
 						</p>
+						<span
+							className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+								sessionsWithDateCount === 16
+									? "bg-emerald-50 text-emerald-700"
+									: sessionsWithDateCount > 0
+										? "bg-amber-50 text-amber-700"
+										: "bg-slate-100 text-slate-500"
+							}`}
+						>
+							{sessionsWithDateCount === 16
+								? "Lengkap Bertanggal"
+								: `${16 - sessionsWithDateCount} sesi belum diatur`}
+						</span>
 					</CardContent>
 				</Card>
 			</div>
@@ -815,8 +939,7 @@ export default function MataKuliahDetailPage() {
 									variant="outline"
 									className="bg-white border-blue-200 text-blue-700 self-start md:self-auto font-medium"
 								>
-									PKKMB • Beginning Class • Pertemuan 1–16 • UTS (P8) • UAS
-									(P16)
+									Pertemuan 1–16 • UTS (P8) • UAS (P16)
 								</Badge>
 							</div>
 						</CardHeader>
@@ -824,26 +947,67 @@ export default function MataKuliahDetailPage() {
 							<Accordion type="single" collapsible className="w-full space-y-3">
 								{meetings.map((meet) => {
 									const isEditingInfo = editingMeeting === meet.id;
+									const isUts =
+										meet.meetingType === "uts" || meet.meetingNumber === 8;
+									const isUas =
+										meet.meetingType === "uas" || meet.meetingNumber === 16;
+									const isExam = isUts || isUas;
 
-									// Only count 'hadir' for students currently enrolled in the course
-									const presentCount = students.filter(
-										(s) => attendanceData[meet.id]?.[s.id]?.status === "hadir",
-									).length;
+									// Only count 'hadir' / 'mengikuti ujian' for students currently enrolled in the course
+									const presentCount = students.filter((s) => {
+										const st = attendanceData[meet.id]?.[s.id]?.status;
+										return st === "hadir" || st === "susulan";
+									}).length;
+
+									const examScoreCount = students.filter((s) => {
+										const att = attendanceData[meet.id]?.[s.id];
+										return (
+											att?.theoryScore !== undefined &&
+											att?.theoryScore !== null &&
+											att?.theoryScore !== ""
+										);
+									}).length;
 
 									return (
 										<AccordionItem
 											value={`meet-${meet.id}`}
 											key={meet.id}
-											className="border border-slate-200 rounded-xl px-4 py-1.5 bg-white data-[state=open]:border-blue-300 data-[state=open]:shadow-md transition-all"
+											className={`rounded-xl px-4 py-1.5 transition-all ${
+												isUts
+													? "border-2 border-amber-300 bg-amber-50/20 data-[state=open]:border-amber-500 data-[state=open]:shadow-md"
+													: isUas
+														? "border-2 border-rose-300 bg-rose-50/20 data-[state=open]:border-rose-500 data-[state=open]:shadow-md"
+														: "border border-slate-200 bg-white data-[state=open]:border-blue-300 data-[state=open]:shadow-md"
+											}`}
 										>
 											<AccordionTrigger className="hover:no-underline py-2.5">
 												<div className="flex items-center gap-3 w-full justify-between pr-4">
 													<div className="text-left">
 														<div className="flex items-center gap-2 flex-wrap">
-															<p className="font-bold text-slate-800 text-base">
+															<p
+																className={`font-bold text-base ${
+																	isUts
+																		? "text-amber-950 font-extrabold"
+																		: isUas
+																			? "text-rose-950 font-extrabold"
+																			: "text-slate-800"
+																}`}
+															>
 																{meet.meetingLabel}
 															</p>
-															{getSessionTypeBadge(meet.sessionType)}
+															{isUts ? (
+																<Badge className="bg-amber-100 text-amber-900 border-amber-300 font-bold px-2.5 py-0.5 text-xs shadow-2xs">
+																	<GraduationCap className="w-3.5 h-3.5 mr-1 inline" />
+																	UJIAN TENGAH SEMESTER (UTS)
+																</Badge>
+															) : isUas ? (
+																<Badge className="bg-rose-100 text-rose-900 border-rose-300 font-bold px-2.5 py-0.5 text-xs shadow-2xs">
+																	<GraduationCap className="w-3.5 h-3.5 mr-1 inline" />
+																	UJIAN AKHIR SEMESTER (UAS)
+																</Badge>
+															) : (
+																getSessionTypeBadge(meet.sessionType)
+															)}
 														</div>
 														<p className="text-xs text-slate-500 font-normal mt-0.5">
 															{meet.meetingDate
@@ -860,16 +1024,33 @@ export default function MataKuliahDetailPage() {
 														</p>
 													</div>
 													<div className="flex items-center gap-2 shrink-0">
-														<Badge
-															variant="secondary"
-															className={`font-semibold text-xs px-2.5 py-1 ${
-																presentCount > 0
-																	? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-																	: "bg-slate-100 text-slate-600"
-															}`}
-														>
-															{presentCount} / {students.length} Hadir
-														</Badge>
+														{isExam ? (
+															<Badge
+																variant="secondary"
+																className={`font-semibold text-xs px-2.5 py-1 ${
+																	examScoreCount === students.length &&
+																	students.length > 0
+																		? "bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold"
+																		: examScoreCount > 0
+																			? "bg-amber-50 text-amber-800 border border-amber-300 font-bold"
+																			: "bg-slate-100 text-slate-600"
+																}`}
+															>
+																{examScoreCount} / {students.length} Nilai
+																Terisi
+															</Badge>
+														) : (
+															<Badge
+																variant="secondary"
+																className={`font-semibold text-xs px-2.5 py-1 ${
+																	presentCount > 0
+																		? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+																		: "bg-slate-100 text-slate-600"
+																}`}
+															>
+																{presentCount} / {students.length} Hadir
+															</Badge>
+														)}
 													</div>
 												</div>
 											</AccordionTrigger>
@@ -1027,11 +1208,15 @@ export default function MataKuliahDetailPage() {
 																Presensi Kehadiran & Nilai Mahasiswa Sesi Ini
 															</h4>
 															<p className="text-xs text-slate-500">
-																{meet.sessionType === "praktik"
-																	? "Fokus input Nilai Praktik (0-100)"
-																	: meet.sessionType === "keduanya"
-																		? "Input Nilai Teori & Praktik (0-100)"
-																		: "Fokus input Nilai Teori (0-100)"}
+																{isUts
+																	? "Fokus input Nilai Ujian Tengah Semester (0-100)"
+																	: isUas
+																		? "Fokus input Nilai Ujian Akhir Semester (0-100)"
+																		: meet.sessionType === "praktik"
+																			? "Fokus input Nilai Praktik (0-100)"
+																			: meet.sessionType === "keduanya"
+																				? "Input Nilai Teori & Praktik (0-100)"
+																				: "Fokus input Nilai Teori (0-100)"}
 															</p>
 														</div>
 														<Button
@@ -1048,6 +1233,36 @@ export default function MataKuliahDetailPage() {
 															Simpan Presensi & Nilai
 														</Button>
 													</div>
+
+													{isExam && (
+														<div
+															className={`p-3.5 rounded-xl border flex items-start gap-3 ${
+																isUts
+																	? "bg-amber-50/80 border-amber-200 text-amber-900"
+																	: "bg-rose-50/80 border-rose-200 text-rose-900"
+															}`}
+														>
+															<GraduationCap
+																className={`w-5 h-5 shrink-0 mt-0.5 ${
+																	isUts ? "text-amber-700" : "text-rose-700"
+																}`}
+															/>
+															<div className="text-xs">
+																<p className="font-bold text-sm">
+																	{isUts
+																		? "Sesi Evaluasi Ujian Tengah Semester (UTS)"
+																		: "Sesi Evaluasi Ujian Akhir Semester (UAS)"}
+																</p>
+																<p className="mt-0.5 opacity-90">
+																	Sesi ini merupakan agenda evaluasi formal
+																	perkuliahan. Input nilai ujian mahasiswa
+																	(0–100) dan verifikasi status kehadiran ujian.
+																	Mahasiswa yang berhalangan dapat ditandai
+																	dengan status <strong>Ujian Susulan</strong>.
+																</p>
+															</div>
+														</div>
+													)}
 
 													{students.length === 0 ? (
 														<div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
@@ -1074,22 +1289,30 @@ export default function MataKuliahDetailPage() {
 																		<TableHead className="text-xs font-bold text-slate-700">
 																			Nama Mahasiswa
 																		</TableHead>
-																		<TableHead className="w-40 text-xs font-bold text-slate-700">
-																			Kehadiran
+																		<TableHead className="w-44 text-xs font-bold text-slate-700">
+																			{isExam ? "Kehadiran Ujian" : "Kehadiran"}
 																		</TableHead>
-																		{(!meet.sessionType ||
-																			meet.sessionType === "teori" ||
-																			meet.sessionType === "keduanya") && (
-																			<TableHead className="w-28 text-xs font-bold text-slate-700">
-																				Nilai Teori
+																		{isExam ? (
+																			<TableHead className="w-32 text-xs font-bold text-slate-700">
+																				{isUts ? "Nilai UTS" : "Nilai UAS"}
 																			</TableHead>
-																		)}
-																		{(!meet.sessionType ||
-																			meet.sessionType === "praktik" ||
-																			meet.sessionType === "keduanya") && (
-																			<TableHead className="w-28 text-xs font-bold text-slate-700">
-																				Nilai Praktik
-																			</TableHead>
+																		) : (
+																			<>
+																				{(!meet.sessionType ||
+																					meet.sessionType === "teori" ||
+																					meet.sessionType === "keduanya") && (
+																					<TableHead className="w-28 text-xs font-bold text-slate-700">
+																						Nilai Teori
+																					</TableHead>
+																				)}
+																				{(!meet.sessionType ||
+																					meet.sessionType === "praktik" ||
+																					meet.sessionType === "keduanya") && (
+																					<TableHead className="w-28 text-xs font-bold text-slate-700">
+																						Nilai Praktik
+																					</TableHead>
+																				)}
+																			</>
 																		)}
 																		<TableHead className="text-xs font-bold text-slate-700">
 																			Catatan
@@ -1161,15 +1384,18 @@ export default function MataKuliahDetailPage() {
 																								currentEntry.status === "hadir"
 																									? "border-emerald-300 bg-emerald-50/70 text-emerald-800 font-bold"
 																									: currentEntry.status ===
-																											"izin"
-																										? "border-blue-300 bg-blue-50/70 text-blue-800 font-bold"
+																											"susulan"
+																										? "border-amber-300 bg-amber-50/70 text-amber-800 font-bold"
 																										: currentEntry.status ===
-																												"sakit"
-																											? "border-amber-300 bg-amber-50/70 text-amber-800 font-bold"
+																												"izin"
+																											? "border-blue-300 bg-blue-50/70 text-blue-800 font-bold"
 																											: currentEntry.status ===
-																													"alpha"
-																												? "border-red-300 bg-red-50/70 text-red-800 font-bold"
-																												: "border-slate-300 bg-white text-slate-400"
+																													"sakit"
+																												? "border-purple-300 bg-purple-50/70 text-purple-800 font-bold"
+																												: currentEntry.status ===
+																														"alpha"
+																													? "border-red-300 bg-red-50/70 text-red-800 font-bold"
+																													: "border-slate-300 bg-white text-slate-400"
 																							}`}
 																						>
 																							<SelectValue placeholder="Pilih status" />
@@ -1181,44 +1407,83 @@ export default function MataKuliahDetailPage() {
 																							>
 																								- Belum Diisi -
 																							</SelectItem>
-																							<SelectItem
-																								value="hadir"
-																								className="text-emerald-700 font-bold text-xs"
-																							>
-																								✓ Hadir
-																							</SelectItem>
-																							<SelectItem
-																								value="izin"
-																								className="text-blue-700 font-bold text-xs"
-																							>
-																								ℹ Izin
-																							</SelectItem>
-																							<SelectItem
-																								value="sakit"
-																								className="text-amber-700 font-bold text-xs"
-																							>
-																								✚ Sakit
-																							</SelectItem>
-																							<SelectItem
-																								value="alpha"
-																								className="text-red-700 font-bold text-xs"
-																							>
-																								✕ Alpha
-																							</SelectItem>
+																							{isExam ? (
+																								<>
+																									<SelectItem
+																										value="hadir"
+																										className="text-emerald-700 font-bold text-xs"
+																									>
+																										✓ Mengikuti Ujian
+																									</SelectItem>
+																									<SelectItem
+																										value="susulan"
+																										className="text-amber-700 font-bold text-xs"
+																									>
+																										⏳ Ujian Susulan
+																									</SelectItem>
+																									<SelectItem
+																										value="izin"
+																										className="text-blue-700 font-bold text-xs"
+																									>
+																										ℹ Izin
+																									</SelectItem>
+																									<SelectItem
+																										value="sakit"
+																										className="text-purple-700 font-bold text-xs"
+																									>
+																										✚ Sakit
+																									</SelectItem>
+																									<SelectItem
+																										value="alpha"
+																										className="text-red-700 font-bold text-xs"
+																									>
+																										✕ Tidak Hadir
+																									</SelectItem>
+																								</>
+																							) : (
+																								<>
+																									<SelectItem
+																										value="hadir"
+																										className="text-emerald-700 font-bold text-xs"
+																									>
+																										✓ Hadir
+																									</SelectItem>
+																									<SelectItem
+																										value="izin"
+																										className="text-blue-700 font-bold text-xs"
+																									>
+																										ℹ Izin
+																									</SelectItem>
+																									<SelectItem
+																										value="sakit"
+																										className="text-amber-700 font-bold text-xs"
+																									>
+																										✚ Sakit
+																									</SelectItem>
+																									<SelectItem
+																										value="alpha"
+																										className="text-red-700 font-bold text-xs"
+																									>
+																										✕ Alpha
+																									</SelectItem>
+																								</>
+																							)}
 																						</SelectContent>
 																					</Select>
 																				</TableCell>
 
-																				{(!meet.sessionType ||
-																					meet.sessionType === "teori" ||
-																					meet.sessionType === "keduanya") && (
+																				{isExam ? (
 																					<TableCell>
 																						<Input
 																							type="number"
 																							min={0}
 																							max={100}
 																							placeholder="0 - 100"
-																							className="border-slate-300 bg-white h-8 text-xs w-24 font-mono font-semibold text-blue-700"
+																							className={`border-slate-300 bg-white h-8 text-xs w-28 font-mono font-bold ${
+																								isUts
+																									? "text-amber-800 focus:border-amber-500"
+																									: "text-rose-800 focus:border-rose-500"
+																							}`}
 																							value={
 																								currentEntry.theoryScore !==
 																									undefined &&
@@ -1258,6 +1523,7 @@ export default function MataKuliahDetailPage() {
 																											[s.id]: {
 																												...currentEntry,
 																												theoryScore: val,
+																												practicalScore: "",
 																											},
 																										},
 																									};
@@ -1265,64 +1531,131 @@ export default function MataKuliahDetailPage() {
 																							}}
 																						/>
 																					</TableCell>
-																				)}
+																				) : (
+																					<>
+																						{(!meet.sessionType ||
+																							meet.sessionType === "teori" ||
+																							meet.sessionType ===
+																								"keduanya") && (
+																							<TableCell>
+																								<Input
+																									type="number"
+																									min={0}
+																									max={100}
+																									placeholder="0 - 100"
+																									className="border-slate-300 bg-white h-8 text-xs w-24 font-mono font-semibold text-blue-700"
+																									value={
+																										currentEntry.theoryScore !==
+																											undefined &&
+																										currentEntry.theoryScore !==
+																											null
+																											? currentEntry.theoryScore
+																											: ""
+																									}
+																									onKeyDown={(e) => {
+																										if (
+																											e.key === "-" ||
+																											e.key === "e" ||
+																											e.key === "E"
+																										)
+																											e.preventDefault();
+																									}}
+																									onChange={(e) => {
+																										const val =
+																											e.target.value === ""
+																												? ""
+																												: Math.max(
+																														0,
+																														Math.min(
+																															100,
+																															Number(
+																																e.target.value,
+																															) || 0,
+																														),
+																													);
+																										setAttendanceData(
+																											(prev) => {
+																												const meetMap =
+																													prev[meet.id] || {};
+																												return {
+																													...prev,
+																													[meet.id]: {
+																														...meetMap,
+																														[s.id]: {
+																															...currentEntry,
+																															theoryScore: val,
+																														},
+																													},
+																												};
+																											},
+																										);
+																									}}
+																								/>
+																							</TableCell>
+																						)}
 
-																				{(!meet.sessionType ||
-																					meet.sessionType === "praktik" ||
-																					meet.sessionType === "keduanya") && (
-																					<TableCell>
-																						<Input
-																							type="number"
-																							min={0}
-																							max={100}
-																							placeholder="0 - 100"
-																							className="border-slate-300 bg-white h-8 text-xs w-24 font-mono font-semibold text-emerald-700"
-																							value={
-																								currentEntry.practicalScore !==
-																									undefined &&
-																								currentEntry.practicalScore !==
-																									null
-																									? currentEntry.practicalScore
-																									: ""
-																							}
-																							onKeyDown={(e) => {
-																								if (
-																									e.key === "-" ||
-																									e.key === "e" ||
-																									e.key === "E"
-																								)
-																									e.preventDefault();
-																							}}
-																							onChange={(e) => {
-																								const val =
-																									e.target.value === ""
-																										? ""
-																										: Math.max(
-																												0,
-																												Math.min(
-																													100,
-																													Number(
-																														e.target.value,
-																													) || 0,
-																												),
-																											);
-																								setAttendanceData((prev) => {
-																									const meetMap =
-																										prev[meet.id] || {};
-																									return {
-																										...prev,
-																										[meet.id]: {
-																											...meetMap,
-																											[s.id]: {
-																												...currentEntry,
-																												practicalScore: val,
+																						{(!meet.sessionType ||
+																							meet.sessionType === "praktik" ||
+																							meet.sessionType ===
+																								"keduanya") && (
+																							<TableCell>
+																								<Input
+																									type="number"
+																									min={0}
+																									max={100}
+																									placeholder="0 - 100"
+																									className="border-slate-300 bg-white h-8 text-xs w-24 font-mono font-semibold text-emerald-700"
+																									value={
+																										currentEntry.practicalScore !==
+																											undefined &&
+																										currentEntry.practicalScore !==
+																											null
+																											? currentEntry.practicalScore
+																											: ""
+																									}
+																									onKeyDown={(e) => {
+																										if (
+																											e.key === "-" ||
+																											e.key === "e" ||
+																											e.key === "E"
+																										)
+																											e.preventDefault();
+																									}}
+																									onChange={(e) => {
+																										const val =
+																											e.target.value === ""
+																												? ""
+																												: Math.max(
+																														0,
+																														Math.min(
+																															100,
+																															Number(
+																																e.target.value,
+																															) || 0,
+																														),
+																													);
+																										setAttendanceData(
+																											(prev) => {
+																												const meetMap =
+																													prev[meet.id] || {};
+																												return {
+																													...prev,
+																													[meet.id]: {
+																														...meetMap,
+																														[s.id]: {
+																															...currentEntry,
+																															practicalScore:
+																																val,
+																														},
+																													},
+																												};
 																											},
-																										},
-																									};
-																								});
-																							}}
-																						/>
-																					</TableCell>
+																										);
+																									}}
+																								/>
+																							</TableCell>
+																						)}
+																					</>
 																				)}
 
 																				<TableCell>
@@ -1953,6 +2286,102 @@ export default function MataKuliahDetailPage() {
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
+
+			{/* Dialog Modal: Generate Tanggal Perkuliahan Otomatis */}
+			<Dialog open={isGenerateDatesOpen} onOpenChange={setIsGenerateDatesOpen}>
+				<DialogContent className="max-w-md rounded-2xl">
+					<DialogHeader>
+						<DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+							<Calendar className="w-5 h-5 text-blue-600" />
+							Generate Tanggal Perkuliahan Otomatis
+						</DialogTitle>
+						<DialogDescription className="text-xs text-slate-600">
+							Sistem akan menghitung tanggal untuk Pertemuan 1 s.d. 16 secara
+							berkala (setiap 7 hari) dan memperbarui kalender sesi perkuliahan.
+						</DialogDescription>
+					</DialogHeader>
+
+					<div className="space-y-4 py-2">
+						<div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1">
+							<p>
+								<strong>Mata Kuliah:</strong> {course.name} ({course.code})
+							</p>
+							<p>
+								<strong>Angkatan / Rombel:</strong> Angkatan {course.cohort} •{" "}
+								{course.rombel || "Kelas A"}
+							</p>
+						</div>
+
+						<div className="space-y-1.5">
+							<Label className="text-xs font-semibold text-slate-700">
+								Tanggal Pertemuan Pertama (Sesi 1){" "}
+								<span className="text-red-500">*</span>
+							</Label>
+							<Input
+								type="date"
+								value={generateStartDate}
+								onChange={(e) => setGenerateStartDate(e.target.value)}
+								className="h-9 text-xs rounded-xl border-slate-300"
+							/>
+							<p className="text-[11px] text-slate-500">
+								Pilih tanggal perkuliahan pertama dimulai pada kalender
+								akademik.
+							</p>
+						</div>
+
+						{generateStartDate && (
+							<div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 text-xs space-y-2">
+								<p className="font-semibold text-slate-700 flex items-center justify-between">
+									<span>Pratinjau Jadwal Perkuliahan:</span>
+									<span className="text-[10px] text-blue-600 font-mono font-normal">
+										16 Pertemuan
+									</span>
+								</p>
+								<div className="max-h-44 overflow-y-auto space-y-1 pr-1 font-mono text-[11px]">
+									{previewDates.map((p, i) => (
+										<div
+											key={i}
+											className={`flex justify-between py-1 px-1.5 rounded border-b border-slate-100 last:border-none ${
+												p.label.includes("UTS")
+													? "bg-amber-100/60 font-bold text-amber-900"
+													: p.label.includes("UAS")
+														? "bg-rose-100/60 font-bold text-rose-900"
+														: ""
+											}`}
+										>
+											<span className="text-slate-600">{p.label}:</span>
+											<span className="font-semibold text-slate-800">
+												{p.date}
+											</span>
+										</div>
+									))}
+								</div>
+							</div>
+						)}
+					</div>
+
+					<DialogFooter className="gap-2 pt-2 border-t border-slate-100">
+						<Button
+							variant="outline"
+							onClick={() => setIsGenerateDatesOpen(false)}
+							disabled={isGeneratingDates}
+							className="rounded-xl text-xs"
+						>
+							Batal
+						</Button>
+						<Button
+							onClick={handleGenerateDatesSubmit}
+							disabled={isGeneratingDates || !generateStartDate}
+							className="bg-[#0517B0] hover:bg-blue-900 text-white rounded-xl text-xs font-semibold"
+						>
+							{isGeneratingDates && (
+								<Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+							)}
+							Terapkan Tanggal Sesi
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

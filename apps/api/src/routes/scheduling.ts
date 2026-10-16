@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ne, not, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
 import {
@@ -51,6 +51,9 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 				dosen: {
 					columns: { id: true, fullName: true },
 				},
+				dosenPendamping: {
+					columns: { id: true, fullName: true },
+				},
 			},
 			orderBy: [asc(classSchedules.dayOfWeek), asc(classSchedules.startTime)],
 		});
@@ -63,6 +66,26 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 			const payload = body as any;
 			const targetRombel = (payload.rombel || "Kelas A").trim();
 			const targetRoom = (payload.room || "").trim();
+
+			const cleanDosenPendampingId =
+				payload.dosenPendampingId &&
+				payload.dosenPendampingId !== 0 &&
+				payload.dosenPendampingId !== "none"
+					? Number(payload.dosenPendampingId)
+					: null;
+
+			if (
+				cleanDosenPendampingId &&
+				payload.dosenId &&
+				cleanDosenPendampingId === Number(payload.dosenId)
+			) {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Dosen pendamping tidak boleh sama dengan dosen pengampu utama.",
+				};
+			}
 
 			// Conflict Validation
 			const existingClass = await db.query.classSchedules.findMany({
@@ -107,14 +130,15 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 				}
 			}
 
-			// 2. Check Dosen Conflict
+			// 2. Check Dosen Utama Conflict (both as primary or companion in other schedules)
 			if (payload.dosenId) {
 				const allDosenSchedules = [
 					...existingClass,
 					...existingPracticum,
 				].filter(
 					(s) =>
-						s.dosenId === payload.dosenId &&
+						(s.dosenId === payload.dosenId ||
+							s.dosenPendampingId === payload.dosenId) &&
 						(!payload.sessionDate ||
 							!s.sessionDate ||
 							payload.sessionDate === s.sessionDate),
@@ -134,7 +158,41 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 						set.status = 400;
 						return {
 							success: false,
-							message: `Konflik Dosen: Dosen pengampu sudah memiliki jadwal mengajar pada rentang waktu ini.`,
+							message: `Konflik Dosen: Dosen pengampu utama sudah memiliki jadwal mengajar pada rentang waktu ini.`,
+						};
+					}
+				}
+			}
+
+			// 2b. Check Dosen Pendamping Conflict (Layer 4)
+			if (cleanDosenPendampingId) {
+				const allCompanionSchedules = [
+					...existingClass,
+					...existingPracticum,
+				].filter(
+					(s) =>
+						(s.dosenId === cleanDosenPendampingId ||
+							s.dosenPendampingId === cleanDosenPendampingId) &&
+						(!payload.sessionDate ||
+							!s.sessionDate ||
+							payload.sessionDate === s.sessionDate),
+				);
+
+				for (const s of allCompanionSchedules) {
+					if (
+						s.startTime &&
+						s.endTime &&
+						isTimeOverlap(
+							payload.startTime,
+							payload.endTime,
+							s.startTime,
+							s.endTime,
+						)
+					) {
+						set.status = 400;
+						return {
+							success: false,
+							message: `Konflik Dosen Pendamping: Dosen pendamping sudah memiliki jadwal mengajar pada rentang waktu ini.`,
 						};
 					}
 				}
@@ -181,6 +239,7 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 				.values({
 					subject: payload.subject,
 					dosenId: payload.dosenId,
+					dosenPendampingId: cleanDosenPendampingId,
 					cohort: cohortNum,
 					rombel: targetRombel,
 					room: targetRoom,
@@ -201,6 +260,7 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 			body: t.Object({
 				subject: t.String(),
 				dosenId: t.Optional(t.Number()),
+				dosenPendampingId: t.Optional(t.Union([t.Number(), t.Null()])),
 				cohort: t.Union([t.String(), t.Number()]),
 				rombel: t.Optional(t.String()),
 				room: t.String(),
@@ -231,6 +291,26 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 		const room = (payload.room ?? current.room).trim();
 		const dosenId =
 			payload.dosenId !== undefined ? payload.dosenId : current.dosenId;
+
+		let newDosenPendampingId = current.dosenPendampingId;
+		if (payload.dosenPendampingId !== undefined) {
+			newDosenPendampingId =
+				payload.dosenPendampingId &&
+				payload.dosenPendampingId !== 0 &&
+				payload.dosenPendampingId !== "none"
+					? Number(payload.dosenPendampingId)
+					: null;
+		}
+
+		if (newDosenPendampingId && dosenId && newDosenPendampingId === dosenId) {
+			set.status = 400;
+			return {
+				success: false,
+				message:
+					"Dosen pendamping tidak boleh sama dengan dosen pengampu utama.",
+			};
+		}
+
 		const cohort =
 			payload.cohort !== undefined
 				? parseInt(payload.cohort, 10)
@@ -279,11 +359,11 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 			}
 		}
 
-		// 2. Dosen conflict
+		// 2. Dosen Utama conflict
 		if (dosenId) {
 			const allDosenSchedules = [...existingClass, ...existingPracticum].filter(
 				(s) =>
-					s.dosenId === dosenId &&
+					(s.dosenId === dosenId || s.dosenPendampingId === dosenId) &&
 					(!sessionDate || !s.sessionDate || sessionDate === s.sessionDate),
 			);
 			for (const s of allDosenSchedules) {
@@ -296,6 +376,32 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 					return {
 						success: false,
 						message: `Konflik Dosen: Dosen pengampu sudah memiliki jadwal mengajar pada rentang waktu ini.`,
+					};
+				}
+			}
+		}
+
+		// 2b. Dosen Pendamping conflict (Layer 4)
+		if (newDosenPendampingId) {
+			const allCompanionSchedules = [
+				...existingClass,
+				...existingPracticum,
+			].filter(
+				(s) =>
+					(s.dosenId === newDosenPendampingId ||
+						s.dosenPendampingId === newDosenPendampingId) &&
+					(!sessionDate || !s.sessionDate || sessionDate === s.sessionDate),
+			);
+			for (const s of allCompanionSchedules) {
+				if (
+					s.startTime &&
+					s.endTime &&
+					isTimeOverlap(startTime, endTime, s.startTime, s.endTime)
+				) {
+					set.status = 400;
+					return {
+						success: false,
+						message: `Konflik Dosen Pendamping: Dosen pendamping sudah memiliki jadwal mengajar pada rentang waktu ini.`,
 					};
 				}
 			}
@@ -328,6 +434,8 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 		const updateData: any = { updatedAt: new Date() };
 		if (payload.subject !== undefined) updateData.subject = payload.subject;
 		if (payload.dosenId !== undefined) updateData.dosenId = payload.dosenId;
+		if (payload.dosenPendampingId !== undefined)
+			updateData.dosenPendampingId = newDosenPendampingId;
 		if (payload.cohort !== undefined)
 			updateData.cohort = parseInt(payload.cohort, 10);
 		if (payload.rombel !== undefined) updateData.rombel = rombel;
@@ -386,6 +494,9 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 				dosen: {
 					columns: { id: true, fullName: true },
 				},
+				dosenPendamping: {
+					columns: { id: true, fullName: true },
+				},
 			},
 			orderBy: [
 				asc(practicumSchedules.dayOfWeek),
@@ -401,6 +512,26 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 			const payload = body as any;
 			const targetRombel = (payload.rombel || "Kelas A").trim();
 			const targetRoom = (payload.room || "").trim();
+
+			const cleanDosenPendampingId =
+				payload.dosenPendampingId &&
+				payload.dosenPendampingId !== 0 &&
+				payload.dosenPendampingId !== "none"
+					? Number(payload.dosenPendampingId)
+					: null;
+
+			if (
+				cleanDosenPendampingId &&
+				payload.dosenId &&
+				cleanDosenPendampingId === Number(payload.dosenId)
+			) {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Dosen pendamping tidak boleh sama dengan dosen pengampu utama.",
+				};
+			}
 
 			// Conflict Validation
 			const existingClass = await db.query.classSchedules.findMany({
@@ -444,14 +575,15 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 				}
 			}
 
-			// 2. Dosen check
+			// 2. Dosen Utama check (both as primary or companion in other schedules)
 			if (payload.dosenId) {
 				const allDosenSchedules = [
 					...existingClass,
 					...existingPracticum,
 				].filter(
 					(s) =>
-						s.dosenId === payload.dosenId &&
+						(s.dosenId === payload.dosenId ||
+							s.dosenPendampingId === payload.dosenId) &&
 						(!payload.sessionDate ||
 							!s.sessionDate ||
 							payload.sessionDate === s.sessionDate),
@@ -470,7 +602,40 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 						set.status = 400;
 						return {
 							success: false,
-							message: `Konflik Dosen: Dosen sudah memiliki jadwal mengajar pada rentang waktu ini.`,
+							message: `Konflik Dosen: Dosen pengampu utama sudah memiliki jadwal mengajar pada rentang waktu ini.`,
+						};
+					}
+				}
+			}
+
+			// 2b. Dosen Pendamping check (Layer 4)
+			if (cleanDosenPendampingId) {
+				const allCompanionSchedules = [
+					...existingClass,
+					...existingPracticum,
+				].filter(
+					(s) =>
+						(s.dosenId === cleanDosenPendampingId ||
+							s.dosenPendampingId === cleanDosenPendampingId) &&
+						(!payload.sessionDate ||
+							!s.sessionDate ||
+							payload.sessionDate === s.sessionDate),
+				);
+				for (const s of allCompanionSchedules) {
+					if (
+						s.startTime &&
+						s.endTime &&
+						isTimeOverlap(
+							payload.startTime,
+							payload.endTime,
+							s.startTime,
+							s.endTime,
+						)
+					) {
+						set.status = 400;
+						return {
+							success: false,
+							message: `Konflik Dosen Pendamping: Dosen pendamping sudah memiliki jadwal mengajar pada rentang waktu ini.`,
 						};
 					}
 				}
@@ -517,6 +682,7 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 				.values({
 					subject: payload.subject,
 					dosenId: payload.dosenId,
+					dosenPendampingId: cleanDosenPendampingId,
 					cohort: cohortNum,
 					rombel: targetRombel,
 					room: targetRoom,
@@ -537,6 +703,7 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 			body: t.Object({
 				subject: t.String(),
 				dosenId: t.Optional(t.Number()),
+				dosenPendampingId: t.Optional(t.Union([t.Number(), t.Null()])),
 				cohort: t.Union([t.String(), t.Number()]),
 				rombel: t.Optional(t.String()),
 				room: t.String(),
@@ -567,6 +734,26 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 		const room = (payload.room ?? current.room).trim();
 		const dosenId =
 			payload.dosenId !== undefined ? payload.dosenId : current.dosenId;
+
+		let newDosenPendampingId = current.dosenPendampingId;
+		if (payload.dosenPendampingId !== undefined) {
+			newDosenPendampingId =
+				payload.dosenPendampingId &&
+				payload.dosenPendampingId !== 0 &&
+				payload.dosenPendampingId !== "none"
+					? Number(payload.dosenPendampingId)
+					: null;
+		}
+
+		if (newDosenPendampingId && dosenId && newDosenPendampingId === dosenId) {
+			set.status = 400;
+			return {
+				success: false,
+				message:
+					"Dosen pendamping tidak boleh sama dengan dosen pengampu utama.",
+			};
+		}
+
 		const cohort =
 			payload.cohort !== undefined
 				? parseInt(payload.cohort, 10)
@@ -614,10 +801,11 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 			}
 		}
 
+		// 2. Dosen Utama conflict
 		if (dosenId) {
 			const allDosenSchedules = [...existingClass, ...existingPracticum].filter(
 				(s) =>
-					s.dosenId === dosenId &&
+					(s.dosenId === dosenId || s.dosenPendampingId === dosenId) &&
 					(!sessionDate || !s.sessionDate || sessionDate === s.sessionDate),
 			);
 			for (const s of allDosenSchedules) {
@@ -629,7 +817,33 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 					set.status = 400;
 					return {
 						success: false,
-						message: `Konflik Dosen: Dosen sudah memiliki jadwal mengajar pada rentang waktu ini.`,
+						message: `Konflik Dosen: Dosen pengampu sudah memiliki jadwal mengajar pada rentang waktu ini.`,
+					};
+				}
+			}
+		}
+
+		// 2b. Dosen Pendamping conflict (Layer 4)
+		if (newDosenPendampingId) {
+			const allCompanionSchedules = [
+				...existingClass,
+				...existingPracticum,
+			].filter(
+				(s) =>
+					(s.dosenId === newDosenPendampingId ||
+						s.dosenPendampingId === newDosenPendampingId) &&
+					(!sessionDate || !s.sessionDate || sessionDate === s.sessionDate),
+			);
+			for (const s of allCompanionSchedules) {
+				if (
+					s.startTime &&
+					s.endTime &&
+					isTimeOverlap(startTime, endTime, s.startTime, s.endTime)
+				) {
+					set.status = 400;
+					return {
+						success: false,
+						message: `Konflik Dosen Pendamping: Dosen pendamping sudah memiliki jadwal mengajar pada rentang waktu ini.`,
 					};
 				}
 			}
@@ -661,6 +875,8 @@ export const schedulingRoutes = new Elysia({ prefix: "/scheduling" })
 		const updateData: any = { updatedAt: new Date() };
 		if (payload.subject !== undefined) updateData.subject = payload.subject;
 		if (payload.dosenId !== undefined) updateData.dosenId = payload.dosenId;
+		if (payload.dosenPendampingId !== undefined)
+			updateData.dosenPendampingId = newDosenPendampingId;
 		if (payload.cohort !== undefined)
 			updateData.cohort = parseInt(payload.cohort, 10);
 		if (payload.rombel !== undefined) updateData.rombel = rombel;

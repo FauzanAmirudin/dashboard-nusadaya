@@ -181,8 +181,8 @@ export async function ensureDatabaseSchema() {
 
 			DO $$
 			BEGIN
-				IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'courses_code_unique') THEN
-					ALTER TABLE courses DROP CONSTRAINT courses_code_unique;
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'courses_code_unique') THEN
+					ALTER TABLE courses ADD CONSTRAINT courses_code_unique UNIQUE (code);
 				END IF;
 			END $$;
 		`);

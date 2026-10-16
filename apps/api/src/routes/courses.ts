@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
 import {
@@ -15,6 +15,12 @@ import {
 } from "../db/schema";
 import { getValidUserId, hasRole } from "../lib/permissions";
 
+function addDays(baseDateStr: string, days: number): string {
+	const d = new Date(baseDateStr + "T00:00:00Z");
+	d.setUTCDate(d.getUTCDate() + days);
+	return d.toISOString().split("T")[0];
+}
+
 export const coursesRoutes = new Elysia({ prefix: "/courses" })
 	.derive((context) => {
 		const user = (context as any).user;
@@ -24,19 +30,20 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 	// ==========================================
 	// 1. MATA KULIAH (COURSES) CRUD
 	// ==========================================
-	.get("/", async ({ query, user, set }: any) => {
-		if (!user) {
-			set.status = 401;
-			return { success: false, message: "Unauthorized" };
-		}
-
+	.get("/", async ({ query, user }: any) => {
 		const { cohort, type, peminatan, rombel } = query || {};
 
 		const conditions = [];
 
-		// If Dosen (and not akademik/superadmin), only their own courses
-		if (hasRole(user, "dosen") && !hasRole(user, "akademik")) {
-			conditions.push(eq(courses.dosenId, Number(user.id)));
+		// If Dosen (and not akademik/superadmin), only their own courses (dosen utama atau dosen pendamping)
+		if (user && hasRole(user, "dosen") && !hasRole(user, "akademik")) {
+			const dosenIdNum = Number(user.id);
+			conditions.push(
+				or(
+					eq(courses.dosenId, dosenIdNum),
+					eq(courses.dosenPendampingId, dosenIdNum),
+				),
+			);
 		}
 
 		if (cohort)
@@ -52,6 +59,9 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			where: conditions.length > 0 ? and(...conditions) : undefined,
 			with: {
 				dosen: {
+					columns: { id: true, fullName: true },
+				},
+				dosenPendamping: {
 					columns: { id: true, fullName: true },
 				},
 				meetings: {
@@ -76,19 +86,36 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			const cohortNum = parseInt(input.cohort, 10);
 			const sksNum = input.sks ? Number(input.sks) : 2;
 
-			// Validation: allow same code across cohorts or across different rombels (Multi-Kelas Paralel)
+			const cleanCode = input.code.trim();
+
+			// Validation: Code must be globally unique (hanya satu per mata kuliah)
 			const existingCourse = await db.query.courses.findFirst({
-				where: and(
-					eq(courses.code, input.code.trim()),
-					eq(courses.cohort, cohortNum),
-					eq(courses.rombel, targetRombel),
-				),
+				where: sql`LOWER(${courses.code}) = LOWER(${cleanCode})`,
 			});
 			if (existingCourse) {
 				set.status = 400;
 				return {
 					success: false,
-					message: `Mata kuliah dengan kode '${input.code}' untuk Angkatan ${cohortNum} (${targetRombel}) sudah ada.`,
+					message: `Kode mata kuliah '${cleanCode}' sudah digunakan oleh mata kuliah '${existingCourse.name}'. Kode mata kuliah harus unik (hanya satu per mata kuliah).`,
+				};
+			}
+
+			const cleanDosenPendampingId =
+				input.dosenPendampingId &&
+				input.dosenPendampingId !== 0 &&
+				input.dosenPendampingId !== "none"
+					? Number(input.dosenPendampingId)
+					: null;
+
+			if (
+				cleanDosenPendampingId &&
+				cleanDosenPendampingId === Number(input.dosenId)
+			) {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Dosen pendamping tidak boleh sama dengan dosen pengampu utama",
 				};
 			}
 
@@ -99,6 +126,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 					name: input.name.trim(),
 					sks: sksNum,
 					dosenId: input.dosenId,
+					dosenPendampingId: cleanDosenPendampingId,
 					peminatan: input.peminatan || null,
 					cohort: cohortNum,
 					rombel: targetRombel,
@@ -111,25 +139,10 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			const meetingsToInsert: {
 				courseId: number;
 				meetingNumber: number;
-				meetingType: "pkkmb" | "beginning" | "regular" | "uts" | "uas";
+				meetingType: "regular" | "uts" | "uas";
 				meetingLabel: string;
 				description?: string;
-			}[] = [
-				{
-					courseId: newCourse.id,
-					meetingNumber: -1,
-					meetingType: "pkkmb",
-					meetingLabel: "PKKMB - Pengenalan Program",
-					description: "Pengenalan Program Perkuliahan & Kebijakan Kampus",
-				},
-				{
-					courseId: newCourse.id,
-					meetingNumber: 0,
-					meetingType: "beginning",
-					meetingLabel: "Beginning Class & Kontrak Kuliah",
-					description: "Orientasi Perkuliahan, Silabus, dan Kontrak Belajar",
-				},
-			];
+			}[] = [];
 
 			for (let i = 1; i <= 16; i++) {
 				let mType: "regular" | "uts" | "uas" = "regular";
@@ -161,6 +174,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				code: t.String(),
 				name: t.String(),
 				dosenId: t.Number(),
+				dosenPendampingId: t.Optional(t.Union([t.Number(), t.Null()])),
 				peminatan: t.Optional(t.String()),
 				cohort: t.Number(),
 				type: t.Enum({ teori: "teori", praktik: "praktik" }),
@@ -177,6 +191,9 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				dosen: {
 					columns: { id: true, fullName: true },
 				},
+				dosenPendamping: {
+					columns: { id: true, fullName: true },
+				},
 			},
 		});
 
@@ -187,8 +204,9 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 
 		if (
 			hasRole(user, "dosen") &&
-			!hasRole(user, "akademik") &&
-			course.dosenId !== user.id
+			!hasRole(user, "akademik", "superadmin") &&
+			course.dosenId !== user.id &&
+			course.dosenPendampingId !== user.id
 		) {
 			set.status = 403;
 			return { success: false, message: "Anda bukan pengampu mata kuliah ini" };
@@ -224,12 +242,10 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			const newRombel = (input.rombel ?? current.rombel ?? "Kelas A").trim();
 			const newSks = input.sks !== undefined ? Number(input.sks) : current.sks;
 
-			// Validate duplicate course (code + cohort + rombel) excluding current
+			// Validate duplicate course code (must be unique per course) excluding current
 			const existingDuplicate = await db.query.courses.findFirst({
 				where: and(
-					eq(courses.code, newCode),
-					eq(courses.cohort, newCohort),
-					eq(courses.rombel, newRombel),
+					sql`LOWER(${courses.code}) = LOWER(${newCode})`,
 					ne(courses.id, id),
 				),
 			});
@@ -238,7 +254,29 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				set.status = 400;
 				return {
 					success: false,
-					message: `Mata kuliah dengan kode '${newCode}' untuk Angkatan ${newCohort} (${newRombel}) sudah ada.`,
+					message: `Kode mata kuliah '${newCode}' sudah digunakan oleh mata kuliah '${existingDuplicate.name}'. Kode mata kuliah harus unik (hanya satu per mata kuliah).`,
+				};
+			}
+
+			let newDosenPendampingId = current.dosenPendampingId;
+			if (input.dosenPendampingId !== undefined) {
+				newDosenPendampingId =
+					input.dosenPendampingId &&
+					input.dosenPendampingId !== 0 &&
+					input.dosenPendampingId !== "none"
+						? Number(input.dosenPendampingId)
+						: null;
+			}
+
+			const finalDosenId =
+				input.dosenId !== undefined ? input.dosenId : current.dosenId;
+
+			if (newDosenPendampingId && newDosenPendampingId === finalDosenId) {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Dosen pendamping tidak boleh sama dengan dosen pengampu utama",
 				};
 			}
 
@@ -248,8 +286,8 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 					code: newCode,
 					name: input.name !== undefined ? input.name.trim() : current.name,
 					sks: newSks,
-					dosenId:
-						input.dosenId !== undefined ? input.dosenId : current.dosenId,
+					dosenId: finalDosenId,
+					dosenPendampingId: newDosenPendampingId,
 					peminatan:
 						input.peminatan !== undefined
 							? input.peminatan || null
@@ -269,6 +307,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				code: t.Optional(t.String()),
 				name: t.Optional(t.String()),
 				dosenId: t.Optional(t.Number()),
+				dosenPendampingId: t.Optional(t.Union([t.Number(), t.Null()])),
 				peminatan: t.Optional(t.String()),
 				cohort: t.Optional(t.Number()),
 				type: t.Optional(t.Enum({ teori: "teori", praktik: "praktik" })),
@@ -287,6 +326,11 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 
 		// Drizzle cannot cascade delete by default easily unless setup,
 		// so we delete child items first manually.
+		await db.delete(courseGrades).where(eq(courseGrades.courseId, id));
+		await db
+			.delete(courseEnrollments)
+			.where(eq(courseEnrollments.courseId, id));
+
 		const meetings = await db.query.courseMeetings.findMany({
 			where: eq(courseMeetings.courseId, id),
 		});
@@ -614,6 +658,93 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			}),
 		},
 	)
+	.post(
+		"/:id/meetings/generate-dates",
+		async ({ params, body, user, set }) => {
+			if (!hasRole(user, "akademik", "superadmin", "dosen")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			const courseId = parseInt(params.id, 10);
+			const { startDate, includePkkmbBeginning } = body as {
+				startDate: string;
+				includePkkmbBeginning?: boolean;
+			};
+
+			if (!startDate || isNaN(Date.parse(startDate))) {
+				set.status = 400;
+				return {
+					success: false,
+					message: "Format tanggal mulai pertemuan (startDate) tidak valid",
+				};
+			}
+
+			const course = await db.query.courses.findFirst({
+				where: eq(courses.id, courseId),
+			});
+			if (!course) {
+				set.status = 404;
+				return { success: false, message: "Mata kuliah tidak ditemukan" };
+			}
+
+			if (
+				hasRole(user, "dosen") &&
+				!hasRole(user, "akademik", "superadmin") &&
+				course.dosenId !== user.id
+			) {
+				set.status = 403;
+				return {
+					success: false,
+					message: "Anda bukan pengampu mata kuliah ini",
+				};
+			}
+
+			const meetings = await db.query.courseMeetings.findMany({
+				where: eq(courseMeetings.courseId, courseId),
+			});
+
+			if (meetings.length === 0) {
+				set.status = 400;
+				return {
+					success: false,
+					message: "Tidak ada data pertemuan pada mata kuliah ini",
+				};
+			}
+
+			let updatedCount = 0;
+			for (const meeting of meetings) {
+				let targetDate: string | null = null;
+				if (meeting.meetingNumber >= 1 && meeting.meetingNumber <= 16) {
+					const daysOffset = (meeting.meetingNumber - 1) * 7;
+					targetDate = addDays(startDate, daysOffset);
+				}
+
+				if (targetDate) {
+					await db
+						.update(courseMeetings)
+						.set({
+							meetingDate: targetDate,
+							updatedAt: new Date(),
+						})
+						.where(eq(courseMeetings.id, meeting.id));
+					updatedCount++;
+				}
+			}
+
+			return {
+				success: true,
+				message: `Berhasil mengatur tanggal untuk ${updatedCount} pertemuan perkuliahan`,
+				data: { updatedCount },
+			};
+		},
+		{
+			body: t.Object({
+				startDate: t.String(),
+				includePkkmbBeginning: t.Optional(t.Boolean()),
+			}),
+		},
+	)
 
 	// ==========================================
 	// 3. ACTIVITIES CRUD
@@ -773,7 +904,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 						const presentCount = studentAttendances.filter(
 							(a) => a.status === "hadir",
 						).length;
-						const totalMeetings = allMeetingIds.length || 18;
+						const totalMeetings = 16;
 						const attendanceRate = Math.min(
 							100,
 							Math.round((presentCount / totalMeetings) * 100),
@@ -791,7 +922,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 										validTheoryScores.reduce((acc, curr) => acc + curr, 0) /
 											validTheoryScores.length,
 									)
-								: 0;
+								: null;
 
 						// Average practical score
 						const validPracticalScores = studentAttendances
@@ -806,19 +937,24 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 										validPracticalScores.reduce((acc, curr) => acc + curr, 0) /
 											validPracticalScores.length,
 									)
-								: 0;
+								: null;
 
 						// Calculate final score
 						const isPracticalCourse = course.type === "praktik";
-						const finalScore = isPracticalCourse
-							? avgPractical * 0.8 + avgTheory * 0.2
-							: avgTheory;
+						let displayGrade: string | null = null;
+						if (avgTheory !== null || avgPractical !== null) {
+							const p = avgPractical ?? avgTheory ?? 0;
+							const t = avgTheory ?? avgPractical ?? 0;
+							const finalScore = isPracticalCourse
+								? Math.round(p * 0.8 + t * 0.2)
+								: t;
 
-						let displayGrade = "E";
-						if (finalScore >= 85) displayGrade = "A";
-						else if (finalScore >= 75) displayGrade = "B";
-						else if (finalScore >= 65) displayGrade = "C";
-						else if (finalScore >= 50) displayGrade = "D";
+							displayGrade = "E";
+							if (finalScore >= 85) displayGrade = "A";
+							else if (finalScore >= 75) displayGrade = "B";
+							else if (finalScore >= 65) displayGrade = "C";
+							else if (finalScore >= 50) displayGrade = "D";
+						}
 
 						// Overall status based on attendance
 						const status =
