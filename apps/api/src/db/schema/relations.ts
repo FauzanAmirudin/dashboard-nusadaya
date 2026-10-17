@@ -63,6 +63,7 @@ import {
 	classSchedules,
 	dutySchedules,
 	morningAssemblyRecords,
+	morningAssemblyScheduleConfig,
 	morningAssemblySessions,
 	odsAttendanceRecords,
 	practicumSchedules,
@@ -798,6 +799,16 @@ export const morningAssemblyRecordsRelations = relations(
 		}),
 		recorder: one(users, {
 			fields: [morningAssemblyRecords.recordedBy],
+			references: [users.id],
+		}),
+	}),
+);
+
+export const morningAssemblyScheduleConfigRelations = relations(
+	morningAssemblyScheduleConfig,
+	({ one }) => ({
+		creator: one(users, {
+			fields: [morningAssemblyScheduleConfig.createdBy],
 			references: [users.id],
 		}),
 	}),

@@ -12,6 +12,7 @@ import {
 	courses,
 	dutySchedules,
 	morningAssemblyRecords,
+	morningAssemblyScheduleConfig,
 	morningAssemblySessions,
 	odsAttendanceRecords,
 	practicumSchedules,
@@ -1364,8 +1365,454 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 	)
 
 	// =========================================================================
-	// BARIS PAGI MINGGUAN (KEPATUHAN JAM KEDATANGAN 06.22 - AKD-05)
 	// =========================================================================
+	// BARIS PAGI HYBRID (KEPATUHAN JAM KEDATANGAN 06.22 - AKD-05)
+	// =========================================================================
+
+	// 1. RECURRING SCHEDULE CONFIG
+	.get("/baris-pagi/schedule-config", async ({ query }) => {
+		const { cohort } = query;
+		const conditions = [];
+		if (cohort && cohort !== "all") {
+			conditions.push(
+				eq(
+					morningAssemblyScheduleConfig.cohort,
+					parseInt(cohort as string, 10),
+				),
+			);
+		}
+		const configs = await db.query.morningAssemblyScheduleConfig.findMany({
+			where: conditions.length > 0 ? and(...conditions) : undefined,
+			orderBy: [asc(morningAssemblyScheduleConfig.cohort)],
+		});
+		return { success: true, data: configs };
+	})
+
+	.post("/baris-pagi/schedule-config", async ({ body, user, set }) => {
+		const payload = body as {
+			cohort: number | string;
+			dayOfWeek?: number;
+			targetTime?: string;
+			checkInWindowStart?: string;
+			checkInWindowEnd?: string;
+			location?: string;
+			rombel?: string;
+			isActive?: boolean;
+		};
+
+		if (!payload.cohort) {
+			set.status = 400;
+			return { success: false, message: "Angkatan (cohort) wajib diisi" };
+		}
+
+		const cohortNum = parseInt(payload.cohort.toString(), 10);
+		const existing = await db.query.morningAssemblyScheduleConfig.findFirst({
+			where: eq(morningAssemblyScheduleConfig.cohort, cohortNum),
+		});
+
+		if (existing) {
+			const [updated] = await db
+				.update(morningAssemblyScheduleConfig)
+				.set({
+					dayOfWeek:
+						payload.dayOfWeek !== undefined
+							? payload.dayOfWeek
+							: existing.dayOfWeek,
+					targetTime: payload.targetTime || existing.targetTime,
+					checkInWindowStart:
+						payload.checkInWindowStart || existing.checkInWindowStart,
+					checkInWindowEnd:
+						payload.checkInWindowEnd || existing.checkInWindowEnd,
+					location: payload.location || existing.location,
+					rombel: payload.rombel || existing.rombel,
+					isActive:
+						payload.isActive !== undefined
+							? payload.isActive
+							: existing.isActive,
+					updatedAt: new Date(),
+				})
+				.where(eq(morningAssemblyScheduleConfig.id, existing.id))
+				.returning();
+
+			return {
+				success: true,
+				message: "Konfigurasi jadwal recurring baris pagi berhasil diperbarui",
+				data: updated,
+			};
+		} else {
+			const [created] = await db
+				.insert(morningAssemblyScheduleConfig)
+				.values({
+					cohort: cohortNum,
+					dayOfWeek: payload.dayOfWeek ?? 1,
+					targetTime: payload.targetTime || "06:22",
+					checkInWindowStart: payload.checkInWindowStart || "05:30",
+					checkInWindowEnd: payload.checkInWindowEnd || "07:00",
+					location: payload.location || "Lapangan Utama Kampus",
+					rombel: payload.rombel || "Semua",
+					isActive: payload.isActive ?? true,
+					createdBy: await resolveValidUserId(user?.id),
+				})
+				.returning();
+
+			return {
+				success: true,
+				message: "Konfigurasi jadwal recurring baris pagi berhasil disimpan",
+				data: created,
+			};
+		}
+	})
+
+	// 2. AUTO GENERATE SESSIONS
+	.post("/baris-pagi/generate-sessions", async ({ body, user }) => {
+		const payload = body as {
+			cohort?: number | string;
+			startDate?: string;
+			weeksAhead?: number;
+		};
+
+		const cohortNum = payload.cohort
+			? parseInt(payload.cohort.toString(), 10)
+			: null;
+		const weeks = Math.min(Math.max(payload.weeksAhead || 4, 1), 16);
+
+		const configConds = [eq(morningAssemblyScheduleConfig.isActive, true)];
+		if (cohortNum) {
+			configConds.push(eq(morningAssemblyScheduleConfig.cohort, cohortNum));
+		}
+		let configs = await db.query.morningAssemblyScheduleConfig.findMany({
+			where: and(...configConds),
+		});
+
+		if (configs.length === 0) {
+			configs = [
+				{
+					id: 0,
+					cohort: cohortNum || 16,
+					dayOfWeek: 1, // Monday
+					targetTime: "06:22",
+					checkInWindowStart: "05:30",
+					checkInWindowEnd: "07:00",
+					location: "Lapangan Utama Kampus",
+					rombel: "Semua",
+					isActive: true,
+					createdBy: null,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
+			];
+		}
+
+		const createdSessions = [];
+
+		for (const cfg of configs) {
+			const targetDates: string[] = [];
+			const baseDate = payload.startDate
+				? new Date(payload.startDate)
+				: new Date();
+
+			for (let i = 0; i < weeks * 7; i++) {
+				const checkDate = new Date(baseDate);
+				checkDate.setDate(baseDate.getDate() + i);
+				if (checkDate.getDay() === cfg.dayOfWeek) {
+					const y = checkDate.getFullYear();
+					const m = String(checkDate.getMonth() + 1).padStart(2, "0");
+					const d = String(checkDate.getDate()).padStart(2, "0");
+					targetDates.push(`${y}-${m}-${d}`);
+				}
+				if (targetDates.length >= weeks) break;
+			}
+
+			for (const dateStr of targetDates) {
+				const existing = await db.query.morningAssemblySessions.findFirst({
+					where: and(
+						eq(morningAssemblySessions.cohort, cfg.cohort),
+						eq(morningAssemblySessions.sessionDate, dateStr),
+					),
+				});
+
+				if (!existing) {
+					const [newSession] = await db
+						.insert(morningAssemblySessions)
+						.values({
+							cohort: cfg.cohort,
+							rombel: cfg.rombel,
+							sessionDate: dateStr,
+							targetTime: cfg.targetTime,
+							checkInWindowStart: cfg.checkInWindowStart,
+							checkInWindowEnd: cfg.checkInWindowEnd,
+							location: cfg.location,
+							notes: "Sesi apel pagi mingguan terjadwal otomatis",
+							isAutoGenerated: true,
+							sessionStatus: "scheduled",
+							createdBy: await resolveValidUserId(user?.id),
+						})
+						.returning();
+					createdSessions.push(newSession);
+				}
+			}
+		}
+
+		return {
+			success: true,
+			message: `Berhasil men-generate ${createdSessions.length} sesi apel baris pagi`,
+			data: createdSessions,
+		};
+	})
+
+	// 3. TODAY SESSION & WINDOW CHECK (FOR MAHASISWA & ADMIN)
+	.get("/baris-pagi/today", async ({ user }) => {
+		const { dateStr, timeStr } = getWIBDateTime();
+
+		let student = null;
+		if (user) {
+			student = await db.query.students.findFirst({
+				where: or(
+					eq(students.studentUserId, user.id),
+					eq(students.email, user.email || ""),
+					eq(students.nim, user.username || ""),
+				),
+			});
+		}
+
+		const sessionConds = [
+			eq(morningAssemblySessions.sessionDate, dateStr),
+			sql`${morningAssemblySessions.sessionStatus} != 'cancelled'`,
+		];
+		if (student) {
+			sessionConds.push(eq(morningAssemblySessions.cohort, student.cohort));
+		}
+
+		const session = await db.query.morningAssemblySessions.findFirst({
+			where: and(...sessionConds),
+			orderBy: [desc(morningAssemblySessions.id)],
+			with: {
+				creator: { columns: { fullName: true } },
+			},
+		});
+
+		let myRecord = null;
+		if (session && student) {
+			myRecord = await db.query.morningAssemblyRecords.findFirst({
+				where: and(
+					eq(morningAssemblyRecords.sessionId, session.id),
+					eq(morningAssemblyRecords.studentId, student.id),
+				),
+			});
+		}
+
+		const isWindowOpen = session
+			? isWithinWindow(
+					timeStr,
+					session.checkInWindowStart || "05:30",
+					session.checkInWindowEnd || "07:00",
+				)
+			: false;
+
+		return {
+			success: true,
+			data: {
+				serverDate: dateStr,
+				serverTime: timeStr,
+				session: session
+					? {
+							id: session.id,
+							cohort: session.cohort,
+							rombel: session.rombel,
+							sessionDate: session.sessionDate,
+							targetTime: session.targetTime || "06:22",
+							checkInWindowStart: session.checkInWindowStart || "05:30",
+							checkInWindowEnd: session.checkInWindowEnd || "07:00",
+							location: session.location,
+							notes: session.notes,
+							sessionStatus: session.sessionStatus,
+							isAutoGenerated: session.isAutoGenerated,
+							rescheduledFrom: session.rescheduledFrom,
+							isWindowOpen,
+							hasRecorded: !!myRecord,
+							myRecord: myRecord || null,
+						}
+					: null,
+				student: student
+					? {
+							id: student.id,
+							name: student.name,
+							nim: student.nim,
+							cohort: student.cohort,
+							rombel: student.rombel,
+						}
+					: null,
+			},
+		};
+	})
+
+	// 4. MAHASISWA SELF CHECK-IN
+	.post("/baris-pagi/self-checkin", async ({ body, user, set }) => {
+		if (!user) {
+			set.status = 401;
+			return {
+				success: false,
+				message: "Unauthorized. Silakan login terlebih dahulu.",
+			};
+		}
+
+		const student = await db.query.students.findFirst({
+			where: or(
+				eq(students.studentUserId, user.id),
+				eq(students.email, user.email || ""),
+				eq(students.nim, user.username || ""),
+			),
+		});
+
+		if (!student) {
+			set.status = 404;
+			return {
+				success: false,
+				message: "Profil mahasiswa Anda tidak ditemukan dalam database.",
+			};
+		}
+
+		const { dateStr, timeStr } = getWIBDateTime();
+
+		const session = await db.query.morningAssemblySessions.findFirst({
+			where: and(
+				eq(morningAssemblySessions.sessionDate, dateStr),
+				eq(morningAssemblySessions.cohort, student.cohort),
+				sql`${morningAssemblySessions.sessionStatus} != 'cancelled'`,
+			),
+		});
+
+		if (!session) {
+			set.status = 404;
+			return {
+				success: false,
+				message: `Tidak ada sesi apel baris pagi aktif untuk Angkatan ${student.cohort} pada hari ini (${dateStr}).`,
+			};
+		}
+
+		const windowStart = session.checkInWindowStart || "05:30";
+		const windowEnd = session.checkInWindowEnd || "07:00";
+		const withinWindow = isWithinWindow(timeStr, windowStart, windowEnd);
+
+		if (!withinWindow) {
+			set.status = 400;
+			return {
+				success: false,
+				message: `Batas waktu presensi mandiri adalah pukul ${windowStart} - ${windowEnd} WIB. Waktu server saat ini ${timeStr} WIB.`,
+			};
+		}
+
+		const existingRecord = await db.query.morningAssemblyRecords.findFirst({
+			where: and(
+				eq(morningAssemblyRecords.sessionId, session.id),
+				eq(morningAssemblyRecords.studentId, student.id),
+			),
+		});
+
+		if (existingRecord) {
+			set.status = 400;
+			return {
+				success: false,
+				message: `Anda sudah melakukan presensi untuk sesi ini pada pukul ${existingRecord.arrivalTime || "-"} WIB (${existingRecord.status}).`,
+				data: existingRecord,
+			};
+		}
+
+		const targetTime = session.targetTime || "06:22";
+		const evalResult = evaluateMorningAssemblyArrival(timeStr, targetTime);
+		const payload = (body || {}) as { notes?: string };
+
+		const [newRecord] = await db
+			.insert(morningAssemblyRecords)
+			.values({
+				sessionId: session.id,
+				studentId: student.id,
+				status: evalResult.status,
+				arrivalTime: timeStr,
+				minutesLate: evalResult.minutesLate,
+				selfCheckinAt: new Date(),
+				checkinMethod: "self",
+				notes: payload.notes || "Absen mandiri via portal mahasiswa",
+				recordedBy: user.id,
+			})
+			.returning();
+
+		await syncAttendanceAggregate(student.id);
+
+		const successMsg =
+			evalResult.status === "hadir"
+				? `Presensi Berhasil! Anda hadir tepat waktu pukul ${timeStr} WIB.`
+				: `Presensi Berhasil! Anda tercatat terlambat ${evalResult.minutesLate} menit (pukul ${timeStr} WIB, batas ${targetTime} WIB).`;
+
+		return {
+			success: true,
+			message: successMsg,
+			data: newRecord,
+		};
+	})
+
+	// 5. MAHASISWA PERSONAL RECORDS
+	.get("/baris-pagi/my-records", async ({ user, set }) => {
+		if (!user) {
+			set.status = 401;
+			return { success: false, message: "Unauthorized" };
+		}
+
+		const student = await db.query.students.findFirst({
+			where: or(
+				eq(students.studentUserId, user.id),
+				eq(students.email, user.email || ""),
+				eq(students.nim, user.username || ""),
+			),
+		});
+
+		if (!student) {
+			set.status = 404;
+			return { success: false, message: "Profil mahasiswa tidak ditemukan" };
+		}
+
+		const records = await db.query.morningAssemblyRecords.findMany({
+			where: eq(morningAssemblyRecords.studentId, student.id),
+			with: {
+				session: true,
+			},
+			orderBy: (r, { desc }) => [desc(r.id)],
+		});
+
+		const total = records.length;
+		const tepatWaktu = records.filter((r) => r.status === "hadir").length;
+		const terlambat = records.filter((r) => r.status === "terlambat").length;
+		const izin = records.filter((r) => r.status === "izin").length;
+		const sakit = records.filter((r) => r.status === "sakit").length;
+		const alpha = records.filter((r) => r.status === "alpha").length;
+		const complianceRate =
+			total > 0 ? Math.round((tepatWaktu / total) * 100) : 100;
+
+		return {
+			success: true,
+			data: {
+				student: {
+					id: student.id,
+					name: student.name,
+					nim: student.nim,
+					cohort: student.cohort,
+					rombel: student.rombel,
+				},
+				records,
+				summary: {
+					total,
+					tepatWaktu,
+					terlambat,
+					izin,
+					sakit,
+					alpha,
+					complianceRate,
+				},
+			},
+		};
+	})
+
+	// 6. SESSIONS LIST (ENRICHED WITH STATUS & TIMING)
 	.get("/baris-pagi/sessions", async ({ query }) => {
 		const { cohort, rombel, dateFrom, dateTo } = query;
 		const conditions = [];
@@ -1397,6 +1844,7 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 						status: true,
 						arrivalTime: true,
 						minutesLate: true,
+						checkinMethod: true,
 					},
 				},
 				creator: { columns: { fullName: true } },
@@ -1412,6 +1860,9 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			const izin = s.records.filter((r) => r.status === "izin").length;
 			const sakit = s.records.filter((r) => r.status === "sakit").length;
 			const alpha = s.records.filter((r) => r.status === "alpha").length;
+			const selfCheckins = s.records.filter(
+				(r) => r.checkinMethod === "self",
+			).length;
 			const complianceRate =
 				total > 0 ? Math.round((hadir / total) * 100) : 100;
 
@@ -1421,8 +1872,13 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				rombel: s.rombel,
 				sessionDate: s.sessionDate,
 				targetTime: s.targetTime || "06:22",
+				checkInWindowStart: s.checkInWindowStart || "05:30",
+				checkInWindowEnd: s.checkInWindowEnd || "07:00",
 				location: s.location,
 				notes: s.notes,
+				sessionStatus: s.sessionStatus || "scheduled",
+				isAutoGenerated: s.isAutoGenerated || false,
+				rescheduledFrom: s.rescheduledFrom || null,
 				createdBy: s.creator?.fullName || "Petugas",
 				createdAt: s.createdAt,
 				stats: {
@@ -1432,6 +1888,7 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 					izin,
 					sakit,
 					alpha,
+					selfCheckins,
 					complianceRate,
 				},
 			};
@@ -1440,6 +1897,7 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 		return { success: true, data: enriched };
 	})
 
+	// 7. SESSION DETAIL (MEMBERS & STATS)
 	.get("/baris-pagi/sessions/:id", async ({ params, set }) => {
 		const id = parseInt(params.id, 10);
 		const session = await db.query.morningAssemblySessions.findFirst({
@@ -1454,7 +1912,6 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			return { success: false, message: "Sesi baris pagi tidak ditemukan" };
 		}
 
-		// Fetch all students for this cohort & rombel
 		const studentConds = [
 			eq(students.cohort, session.cohort),
 			eq(students.isArchived, false),
@@ -1469,7 +1926,6 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			columns: { id: true, name: true, nim: true, rombel: true, cohort: true },
 		});
 
-		// Fetch existing records for this session
 		const existingRecords = await db.query.morningAssemblyRecords.findMany({
 			where: eq(morningAssemblyRecords.sessionId, id),
 			with: {
@@ -1489,6 +1945,8 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				status: rec ? rec.status : null,
 				arrivalTime: rec ? rec.arrivalTime || "" : "",
 				minutesLate: rec ? rec.minutesLate || 0 : 0,
+				checkinMethod: rec ? rec.checkinMethod || "admin" : null,
+				selfCheckinAt: rec?.selfCheckinAt || null,
 				notes: rec ? rec.notes || "" : "",
 				recordId: rec ? rec.id : null,
 				recordedBy: rec?.recorder?.fullName || null,
@@ -1502,6 +1960,7 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 		const izin = members.filter((m) => m.status === "izin").length;
 		const sakit = members.filter((m) => m.status === "sakit").length;
 		const alpha = members.filter((m) => m.status === "alpha").length;
+		const selfCount = members.filter((m) => m.checkinMethod === "self").length;
 		const unrecorded = members.filter((m) => !m.status).length;
 
 		return {
@@ -1516,6 +1975,7 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 					izin,
 					sakit,
 					alpha,
+					selfCount,
 					unrecorded,
 					complianceRate: total > 0 ? Math.round((hadir / total) * 100) : 100,
 				},
@@ -1523,12 +1983,15 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 		};
 	})
 
+	// 8. CREATE MANUAL SESSION
 	.post("/baris-pagi/sessions", async ({ body, user, set }) => {
 		const payload = body as {
 			cohort: number | string;
 			rombel?: string;
 			sessionDate: string;
 			targetTime?: string;
+			checkInWindowStart?: string;
+			checkInWindowEnd?: string;
 			location?: string;
 			notes?: string;
 		};
@@ -1552,9 +2015,13 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				rombel: payload.rombel || "Semua",
 				sessionDate: payload.sessionDate,
 				targetTime,
+				checkInWindowStart: payload.checkInWindowStart || "05:30",
+				checkInWindowEnd: payload.checkInWindowEnd || "07:00",
 				location,
 				notes: payload.notes || null,
-				createdBy: user.id,
+				isAutoGenerated: false,
+				sessionStatus: "scheduled",
+				createdBy: await resolveValidUserId(user?.id),
 			})
 			.returning();
 
@@ -1565,6 +2032,157 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 		};
 	})
 
+	// 9. RESCHEDULE SESSION
+	.patch(
+		"/baris-pagi/sessions/:id/reschedule",
+		async ({ params, body, set }) => {
+			const id = parseInt(params.id, 10);
+			const payload = body as { newDate: string; reason?: string };
+
+			if (!payload.newDate) {
+				set.status = 400;
+				return {
+					success: false,
+					message: "Tanggal baru (newDate) wajib diisi",
+				};
+			}
+
+			const session = await db.query.morningAssemblySessions.findFirst({
+				where: eq(morningAssemblySessions.id, id),
+			});
+
+			if (!session) {
+				set.status = 404;
+				return { success: false, message: "Sesi baris pagi tidak ditemukan" };
+			}
+
+			const oldDate = session.sessionDate;
+			const reasonNote = payload.reason
+				? `[Jadwal diundur dari ${oldDate}: ${payload.reason}]`
+				: `[Jadwal diundur dari ${oldDate}]`;
+
+			const [updated] = await db
+				.update(morningAssemblySessions)
+				.set({
+					sessionDate: payload.newDate,
+					rescheduledFrom: oldDate,
+					notes: session.notes ? `${session.notes} ${reasonNote}` : reasonNote,
+					updatedAt: new Date(),
+				})
+				.where(eq(morningAssemblySessions.id, id))
+				.returning();
+
+			return {
+				success: true,
+				message: `Sesi baris pagi berhasil dijadwal ulang ke tanggal ${payload.newDate}`,
+				data: updated,
+			};
+		},
+	)
+
+	// 10. UPDATE SESSION STATUS
+	.patch("/baris-pagi/sessions/:id/status", async ({ params, body, set }) => {
+		const id = parseInt(params.id, 10);
+		const payload = body as { status: string };
+
+		if (!payload.status) {
+			set.status = 400;
+			return { success: false, message: "Status sesi wajib diisi" };
+		}
+
+		const session = await db.query.morningAssemblySessions.findFirst({
+			where: eq(morningAssemblySessions.id, id),
+		});
+
+		if (!session) {
+			set.status = 404;
+			return { success: false, message: "Sesi baris pagi tidak ditemukan" };
+		}
+
+		const [updated] = await db
+			.update(morningAssemblySessions)
+			.set({
+				sessionStatus: payload.status,
+				updatedAt: new Date(),
+			})
+			.where(eq(morningAssemblySessions.id, id))
+			.returning();
+
+		return {
+			success: true,
+			message: `Status sesi baris pagi berhasil diubah menjadi ${payload.status}`,
+			data: updated,
+		};
+	})
+
+	// 11. MARK ALL UNRECORDED STUDENTS AS ALPHA
+	.post(
+		"/baris-pagi/sessions/:id/auto-alpha",
+		async ({ params, user, set }) => {
+			const sessionId = parseInt(params.id, 10);
+			const session = await db.query.morningAssemblySessions.findFirst({
+				where: eq(morningAssemblySessions.id, sessionId),
+			});
+
+			if (!session) {
+				set.status = 404;
+				return { success: false, message: "Sesi baris pagi tidak ditemukan" };
+			}
+
+			const studentConds = [
+				eq(students.cohort, session.cohort),
+				eq(students.isArchived, false),
+			];
+			if (session.rombel && session.rombel !== "Semua") {
+				studentConds.push(eq(students.rombel, session.rombel));
+			}
+			const allCohortStudents = await db.query.students.findMany({
+				where: and(...studentConds),
+				columns: { id: true },
+			});
+
+			const existingRecords = await db.query.morningAssemblyRecords.findMany({
+				where: eq(morningAssemblyRecords.sessionId, sessionId),
+				columns: { studentId: true },
+			});
+			const recordedStudentIds = new Set(
+				existingRecords.map((r) => r.studentId),
+			);
+
+			const missingStudents = allCohortStudents.filter(
+				(st) => !recordedStudentIds.has(st.id),
+			);
+
+			if (missingStudents.length === 0) {
+				return {
+					success: true,
+					message:
+						"Semua mahasiswa sudah memiliki catatan kehadiran untuk sesi ini.",
+					markedCount: 0,
+				};
+			}
+
+			for (const st of missingStudents) {
+				await db.insert(morningAssemblyRecords).values({
+					sessionId,
+					studentId: st.id,
+					status: "alpha",
+					notes: "Otomatis ditandai Alpha oleh sistem (tidak check-in)",
+					checkinMethod: "admin",
+					recordedBy: await resolveValidUserId(user?.id),
+				});
+				await syncAttendanceAggregate(st.id);
+			}
+
+			return {
+				success: true,
+				message: `Berhasil menandai ${missingStudents.length} mahasiswa yang belum hadir sebagai Alpha`,
+				markedCount: missingStudents.length,
+			};
+		},
+	)
+
+	// 12. GENERAL PATCH SESSION
 	.patch("/baris-pagi/sessions/:id", async ({ params, body, set }) => {
 		const id = parseInt(params.id, 10);
 		const payload = body as any;
@@ -1583,6 +2201,11 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 		if (payload.location) updateData.location = payload.location;
 		if (payload.notes !== undefined) updateData.notes = payload.notes;
 		if (payload.rombel) updateData.rombel = payload.rombel;
+		if (payload.checkInWindowStart)
+			updateData.checkInWindowStart = payload.checkInWindowStart;
+		if (payload.checkInWindowEnd)
+			updateData.checkInWindowEnd = payload.checkInWindowEnd;
+		if (payload.sessionStatus) updateData.sessionStatus = payload.sessionStatus;
 
 		const [updated] = await db
 			.update(morningAssemblySessions)
@@ -1593,10 +2216,10 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 		return { success: true, data: updated };
 	})
 
+	// 13. DELETE SESSION
 	.delete("/baris-pagi/sessions/:id", async ({ params, set }) => {
 		const id = parseInt(params.id, 10);
 
-		// Get affected student IDs before deletion
 		const records = await db.query.morningAssemblyRecords.findMany({
 			where: eq(morningAssemblyRecords.sessionId, id),
 			columns: { studentId: true },
@@ -1607,7 +2230,6 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			.delete(morningAssemblySessions)
 			.where(eq(morningAssemblySessions.id, id));
 
-		// Recalculate academic data for affected students
 		for (const sId of studentIds) {
 			await syncAttendanceAggregate(sId);
 		}
@@ -1946,6 +2568,57 @@ export function evaluateMorningAssemblyArrival(
 			minutesLate: arrMinutes - tarMinutes,
 			isLate: true,
 		};
+	}
+}
+
+// Helper to get current WIB date (YYYY-MM-DD) and time (HH:mm)
+export function getWIBDateTime(date: Date = new Date()) {
+	const formatter = new Intl.DateTimeFormat("en-CA", {
+		timeZone: "Asia/Jakarta",
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+		hour12: false,
+	});
+	const parts = formatter.formatToParts(date);
+	const get = (type: string) => parts.find((p) => p.type === type)?.value || "";
+	const dateStr = `${get("year")}-${get("month")}-${get("day")}`;
+	const timeStr = `${get("hour")}:${get("minute")}`;
+	return { dateStr, timeStr };
+}
+
+// Helper to check if timeStr is within windowStart and windowEnd (HH:mm)
+export function isWithinWindow(
+	timeStr: string,
+	windowStart: string = "05:30",
+	windowEnd: string = "07:00",
+): boolean {
+	if (!timeStr || !timeStr.includes(":")) return false;
+	const [h, m] = timeStr.split(":").map((v) => parseInt(v, 10) || 0);
+	const [sh, sm] = windowStart.split(":").map((v) => parseInt(v, 10) || 0);
+	const [eh, em] = windowEnd.split(":").map((v) => parseInt(v, 10) || 0);
+	const nowMin = h * 60 + m;
+	const startMin = sh * 60 + sm;
+	const endMin = eh * 60 + em;
+	return nowMin >= startMin && nowMin <= endMin;
+}
+
+// Helper to resolve valid user id or return null if user doesn't exist
+export async function resolveValidUserId(
+	userId: number | null | undefined,
+): Promise<number | null> {
+	if (!userId) return null;
+	try {
+		const u = await db.query.users.findFirst({
+			where: eq(users.id, userId),
+			columns: { id: true },
+		});
+		return u ? u.id : null;
+	} catch {
+		return null;
 	}
 }
 

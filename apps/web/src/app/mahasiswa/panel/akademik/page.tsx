@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { BarisPagiCheckinWidget } from "@/components/mahasiswa/BarisPagiCheckinWidget";
 import { Badge } from "@/components/ui/badge";
 import {
 	Card,
@@ -183,6 +184,9 @@ export default function AcademicPanelMahasiswa() {
 					</div>
 				</CardHeader>
 				<CardContent className="p-6 sm:p-8 space-y-8">
+					{/* Widget Presensi Baris Pagi */}
+					<BarisPagiCheckinWidget />
+
 					{/* Section 1: Ringkasan Metrik Akademik */}
 					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 						<div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100 flex flex-col justify-between items-center text-center">

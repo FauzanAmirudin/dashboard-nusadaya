@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { BarisPagiCheckinWidget } from "@/components/mahasiswa/BarisPagiCheckinWidget";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -266,6 +267,9 @@ export default function MahasiswaDashboard() {
 					</div>
 				</CardContent>
 			</Card>
+
+			{/* WIDGET APEL BARIS PAGI & ABSEN MANDIRI */}
+			<BarisPagiCheckinWidget />
 
 			{/* HEADING PROGRESS */}
 			<div className="flex items-center justify-between mt-8 mb-2">

@@ -7,6 +7,7 @@ import {
 	CheckCircle2,
 	ChevronDown,
 	ChevronUp,
+	ClipboardCheck,
 	Clock,
 	Edit2,
 	FileText,
@@ -61,8 +62,6 @@ interface MeetingDetailModalState {
 	meetingLabel: string;
 	meetingDate: string | null;
 	status: "hadir" | "izin" | "sakit" | "alpha";
-	theoryScore: number | "";
-	practicalScore: number | "";
 	notes: string;
 }
 
@@ -73,15 +72,12 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 	const { user } = useAuthStore();
 	const canEdit = user?.role === "superadmin" || user?.role === "akademik";
 
-	// Edit Agregat Mata Kuliah
+	// Edit Agregat Kehadiran Mata Kuliah
 	const [editingCourse, setEditingCourse] = useState<number | null>(null);
 	const [editForm, setEditForm] = useState({
 		attendancePresent: 0,
 		totalMeetings: 16,
-		practicalScore: 0,
-		theoryScore: 0,
 		attitudeNote: "",
-		grade: "",
 	});
 	const [isSaving, setIsSaving] = useState(false);
 
@@ -94,8 +90,6 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 		meetingLabel: "",
 		meetingDate: null,
 		status: "hadir",
-		theoryScore: "",
-		practicalScore: "",
 		notes: "",
 	});
 	const [isSavingMeeting, setIsSavingMeeting] = useState(false);
@@ -127,10 +121,7 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 		setEditForm({
 			attendancePresent: course.attendancePresent || 0,
 			totalMeetings: course.totalMeetings || 16,
-			practicalScore: course.practicalScore || 0,
-			theoryScore: course.theoryScore || 0,
 			attitudeNote: course.attitudeNote || "",
-			grade: course.grade || "",
 		});
 	};
 
@@ -140,25 +131,22 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 			const payload: any = {
 				attendancePresent: editForm.attendancePresent,
 				totalMeetings: editForm.totalMeetings,
-				practicalScore: editForm.practicalScore,
-				theoryScore: editForm.theoryScore,
 				attitudeNote: editForm.attitudeNote,
 			};
-			if (editForm.grade) payload.grade = editForm.grade;
 
 			const res = await (api as any).attendance.mahasiswa[studentId][
 				"mata-kuliah"
 			][courseGradeId].patch(payload);
 
 			if (res.data?.success) {
-				toast.success("Berhasil memperbarui nilai & presensi mata kuliah");
+				toast.success("Berhasil memperbarui data presensi mata kuliah");
 				setEditingCourse(null);
 				await fetchData();
 			} else {
 				toast.error(res.data?.message || "Gagal menyimpan perubahan");
 			}
 		} catch (error) {
-			toast.error("Terjadi kesalahan sistem saat menyimpan nilai");
+			toast.error("Terjadi kesalahan sistem saat menyimpan data presensi");
 		} finally {
 			setIsSaving(false);
 		}
@@ -187,7 +175,7 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 		}
 	};
 
-	// Open dialog to edit full meeting details (status, scores, notes)
+	// Open dialog to edit meeting attendance & notes
 	const handleOpenMeetingModal = (courseId: number, m: any) => {
 		const mId = m.id || m.meetingId;
 		setMeetingModal({
@@ -198,14 +186,6 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 			meetingLabel: m.meetingLabel || `Pertemuan ${m.meetingNumber || 1}`,
 			meetingDate: m.meetingDate || m.session?.sessionDate || null,
 			status: m.status || "hadir",
-			theoryScore:
-				m.theoryScore !== null && m.theoryScore !== undefined
-					? m.theoryScore
-					: "",
-			practicalScore:
-				m.practicalScore !== null && m.practicalScore !== undefined
-					? m.practicalScore
-					: "",
 			notes: m.notes || "",
 		});
 	};
@@ -216,14 +196,6 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 			const payload: any = {
 				status: meetingModal.status,
 				notes: meetingModal.notes || null,
-				theoryScore:
-					meetingModal.theoryScore !== ""
-						? Number(meetingModal.theoryScore)
-						: null,
-				practicalScore:
-					meetingModal.practicalScore !== ""
-						? Number(meetingModal.practicalScore)
-						: null,
 			};
 
 			const res = await (api as any).attendance.mahasiswa[studentId][
@@ -231,7 +203,7 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 			][meetingModal.courseId][meetingModal.meetingId].patch(payload);
 
 			if (res.data?.success) {
-				toast.success("Catatan & penilaian sesi perkuliahan berhasil disimpan");
+				toast.success("Presensi & catatan sesi perkuliahan berhasil disimpan");
 				setMeetingModal((prev) => ({ ...prev, isOpen: false }));
 				await fetchData();
 			} else {
@@ -399,32 +371,49 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 											)}
 										</div>
 
-										{/* Nilai Akhir dari Database */}
-										<div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50/80 border border-blue-200/70 text-[#0517B0]">
-											<Award className="w-3.5 h-3.5 text-amber-500" />
-											<span className="font-medium text-slate-700">
-												Nilai Akhir:
-											</span>
-											<span className="font-black text-sm">
-												{displayGradeLetter}
-											</span>
-										</div>
-
-										{/* Komponen Nilai Teori & Praktik */}
-										<div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-600 font-medium">
-											<span>
-												Praktik:{" "}
-												<strong className="text-slate-800">
-													{g.practicalScore ?? "-"}
-												</strong>
+										{/* Rincian Sesi Kehadiran */}
+										<div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-xs font-medium">
+											<span className="text-emerald-700 font-bold">
+												{
+													(g.meetings || []).filter(
+														(m: any) => m.status === "hadir",
+													).length
+												}{" "}
+												Hadir
 											</span>
 											<span className="text-slate-300">•</span>
-											<span>
-												Teori:{" "}
-												<strong className="text-slate-800">
-													{g.theoryScore ?? "-"}
-												</strong>
+											<span className="text-blue-700 font-bold">
+												{
+													(g.meetings || []).filter(
+														(m: any) => m.status === "izin",
+													).length
+												}{" "}
+												Izin
 											</span>
+											<span className="text-slate-300">•</span>
+											<span className="text-amber-700 font-bold">
+												{
+													(g.meetings || []).filter(
+														(m: any) => m.status === "sakit",
+													).length
+												}{" "}
+												Sakit
+											</span>
+											{(g.meetings || []).filter(
+												(m: any) => m.status === "alpha",
+											).length > 0 && (
+												<>
+													<span className="text-slate-300">•</span>
+													<span className="text-rose-700 font-bold">
+														{
+															(g.meetings || []).filter(
+																(m: any) => m.status === "alpha",
+															).length
+														}{" "}
+														Alpha
+													</span>
+												</>
+											)}
 										</div>
 
 										{/* Attitude note chip */}
@@ -456,7 +445,7 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 											<Edit2 className="w-3.5 h-3.5" />
 										)}
 										<span>
-											{isEditing ? "Tutup Form" : "Koreksi Hadir & Nilai"}
+											{isEditing ? "Tutup Form" : "Koreksi Kehadiran"}
 										</span>
 									</Button>
 								)}
@@ -479,14 +468,14 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 
 						{/* Expanded Content */}
 						<CollapsibleContent className="bg-slate-50/50 border-t border-slate-100 p-4 sm:p-5 space-y-4">
-							{/* Form Edit Nilai & Sikap Mata Kuliah (Direct Database Update) */}
+							{/* Form Edit Kehadiran & Sikap (Direct Database Update) */}
 							{isEditing && (
 								<div className="p-4 sm:p-5 bg-white rounded-2xl border border-blue-200 shadow-xs space-y-4 animate-in fade-in-50 duration-150">
 									<div className="flex items-center justify-between border-b border-slate-100 pb-3">
 										<div className="flex items-center gap-2">
 											<Sparkles className="w-4 h-4 text-[#0517B0]" />
 											<h5 className="text-xs sm:text-sm font-bold text-slate-800">
-												Koreksi Presensi, Nilai Vokasi & Catatan Sikap
+												Koreksi Kehadiran & Catatan Presensi
 											</h5>
 										</div>
 										<Badge variant="outline" className="text-[10px] font-mono">
@@ -494,7 +483,7 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 										</Badge>
 									</div>
 
-									<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+									<div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
 										<div className="space-y-1">
 											<Label className="text-xs font-semibold text-slate-700">
 												Total Hadir
@@ -516,7 +505,7 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 
 										<div className="space-y-1">
 											<Label className="text-xs font-semibold text-slate-700">
-												Total Sesi
+												Total Sesi Perkuliahan
 											</Label>
 											<Input
 												type="number"
@@ -533,62 +522,6 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 										</div>
 
 										<div className="space-y-1">
-											<Label className="text-xs font-semibold text-slate-700">
-												Nilai Praktik (80%)
-											</Label>
-											<Input
-												type="number"
-												className="h-9 text-xs bg-white font-bold text-blue-700"
-												value={editForm.practicalScore}
-												onChange={(e) =>
-													setEditForm((p) => ({
-														...p,
-														practicalScore: parseInt(e.target.value, 10) || 0,
-													}))
-												}
-												min={0}
-												max={100}
-											/>
-										</div>
-
-										<div className="space-y-1">
-											<Label className="text-xs font-semibold text-slate-700">
-												Nilai Teori (20%)
-											</Label>
-											<Input
-												type="number"
-												className="h-9 text-xs bg-white font-bold text-indigo-700"
-												value={editForm.theoryScore}
-												onChange={(e) =>
-													setEditForm((p) => ({
-														...p,
-														theoryScore: parseInt(e.target.value, 10) || 0,
-													}))
-												}
-												min={0}
-												max={100}
-											/>
-										</div>
-
-										<div className="space-y-1">
-											<Label className="text-xs font-semibold text-slate-700">
-												Nilai Huruf (Opsional)
-											</Label>
-											<Input
-												className="h-9 text-xs bg-white font-bold uppercase text-center"
-												placeholder="Auto"
-												value={editForm.grade}
-												onChange={(e) =>
-													setEditForm((p) => ({
-														...p,
-														grade: e.target.value.toUpperCase(),
-													}))
-												}
-												maxLength={2}
-											/>
-										</div>
-
-										<div className="space-y-1 col-span-2 sm:col-span-1 lg:col-span-1 flex flex-col justify-end">
 											<Button
 												size="sm"
 												onClick={() => handleSaveEdit(g.id)}
@@ -600,7 +533,7 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 												) : (
 													<Save className="w-3.5 h-3.5" />
 												)}
-												<span>Simpan Nilai</span>
+												<span>Simpan Presensi</span>
 											</Button>
 										</div>
 									</div>
@@ -816,33 +749,6 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 																		</span>
 																	</div>
 
-																	{/* Nilai Sesi / Ujian (Jika Ada) */}
-																	{((m.theoryScore !== null &&
-																		m.theoryScore !== undefined) ||
-																		(m.practicalScore !== null &&
-																			m.practicalScore !== undefined)) && (
-																		<div className="flex items-center gap-2 text-[10px] font-semibold text-slate-700 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
-																			{m.theoryScore !== null &&
-																				m.theoryScore !== undefined && (
-																					<span>
-																						Nilai Ujian:{" "}
-																						<strong className="text-indigo-700">
-																							{m.theoryScore}
-																						</strong>
-																					</span>
-																				)}
-																			{m.practicalScore !== null &&
-																				m.practicalScore !== undefined && (
-																					<span>
-																						Praktik:{" "}
-																						<strong className="text-blue-700">
-																							{m.practicalScore}
-																						</strong>
-																					</span>
-																				)}
-																		</div>
-																	)}
-
 																	{/* Catatan Sesi / Izin / Keterangan dari Database */}
 																	{m.notes && m.notes.trim() !== "" && (
 																		<div className="flex items-start gap-1.5 p-1.5 rounded-lg bg-amber-50/60 border border-amber-200/70 text-[10px] text-amber-900">
@@ -944,7 +850,7 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 																				handleOpenMeetingModal(g.courseId, m)
 																			}
 																			className="h-6 px-1.5 text-[10px] text-slate-500 hover:text-[#0517B0] hover:bg-blue-50 rounded-lg gap-1"
-																			title="Edit Catatan & Nilai Sesi"
+																			title="Edit Catatan & Presensi Sesi"
 																		>
 																			<Pencil className="w-2.5 h-2.5" />
 																			<span>Catatan</span>
@@ -975,8 +881,8 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 				<DialogContent className="max-w-md rounded-2xl">
 					<DialogHeader>
 						<DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
-							<FileText className="w-5 h-5 text-[#0517B0]" />
-							Detail & Catatan Sesi Pertemuan
+							<ClipboardCheck className="w-5 h-5 text-[#0517B0]" />
+							Presensi & Catatan Sesi Pertemuan
 						</DialogTitle>
 						<DialogDescription className="text-xs text-slate-500">
 							{meetingModal.meetingLabel} • Mahasiswa:{" "}
@@ -1010,58 +916,13 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 							</Select>
 						</div>
 
-						{/* Nilai Teori & Praktik Sesi */}
-						<div className="grid grid-cols-2 gap-3">
-							<div className="space-y-1.5">
-								<Label className="text-xs font-semibold text-slate-700">
-									Nilai Ujian / Teori (0-100)
-								</Label>
-								<Input
-									type="number"
-									min={0}
-									max={100}
-									placeholder="Belum ada nilai"
-									value={meetingModal.theoryScore}
-									onChange={(e) =>
-										setMeetingModal((p) => ({
-											...p,
-											theoryScore:
-												e.target.value === "" ? "" : Number(e.target.value),
-										}))
-									}
-									className="h-9 text-xs rounded-xl font-bold"
-								/>
-							</div>
-
-							<div className="space-y-1.5">
-								<Label className="text-xs font-semibold text-slate-700">
-									Nilai Praktik (0-100)
-								</Label>
-								<Input
-									type="number"
-									min={0}
-									max={100}
-									placeholder="Belum ada nilai"
-									value={meetingModal.practicalScore}
-									onChange={(e) =>
-										setMeetingModal((p) => ({
-											...p,
-											practicalScore:
-												e.target.value === "" ? "" : Number(e.target.value),
-										}))
-									}
-									className="h-9 text-xs rounded-xl font-bold"
-								/>
-							</div>
-						</div>
-
 						{/* Catatan Sesi / Surat Izin / Keterangan */}
 						<div className="space-y-1.5">
 							<Label className="text-xs font-semibold text-slate-700">
 								Catatan Sesi / Keterangan Khusus
 							</Label>
 							<Textarea
-								placeholder="Tuliskan catatan dosen, alasan izin/sakit, nomor surat dokter, atau evaluasi tugas..."
+								placeholder="Tuliskan catatan izin/sakit, nomor surat dokter, dispensasi kampus, atau keterangan kehadiran..."
 								value={meetingModal.notes}
 								onChange={(e) =>
 									setMeetingModal((p) => ({ ...p, notes: e.target.value }))
@@ -1092,7 +953,7 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 							) : (
 								<Save className="w-3.5 h-3.5" />
 							)}
-							Simpan Catatan
+							Simpan Presensi Sesi
 						</Button>
 					</DialogFooter>
 				</DialogContent>
