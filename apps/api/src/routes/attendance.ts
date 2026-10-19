@@ -1601,19 +1601,43 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			});
 		}
 
+		const windowStart = session?.checkInWindowStart || "05:30";
+		const windowEnd = session?.checkInWindowEnd || "07:00";
 		const isWindowOpen = session
-			? isWithinWindow(
-					timeStr,
-					session.checkInWindowStart || "05:30",
-					session.checkInWindowEnd || "07:00",
-				)
+			? isWithinWindow(timeStr, windowStart, windowEnd)
 			: false;
+
+		let windowStatus: "UPCOMING" | "OPEN" | "CLOSED" = "CLOSED";
+		if (session) {
+			if (timeStr < windowStart) {
+				windowStatus = "UPCOMING";
+			} else if (timeStr <= windowEnd) {
+				windowStatus = "OPEN";
+			} else {
+				windowStatus = "CLOSED";
+			}
+		}
+
+		const studentCheckin = myRecord
+			? {
+					id: myRecord.id,
+					status: myRecord.status,
+					arrivalTime: myRecord.arrivalTime,
+					minutesLate: myRecord.minutesLate || 0,
+					checkinMethod: myRecord.checkinMethod || "officer",
+					selfCheckinAt: myRecord.selfCheckinAt || null,
+				}
+			: null;
 
 		return {
 			success: true,
 			data: {
+				hasSession: !!session,
 				serverDate: dateStr,
 				serverTime: timeStr,
+				currentTimeWIB: `${dateStr} ${timeStr}`,
+				windowStatus,
+				studentCheckin,
 				session: session
 					? {
 							id: session.id,
@@ -1788,6 +1812,32 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 		const complianceRate =
 			total > 0 ? Math.round((tepatWaktu / total) * 100) : 100;
 
+		const stats = {
+			totalSessions: total,
+			total,
+			hadir: tepatWaktu,
+			tepatWaktu,
+			terlambat,
+			izin,
+			sakit,
+			alpha,
+			complianceRate,
+		};
+
+		const formattedRecords = records.map((r) => ({
+			id: r.id,
+			sessionId: r.sessionId,
+			sessionDate: r.session?.sessionDate || "-",
+			targetTime: r.session?.targetTime || "06:22",
+			location: r.session?.location || "-",
+			arrivalTime: r.arrivalTime,
+			status: r.status,
+			checkinMethod: r.checkinMethod || "officer",
+			minutesLate: r.minutesLate || 0,
+			notes: r.notes,
+			session: r.session,
+		}));
+
 		return {
 			success: true,
 			data: {
@@ -1798,16 +1848,9 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 					cohort: student.cohort,
 					rombel: student.rombel,
 				},
-				records,
-				summary: {
-					total,
-					tepatWaktu,
-					terlambat,
-					izin,
-					sakit,
-					alpha,
-					complianceRate,
-				},
+				records: formattedRecords,
+				summary: stats,
+				stats,
 			},
 		};
 	})

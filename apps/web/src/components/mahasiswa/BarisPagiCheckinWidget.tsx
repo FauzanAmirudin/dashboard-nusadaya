@@ -65,32 +65,50 @@ interface TodaySessionData {
 }
 
 interface MyRecordsData {
-	student: {
+	student?: {
 		id: number;
 		name: string;
 		nim: string;
 		cohort: number;
 	};
-	stats: {
-		totalSessions: number;
-		hadir: number;
-		terlambat: number;
-		izin: number;
-		sakit: number;
-		alpha: number;
-		complianceRate: number;
+	stats?: {
+		totalSessions?: number;
+		total?: number;
+		hadir?: number;
+		tepatWaktu?: number;
+		terlambat?: number;
+		izin?: number;
+		sakit?: number;
+		alpha?: number;
+		complianceRate?: number;
 	};
-	records: Array<{
+	summary?: {
+		totalSessions?: number;
+		total?: number;
+		hadir?: number;
+		tepatWaktu?: number;
+		terlambat?: number;
+		izin?: number;
+		sakit?: number;
+		alpha?: number;
+		complianceRate?: number;
+	};
+	records?: Array<{
 		id: number;
 		sessionId: number;
-		sessionDate: string;
-		targetTime: string;
-		location: string;
-		arrivalTime: string | null;
-		status: string;
-		checkinMethod: string;
-		minutesLate: number;
-		notes: string | null;
+		sessionDate?: string;
+		targetTime?: string;
+		location?: string;
+		arrivalTime?: string | null;
+		status?: string;
+		checkinMethod?: string;
+		minutesLate?: number;
+		notes?: string | null;
+		session?: {
+			sessionDate?: string;
+			targetTime?: string;
+			location?: string;
+		};
 	}>;
 }
 
@@ -207,7 +225,9 @@ export function BarisPagiCheckinWidget() {
 	}
 
 	// Case 1: No session today
-	if (!data || !data.hasSession || !data.session) {
+	const hasActiveSession = Boolean(data?.session && (data?.hasSession ?? true));
+
+	if (!hasActiveSession) {
 		return (
 			<Card className="rounded-2xl border-dashed border-slate-300 bg-gradient-to-r from-slate-50/70 to-blue-50/20 p-5">
 				<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -246,9 +266,14 @@ export function BarisPagiCheckinWidget() {
 		);
 	}
 
-	const { session, windowStatus, studentCheckin } = data;
-	const isCheckinOpen = windowStatus === "OPEN";
-	const isAlreadyCheckedIn = !!studentCheckin;
+	const session = data!.session!;
+	const studentCheckin =
+		data?.studentCheckin || (session as any)?.myRecord || null;
+	const isCheckinOpen =
+		data?.windowStatus === "OPEN" || (session as any)?.isWindowOpen === true;
+	const isAlreadyCheckedIn = Boolean(
+		studentCheckin && (studentCheckin.status || (session as any)?.hasRecorded),
+	);
 
 	return (
 		<Card
@@ -482,6 +507,10 @@ export function BarisPagiCheckinWidget() {
 
 	// Helper for rendering history modal
 	function renderHistoryDialog() {
+		const stats = historyData?.stats || (historyData as any)?.summary || {};
+		const complianceRate = stats.complianceRate ?? 100;
+		const records = historyData?.records || [];
+
 		return (
 			<Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
 				<DialogContent className="max-w-2xl rounded-2xl max-h-[85vh] overflow-y-auto">
@@ -516,11 +545,11 @@ export function BarisPagiCheckinWidget() {
 										Tingkat Kepatuhan Apel
 									</span>
 									<span className="font-mono font-extrabold text-lg text-slate-900">
-										{historyData.stats.complianceRate}%
+										{complianceRate}%
 									</span>
 								</div>
 								<Progress
-									value={historyData.stats.complianceRate}
+									value={complianceRate}
 									className="h-2.5 bg-slate-200 rounded-full"
 								/>
 
@@ -530,7 +559,7 @@ export function BarisPagiCheckinWidget() {
 											Tepat
 										</span>
 										<span className="font-bold font-mono text-xs text-emerald-900">
-											{historyData.stats.hadir}
+											{stats.hadir ?? stats.tepatWaktu ?? 0}
 										</span>
 									</div>
 									<div className="p-2 bg-amber-50 rounded-xl border border-amber-100">
@@ -538,7 +567,7 @@ export function BarisPagiCheckinWidget() {
 											Telat
 										</span>
 										<span className="font-bold font-mono text-xs text-amber-900">
-											{historyData.stats.terlambat}
+											{stats.terlambat ?? 0}
 										</span>
 									</div>
 									<div className="p-2 bg-blue-50 rounded-xl border border-blue-100">
@@ -546,7 +575,7 @@ export function BarisPagiCheckinWidget() {
 											Izin
 										</span>
 										<span className="font-bold font-mono text-xs text-blue-900">
-											{historyData.stats.izin}
+											{stats.izin ?? 0}
 										</span>
 									</div>
 									<div className="p-2 bg-purple-50 rounded-xl border border-purple-100">
@@ -554,7 +583,7 @@ export function BarisPagiCheckinWidget() {
 											Sakit
 										</span>
 										<span className="font-bold font-mono text-xs text-purple-900">
-											{historyData.stats.sakit}
+											{stats.sakit ?? 0}
 										</span>
 									</div>
 									<div className="p-2 bg-rose-50 rounded-xl border border-rose-100">
@@ -562,7 +591,7 @@ export function BarisPagiCheckinWidget() {
 											Alpha
 										</span>
 										<span className="font-bold font-mono text-xs text-rose-900">
-											{historyData.stats.alpha}
+											{stats.alpha ?? 0}
 										</span>
 									</div>
 								</div>
@@ -571,59 +600,63 @@ export function BarisPagiCheckinWidget() {
 							{/* History table */}
 							<div className="space-y-2">
 								<h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-									Daftar Pertemuan ({historyData.records.length})
+									Daftar Pertemuan ({records.length})
 								</h4>
 
-								{historyData.records.length === 0 ? (
+								{records.length === 0 ? (
 									<p className="text-xs text-slate-400 text-center py-4">
 										Belum ada catatan presensi baris pagi.
 									</p>
 								) : (
 									<div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
-										{historyData.records.map((rec) => (
-											<div
-												key={rec.id}
-												className="p-3 flex items-center justify-between text-xs hover:bg-slate-50 transition-colors"
-											>
-												<div className="space-y-0.5">
-													<p className="font-semibold text-slate-900">
-														{rec.sessionDate}
-													</p>
-													<div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
-														<span>
-															Jam Datang:{" "}
-															<strong className="font-mono text-slate-700">
-																{rec.arrivalTime || "-"}
-															</strong>
-														</span>
-														<span>•</span>
-														<span>
-															{rec.checkinMethod === "self"
-																? "Mandiri"
-																: "Petugas"}
-														</span>
-													</div>
-												</div>
-
-												<Badge
-													className={cn(
-														"text-[10px] font-semibold border-0",
-														rec.status === "hadir" &&
-															"bg-emerald-100 text-emerald-800",
-														rec.status === "terlambat" &&
-															"bg-amber-100 text-amber-800",
-														rec.status === "izin" &&
-															"bg-blue-100 text-blue-800",
-														rec.status === "sakit" &&
-															"bg-purple-100 text-purple-800",
-														rec.status === "alpha" &&
-															"bg-rose-100 text-rose-800",
-													)}
+										{records.map((rec) => {
+											const sessionDate =
+												rec.sessionDate || rec.session?.sessionDate || "-";
+											return (
+												<div
+													key={rec.id}
+													className="p-3 flex items-center justify-between text-xs hover:bg-slate-50 transition-colors"
 												>
-													{rec.status.toUpperCase()}
-												</Badge>
-											</div>
-										))}
+													<div className="space-y-0.5">
+														<p className="font-semibold text-slate-900">
+															{sessionDate}
+														</p>
+														<div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
+															<span>
+																Jam Datang:{" "}
+																<strong className="font-mono text-slate-700">
+																	{rec.arrivalTime || "-"}
+																</strong>
+															</span>
+															<span>•</span>
+															<span>
+																{rec.checkinMethod === "self"
+																	? "Mandiri"
+																	: "Petugas"}
+															</span>
+														</div>
+													</div>
+
+													<Badge
+														className={cn(
+															"text-[10px] font-semibold border-0",
+															rec.status === "hadir" &&
+																"bg-emerald-100 text-emerald-800",
+															rec.status === "terlambat" &&
+																"bg-amber-100 text-amber-800",
+															rec.status === "izin" &&
+																"bg-blue-100 text-blue-800",
+															rec.status === "sakit" &&
+																"bg-purple-100 text-purple-800",
+															rec.status === "alpha" &&
+																"bg-rose-100 text-rose-800",
+														)}
+													>
+														{rec.status ? rec.status.toUpperCase() : "-"}
+													</Badge>
+												</div>
+											);
+										})}
 									</div>
 								)}
 							</div>
