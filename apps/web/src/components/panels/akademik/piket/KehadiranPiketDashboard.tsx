@@ -152,7 +152,11 @@ interface GroupDailyBoard {
 	};
 }
 
-export function KehadiranPiketDashboard() {
+export function KehadiranPiketDashboard({
+	hidePageHeader = false,
+}: {
+	hidePageHeader?: boolean;
+} = {}) {
 	const { user } = useAuthStore();
 	const canEdit = hasRole(user, "akademik") || hasRole(user, "superadmin");
 
@@ -679,25 +683,76 @@ export function KehadiranPiketDashboard() {
 	return (
 		<div className="space-y-6 pb-12">
 			{/* Top Executive Header */}
-			<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-				<div>
-					<div className="flex items-center gap-3">
-						<div className="p-2.5 bg-blue-50 text-[#0517B0] rounded-lg border border-blue-100">
-							<Sparkles className="w-6 h-6" />
-						</div>
-						<div>
-							<h1 className="text-2xl font-bold text-slate-900">
-								Manajemen Kehadiran Piket
-							</h1>
-							<p className="text-slate-500 text-xs sm:text-sm mt-0.5">
-								Pengelolaan presensi harian kelompok piket kampus, monitoring
-								kepatuhan kebersihan, dan rekapitulasi kehadiran mahasiswa.
-							</p>
+			{!hidePageHeader ? (
+				<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+					<div>
+						<div className="flex items-center gap-3">
+							<div className="p-2.5 bg-blue-50 text-[#0517B0] rounded-lg border border-blue-100">
+								<Sparkles className="w-6 h-6" />
+							</div>
+							<div>
+								<h1 className="text-2xl font-bold text-slate-900">
+									Manajemen Kehadiran Piket
+								</h1>
+								<p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+									Pengelolaan presensi harian kelompok piket kampus, monitoring
+									kepatuhan kebersihan, dan rekapitulasi kehadiran mahasiswa.
+								</p>
+							</div>
 						</div>
 					</div>
-				</div>
 
-				<div className="flex flex-wrap items-center gap-2.5">
+					<div className="flex flex-wrap items-center gap-2.5">
+						<Link
+							href="/dashboard/penjadwalan"
+							className={cn(
+								buttonVariants({ variant: "outline", size: "sm" }),
+								"border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9",
+							)}
+						>
+							<Clock className="w-3.5 h-3.5 text-slate-500" />
+							Atur Jadwal Kelompok Piket
+						</Link>
+
+						{activeTab === "board" && (
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={handleExportBoard}
+								className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
+							>
+								<Download className="w-3.5 h-3.5" />
+								Export Presensi Hari Ini
+							</Button>
+						)}
+
+						{activeTab === "history" && (
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={handleExportHistory}
+								className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
+							>
+								<Download className="w-3.5 h-3.5" />
+								Export Riwayat CSV
+							</Button>
+						)}
+
+						{activeTab === "students" && (
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={handleExportStudentSummary}
+								className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
+							>
+								<Download className="w-3.5 h-3.5" />
+								Export Rekap Mahasiswa
+							</Button>
+						)}
+					</div>
+				</div>
+			) : (
+				<div className="flex flex-wrap items-center justify-end gap-2.5">
 					<Link
 						href="/dashboard/penjadwalan"
 						className={cn(
@@ -745,7 +800,7 @@ export function KehadiranPiketDashboard() {
 						</Button>
 					)}
 				</div>
-			</div>
+			)}
 
 			{/* KPI Summary Cards */}
 			{boardData && activeTab === "board" && (

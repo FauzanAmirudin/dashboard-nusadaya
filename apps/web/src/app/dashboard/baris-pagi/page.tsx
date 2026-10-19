@@ -1,5 +1,5 @@
-import { BarisPagiDashboard } from "@/components/panels/akademik/baris-pagi/BarisPagiDashboard";
+import { redirect } from "next/navigation";
 
 export default function BarisPagiPage() {
-	return <BarisPagiDashboard />;
+	redirect("/dashboard/kehadiran?tab=baris-pagi");
 }

@@ -1,5 +1,5 @@
-import { KehadiranPiketDashboard } from "@/components/panels/akademik/piket/KehadiranPiketDashboard";
+import { redirect } from "next/navigation";
 
 export default function KehadiranPiketPage() {
-	return <KehadiranPiketDashboard />;
+	redirect("/dashboard/kehadiran?tab=piket");
 }

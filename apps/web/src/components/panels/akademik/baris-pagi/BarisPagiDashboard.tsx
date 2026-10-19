@@ -201,7 +201,11 @@ interface StudentSummaryItem {
 	statusDisiplin: "DISIPLIN" | "PERLU_PEMBINAAN" | "KRITIS";
 }
 
-export function BarisPagiDashboard() {
+export function BarisPagiDashboard({
+	hidePageHeader = false,
+}: {
+	hidePageHeader?: boolean;
+} = {}) {
 	const { user } = useAuthStore();
 	const isStaff = user?.role === "superadmin" || user?.role === "akademik";
 
@@ -895,36 +899,64 @@ export function BarisPagiDashboard() {
 	return (
 		<div className="space-y-6">
 			{/* Top Header Banner */}
-			<div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-2xs">
-				<div className="flex items-center gap-3.5">
-					<div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-700 via-blue-700 to-indigo-900 text-white flex items-center justify-center shadow-xs ring-4 ring-blue-50 shrink-0">
-						<ShieldCheck className="w-6 h-6" />
-					</div>
-					<div>
-						<div className="flex items-center gap-2.5 flex-wrap">
-							<h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-								Kepatuhan Baris Pagi
-							</h1>
-							<Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100 border border-amber-300 font-bold text-xs px-2.5 py-0.5 rounded-full">
-								<Clock className="w-3.5 h-3.5 mr-1 text-amber-700" />
-								Standar 06.22 WIB
-							</Badge>
-							<Badge
-								variant="secondary"
-								className="bg-blue-50 text-[#0517B0] text-xs font-semibold px-2 py-0.5 rounded-full border border-blue-200"
-							>
-								Panel Akademik
-							</Badge>
+			{!hidePageHeader ? (
+				<div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-2xs">
+					<div className="flex items-center gap-3.5">
+						<div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-700 via-blue-700 to-indigo-900 text-white flex items-center justify-center shadow-xs ring-4 ring-blue-50 shrink-0">
+							<ShieldCheck className="w-6 h-6" />
 						</div>
-						<p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">
-							Pencatatan kehadiran apel baris pagi mingguan dan evaluasi jam
-							kedatangan aktual mahasiswa (threshold baku 06.22) untuk integrasi
-							matriks All-Service.
-						</p>
+						<div>
+							<div className="flex items-center gap-2.5 flex-wrap">
+								<h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+									Kepatuhan Baris Pagi
+								</h1>
+								<Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100 border border-amber-300 font-bold text-xs px-2.5 py-0.5 rounded-full">
+									<Clock className="w-3.5 h-3.5 mr-1 text-amber-700" />
+									Standar 06.22 WIB
+								</Badge>
+								<Badge
+									variant="secondary"
+									className="bg-blue-50 text-[#0517B0] text-xs font-semibold px-2 py-0.5 rounded-full border border-blue-200"
+								>
+									Panel Akademik
+								</Badge>
+							</div>
+							<p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">
+								Pencatatan kehadiran apel baris pagi mingguan dan evaluasi jam
+								kedatangan aktual mahasiswa (threshold baku 06.22) untuk
+								integrasi matriks All-Service.
+							</p>
+						</div>
+					</div>
+
+					<div className="flex items-center gap-2.5 w-full sm:w-auto">
+						{isStaff && (
+							<Button
+								onClick={() => setIsCreateOpen(true)}
+								className="bg-[#0517B0] hover:bg-blue-800 text-white shadow-xs rounded-xl font-semibold text-xs sm:text-sm gap-2"
+							>
+								<Plus className="w-4 h-4" />
+								<span>Buat Sesi Baris Pagi</span>
+							</Button>
+						)}
+						<Button
+							variant="outline"
+							size="icon"
+							onClick={() => {
+								fetchSessions();
+								if (selectedSessionId) fetchBoardData(selectedSessionId);
+								if (activeTab === "rekap") fetchSummary();
+								toast.info("Data diperbarui");
+							}}
+							className="rounded-xl border-slate-200"
+							title="Segarkan Data"
+						>
+							<RefreshCw className="w-4 h-4 text-slate-600" />
+						</Button>
 					</div>
 				</div>
-
-				<div className="flex items-center gap-2.5 w-full sm:w-auto">
+			) : (
+				<div className="flex items-center justify-end gap-2.5 w-full">
 					{isStaff && (
 						<Button
 							onClick={() => setIsCreateOpen(true)}
@@ -949,7 +981,7 @@ export function BarisPagiDashboard() {
 						<RefreshCw className="w-4 h-4 text-slate-600" />
 					</Button>
 				</div>
-			</div>
+			)}
 
 			{/* Tabs Segment */}
 			<Tabs

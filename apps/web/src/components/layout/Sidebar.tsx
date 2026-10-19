@@ -153,13 +153,13 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 			},
 			{
 				label: "Kehadiran Piket",
-				href: "/dashboard/kehadiran-piket",
+				href: "/dashboard/kehadiran?tab=piket",
 				roles: ["superadmin", "akademik"],
 				icon: Sparkles,
 			},
 			{
 				label: "Kepatuhan Baris Pagi",
-				href: "/dashboard/baris-pagi",
+				href: "/dashboard/kehadiran?tab=baris-pagi",
 				roles: ["superadmin", "akademik"],
 				icon: ShieldCheck,
 			},
@@ -472,6 +472,17 @@ function checkItemActive(
 				pathname.startsWith("/dashboard/akademik/")) &&
 			!pathname.startsWith("/dashboard/akademik/pa")
 		);
+	}
+
+	if (href.startsWith("/dashboard/kehadiran")) {
+		if (pathname === "/dashboard/kehadiran") {
+			if (href.includes("?tab=")) {
+				const tabInHref = href.split("?tab=")[1];
+				return rawContext === tabInHref;
+			}
+			return !rawContext || rawContext === "all-service";
+		}
+		return false;
 	}
 
 	return pathname === href || pathname.startsWith(`${href}/`);
