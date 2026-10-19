@@ -312,6 +312,7 @@ export async function processLogin({
 			requiresOtp: true,
 			tempToken: otpResult.tempToken,
 			maskedEmail: otpResult.maskedEmail,
+			otpCode: otpResult.otp,
 			message: `Kode verifikasi telah dikirimkan ke ${otpResult.maskedEmail}`,
 		};
 	}
@@ -614,6 +615,7 @@ export async function processResendOtp({
 		success: true,
 		message: `Kode verifikasi baru telah dikirim ke ${resendResult.maskedEmail}`,
 		maskedEmail: resendResult.maskedEmail,
+		otpCode: resendResult.otpCode,
 		cooldownSeconds: resendResult.cooldownSeconds,
 	};
 }

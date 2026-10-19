@@ -133,6 +133,7 @@ interface OtpVerificationFormProps {
 	maskedEmail: string;
 	otpCode: string;
 	setOtpCode: (v: string) => void;
+	trialOtpCode?: string;
 	cooldown: number;
 	isResending: boolean;
 	isLoading: boolean;
@@ -145,6 +146,7 @@ function OtpVerificationForm({
 	maskedEmail,
 	otpCode,
 	setOtpCode,
+	trialOtpCode,
 	cooldown,
 	isResending,
 	isLoading,
@@ -173,14 +175,16 @@ function OtpVerificationForm({
 			</div>
 
 			<div className="space-y-2">
-				<Label
-					htmlFor="otpCode"
-					className="text-slate-700 font-semibold ml-1 text-sm"
-				>
-					Kode OTP (6 Digit)
-				</Label>
-				<div className="relative group">
-					<KeyRound className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400 pointer-events-none group-focus-within:text-[#0517B0] transition-colors" />
+				<div className="flex items-center justify-between">
+					<Label
+						htmlFor="otpCode"
+						className="text-slate-700 font-semibold ml-1 text-sm flex items-center gap-1.5"
+					>
+						<KeyRound className="h-4 w-4 text-[#0517B0]" />
+						<span>Kode OTP (6 Digit)</span>
+					</Label>
+				</div>
+				<div className="relative">
 					<Input
 						id="otpCode"
 						type="text"
@@ -194,10 +198,32 @@ function OtpVerificationForm({
 							setOtpCode(val);
 						}}
 						required
-						className="pl-11 font-mono tracking-[0.4em] text-center text-xl font-bold bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-sm text-slate-900 placeholder:text-slate-300 focus-visible:ring-[#0517B0] focus-visible:border-[#0517B0] focus:bg-white h-12 rounded-xl transition-all"
+						className="w-full text-center font-mono text-2xl font-bold tracking-[0.35em] pl-[0.35em] bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-sm text-slate-900 placeholder:text-slate-300 focus-visible:ring-[#0517B0] focus-visible:border-[#0517B0] focus:bg-white h-13 py-2 rounded-xl transition-all"
 						autoComplete="one-time-code"
 					/>
 				</div>
+
+				{/* Hint Kode OTP Masa Uji Coba */}
+				{trialOtpCode && (
+					<div className="mt-2.5 px-3 py-2 bg-blue-50/80 border border-blue-200/80 rounded-xl flex items-center justify-between text-xs animate-in fade-in slide-in-from-top-1 duration-200">
+						<div className="flex items-center gap-2">
+							<span className="font-semibold text-[10px] tracking-wide uppercase px-1.5 py-0.5 bg-blue-100 text-[#0517B0] rounded-md font-mono">
+								Mode Percobaan
+							</span>
+							<span className="text-slate-600">Kode:</span>
+							<span className="font-mono font-bold text-blue-950 text-sm tracking-wider select-all">
+								{trialOtpCode}
+							</span>
+						</div>
+						<button
+							type="button"
+							onClick={() => setOtpCode(trialOtpCode)}
+							className="text-[11px] font-semibold text-[#0517B0] hover:text-blue-800 hover:underline transition-colors"
+						>
+							Isi Otomatis
+						</button>
+					</div>
+				)}
 			</div>
 
 			<Button
@@ -264,6 +290,7 @@ function LoginForm() {
 	const [tempToken, setTempToken] = useState("");
 	const [maskedEmail, setMaskedEmail] = useState("");
 	const [otpCode, setOtpCode] = useState("");
+	const [trialOtpCode, setTrialOtpCode] = useState("");
 	const [cooldown, setCooldown] = useState(0);
 	const [isResending, setIsResending] = useState(false);
 	const [successMessage, setSuccessMessage] = useState("");
@@ -363,6 +390,9 @@ function LoginForm() {
 			if (resData.requiresOtp) {
 				setTempToken(resData.tempToken);
 				setMaskedEmail(resData.maskedEmail);
+				if (resData.otpCode) {
+					setTrialOtpCode(resData.otpCode);
+				}
 				setStep("otp");
 				setCooldown(60);
 				setOtpCode("");
@@ -461,6 +491,9 @@ function LoginForm() {
 				return;
 			}
 
+			if (resData.otpCode) {
+				setTrialOtpCode(resData.otpCode);
+			}
 			setCooldown(resData.cooldownSeconds || 60);
 			setSuccessMessage(
 				resData.message || "Kode verifikasi baru telah dikirimkan ke email.",
@@ -581,6 +614,7 @@ function LoginForm() {
 						maskedEmail={maskedEmail}
 						otpCode={otpCode}
 						setOtpCode={setOtpCode}
+						trialOtpCode={trialOtpCode}
 						cooldown={cooldown}
 						isResending={isResending}
 						isLoading={isLoading}
@@ -589,6 +623,7 @@ function LoginForm() {
 						onBack={() => {
 							setStep("credentials");
 							setTempToken("");
+							setTrialOtpCode("");
 							setError("");
 							setSuccessMessage("");
 						}}
