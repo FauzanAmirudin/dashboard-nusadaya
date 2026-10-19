@@ -19,7 +19,7 @@ export const courses = pgTable(
 	"courses",
 	{
 		id: serial("id").primaryKey(),
-		code: text("code").unique().notNull(),
+		code: text("code").notNull(),
 		name: text("name").notNull(),
 		sks: integer("sks").default(2).notNull(),
 		dosenId: integer("dosen_id")
