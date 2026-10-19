@@ -524,27 +524,27 @@ export function KehadiranDashboard({
 			>
 				{/* Top Switcher & Filter Bar */}
 				<div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-					<TabsList className="bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/60 shadow-2xs grid grid-cols-2 md:grid-cols-4 max-w-2xl h-auto gap-1">
+					<TabsList className="bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/60 shadow-2xs grid grid-cols-2 md:grid-cols-4 max-w-xl h-auto gap-1">
 						<TabsTrigger
 							value="all-service"
 							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-xs rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold cursor-pointer gap-2 transition-all"
 						>
 							<Award className="w-4 h-4 text-amber-500 shrink-0" />
-							<span className="truncate">Matriks All-Service</span>
+							<span className="truncate">Semua</span>
 						</TabsTrigger>
 						<TabsTrigger
 							value="kuliah"
 							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-xs rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold cursor-pointer gap-2 transition-all"
 						>
 							<GraduationCap className="w-4 h-4 text-blue-600 shrink-0" />
-							<span className="truncate">Perkuliahan</span>
+							<span className="truncate">Kuliah</span>
 						</TabsTrigger>
 						<TabsTrigger
 							value="piket"
 							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-xs rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold cursor-pointer gap-2 transition-all"
 						>
 							<CalendarDays className="w-4 h-4 text-emerald-600 shrink-0" />
-							<span className="truncate">Kehadiran Piket</span>
+							<span className="truncate">Piket</span>
 						</TabsTrigger>
 						<TabsTrigger
 							value="baris-pagi"
