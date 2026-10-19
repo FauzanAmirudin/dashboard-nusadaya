@@ -312,7 +312,7 @@ export async function processLogin({
 			requiresOtp: true,
 			tempToken: otpResult.tempToken,
 			maskedEmail: otpResult.maskedEmail,
-			otpCode: otpResult.otp,
+			otpCode: otpResult.otpCode,
 			message: `Kode verifikasi telah dikirimkan ke ${otpResult.maskedEmail}`,
 		};
 	}
