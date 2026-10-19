@@ -10,6 +10,7 @@
 		"db:studio": "bunx drizzle-kit studio",
 		"seed": "bun run seed.ts",
 		"seed:batch": "bun run scripts/seed-users-batch.ts",
+		"seed:additional-students": "bun run scripts/seed-additional-students.ts",
 		"update:superadmin-email": "bun run scripts/update-superadmin-email.ts",
 		"audit:emails": "bun run scripts/audit-user-emails.ts"
 	},
