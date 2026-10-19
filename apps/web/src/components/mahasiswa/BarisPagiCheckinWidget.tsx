@@ -269,8 +269,9 @@ export function BarisPagiCheckinWidget() {
 	const session = data!.session!;
 	const studentCheckin =
 		data?.studentCheckin || (session as any)?.myRecord || null;
+	const windowStatus = data?.windowStatus;
 	const isCheckinOpen =
-		data?.windowStatus === "OPEN" || (session as any)?.isWindowOpen === true;
+		windowStatus === "OPEN" || (session as any)?.isWindowOpen === true;
 	const isAlreadyCheckedIn = Boolean(
 		studentCheckin && (studentCheckin.status || (session as any)?.hasRecorded),
 	);
