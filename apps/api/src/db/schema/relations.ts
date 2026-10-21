@@ -3,6 +3,7 @@ import {
 	academicAttitudeLogs,
 	academicData,
 	academicDocuments,
+	academicKhsTranscripts,
 	courseGradeDocuments,
 	courseGrades,
 	overseasProgramChecklists,
@@ -58,6 +59,7 @@ import {
 } from "./pmb";
 import {
 	announcements,
+	attendanceCheckpointConfig,
 	attendanceRecords,
 	attendanceSessions,
 	classSchedules,
@@ -68,6 +70,7 @@ import {
 	odsAttendanceRecords,
 	practicumSchedules,
 	pramagangAttendanceRecords,
+	selfieFraudFlags,
 } from "./scheduling";
 import {
 	auditLogs,
@@ -270,6 +273,20 @@ export const academicDocumentsRelations = relations(
 		}),
 		verifiedBy: one(users, {
 			fields: [academicDocuments.verifiedBy],
+			references: [users.id],
+		}),
+	}),
+);
+
+export const academicKhsTranscriptsRelations = relations(
+	academicKhsTranscripts,
+	({ one }) => ({
+		student: one(students, {
+			fields: [academicKhsTranscripts.studentId],
+			references: [students.id],
+		}),
+		publisher: one(users, {
+			fields: [academicKhsTranscripts.publishedBy],
 			references: [users.id],
 		}),
 	}),
@@ -677,6 +694,10 @@ export const attendanceRecordsRelations = relations(
 			fields: [attendanceRecords.recordedBy],
 			references: [users.id],
 		}),
+		verifier: one(users, {
+			fields: [attendanceRecords.verifiedBy],
+			references: [users.id],
+		}),
 	}),
 );
 
@@ -691,6 +712,10 @@ export const odsAttendanceRecordsRelations = relations(
 			fields: [odsAttendanceRecords.recordedBy],
 			references: [users.id],
 		}),
+		verifier: one(users, {
+			fields: [odsAttendanceRecords.verifiedBy],
+			references: [users.id],
+		}),
 	}),
 );
 
@@ -703,6 +728,10 @@ export const pramagangAttendanceRecordsRelations = relations(
 		}),
 		recorder: one(users, {
 			fields: [pramagangAttendanceRecords.recordedBy],
+			references: [users.id],
+		}),
+		verifier: one(users, {
+			fields: [pramagangAttendanceRecords.verifiedBy],
 			references: [users.id],
 		}),
 	}),
@@ -745,6 +774,10 @@ export const courseMeetingsRelations = relations(
 		course: one(courses, {
 			fields: [courseMeetings.courseId],
 			references: [courses.id],
+		}),
+		dosenPengajar: one(users, {
+			fields: [courseMeetings.dosenPengajarId],
+			references: [users.id],
 		}),
 		activities: many(courseMeetingActivities),
 		attendances: many(courseMeetingAttendances),
@@ -801,6 +834,10 @@ export const morningAssemblyRecordsRelations = relations(
 			fields: [morningAssemblyRecords.recordedBy],
 			references: [users.id],
 		}),
+		verifier: one(users, {
+			fields: [morningAssemblyRecords.verifiedBy],
+			references: [users.id],
+		}),
 	}),
 );
 
@@ -809,6 +846,30 @@ export const morningAssemblyScheduleConfigRelations = relations(
 	({ one }) => ({
 		creator: one(users, {
 			fields: [morningAssemblyScheduleConfig.createdBy],
+			references: [users.id],
+		}),
+	}),
+);
+
+export const attendanceCheckpointConfigRelations = relations(
+	attendanceCheckpointConfig,
+	({ one }) => ({
+		creator: one(users, {
+			fields: [attendanceCheckpointConfig.createdBy],
+			references: [users.id],
+		}),
+	}),
+);
+
+export const selfieFraudFlagsRelations = relations(
+	selfieFraudFlags,
+	({ one }) => ({
+		student: one(students, {
+			fields: [selfieFraudFlags.studentId],
+			references: [students.id],
+		}),
+		reviewer: one(users, {
+			fields: [selfieFraudFlags.reviewedBy],
 			references: [users.id],
 		}),
 	}),

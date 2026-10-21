@@ -3,16 +3,17 @@
 import {
 	Award,
 	CalendarDays,
-	CheckCircle2,
+	Camera,
 	ClipboardCheck,
 	Clock,
 	Download,
 	GraduationCap,
 	Loader2,
+	MapPin,
 	RotateCcw,
 	Search,
+	ShieldAlert,
 	ShieldCheck,
-	Users,
 	X,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -20,9 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import {
 	Select,
 	SelectContent,
@@ -33,9 +32,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { API_URL, api, getToken } from "@/lib/eden";
 import { TabAllServiceMatrix } from "./tabs/TabAllServiceMatrix";
+import { TabCheckpointConfig } from "./tabs/TabCheckpointConfig";
+import { TabFraudFlagsReview } from "./tabs/TabFraudFlagsReview";
 import { TabKehadiranPiket } from "./tabs/TabKehadiranPiket";
 import { TabKepatuhanBarisPagi } from "./tabs/TabKepatuhanBarisPagi";
 import { TabPresensiKuliah } from "./tabs/TabPresensiKuliah";
+import { TabSelfieLiveFeed } from "./tabs/TabSelfieLiveFeed";
 import type { AllServiceStudentItem, KehadiranTabKey } from "./types";
 
 interface KehadiranDashboardProps {
@@ -49,20 +51,23 @@ export function KehadiranDashboard({
 	const searchParams = useSearchParams();
 
 	const tabQuery = searchParams.get("tab") as KehadiranTabKey | null;
+	const allowedTabs = [
+		"all-service",
+		"selfie-feed",
+		"kuliah",
+		"piket",
+		"baris-pagi",
+		"fraud-review",
+		"checkpoint-config",
+	];
 	const initialTab: KehadiranTabKey =
-		tabQuery &&
-		["all-service", "kuliah", "piket", "baris-pagi"].includes(tabQuery)
-			? tabQuery
-			: defaultTab;
+		tabQuery && (allowedTabs as any).includes(tabQuery) ? tabQuery : defaultTab;
 
 	const [activeTab, setActiveTab] = useState<KehadiranTabKey>(initialTab);
 
 	// Sync activeTab when URL query changes (e.g. browser back/forward or sidebar click)
 	useEffect(() => {
-		if (
-			tabQuery &&
-			["all-service", "kuliah", "piket", "baris-pagi"].includes(tabQuery)
-		) {
+		if (tabQuery && (allowedTabs as any).includes(tabQuery)) {
 			setActiveTab(tabQuery);
 		}
 	}, [tabQuery]);
@@ -136,7 +141,7 @@ export function KehadiranDashboard({
 
 	useEffect(() => {
 		fetchStudents();
-	}, []);
+	}, [activeTab]);
 
 	useEffect(() => {
 		fetchAllServiceData();
@@ -172,45 +177,6 @@ export function KehadiranDashboard({
 			return true;
 		});
 	}, [students, cohortFilter, rombelFilter, searchQuery]);
-
-	// Calculate High-level Metrics directly from dynamic database data
-	const totalStudents = students.length;
-
-	let totalMeetingsSum = 0;
-	let totalPresentSum = 0;
-	let totalPiketSessions = 0;
-	let totalPiketPresent = 0;
-	let totalBarisSessions = 0;
-	let totalBarisTepatWaktu = 0;
-
-	students.forEach((item: any) => {
-		const courses = item.courseGrades || [];
-		courses.forEach((c: any) => {
-			totalMeetingsSum += c.totalMeetings || 16;
-			totalPresentSum += c.attendancePresent || 0;
-		});
-
-		const acad = item.academic || {};
-		totalPiketSessions += acad.attendancePiketTotal || 0;
-		totalPiketPresent += acad.attendancePiketPresent || 0;
-		totalBarisSessions += acad.attendanceBarisTotal || 0;
-		totalBarisTepatWaktu += acad.attendanceBarisPresent || 0;
-	});
-
-	const avgAttendanceRate =
-		totalMeetingsSum > 0
-			? Math.round((totalPresentSum / totalMeetingsSum) * 100)
-			: 100;
-
-	const avgPiketRate =
-		totalPiketSessions > 0
-			? Math.round((totalPiketPresent / totalPiketSessions) * 100)
-			: 100;
-
-	const avgBarisRate =
-		totalBarisSessions > 0
-			? Math.round((totalBarisTepatWaktu / totalBarisSessions) * 100)
-			: 100;
 
 	// Export Comprehensive All-Service Multi-Sheet Excel
 	const handleExport = async () => {
@@ -400,122 +366,6 @@ export function KehadiranDashboard({
 				</div>
 			</div>
 
-			{/* KPI Summary Cards Grid - 4 Pillars */}
-			<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-				{/* 1. Presensi Perkuliahan (50%) */}
-				<Card className="bg-white border border-slate-200/90 shadow-2xs rounded-2xl overflow-hidden hover:border-slate-300 transition-all">
-					<CardContent className="p-4 sm:p-5">
-						<div className="flex items-center justify-between">
-							<div>
-								<span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-									Pilar 1 (Bobot 50%)
-								</span>
-								<p className="text-xs text-slate-500 font-medium mt-1">
-									Presensi Kuliah
-								</p>
-							</div>
-							<div className="w-8 h-8 rounded-xl bg-blue-50 text-[#0517B0] flex items-center justify-center">
-								<GraduationCap className="w-4 h-4" />
-							</div>
-						</div>
-						<p className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-2">
-							{avgAttendanceRate}%
-						</p>
-						<div className="w-full mt-2">
-							<Progress
-								value={avgAttendanceRate}
-								className="h-1.5 bg-blue-100 [&>div]:bg-[#0517B0]"
-							/>
-						</div>
-					</CardContent>
-				</Card>
-
-				{/* 2. Presensi Piket Kebersihan (25%) */}
-				<Card className="bg-white border border-slate-200/90 shadow-2xs rounded-2xl overflow-hidden hover:border-slate-300 transition-all">
-					<CardContent className="p-4 sm:p-5">
-						<div className="flex items-center justify-between">
-							<div>
-								<span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-									Pilar 2 (Bobot 25%)
-								</span>
-								<p className="text-xs text-slate-500 font-medium mt-1">
-									Piket Kebersihan
-								</p>
-							</div>
-							<div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-								<CalendarDays className="w-4 h-4" />
-							</div>
-						</div>
-						<p className="text-xl sm:text-2xl font-bold text-emerald-700 tracking-tight mt-2">
-							{avgPiketRate}%
-						</p>
-						<div className="w-full mt-2">
-							<Progress
-								value={avgPiketRate}
-								className="h-1.5 bg-emerald-100 [&>div]:bg-emerald-600"
-							/>
-						</div>
-					</CardContent>
-				</Card>
-
-				{/* 3. Kepatuhan Baris Pagi 06.22 (25%) */}
-				<Card className="bg-white border border-slate-200/90 shadow-2xs rounded-2xl overflow-hidden hover:border-slate-300 transition-all">
-					<CardContent className="p-4 sm:p-5">
-						<div className="flex items-center justify-between">
-							<div>
-								<span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-									Pilar 3 (Bobot 25%)
-								</span>
-								<p className="text-xs text-slate-500 font-medium mt-1">
-									Baris Pagi (06.22)
-								</p>
-							</div>
-							<div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-								<ShieldCheck className="w-4 h-4" />
-							</div>
-						</div>
-						<p className="text-xl sm:text-2xl font-bold text-amber-700 tracking-tight mt-2">
-							{avgBarisRate}%
-						</p>
-						<div className="w-full mt-2">
-							<Progress
-								value={avgBarisRate}
-								className="h-1.5 bg-amber-100 [&>div]:bg-amber-600"
-							/>
-						</div>
-					</CardContent>
-				</Card>
-
-				{/* 4. Konsolidasi Mahasiswa Aktif */}
-				<Card className="bg-white border border-slate-200/90 shadow-2xs rounded-2xl overflow-hidden hover:border-slate-300 transition-all">
-					<CardContent className="p-4 sm:p-5">
-						<div className="flex items-center justify-between">
-							<div>
-								<span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-									Institusi
-								</span>
-								<p className="text-xs text-slate-500 font-medium mt-1">
-									Total Mahasiswa
-								</p>
-							</div>
-							<div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-								<Users className="w-4 h-4" />
-							</div>
-						</div>
-						<p className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-2">
-							{totalStudents}{" "}
-							<span className="text-xs font-semibold text-slate-400 font-normal">
-								Mahasiswa
-							</span>
-						</p>
-						<div className="flex items-center gap-1.5 text-[11px] text-emerald-600 mt-2 font-medium">
-							<CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-							<span>Semua Peminatan Aktif</span>
-						</div>
-					</CardContent>
-				</Card>
-			</div>
-
 			{/* Main Content Tabs: 4 Dimension Tabs */}
 			<Tabs
 				value={activeTab}
@@ -524,13 +374,20 @@ export function KehadiranDashboard({
 			>
 				{/* Top Switcher & Filter Bar */}
 				<div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-					<TabsList className="bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/60 shadow-2xs grid grid-cols-2 md:grid-cols-4 max-w-xl h-auto gap-1">
+					<TabsList className="bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/60 shadow-2xs flex flex-wrap max-w-full h-auto gap-1">
 						<TabsTrigger
 							value="all-service"
 							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-xs rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold cursor-pointer gap-2 transition-all"
 						>
 							<Award className="w-4 h-4 text-amber-500 shrink-0" />
 							<span className="truncate">Semua</span>
+						</TabsTrigger>
+						<TabsTrigger
+							value="selfie-feed"
+							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-xs rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold cursor-pointer gap-2 transition-all"
+						>
+							<Camera className="w-4 h-4 text-blue-600 shrink-0" />
+							<span className="truncate">Live Feed Selfie</span>
 						</TabsTrigger>
 						<TabsTrigger
 							value="kuliah"
@@ -552,6 +409,20 @@ export function KehadiranDashboard({
 						>
 							<ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
 							<span className="truncate">Baris Pagi</span>
+						</TabsTrigger>
+						<TabsTrigger
+							value="fraud-review"
+							className="data-[state=active]:bg-white data-[state=active]:text-rose-700 data-[state=active]:shadow-xs rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold cursor-pointer gap-2 transition-all"
+						>
+							<ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+							<span className="truncate">Audit Fraud</span>
+						</TabsTrigger>
+						<TabsTrigger
+							value="checkpoint-config"
+							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-xs rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold cursor-pointer gap-2 transition-all"
+						>
+							<MapPin className="w-4 h-4 text-indigo-600 shrink-0" />
+							<span className="truncate">Checkpoint GPS</span>
 						</TabsTrigger>
 					</TabsList>
 
@@ -663,6 +534,30 @@ export function KehadiranDashboard({
 					className="space-y-4 focus-visible:outline-hidden"
 				>
 					<TabKepatuhanBarisPagi />
+				</TabsContent>
+
+				{/* TAB 5: LIVE FEED SELFIE & MONITORING */}
+				<TabsContent
+					value="selfie-feed"
+					className="space-y-4 focus-visible:outline-hidden"
+				>
+					<TabSelfieLiveFeed />
+				</TabsContent>
+
+				{/* TAB 6: FRAUD REVIEW */}
+				<TabsContent
+					value="fraud-review"
+					className="space-y-4 focus-visible:outline-hidden"
+				>
+					<TabFraudFlagsReview />
+				</TabsContent>
+
+				{/* TAB 7: CHECKPOINT CONFIG */}
+				<TabsContent
+					value="checkpoint-config"
+					className="space-y-4 focus-visible:outline-hidden"
+				>
+					<TabCheckpointConfig />
 				</TabsContent>
 			</Tabs>
 		</div>

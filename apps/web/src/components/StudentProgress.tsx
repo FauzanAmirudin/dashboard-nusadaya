@@ -54,6 +54,23 @@ export function StudentProgress({
 			}
 		};
 
+		const handleAkademikSync = (e: any) => {
+			if (e.detail?.studentId === studentId) {
+				if (userRole === "akademik" || !userRole) {
+					if (typeof e.detail.completed === "number") {
+						setCompleted((prev) =>
+							prev === e.detail.completed ? prev : e.detail.completed,
+						);
+					}
+					if (typeof e.detail.total === "number") {
+						setTotal((prev) =>
+							prev === e.detail.total ? prev : e.detail.total,
+						);
+					}
+				}
+			}
+		};
+
 		window.addEventListener(
 			"crm-progress-sync",
 			handleCrmSync as EventListener,
@@ -61,6 +78,10 @@ export function StudentProgress({
 		window.addEventListener(
 			"pmb-progress-sync",
 			handlePmbSync as EventListener,
+		);
+		window.addEventListener(
+			"akademik-progress-sync",
+			handleAkademikSync as EventListener,
 		);
 		return () => {
 			window.removeEventListener(
@@ -70,6 +91,10 @@ export function StudentProgress({
 			window.removeEventListener(
 				"pmb-progress-sync",
 				handlePmbSync as EventListener,
+			);
+			window.removeEventListener(
+				"akademik-progress-sync",
+				handleAkademikSync as EventListener,
 			);
 		};
 	}, [studentId, userRole]);
@@ -120,11 +145,13 @@ export function StudentProgress({
 	}, [studentId, updateTrigger, userRole]);
 
 	const displayTotal =
-		overrideProgress && (userRole === "crm" || !userRole)
+		overrideProgress &&
+		(userRole === "crm" || userRole === "akademik" || !userRole)
 			? overrideProgress.total
 			: total;
 	const displayCompleted =
-		overrideProgress && (userRole === "crm" || !userRole)
+		overrideProgress &&
+		(userRole === "crm" || userRole === "akademik" || !userRole)
 			? overrideProgress.completed
 			: completed;
 

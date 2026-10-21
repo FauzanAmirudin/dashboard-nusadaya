@@ -41,6 +41,7 @@ import {
 import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
 import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
+import { GradeCalculationService } from "../../modules/academic/grade-calculation.service";
 import { fileService } from "../../modules/file/service/file.service";
 
 export const academicRoutes = new Elysia()
@@ -942,5 +943,187 @@ export const academicRoutes = new Elysia()
 				description: t.Optional(t.Any()),
 				documentUrl: t.Optional(t.Any()),
 			}),
+		},
+	)
+
+	// AKD-06: 1. Detail KHS & Rincian Komponen Nilai Otomatis
+	.get("/:id/academic/khs", async ({ params, query, set }) => {
+		try {
+			const id = Number(params.id);
+			const semester = (query as any)?.semester
+				? Number((query as any).semester)
+				: 1;
+			const summary = await GradeCalculationService.calculateStudentGrades(
+				id,
+				semester,
+			);
+			return { success: true, data: summary };
+		} catch (err: any) {
+			set.status = 500;
+			return { success: false, message: err.message || "Gagal memuat KHS" };
+		}
+	})
+
+	// AKD-06: 1b. Transkrip Nilai Kumulatif Keseluruhan Masa Studi Mahasiswa
+	.get("/:id/academic/transcript", async ({ params, set }) => {
+		try {
+			const id = Number(params.id);
+			const transcript =
+				await GradeCalculationService.calculateStudentTranscript(id);
+			return { success: true, data: transcript };
+		} catch (err: any) {
+			set.status = 500;
+			return {
+				success: false,
+				message: err.message || "Gagal memuat transkrip nilai",
+			};
+		}
+	})
+
+	// AKD-06: 2. Pemicu Kalkulasi Ulang Nilai Mahasiswa
+	.post(
+		"/:id/academic/calculate-grades",
+		async ({ params, body, set }) => {
+			try {
+				const id = Number(params.id);
+				const semester = (body as any)?.semester
+					? Number((body as any).semester)
+					: 1;
+				const summary = await GradeCalculationService.calculateStudentGrades(
+					id,
+					semester,
+				);
+				return {
+					success: true,
+					message: `Kalkulasi nilai otomatis berhasil! IPK: ${summary.gpaDisplay}, SKS Lulus: ${summary.totalSksPassed}`,
+					data: summary,
+				};
+			} catch (err: any) {
+				set.status = 500;
+				return {
+					success: false,
+					message: err.message || "Gagal menghitung nilai",
+				};
+			}
+		},
+		{
+			body: t.Optional(
+				t.Object({
+					semester: t.Optional(t.Any()),
+				}),
+			),
+		},
+	)
+
+	// AKD-06: 3. Penerbitan KHS Resmi Ber-nomor Dokumen
+	.post(
+		"/:id/academic/publish-khs",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			try {
+				const id = Number(params.id);
+				const semester = (body as any)?.semester
+					? Number((body as any).semester)
+					: 1;
+				const result = await GradeCalculationService.publishKhsDocument(
+					id,
+					semester,
+					user?.id,
+				);
+				return {
+					success: true,
+					message: `KHS resmi berhasil diterbitkan dengan nomor: ${result.documentNumber}`,
+					data: result,
+				};
+			} catch (err: any) {
+				set.status = 500;
+				return {
+					success: false,
+					message: err.message || "Gagal menerbitkan KHS",
+				};
+			}
+		},
+		{
+			body: t.Optional(
+				t.Object({
+					semester: t.Optional(t.Any()),
+				}),
+			),
+		},
+	)
+
+	// AKD-06: 4. Sinkronisasi KHS, KRS & Transkrip ke Modul Magang (Segmen 19)
+	.post("/:id/academic/sync-to-magang", async (context) => {
+		const { params, set } = context;
+		const user = (context as any).user;
+		try {
+			const id = Number(params.id);
+			const result = await GradeCalculationService.syncKhsToMagang(
+				id,
+				user?.id,
+			);
+			return {
+				success: true,
+				message:
+					"KHS & Transkrip berhasil disinkronkan ke modul Magang (Pra-Paspor otomatis terverifikasi)",
+				data: result,
+			};
+		} catch (err: any) {
+			set.status = 500;
+			return {
+				success: false,
+				message: err.message || "Gagal sinkronisasi ke Magang",
+			};
+		}
+	})
+
+	// AKD-06: 5. Tandai Pelaporan Status Feeder PDDIKTI (Segmen 14)
+	.post(
+		"/:id/academic/pddikti-report",
+		async (context) => {
+			const { params, body, set } = context;
+			try {
+				const id = Number(params.id);
+				const { regNo, isReported = true } = (body as any) || {};
+
+				await db
+					.update(academicData)
+					.set({
+						pddiktiInput: isReported,
+						pddiktiReported: isReported,
+						pddiktiReportedAt: isReported ? new Date() : null,
+						pddiktiRegNo: regNo || null,
+						updatedAt: new Date(),
+					})
+					.where(eq(academicData.studentId, id));
+
+				await Promise.all([
+					cacheDel(`cache:student:${id}`),
+					cacheInvalidatePattern("cache:students:list:*"),
+					cacheInvalidatePattern("cache:mahasiswa:*"),
+				]);
+
+				return {
+					success: true,
+					message: isReported
+						? "Status mahasiswa berhasil ditandai telah dilaporkan ke PDDIKTI"
+						: "Status pelaporan PDDIKTI dibatalkan",
+				};
+			} catch (err: any) {
+				set.status = 500;
+				return {
+					success: false,
+					message: err.message || "Gagal memproses status PDDIKTI",
+				};
+			}
+		},
+		{
+			body: t.Optional(
+				t.Object({
+					isReported: t.Optional(t.Boolean()),
+					regNo: t.Optional(t.String()),
+				}),
+			),
 		},
 	);

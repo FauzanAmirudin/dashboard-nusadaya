@@ -186,6 +186,16 @@ export function DosenDashboard({ user }: DosenDashboardProps) {
 							Mata Kuliah
 						</Button>
 					</Link>
+					<Link href="/dashboard/mata-kuliah/rekap-dosen">
+						<Button
+							variant="outline"
+							size="sm"
+							className="border-purple-200 text-purple-700 hover:bg-purple-50 text-xs gap-1.5 h-9 font-bold"
+						>
+							<Users className="w-3.5 h-3.5" />
+							Presensi
+						</Button>
+					</Link>
 					<Link href="/dashboard/mata-kuliah/rekap">
 						<Button
 							variant="outline"

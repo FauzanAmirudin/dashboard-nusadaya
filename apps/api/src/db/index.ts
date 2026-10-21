@@ -179,6 +179,23 @@ export async function ensureDatabaseSchema() {
 			ALTER TABLE courses ADD COLUMN IF NOT EXISTS rombel TEXT DEFAULT 'Kelas A';
 			ALTER TABLE courses ADD COLUMN IF NOT EXISTS sks INTEGER DEFAULT 2;
 
+			-- Practices budget request extensions
+			ALTER TABLE practices_budget_requests
+			  ADD COLUMN IF NOT EXISTS bukti_pencairan_url TEXT,
+			  ADD COLUMN IF NOT EXISTS bukti_pencairan_file_name TEXT,
+			  ADD COLUMN IF NOT EXISTS tanggal_pencairan TIMESTAMP;
+
+			-- DSN-01: Rekapitulasi Presensi Mengajar Dosen (Team Teaching)
+			ALTER TABLE course_meetings
+			  ADD COLUMN IF NOT EXISTS dosen_pengajar_id INTEGER REFERENCES users(id),
+			  ADD COLUMN IF NOT EXISTS attended_dosen_ids JSONB DEFAULT '[]'::jsonb,
+			  ADD COLUMN IF NOT EXISTS is_team_teaching_attended BOOLEAN DEFAULT false,
+			  ADD COLUMN IF NOT EXISTS teaching_status TEXT DEFAULT 'terlaksana',
+			  ADD COLUMN IF NOT EXISTS teaching_notes TEXT;
+
+			CREATE INDEX IF NOT EXISTS idx_course_meetings_dosen_pengajar_id ON course_meetings(dosen_pengajar_id);
+			CREATE INDEX IF NOT EXISTS idx_course_meetings_date ON course_meetings(meeting_date);
+
 			DO $$
 			BEGIN
 				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'courses_code_unique') THEN

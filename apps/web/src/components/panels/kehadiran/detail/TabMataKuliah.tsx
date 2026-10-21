@@ -4,6 +4,7 @@ import {
 	AlertCircle,
 	Award,
 	BookOpen,
+	Camera,
 	CheckCircle2,
 	ChevronDown,
 	ChevronUp,
@@ -23,6 +24,10 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+	SelfieDetailModal,
+	type SelfieRecordDetail,
+} from "@/components/panels/kehadiran/SelfieDetailModal";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -93,6 +98,8 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 		notes: "",
 	});
 	const [isSavingMeeting, setIsSavingMeeting] = useState(false);
+	const [selectedSelfieRecord, setSelectedSelfieRecord] =
+		useState<SelfieRecordDetail | null>(null);
 
 	const fetchData = async () => {
 		setIsLoading(true);
@@ -415,9 +422,6 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 												</>
 											)}
 										</div>
-
-										{/* Attitude note chip */}
-										{getAttitudeBadge(g.attitudeNote)}
 									</div>
 								</div>
 							</div>
@@ -535,69 +539,6 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 												)}
 												<span>Simpan Presensi</span>
 											</Button>
-										</div>
-									</div>
-
-									<div className="space-y-1.5 pt-1">
-										<Label className="text-xs font-semibold text-slate-700">
-											Catatan Sikap & Kedisiplinan Mahasiswa
-										</Label>
-										<div className="flex gap-2">
-											<Input
-												placeholder="Contoh: Sikap perkuliahan sangat baik dan aktif dalam praktikum..."
-												value={editForm.attitudeNote}
-												onChange={(e) =>
-													setEditForm((p) => ({
-														...p,
-														attitudeNote: e.target.value,
-													}))
-												}
-												className="h-9 text-xs flex-1"
-											/>
-											<div className="flex items-center gap-1 shrink-0">
-												<Button
-													type="button"
-													variant="outline"
-													size="sm"
-													onClick={() =>
-														setEditForm((p) => ({
-															...p,
-															attitudeNote: "Sangat Baik",
-														}))
-													}
-													className="h-9 text-[11px] px-2.5 text-emerald-700 hover:bg-emerald-50 border-emerald-200"
-												>
-													Sangat Baik
-												</Button>
-												<Button
-													type="button"
-													variant="outline"
-													size="sm"
-													onClick={() =>
-														setEditForm((p) => ({
-															...p,
-															attitudeNote: "Baik",
-														}))
-													}
-													className="h-9 text-[11px] px-2.5 text-blue-700 hover:bg-blue-50 border-blue-200"
-												>
-													Baik
-												</Button>
-												<Button
-													type="button"
-													variant="outline"
-													size="sm"
-													onClick={() =>
-														setEditForm((p) => ({
-															...p,
-															attitudeNote: "Cukup",
-														}))
-													}
-													className="h-9 text-[11px] px-2.5 text-amber-700 hover:bg-amber-50 border-amber-200"
-												>
-													Cukup
-												</Button>
-											</div>
 										</div>
 									</div>
 								</div>
@@ -757,6 +698,56 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 																				"{m.notes}"
 																			</span>
 																		</div>
+																	)}
+
+																	{/* Bukti Foto Selfie GPS Mahasiswa */}
+																	{m.selfieUrl && (
+																		<button
+																			type="button"
+																			onClick={() =>
+																				setSelectedSelfieRecord({
+																					id: m.id || m.meetingId || 0,
+																					attendanceType: "kuliah",
+																					title: `${g.courseName} - ${label}`,
+																					student: {
+																						id: studentId,
+																						name:
+																							data?.student?.name ||
+																							"Mahasiswa",
+																						nim: data?.student?.nim || "",
+																					},
+																					status: m.status || "hadir",
+																					selfieUrl: m.selfieUrl,
+																					latitude: m.latitude,
+																					longitude: m.longitude,
+																					gpsAccuracy: m.gpsAccuracy,
+																					locationName: m.locationName,
+																					distanceFromCheckpoint:
+																						m.distanceFromCheckpoint,
+																					isWithinRadius:
+																						m.isWithinRadius ?? true,
+																					selfieTakenAt:
+																						m.selfieTakenAt || m.meetingDate,
+																					verificationStatus:
+																						m.verificationStatus ||
+																						"auto_approved",
+																				})
+																			}
+																			className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-blue-50 border border-blue-200/80 bg-blue-50/40 text-blue-700 transition-colors cursor-pointer group text-left mt-1"
+																			title="Klik untuk melihat foto selfie & peta GPS"
+																		>
+																			<div className="relative w-5 h-5 rounded overflow-hidden border border-blue-300 shrink-0">
+																				<img
+																					src={m.selfieUrl}
+																					alt="Bukti Selfie"
+																					className="w-full h-full object-cover"
+																				/>
+																			</div>
+																			<span className="font-semibold text-[10px] flex items-center gap-1">
+																				<Camera className="w-2.5 h-2.5" />
+																				Selfie GPS
+																			</span>
+																		</button>
 																	)}
 																</div>
 
@@ -958,6 +949,15 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+
+			{/* Modal Detail & Verifikasi Foto Selfie GPS */}
+			{selectedSelfieRecord && (
+				<SelfieDetailModal
+					record={selectedSelfieRecord}
+					onClose={() => setSelectedSelfieRecord(null)}
+					onVerifySuccess={fetchData}
+				/>
+			)}
 		</div>
 	);
 }

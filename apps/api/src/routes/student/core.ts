@@ -534,6 +534,7 @@ export const coreRoutes = new Elysia()
 								classType: students.classType,
 								period: students.period,
 								paId: students.paId,
+								paName: users.fullName,
 								studentStatus: students.studentStatus,
 								overallStatus: students.overallStatus,
 								profilePhotoUrl: students.profilePhotoUrl,
@@ -568,6 +569,10 @@ export const coreRoutes = new Elysia()
 								mitraSponsor: pmbData.mitraSponsor,
 								koordinator: pmbData.koordinator,
 								rekomendasi: pmbData.rekomendasi,
+								referralCategory: pmbData.referralCategory,
+								referralInstitutionName: pmbData.referralInstitutionName,
+								referralContactName: pmbData.referralContactName,
+								referralContactPhone: pmbData.referralContactPhone,
 								rumahJuang: pmbData.rumahJuang,
 							},
 							crm: {
@@ -737,15 +742,43 @@ export const coreRoutes = new Elysia()
 						.leftJoin(paData, eq(students.id, paData.studentId))
 						.leftJoin(internshipData, eq(students.id, internshipData.studentId))
 						.leftJoin(finalDecision, eq(students.id, finalDecision.studentId))
+						.leftJoin(users, eq(students.paId, users.id))
 						.where(whereClause)
 						.orderBy(desc(students.updatedAt), desc(students.id))
 						.limit(limit)
 						.offset(offset);
 
+					// Fetch course grades for the fetched students to provide real-time attendance data
+					const studentIds = results.map((r) => r.student.id);
+					const grades =
+						studentIds.length > 0
+							? await db.query.courseGrades.findMany({
+									where: inArray(courseGrades.studentId, studentIds),
+									columns: {
+										id: true,
+										studentId: true,
+										courseId: true,
+										courseCode: true,
+										courseName: true,
+										totalMeetings: true,
+										attendancePresent: true,
+										attendanceRate: true,
+										grade: true,
+									},
+								})
+							: [];
+
+					const gradesMap = new Map<number, any[]>();
+					for (const g of grades) {
+						const list = gradesMap.get(g.studentId) || [];
+						list.push(g);
+						gradesMap.set(g.studentId, list);
+					}
+
 					// Transform data structure to match frontend expectations while keeping payload ultra-slim
 					const slimData = results.map((r) => ({
 						...r,
-						courseGrades: [],
+						courseGrades: gradesMap.get(r.student.id) || [],
 						financeSemesters: [],
 						financeInstallments: [],
 						financeCustomFields: [],
@@ -877,6 +910,13 @@ export const coreRoutes = new Elysia()
 				roReferral: t.Optional(t.String()),
 				mitraSponsor: t.Optional(t.String()),
 				koordinator: t.Optional(t.String()),
+				referralCategory: t.Optional(t.String()),
+				referralInstitutionName: t.Optional(t.String()),
+				referralContactName: t.Optional(t.String()),
+				referralContactPhone: t.Optional(t.String()),
+				emergencyContactName: t.Optional(t.String()),
+				emergencyContactPhone: t.Optional(t.String()),
+				emergencyContactRelation: t.Optional(t.String()),
 			}),
 		},
 	)
@@ -947,6 +987,15 @@ export const coreRoutes = new Elysia()
 					studentStatus: body.studentStatus || "aktif",
 					destinationCountry: body.destinationCountry,
 					period: body.period,
+					...(body.emergencyContactName !== undefined
+						? { emergencyContactName: body.emergencyContactName }
+						: {}),
+					...(body.emergencyContactPhone !== undefined
+						? { emergencyContactPhone: body.emergencyContactPhone }
+						: {}),
+					...(body.emergencyContactRelation !== undefined
+						? { emergencyContactRelation: body.emergencyContactRelation }
+						: {}),
 					...(body.rombel !== undefined ? { rombel: body.rombel } : {}),
 					updatedAt: new Date(),
 				})
@@ -999,6 +1048,18 @@ export const coreRoutes = new Elysia()
 					roReferral: body.roReferral,
 					mitraSponsor: body.mitraSponsor,
 					koordinator: body.koordinator,
+					...(body.referralCategory !== undefined
+						? { referralCategory: body.referralCategory }
+						: {}),
+					...(body.referralInstitutionName !== undefined
+						? { referralInstitutionName: body.referralInstitutionName }
+						: {}),
+					...(body.referralContactName !== undefined
+						? { referralContactName: body.referralContactName }
+						: {}),
+					...(body.referralContactPhone !== undefined
+						? { referralContactPhone: body.referralContactPhone }
+						: {}),
 					updatedAt: new Date(),
 				})
 				.where(eq(pmbData.studentId, id));
@@ -1096,6 +1157,13 @@ export const coreRoutes = new Elysia()
 				roReferral: t.Optional(t.String()),
 				mitraSponsor: t.Optional(t.String()),
 				koordinator: t.Optional(t.String()),
+				referralCategory: t.Optional(t.String()),
+				referralInstitutionName: t.Optional(t.String()),
+				referralContactName: t.Optional(t.String()),
+				referralContactPhone: t.Optional(t.String()),
+				emergencyContactName: t.Optional(t.String()),
+				emergencyContactPhone: t.Optional(t.String()),
+				emergencyContactRelation: t.Optional(t.String()),
 			}),
 		},
 	)

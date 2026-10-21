@@ -132,7 +132,7 @@ export const documentsRoutes = new Elysia()
 			}
 
 			// === Guard untuk role mahasiswa ===
-			if (user && hasRole(user, "mahasiswa")) {
+			if (user && user.role === "mahasiswa" && !hasRole(user, "superadmin")) {
 				// Mahasiswa hanya bisa upload ke data miliknya sendiri
 				const studentRow = await db.query.students.findFirst({
 					where: eq(students.id, studentId),
@@ -391,8 +391,15 @@ export const documentsRoutes = new Elysia()
 				return { success: false, message: "Invalid panel" };
 		}
 
-		// === Guard untuk role mahasiswa saat hapus dokumen CRM ===
-		if (hasRole(user, "mahasiswa") && panel === "crm") {
+		// === Guard untuk role mahasiswa saat hapus dokumen ===
+		if (user && user.role === "mahasiswa" && !hasRole(user, "superadmin")) {
+			if (panel !== "crm") {
+				set.status = 403;
+				return {
+					success: false,
+					message: "Mahasiswa hanya diizinkan menghapus dokumen CRM",
+				};
+			}
 			// Verifikasi kepemilikan
 			const studentRow = await db.query.students.findFirst({
 				where: eq(students.id, studentId),

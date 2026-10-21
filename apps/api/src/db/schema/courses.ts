@@ -1,7 +1,9 @@
 import {
+	boolean,
 	date,
 	index,
 	integer,
+	jsonb,
 	pgTable,
 	serial,
 	text,
@@ -44,20 +46,33 @@ export const courses = pgTable(
 	],
 );
 
-export const courseMeetings = pgTable("course_meetings", {
-	id: serial("id").primaryKey(),
-	courseId: integer("course_id")
-		.references(() => courses.id)
-		.notNull(),
-	meetingNumber: integer("meeting_number").notNull(), // 1 to 16
-	meetingType: meetingTypeEnum("meeting_type").notNull(), // regular, uts, uas
-	sessionType: text("session_type"), // "teori" | "praktik" | "keduanya"
-	meetingLabel: text("meeting_label").notNull(),
-	description: text("description"),
-	meetingDate: date("meeting_date"),
-	createdAt: timestamp("created_at").defaultNow().notNull(),
-	updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const courseMeetings = pgTable(
+	"course_meetings",
+	{
+		id: serial("id").primaryKey(),
+		courseId: integer("course_id")
+			.references(() => courses.id)
+			.notNull(),
+		meetingNumber: integer("meeting_number").notNull(), // 1 to 16
+		meetingType: meetingTypeEnum("meeting_type").notNull(), // regular, uts, uas
+		sessionType: text("session_type"), // "teori" | "praktik" | "keduanya"
+		meetingLabel: text("meeting_label").notNull(),
+		description: text("description"),
+		meetingDate: date("meeting_date"),
+		dosenPengajarId: integer("dosen_pengajar_id").references(() => users.id),
+		attendedDosenIds: jsonb("attended_dosen_ids").$type<number[]>().default([]),
+		isTeamTeachingAttended: boolean("is_team_teaching_attended").default(false),
+		teachingStatus: text("teaching_status").default("terlaksana"),
+		teachingNotes: text("teaching_notes"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(t) => [
+		index("idx_course_meetings_course_id").on(t.courseId),
+		index("idx_course_meetings_dosen_pengajar_id").on(t.dosenPengajarId),
+		index("idx_course_meetings_date").on(t.meetingDate),
+	],
+);
 
 export const courseMeetingActivities = pgTable("course_meeting_activities", {
 	id: serial("id").primaryKey(),

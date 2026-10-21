@@ -6,6 +6,7 @@ import {
 	Award,
 	CalendarDays,
 	Calendar as CalendarIcon,
+	Camera,
 	Check,
 	CheckCircle,
 	CheckCircle2,
@@ -18,7 +19,6 @@ import {
 	Loader2,
 	MapPin,
 	Plus,
-	Radio,
 	RefreshCw,
 	RotateCcw,
 	Save,
@@ -37,6 +37,10 @@ import {
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import {
+	SelfieDetailModal,
+	type SelfieRecordDetail,
+} from "@/components/panels/kehadiran/SelfieDetailModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -166,12 +170,20 @@ interface MemberRecord {
 	status: "hadir" | "terlambat" | "izin" | "sakit" | "alpha" | null;
 	arrivalTime: string;
 	minutesLate: number;
-	checkinMethod?: "self" | "admin" | null;
+	checkinMethod?: "self" | "admin" | "self_selfie" | string | null;
 	selfCheckinAt?: string | null;
 	notes: string;
 	recordId: number | null;
 	recordedBy: string | null;
 	recordedAt: string | null;
+	selfieUrl?: string | null;
+	latitude?: number | null;
+	longitude?: number | null;
+	gpsAccuracy?: number | null;
+	locationName?: string | null;
+	distanceFromCheckpoint?: number | null;
+	isWithinRadius?: boolean | null;
+	verificationStatus?: string | null;
 }
 
 interface ScheduleConfigItem {
@@ -229,6 +241,8 @@ export function BarisPagiDashboard({
 	const [isSavingBoard, setIsSavingBoard] = useState(false);
 	const [boardSearch, setBoardSearch] = useState("");
 	const [boardStatusFilter, setBoardStatusFilter] = useState("all");
+	const [selectedSelfieRecord, setSelectedSelfieRecord] =
+		useState<SelfieRecordDetail | null>(null);
 
 	// Summary / Rekap state
 	const [summaryList, setSummaryList] = useState<StudentSummaryItem[]>([]);
@@ -287,36 +301,8 @@ export function BarisPagiDashboard({
 	});
 	const [isRescheduling, setIsRescheduling] = useState(false);
 
-	// Realtime Live & Auto-Alpha states
-	const [autoRefresh, setAutoRefresh] = useState(false);
+	// Realtime Auto-Alpha state
 	const [isAutoAlphaRunning, setIsAutoAlphaRunning] = useState(false);
-	const [liveClock, setLiveClock] = useState("");
-
-	// Live clock timer
-	useEffect(() => {
-		const updateClock = () => {
-			const now = new Date();
-			const timeStr = new Intl.DateTimeFormat("id-ID", {
-				timeZone: "Asia/Jakarta",
-				hour: "2-digit",
-				minute: "2-digit",
-				second: "2-digit",
-			}).format(now);
-			setLiveClock(`${timeStr} WIB`);
-		};
-		updateClock();
-		const timer = setInterval(updateClock, 1000);
-		return () => clearInterval(timer);
-	}, []);
-
-	// Auto Refresh Board
-	useEffect(() => {
-		if (!autoRefresh || !selectedSessionId || activeTab !== "board") return;
-		const timer = setInterval(() => {
-			fetchBoardData(selectedSessionId);
-		}, 30000);
-		return () => clearInterval(timer);
-	}, [autoRefresh, selectedSessionId, activeTab]);
 
 	// Fetch schedule config
 	const fetchScheduleConfig = async () => {
@@ -1085,75 +1071,6 @@ export function BarisPagiDashboard({
 						</div>
 					) : (
 						<>
-							{/* Session Stats KPI Row */}
-							<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-								<Card className="border-slate-200/90 shadow-2xs">
-									<CardContent className="p-3.5 space-y-1">
-										<span className="text-[11px] font-medium text-slate-500">
-											Total Peserta
-										</span>
-										<div className="text-xl font-black text-slate-900">
-											{boardStats.total}
-										</div>
-									</CardContent>
-								</Card>
-
-								<Card className="border-emerald-200/70 bg-emerald-50/20 shadow-2xs">
-									<CardContent className="p-3.5 space-y-1">
-										<span className="text-[11px] font-semibold text-emerald-700">
-											Tepat Waktu (≤06.22)
-										</span>
-										<div className="text-xl font-black text-emerald-700">
-											{boardStats.hadir}
-										</div>
-									</CardContent>
-								</Card>
-
-								<Card className="border-amber-200/70 bg-amber-50/20 shadow-2xs">
-									<CardContent className="p-3.5 space-y-1">
-										<span className="text-[11px] font-semibold text-amber-700">
-											Terlambat (&gt;06.22)
-										</span>
-										<div className="text-xl font-black text-amber-700">
-											{boardStats.terlambat}
-										</div>
-									</CardContent>
-								</Card>
-
-								<Card className="border-indigo-200/70 bg-indigo-50/20 shadow-2xs">
-									<CardContent className="p-3.5 space-y-1">
-										<span className="text-[11px] font-semibold text-indigo-700">
-											Absen Mandiri (Self)
-										</span>
-										<div className="text-xl font-black text-indigo-800">
-											{boardStats.selfCheckins}
-										</div>
-									</CardContent>
-								</Card>
-
-								<Card className="border-rose-200/70 bg-rose-50/20 shadow-2xs">
-									<CardContent className="p-3.5 space-y-1">
-										<span className="text-[11px] font-semibold text-rose-700">
-											Belum / Alpha
-										</span>
-										<div className="text-xl font-black text-rose-700">
-											{boardStats.unrecorded} / {boardStats.alpha}
-										</div>
-									</CardContent>
-								</Card>
-
-								<Card className="border-blue-200/70 bg-blue-50/20 shadow-2xs">
-									<CardContent className="p-3.5 space-y-1">
-										<span className="text-[11px] font-semibold text-blue-700">
-											Kepatuhan Sesi
-										</span>
-										<div className="text-xl font-black text-blue-900">
-											{boardStats.rate}%
-										</div>
-									</CardContent>
-								</Card>
-							</div>
-
 							{/* Actions & Filters Bar */}
 							<div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
 								<div className="flex items-center gap-2.5 flex-1 flex-wrap">
@@ -1183,41 +1100,6 @@ export function BarisPagiDashboard({
 											<SelectItem value="unrecorded">Belum Absen</SelectItem>
 										</SelectContent>
 									</Select>
-
-									{/* Realtime Clock & Auto Refresh Indicator */}
-									<div className="flex items-center gap-2 pl-1">
-										<Badge className="bg-slate-900 text-white font-mono text-xs px-2.5 py-1 rounded-xl">
-											<Clock className="w-3.5 h-3.5 mr-1 text-emerald-400" />
-											{liveClock || "06:22 WIB"}
-										</Badge>
-										<Button
-											type="button"
-											variant={autoRefresh ? "default" : "outline"}
-											size="sm"
-											onClick={() => {
-												setAutoRefresh(!autoRefresh);
-												toast.info(
-													!autoRefresh
-														? "Auto-refresh real-time aktif (setiap 30 dtk)"
-														: "Auto-refresh dimatikan",
-												);
-											}}
-											className={cn(
-												"h-9 text-xs rounded-xl gap-1.5 font-semibold",
-												autoRefresh
-													? "bg-emerald-600 hover:bg-emerald-700 text-white"
-													: "text-slate-600 border-slate-200",
-											)}
-										>
-											<Radio
-												className={cn(
-													"w-3.5 h-3.5",
-													autoRefresh && "animate-pulse text-white",
-												)}
-											/>
-											<span>{autoRefresh ? "Live 30s" : "Live Off"}</span>
-										</Button>
-									</div>
 								</div>
 
 								{isStaff && (
@@ -1278,6 +1160,7 @@ export function BarisPagiDashboard({
 													Jam Kedatangan (06.22)
 												</th>
 												<th className="py-3 px-4 w-72">Status Presensi</th>
+												<th className="py-3 px-4 w-36">Metode & Bukti</th>
 												<th className="py-3 px-4">Catatan</th>
 											</tr>
 										</thead>
@@ -1469,6 +1352,73 @@ export function BarisPagiDashboard({
 																	Alpha
 																</Button>
 															</div>
+														</td>
+														<td className="py-3 px-4 whitespace-nowrap">
+															{m.selfieUrl ? (
+																<button
+																	type="button"
+																	onClick={() =>
+																		setSelectedSelfieRecord({
+																			id: m.recordId || 0,
+																			attendanceType: "baris_pagi",
+																			title: `Baris Pagi - ${currentSession?.sessionDate || ""}`,
+																			student: {
+																				id: m.studentId,
+																				name: m.name,
+																				nim: m.nim,
+																			},
+																			status: m.status || "hadir",
+																			selfieUrl: m.selfieUrl,
+																			latitude: m.latitude || undefined,
+																			longitude: m.longitude || undefined,
+																			gpsAccuracy: m.gpsAccuracy || undefined,
+																			locationName: m.locationName || undefined,
+																			distanceFromCheckpoint:
+																				m.distanceFromCheckpoint || undefined,
+																			isWithinRadius: m.isWithinRadius ?? true,
+																			selfieTakenAt: m.recordedAt || undefined,
+																			verificationStatus:
+																				m.verificationStatus || "auto_approved",
+																		})
+																	}
+																	className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer group text-left"
+																	title="Klik untuk melihat foto & peta lokasi"
+																>
+																	<div className="relative w-7 h-7 rounded-md overflow-hidden border border-slate-300 group-hover:border-blue-500 shrink-0">
+																		<img
+																			src={m.selfieUrl}
+																			alt="Selfie"
+																			className="w-full h-full object-cover"
+																		/>
+																	</div>
+																	<div>
+																		<span className="font-bold text-[10px] text-blue-600 flex items-center gap-1 group-hover:underline">
+																			<Camera className="w-2.5 h-2.5" />
+																			Selfie GPS
+																		</span>
+																		<span className="text-[9px] text-slate-400 block">
+																			{m.isWithinRadius
+																				? "Dalam Radius"
+																				: "Luar Radius"}
+																		</span>
+																	</div>
+																</button>
+															) : m.checkinMethod === "self" ? (
+																<Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
+																	Mandiri Web
+																</Badge>
+															) : m.status ? (
+																<Badge
+																	variant="outline"
+																	className="text-[10px] text-slate-500 border-slate-200"
+																>
+																	Petugas
+																</Badge>
+															) : (
+																<span className="text-slate-300 text-xs">
+																	-
+																</span>
+															)}
 														</td>
 														<td className="py-3 px-4">
 															<Input
@@ -2661,6 +2611,19 @@ export function BarisPagiDashboard({
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+
+			{/* Modal Detail & Verifikasi Selfie GPS */}
+			{selectedSelfieRecord && (
+				<SelfieDetailModal
+					record={selectedSelfieRecord}
+					onClose={() => setSelectedSelfieRecord(null)}
+					onVerifySuccess={() => {
+						if (selectedSessionId) {
+							fetchSessionMembers(selectedSessionId);
+						}
+					}}
+				/>
+			)}
 		</div>
 	);
 }

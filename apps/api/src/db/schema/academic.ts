@@ -2,6 +2,7 @@ import {
 	boolean,
 	index,
 	integer,
+	jsonb,
 	pgTable,
 	serial,
 	text,
@@ -48,6 +49,18 @@ export const academicData = pgTable(
 		attendanceBarisTotal: integer("attendance_baris_total").default(0),
 		attendanceBarisPresent: integer("attendance_baris_present").default(0), // Tepat waktu (<= 06.22)
 		attendanceBarisLate: integer("attendance_baris_late").default(0), // Terlambat (> 06.22)
+
+		// AKD-06: KHS, KRS, Transkrip & Feeder PDDIKTI Tracking
+		khsPublished: boolean("khs_published").default(false),
+		khsPublishedAt: timestamp("khs_published_at"),
+		krsPublished: boolean("krs_published").default(false),
+		transcriptPublished: boolean("transcript_published").default(false),
+		syncedToMagang: boolean("synced_to_magang").default(false),
+		syncedToMagangAt: timestamp("synced_to_magang_at"),
+		syncedToMagangBy: integer("synced_to_magang_by").references(() => users.id),
+		pddiktiReported: boolean("pddikti_reported").default(false),
+		pddiktiReportedAt: timestamp("pddikti_reported_at"),
+		pddiktiRegNo: text("pddikti_reg_no"),
 
 		isAcc: boolean("is_acc").default(false),
 		accAt: timestamp("acc_at"),
@@ -122,7 +135,18 @@ export const courseGrades = pgTable(
 		attendanceRate: integer("attendance_rate").default(0), // percentage
 		attitudeNote: text("attitude_note"),
 
-		// Skema Nilai Vokasi
+		// Skema Nilai Vokasi & AKD-06
+		sks: integer("sks").default(2),
+		utsScore: integer("uts_score"),
+		uasScore: integer("uas_score"),
+		finalScore: integer("final_score"),
+		gradePoint: integer("grade_point"), // scaled by 100: 400 for 4.00, 350 for 3.50, etc.
+		semester: integer("semester").default(1),
+		isPublished: boolean("is_published").default(false),
+		publishedAt: timestamp("published_at"),
+		syncedToMagang: boolean("synced_to_magang").default(false),
+		syncedToMagangAt: timestamp("synced_to_magang_at"),
+
 		practicalScore: integer("practical_score").default(0),
 		theoryScore: integer("theory_score").default(0),
 		entrepreneurScore: integer("entrepreneur_score").default(0),
@@ -143,6 +167,37 @@ export const courseGrades = pgTable(
 	(t) => [
 		index("idx_course_grades_student_id").on(t.studentId),
 		index("idx_course_grades_course_id").on(t.courseId),
+	],
+);
+
+// 7b. Official KHS, KRS & Transkrip Publications (AKD-06)
+export const academicKhsTranscripts = pgTable(
+	"academic_khs_transcripts",
+	{
+		id: serial("id").primaryKey(),
+		studentId: integer("student_id")
+			.references(() => students.id)
+			.notNull(),
+		type: text("type").notNull().default("khs"), // "khs" | "krs" | "transkrip"
+		semester: integer("semester").notNull().default(1),
+		academicYear: text("academic_year").default("2025/2026"),
+		documentNumber: text("document_number"),
+		totalSks: integer("total_sks").notNull().default(0),
+		gpa: integer("gpa").notNull().default(0), // scaled by 100
+		ips: integer("ips").notNull().default(0), // scaled by 100
+		gradesSnapshot: jsonb("grades_snapshot").$type<any[]>().default([]),
+		status: text("status").notNull().default("draft"), // "draft" | "published" | "synced_magang"
+		publishedBy: integer("published_by").references(() => users.id),
+		publishedAt: timestamp("published_at"),
+		syncedMagangAt: timestamp("synced_magang_at"),
+		pddiktiSyncAt: timestamp("pddikti_sync_at"),
+		fileUrl: text("file_url"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(t) => [
+		index("idx_khs_transcripts_student_id").on(t.studentId),
+		index("idx_khs_transcripts_type_sem").on(t.type, t.semester),
 	],
 );
 

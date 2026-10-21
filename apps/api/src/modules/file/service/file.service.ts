@@ -17,8 +17,8 @@ const ulid = monotonicFactory();
 export interface UploadFileParams {
 	file: File; // File object dari Elysia multipart
 	studentId?: number;
-	category: string; // "identity" | "academic" | "profile" | "finance" | "internship" | "thesis" | "certificates" | "achievement" | "other"
-	panel?: string; // "pmb" | "finance" | "akademik" | dll.
+	category: string; // "identity" | "academic" | "profile" | "finance" | "internship" | "thesis" | "certificates" | "achievement" | "selfie_absen" | "other"
+	panel?: string; // "pmb" | "finance" | "akademik" | "kehadiran" | dll.
 	documentKey?: string;
 	uploadedBy?: number;
 	visibility?: "private" | "public";

@@ -4,6 +4,7 @@ import {
 	AlertCircle,
 	Calendar,
 	CalendarDays,
+	Camera,
 	CheckCircle2,
 	Clock,
 	Edit2,
@@ -17,6 +18,10 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+	SelfieDetailModal,
+	type SelfieRecordDetail,
+} from "@/components/panels/kehadiran/SelfieDetailModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +49,8 @@ export function TabPiket({ studentId }: { studentId: number }) {
 	const [records, setRecords] = useState<any[]>([]);
 	const [schedules, setSchedules] = useState<any[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
+	const [selectedSelfieRecord, setSelectedSelfieRecord] =
+		useState<SelfieRecordDetail | null>(null);
 	const { user } = useAuthStore();
 	const canEdit = user?.role === "superadmin" || user?.role === "akademik";
 
@@ -445,6 +452,51 @@ export function TabPiket({ studentId }: { studentId: number }) {
 												>
 													{(r.status || "HADIR").toUpperCase()}
 												</Badge>
+
+												{/* Bukti Foto Selfie GPS Mahasiswa */}
+												{r.selfieUrl && (
+													<button
+														type="button"
+														onClick={() =>
+															setSelectedSelfieRecord({
+																id: r.id,
+																attendanceType: "piket",
+																title: `Piket - ${r.session?.sessionDate || ""}`,
+																student: {
+																	id: studentId,
+																	name: "Mahasiswa",
+																	nim: "",
+																},
+																status: r.status || "hadir",
+																selfieUrl: r.selfieUrl,
+																latitude: r.latitude,
+																longitude: r.longitude,
+																gpsAccuracy: r.gpsAccuracy,
+																locationName: r.locationName,
+																distanceFromCheckpoint:
+																	r.distanceFromCheckpoint,
+																isWithinRadius: r.isWithinRadius ?? true,
+																selfieTakenAt: r.selfieTakenAt,
+																verificationStatus:
+																	r.verificationStatus || "auto_approved",
+															})
+														}
+														className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-blue-50 border border-blue-200/80 bg-blue-50/40 text-blue-700 transition-colors cursor-pointer group text-left"
+														title="Klik untuk melihat foto selfie & peta GPS"
+													>
+														<div className="relative w-6 h-6 rounded overflow-hidden border border-blue-300 shrink-0">
+															<img
+																src={r.selfieUrl}
+																alt="Bukti Selfie"
+																className="w-full h-full object-cover"
+															/>
+														</div>
+														<span className="font-semibold text-[10px] flex items-center gap-1">
+															<Camera className="w-2.5 h-2.5" />
+															Selfie GPS
+														</span>
+													</button>
+												)}
 												{canEdit && (
 													<Button
 														variant="ghost"
@@ -575,6 +627,15 @@ export function TabPiket({ studentId }: { studentId: number }) {
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+
+			{/* Modal Detail & Verifikasi Foto Selfie GPS */}
+			{selectedSelfieRecord && (
+				<SelfieDetailModal
+					record={selectedSelfieRecord}
+					onClose={() => setSelectedSelfieRecord(null)}
+					onVerifySuccess={fetchData}
+				/>
+			)}
 		</div>
 	);
 }

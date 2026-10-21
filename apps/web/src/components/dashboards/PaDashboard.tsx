@@ -9,7 +9,6 @@ import {
 	HeartHandshake,
 	HelpCircle,
 	MessageCircle,
-	RefreshCw,
 	RotateCcw,
 	Search,
 	ShieldAlert,
@@ -76,7 +75,6 @@ export function PaDashboard({ user: propUser, data = [], onUpdate }: any) {
 	const [paList, setPaList] = useState<{ id: number; fullName: string }[]>([]);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [currentPage, setCurrentPage] = useState(1);
-	const [isRefreshing, setIsRefreshing] = useState(false);
 	const pageSize = 20;
 
 	// Available cohorts dynamically derived strictly from student data
@@ -283,11 +281,6 @@ export function PaDashboard({ user: propUser, data = [], onUpdate }: any) {
 				</div>
 
 				<div className="flex flex-wrap items-center gap-2.5">
-					<div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-semibold text-emerald-700">
-						<span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-						Terhubung Real-Time
-					</div>
-
 					{(isSuperadmin || isAcademicOnly) && (
 						<Select
 							value={selectedPaId}
@@ -307,23 +300,6 @@ export function PaDashboard({ user: propUser, data = [], onUpdate }: any) {
 							</SelectContent>
 						</Select>
 					)}
-
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => {
-							setIsRefreshing(true);
-							onUpdate?.();
-							setTimeout(() => setIsRefreshing(false), 600);
-						}}
-						disabled={isRefreshing}
-						className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9 font-medium"
-					>
-						<RefreshCw
-							className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#0517B0]" : "text-slate-500"}`}
-						/>
-						Refresh
-					</Button>
 
 					<Button
 						variant="outline"

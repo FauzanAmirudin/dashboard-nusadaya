@@ -259,12 +259,15 @@ export const statusRoutes = new Elysia().get(
 			: false;
 		const academicItems = [
 			{ prop: academic?.pddiktiInput, name: "Input PDDIKTI" },
-			{ prop: attendanceOk, name: "Kehadiran (≥80%)" },
 			{ prop: academic?.utsPassed, name: "Lulus UTS" },
 			{ prop: academic?.uasPassed, name: "Lulus UAS" },
 			{ prop: academic?.attitudeIndicator, name: "Attitude Baik" },
 			{ prop: academic?.assignmentsCompleted, name: "Tugas Selesai" },
 			{ prop: academic?.academicCommunication, name: "Komunikasi Akademik" },
+			{
+				prop: academic?.assessmentCompleted,
+				name: "Asesmen Pra-keberangkatan",
+			},
 		];
 		const academicCompleted = academicItems.filter((i) => i.prop).length;
 		academicItems

@@ -178,10 +178,7 @@ function ScoreCard({
 	return (
 		<Card className="bg-white border-slate-200 shadow-sm h-full">
 			<CardHeader className="pb-3 border-b border-slate-100">
-				<CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-					<span className="w-5 h-5 rounded bg-[#0517B0]/10 flex items-center justify-center text-[10px] font-bold text-[#0517B0]">
-						N
-					</span>
+				<CardTitle className="text-sm font-semibold text-slate-700">
 					Nilai Assessment
 				</CardTitle>
 			</CardHeader>
@@ -457,10 +454,7 @@ function PdfCard({
 		<>
 			<Card className="bg-white border-slate-200 shadow-sm h-full">
 				<CardHeader className="pb-3 border-b border-slate-100">
-					<CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-						<span className="w-5 h-5 rounded bg-[#0517B0]/10 flex items-center justify-center text-[10px] font-bold text-[#0517B0]">
-							F
-						</span>
+					<CardTitle className="text-sm font-semibold text-slate-700">
 						Dokumen Hasil Assessment
 					</CardTitle>
 				</CardHeader>

@@ -46,13 +46,28 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { API_URL, api, getToken } from "@/lib/eden";
 import { getPeminatanOption, PEMINATAN_OPTIONS } from "@/lib/peminatan";
-import { useAuthStore } from "@/store";
+import { hasRole, useAuthStore } from "@/store";
 import { filterNumeric, preventNonNumericKey } from "@/utils/form-validators";
 
 export default function StudentProfilePage() {
 	const router = useRouter();
 	const { id } = useParams();
 	const { user } = useAuthStore();
+
+	const canEdit = hasRole(user, "superadmin", "pmb");
+	const isAllowedToView =
+		Boolean(user) &&
+		(user?.role !== "mahasiswa" ||
+			hasRole(
+				user,
+				"superadmin",
+				"pmb",
+				"pa",
+				"akademik",
+				"finance",
+				"karyawan",
+				"dosen",
+			));
 
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSaving, setIsSaving] = useState(false);
@@ -167,15 +182,24 @@ export default function StudentProfilePage() {
 		roReferral: "",
 		mitraSponsor: "",
 		koordinator: "",
+		referralCategory: "",
+		referralInstitutionName: "",
+		referralContactName: "",
+		referralContactPhone: "",
+		emergencyContactName: "",
+		emergencyContactPhone: "",
+		emergencyContactRelation: "",
 	});
 
-	// RBAC Guard: Superadmin & PMB only
+	// RBAC Guard: Semua staf dan admin diperbolehkan melihat detail profil mahasiswa
 	useEffect(() => {
-		if (user && user.role !== "superadmin" && user.role !== "pmb") {
-			toast.error("Anda tidak memiliki izin untuk mengakses halaman ini.");
+		if (user && !isAllowedToView) {
+			toast.error(
+				"Anda tidak memiliki izin untuk mengakses halaman profil mahasiswa.",
+			);
 			router.push("/dashboard");
 		}
-	}, [user, router]);
+	}, [user, isAllowedToView, router]);
 
 	// Fetch PA Users for dropdown
 	useEffect(() => {
@@ -358,6 +382,13 @@ export default function StudentProfilePage() {
 					roReferral: pmbDataObj?.roReferral || "",
 					mitraSponsor: pmbDataObj?.mitraSponsor || "",
 					koordinator: pmbDataObj?.koordinator || "",
+					referralCategory: pmbDataObj?.referralCategory || "",
+					referralInstitutionName: pmbDataObj?.referralInstitutionName || "",
+					referralContactName: pmbDataObj?.referralContactName || "",
+					referralContactPhone: pmbDataObj?.referralContactPhone || "",
+					emergencyContactName: std.emergencyContactName || "",
+					emergencyContactPhone: std.emergencyContactPhone || "",
+					emergencyContactRelation: std.emergencyContactRelation || "",
 				});
 			} else {
 				toast.error("Gagal memuat profil mahasiswa");
@@ -429,6 +460,13 @@ export default function StudentProfilePage() {
 	};
 
 	const handleSaveProfile = async () => {
+		if (!canEdit) {
+			toast.error(
+				"Hanya PMB dan Superadmin yang berwenang mengubah profil mahasiswa.",
+			);
+			return;
+		}
+
 		if (!formData.name?.trim()) {
 			toast.error("Nama lengkap mahasiswa wajib diisi.");
 			return;
@@ -572,6 +610,14 @@ export default function StudentProfilePage() {
 				roReferral: formData.roReferral || undefined,
 				mitraSponsor: formData.mitraSponsor || undefined,
 				koordinator: formData.koordinator || undefined,
+				referralCategory: formData.referralCategory || undefined,
+				referralInstitutionName: formData.referralInstitutionName || undefined,
+				referralContactName: formData.referralContactName || undefined,
+				referralContactPhone: formData.referralContactPhone || undefined,
+				emergencyContactName: formData.emergencyContactName || undefined,
+				emergencyContactPhone: formData.emergencyContactPhone || undefined,
+				emergencyContactRelation:
+					formData.emergencyContactRelation || undefined,
 			};
 
 			// 1. Upload foto profil jika ada file baru yang dipilih
@@ -711,11 +757,17 @@ export default function StudentProfilePage() {
 					<Button
 						variant="outline"
 						size="sm"
-						onClick={() => router.push("/dashboard/students")}
+						onClick={() => {
+							if (typeof window !== "undefined" && window.history.length > 1) {
+								router.back();
+							} else {
+								router.push("/dashboard/students");
+							}
+						}}
 						className="border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer h-9 px-3"
 					>
 						<ArrowLeft className="w-4 h-4 mr-1.5" />
-						Daftar Mahasiswa
+						Kembali
 					</Button>
 					<div>
 						<h1 className="text-lg sm:text-xl font-bold text-slate-900">
@@ -728,49 +780,58 @@ export default function StudentProfilePage() {
 				</div>
 
 				<div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-					{!isEditMode ? (
-						<Button
-							size="sm"
-							onClick={() => setIsEditMode(true)}
-							className="bg-[#0517B0] hover:bg-[#04128A] text-white text-xs font-semibold h-9 shadow-xs cursor-pointer"
-						>
-							<Edit className="w-3.5 h-3.5 mr-1.5" />
-							Edit Profil
-						</Button>
+					{canEdit ? (
+						!isEditMode ? (
+							<Button
+								size="sm"
+								onClick={() => setIsEditMode(true)}
+								className="bg-[#0517B0] hover:bg-[#04128A] text-white text-xs font-semibold h-9 shadow-xs cursor-pointer"
+							>
+								<Edit className="w-3.5 h-3.5 mr-1.5" />
+								Edit Profil
+							</Button>
+						) : (
+							<div className="flex items-center gap-2">
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={isSaving}
+									onClick={() => {
+										setIsEditMode(false);
+										fetchAllStudentData();
+									}}
+									className="text-xs border-slate-200 hover:bg-slate-100 text-slate-700 h-9 cursor-pointer"
+								>
+									<X className="w-3.5 h-3.5 mr-1" />
+									Batal
+								</Button>
+								<Button
+									size="sm"
+									disabled={isSaving}
+									onClick={handleSaveProfile}
+									className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-9 shadow-xs cursor-pointer"
+								>
+									{isSaving ? (
+										<>
+											<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+											Menyimpan...
+										</>
+									) : (
+										<>
+											<Save className="w-3.5 h-3.5 mr-1.5" />
+											Simpan Perubahan
+										</>
+									)}
+								</Button>
+							</div>
+						)
 					) : (
-						<div className="flex items-center gap-2">
-							<Button
-								variant="outline"
-								size="sm"
-								disabled={isSaving}
-								onClick={() => {
-									setIsEditMode(false);
-									fetchAllStudentData();
-								}}
-								className="text-xs border-slate-200 hover:bg-slate-100 text-slate-700 h-9 cursor-pointer"
-							>
-								<X className="w-3.5 h-3.5 mr-1" />
-								Batal
-							</Button>
-							<Button
-								size="sm"
-								disabled={isSaving}
-								onClick={handleSaveProfile}
-								className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-9 shadow-xs cursor-pointer"
-							>
-								{isSaving ? (
-									<>
-										<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-										Menyimpan...
-									</>
-								) : (
-									<>
-										<Save className="w-3.5 h-3.5 mr-1.5" />
-										Simpan Perubahan
-									</>
-								)}
-							</Button>
-						</div>
+						<Badge
+							variant="outline"
+							className="text-slate-500 bg-slate-50 border-slate-200 text-xs px-3 py-1.5 font-medium"
+						>
+							Mode Lihat Saja
+						</Badge>
 					)}
 				</div>
 			</div>
@@ -1052,6 +1113,22 @@ export default function StudentProfilePage() {
 							/>
 							<DataRow label="Periode Keberangkatan" value={student.period} />
 							<DataRow label="Rekomendasi" value={pmb?.rekomendasi} />
+							<DataRow
+								label="Kategori Referral"
+								value={pmb?.referralCategory}
+							/>
+							<DataRow
+								label="Institusi / Lembaga Referral"
+								value={pmb?.referralInstitutionName}
+							/>
+							<DataRow
+								label="PIC Kontak Referral"
+								value={pmb?.referralContactName}
+							/>
+							<DataRow
+								label="No. WhatsApp Referral"
+								value={pmb?.referralContactPhone}
+							/>
 							<DataRow label="Tim Visit" value={pmb?.timVisit} />
 							<DataRow label="Tim Sosialisasi" value={pmb?.timSosialisasi} />
 							<DataRow label="RO Referral" value={pmb?.roReferral} />
@@ -2619,6 +2696,61 @@ export default function StudentProfilePage() {
 										onChange={(e) => updateData("koordinator", e.target.value)}
 										className="h-9 text-xs mt-1"
 										placeholder="Koordinator PMB"
+									/>
+								</div>
+							</div>
+
+							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+								<div>
+									<Label className="text-xs font-semibold">
+										Kategori Referral
+									</Label>
+									<Input
+										value={formData.referralCategory}
+										onChange={(e) =>
+											updateData("referralCategory", e.target.value)
+										}
+										className="h-9 text-xs mt-1"
+										placeholder="sekolah / bkk_fkks / mitra_sponsor / lainnya"
+									/>
+								</div>
+								<div>
+									<Label className="text-xs font-semibold">
+										Asal Lembaga / Sekolah Referral
+									</Label>
+									<Input
+										value={formData.referralInstitutionName}
+										onChange={(e) =>
+											updateData("referralInstitutionName", e.target.value)
+										}
+										className="h-9 text-xs mt-1"
+										placeholder="Nama sekolah atau mitra asal"
+									/>
+								</div>
+								<div>
+									<Label className="text-xs font-semibold">
+										Nama PIC / Kontak Referral
+									</Label>
+									<Input
+										value={formData.referralContactName}
+										onChange={(e) =>
+											updateData("referralContactName", e.target.value)
+										}
+										className="h-9 text-xs mt-1"
+										placeholder="Nama pemberi rekomendasi"
+									/>
+								</div>
+								<div>
+									<Label className="text-xs font-semibold">
+										No. WhatsApp / HP Referral
+									</Label>
+									<Input
+										value={formData.referralContactPhone}
+										onChange={(e) =>
+											updateData("referralContactPhone", e.target.value)
+										}
+										className="h-9 text-xs mt-1"
+										placeholder="0812xxxx"
 									/>
 								</div>
 							</div>

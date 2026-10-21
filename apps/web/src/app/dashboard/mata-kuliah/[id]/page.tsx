@@ -4,6 +4,7 @@ import {
 	ArrowLeft,
 	BookOpen,
 	Calendar,
+	Camera,
 	Check,
 	CheckCircle,
 	CheckSquare,
@@ -32,6 +33,10 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import {
+	SelfieDetailModal,
+	type SelfieRecordDetail,
+} from "@/components/panels/kehadiran/SelfieDetailModal";
 import {
 	Accordion,
 	AccordionContent,
@@ -113,14 +118,30 @@ type MeetingData = {
 	meetingLabel: string;
 	description: string | null;
 	meetingDate: string | null;
+	dosenPengajarId?: number | null;
+	attendedDosenIds?: number[] | null;
+	isTeamTeachingAttended?: boolean | null;
+	teachingStatus?: string | null;
+	teachingNotes?: string | null;
+	dosenPengajar?: { id: number; fullName: string; username: string } | null;
 	activities: any[];
 	attendances: {
+		id?: number;
 		studentId: number;
 		status: string | null;
 		theoryScore?: number | null;
 		practicalScore?: number | null;
 		notes: string | null;
 		student: { name: string; nim: string };
+		selfieUrl?: string | null;
+		latitude?: number | null;
+		longitude?: number | null;
+		gpsAccuracy?: number | null;
+		locationName?: string | null;
+		distanceFromCheckpoint?: number | null;
+		isWithinRadius?: boolean | null;
+		selfieTakenAt?: string | null;
+		verificationStatus?: string | null;
 	}[];
 };
 
@@ -206,6 +227,9 @@ export default function MataKuliahDetailPage() {
 		sessionType: "" as "teori" | "praktik" | "keduanya" | "",
 		date: "",
 		desc: "",
+		teachingLecturerOption: "utama" as "utama" | "pendamping" | "keduanya",
+		teachingStatus: "terlaksana",
+		teachingNotes: "",
 	});
 
 	// Attendance State: Record<meetingId, Record<studentId, StudentAttendanceInput>>
@@ -216,6 +240,8 @@ export default function MataKuliahDetailPage() {
 		null,
 	);
 	const [isSavingInfo, setIsSavingInfo] = useState<number | null>(null);
+	const [selectedSelfieRecord, setSelectedSelfieRecord] =
+		useState<SelfieRecordDetail | null>(null);
 
 	// Generate Dates Modal State
 	const [isGenerateDatesOpen, setIsGenerateDatesOpen] = useState(false);
@@ -511,16 +537,23 @@ export default function MataKuliahDetailPage() {
 	const saveMeetingInfo = async (meetingId: number) => {
 		setIsSavingInfo(meetingId);
 		try {
-			const { error } = await api.courses[courseId].meetings[
-				meetingId.toString()
-			].patch({
+			const patchPayload = {
 				meetingLabel: meetingForm.label,
 				sessionType: meetingForm.sessionType || null,
 				meetingDate: meetingForm.date || undefined,
 				description: meetingForm.desc,
+			};
+
+			const res = await fetchApi(`/courses/${courseId}/meetings/${meetingId}`, {
+				method: "PATCH",
+				body: JSON.stringify(patchPayload),
 			});
-			if (error) throw error;
-			toast.success("Informasi pertemuan & jenis sesi berhasil disimpan");
+			const json = await res.json();
+			if (!res.ok || !json.success) {
+				throw new Error(json.message || "Gagal menyimpan info pertemuan");
+			}
+
+			toast.success("Informasi sesi perkuliahan berhasil disimpan");
 			setEditingMeeting(null);
 
 			// Update local state
@@ -538,7 +571,7 @@ export default function MataKuliahDetailPage() {
 				),
 			);
 		} catch (err: any) {
-			toast.error("Gagal menyimpan info pertemuan");
+			toast.error(err.message || "Gagal menyimpan info pertemuan");
 		} finally {
 			setIsSavingInfo(null);
 		}
@@ -1008,6 +1041,30 @@ export default function MataKuliahDetailPage() {
 															) : (
 																getSessionTypeBadge(meet.sessionType)
 															)}
+
+															{/* Indikator Dosen Pengajar / Team Teaching (DSN-01) */}
+															{meet.isTeamTeachingAttended ? (
+																<Badge className="bg-purple-100 text-purple-800 border-purple-300 font-semibold px-2 py-0.5 text-xs shadow-2xs">
+																	<Users className="w-3 h-3 mr-1 inline" /> Team
+																	Teaching
+																</Badge>
+															) : course?.dosenPendampingId &&
+																meet.dosenPengajarId ===
+																	course.dosenPendampingId ? (
+																<Badge className="bg-sky-100 text-sky-800 border-sky-300 font-medium px-2 py-0.5 text-xs">
+																	<UserCheck className="w-3 h-3 mr-1 inline" />{" "}
+																	{course.dosenPendamping?.fullName?.split(
+																		" ",
+																	)[0] || "Dosen Pendamping"}
+																</Badge>
+															) : course?.dosenPendampingId &&
+																meet.dosenPengajarId === course.dosenId ? (
+																<Badge className="bg-slate-100 text-slate-700 border-slate-200 font-medium px-2 py-0.5 text-xs">
+																	<UserCheck className="w-3 h-3 mr-1 inline" />{" "}
+																	{course.dosen?.fullName?.split(" ")[0] ||
+																		"Dosen Utama"}
+																</Badge>
+															) : null}
 														</div>
 														<p className="text-xs text-slate-500 font-normal mt-0.5">
 															{meet.meetingDate
@@ -1079,6 +1136,9 @@ export default function MataKuliahDetailPage() {
 																			? meet.meetingDate.split("T")[0]
 																			: "",
 																		desc: meet.description || "",
+																		teachingLecturerOption: "utama",
+																		teachingStatus: "terlaksana",
+																		teachingNotes: "",
 																	});
 																	setEditingMeeting(meet.id);
 																}}
@@ -1173,14 +1233,15 @@ export default function MataKuliahDetailPage() {
 																	}
 																/>
 															</div>
+
 															<div className="space-y-1.5 sm:col-span-3">
 																<Label className="text-xs font-semibold text-slate-700">
 																	Deskripsi / Rencana Pembelajaran Sesi Ini
+																	(Silabus)
 																</Label>
-																<Textarea
-																	className="border-slate-300 bg-white text-sm"
-																	rows={2}
-																	placeholder="Topik materi, modul, atau tugas..."
+																<Input
+																	className="border-slate-300 bg-white h-9 text-sm"
+																	placeholder="Topik materi kuliah, capaian pembelajaran, atau silabus..."
 																	value={meetingForm.desc}
 																	onChange={(e) =>
 																		setMeetingForm({
@@ -1190,12 +1251,72 @@ export default function MataKuliahDetailPage() {
 																	}
 																/>
 															</div>
+
+															<div className="sm:col-span-3 bg-purple-50/70 border border-purple-200/80 rounded-lg p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+																<div className="flex items-center gap-2 text-purple-900 font-medium">
+																	<UserCheck className="w-4 h-4 text-purple-600 shrink-0" />
+																	<span>
+																		Absensi mengajar dosen & jurnal perkuliahan
+																		dipusatkan di menu{" "}
+																		<strong>
+																			{user?.role === "dosen"
+																				? "Presensi"
+																				: "Absensi Dosen"}
+																		</strong>
+																		.
+																	</span>
+																</div>
+																<Link
+																	href={
+																		user?.role === "dosen"
+																			? "/dashboard/mata-kuliah/rekap-dosen"
+																			: "/dashboard/akademik/absensi-dosen"
+																	}
+																	className="inline-flex items-center gap-1 font-bold text-purple-700 hover:text-purple-900 shrink-0 underline"
+																>
+																	{user?.role === "dosen"
+																		? "Buka Presensi Mengajar →"
+																		: "Monitoring Absensi Dosen →"}
+																</Link>
+															</div>
 														</div>
 													) : (
-														<p className="text-xs text-slate-600 italic bg-white p-3 rounded-lg border border-slate-200">
-															{meet.description ||
-																"Belum ada deskripsi materi untuk sesi perkuliahan ini."}
-														</p>
+														<div className="space-y-2">
+															<div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200">
+																<div className="flex items-center gap-2">
+																	<span className="font-semibold text-slate-700">
+																		Topik Silabus:
+																	</span>
+																	<span className="italic text-slate-600">
+																		{meet.description ||
+																			"Belum ada rincian materi silabus untuk sesi ini."}
+																	</span>
+																</div>
+																<Link
+																	href={
+																		user?.role === "dosen"
+																			? "/dashboard/mata-kuliah/rekap-dosen"
+																			: "/dashboard/akademik/absensi-dosen"
+																	}
+																	className="text-[11px] text-purple-700 hover:text-purple-900 font-medium flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded border border-purple-200/70 transition-colors"
+																>
+																	<UserCheck className="w-3.5 h-3.5 text-purple-600" />
+																	<span>
+																		Status Mengajar:{" "}
+																		<strong className="capitalize">
+																			{meet.isTeamTeachingAttended
+																				? "Team Teaching"
+																				: meet.teachingStatus || "Belum Diisi"}
+																		</strong>
+																	</span>
+																	<span className="underline font-bold ml-1">
+																		{user?.role === "dosen"
+																			? "Buka Presensi →"
+																			: "Monitoring →"}
+																	</span>
+																</Link>
+															</div>
+														</div>
 													)}
 												</div>
 
@@ -1342,15 +1463,91 @@ export default function MataKuliahDetailPage() {
 																					{s.nim || "-"}
 																				</TableCell>
 																				<TableCell className="text-xs font-bold text-slate-900">
-																					<div className="flex items-center gap-2">
-																						<span>{s.name}</span>
-																						{s.cohort &&
-																							s.cohort !== course.cohort && (
-																								<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] px-1.5 py-0 font-medium">
-																									Angkatan {s.cohort}
-																								</Badge>
-																							)}
-																					</div>
+																					{(() => {
+																						const att = (
+																							meet.attendances || []
+																						).find(
+																							(a: any) => a.studentId === s.id,
+																						);
+																						return (
+																							<div className="flex items-center justify-between gap-2">
+																								<div className="flex items-center gap-2">
+																									<span>{s.name}</span>
+																									{s.cohort &&
+																										s.cohort !==
+																											course.cohort && (
+																											<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] px-1.5 py-0 font-medium">
+																												Angkatan {s.cohort}
+																											</Badge>
+																										)}
+																								</div>
+																								{att?.selfieUrl && (
+																									<button
+																										type="button"
+																										onClick={() =>
+																											setSelectedSelfieRecord({
+																												id: att.id || 0,
+																												attendanceType:
+																													"kuliah",
+																												title: `${course.name} - ${meet.meetingLabel}`,
+																												student: {
+																													id: s.id,
+																													name: s.name,
+																													nim: s.nim,
+																													cohort: s.cohort,
+																												},
+																												status:
+																													currentEntry.status ||
+																													att.status ||
+																													"hadir",
+																												selfieUrl:
+																													att.selfieUrl ||
+																													undefined,
+																												latitude:
+																													att.latitude ||
+																													undefined,
+																												longitude:
+																													att.longitude ||
+																													undefined,
+																												gpsAccuracy:
+																													att.gpsAccuracy ||
+																													undefined,
+																												locationName:
+																													att.locationName ||
+																													undefined,
+																												distanceFromCheckpoint:
+																													att.distanceFromCheckpoint ||
+																													undefined,
+																												isWithinRadius:
+																													att.isWithinRadius ??
+																													true,
+																												selfieTakenAt:
+																													att.selfieTakenAt ||
+																													undefined,
+																												verificationStatus:
+																													att.verificationStatus ||
+																													"auto_approved",
+																											})
+																										}
+																										className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-blue-50 border border-blue-200/80 bg-blue-50/40 text-blue-700 transition-colors cursor-pointer group text-left shrink-0"
+																										title="Lihat foto selfie & peta lokasi GPS mahasiswa"
+																									>
+																										<div className="relative w-5 h-5 rounded overflow-hidden border border-blue-300 shrink-0">
+																											<img
+																												src={att.selfieUrl}
+																												alt="Selfie"
+																												className="w-full h-full object-cover"
+																											/>
+																										</div>
+																										<span className="font-semibold text-[10px] flex items-center gap-0.5">
+																											<Camera className="w-2.5 h-2.5" />
+																											Foto GPS
+																										</span>
+																									</button>
+																								)}
+																							</div>
+																						);
+																					})()}
 																				</TableCell>
 																				<TableCell>
 																					<Select
@@ -2382,6 +2579,17 @@ export default function MataKuliahDetailPage() {
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+
+			{/* Modal Detail & Verifikasi Foto Selfie GPS Mahasiswa */}
+			{selectedSelfieRecord && (
+				<SelfieDetailModal
+					record={selectedSelfieRecord}
+					onClose={() => setSelectedSelfieRecord(null)}
+					onVerifySuccess={() => {
+						fetchData();
+					}}
+				/>
+			)}
 		</div>
 	);
 }

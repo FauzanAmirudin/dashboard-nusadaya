@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import {
 	Table,
 	TableBody,
@@ -23,6 +22,59 @@ interface TabAllServiceMatrixProps {
 	isLoading: boolean;
 }
 
+function DynamicProgressBar({
+	rate,
+	pillar,
+}: {
+	rate: number;
+	pillar: "kuliah" | "piket" | "baris";
+}) {
+	const validRate = Number.isFinite(rate)
+		? Math.min(Math.max(rate, 0), 100)
+		: 0;
+
+	let barColor = "bg-rose-500";
+	if (validRate >= 85) {
+		barColor =
+			pillar === "kuliah"
+				? "bg-[#0517B0]"
+				: pillar === "piket"
+					? "bg-emerald-600"
+					: "bg-amber-600";
+	} else if (validRate >= 70) {
+		barColor = "bg-amber-500";
+	} else if (validRate > 0) {
+		barColor = "bg-rose-500";
+	} else {
+		barColor = "bg-transparent";
+	}
+
+	return (
+		<div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+			<div
+				className={cn(
+					"h-full rounded-full transition-all duration-300",
+					barColor,
+				)}
+				style={{ width: `${validRate}%` }}
+			/>
+		</div>
+	);
+}
+
+function getRateTextColor(rate: number, pillar: "kuliah" | "piket" | "baris") {
+	if (rate === 0) return "text-slate-500";
+	if (rate >= 85) {
+		return pillar === "kuliah"
+			? "text-[#0517B0]"
+			: pillar === "piket"
+				? "text-emerald-700"
+				: "text-amber-700";
+	}
+	if (rate >= 70) return "text-amber-600";
+	return "text-rose-600";
+}
+
 export function TabAllServiceMatrix({
 	allServiceList,
 	isLoading,
@@ -35,7 +87,7 @@ export function TabAllServiceMatrix({
 				<div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
 					<Loader2 className="w-7 h-7 animate-spin text-[#0517B0]" />
 					<span className="text-xs font-medium text-slate-500">
-						Menghitung indeks All-Service mahasiswa dari database...
+						Menghitung akumulasi kehadiran mahasiswa dari database...
 					</span>
 				</div>
 			) : allServiceList.length === 0 ? (
@@ -57,13 +109,11 @@ export function TabAllServiceMatrix({
 								<TableHead className="min-w-[130px]">
 									Angkatan & Rombel
 								</TableHead>
-								<TableHead className="min-w-[150px]">1. Kuliah (50%)</TableHead>
-								<TableHead className="min-w-[150px]">2. Piket (25%)</TableHead>
-								<TableHead className="min-w-[160px]">
-									3. Baris 06.22 (25%)
-								</TableHead>
+								<TableHead className="min-w-[150px]">Kuliah</TableHead>
+								<TableHead className="min-w-[150px]">Piket</TableHead>
+								<TableHead className="min-w-[150px]">Baris Pagi</TableHead>
 								<TableHead className="min-w-[140px] text-center">
-									Indeks All-Service
+									Akumulasi
 								</TableHead>
 								<TableHead className="text-center pr-5 w-[110px]">
 									Aksi
@@ -73,16 +123,6 @@ export function TabAllServiceMatrix({
 						<TableBody>
 							{allServiceList.map((item) => {
 								const initials = getInitials(item.name);
-								let badgeColor =
-									"bg-emerald-50 text-emerald-700 border-emerald-200";
-								let statusLabel = "DISIPLIN";
-								if (item.allServiceStatus === "PERLU_PEMBINAAN") {
-									badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
-									statusLabel = "PEMBINAAN";
-								} else if (item.allServiceStatus === "KRITIS") {
-									badgeColor = "bg-rose-50 text-rose-700 border-rose-200";
-									statusLabel = "KRITIS";
-								}
 
 								return (
 									<TableRow
@@ -134,9 +174,14 @@ export function TabAllServiceMatrix({
 
 										{/* Pilar 1: Perkuliahan */}
 										<TableCell className="py-3.5">
-											<div className="space-y-1 max-w-[130px]">
+											<div className="space-y-1.5 max-w-[130px]">
 												<div className="flex items-center justify-between text-[11px]">
-													<span className="font-bold text-slate-800">
+													<span
+														className={cn(
+															"font-bold",
+															getRateTextColor(item.kuliah.rate, "kuliah"),
+														)}
+													>
 														{item.kuliah.rate}%
 													</span>
 													<span className="text-slate-400 text-[10px]">
@@ -144,18 +189,23 @@ export function TabAllServiceMatrix({
 														{item.kuliah.totalMeetings} Sesi
 													</span>
 												</div>
-												<Progress
-													value={item.kuliah.rate}
-													className="h-1.5 bg-slate-100 [&>div]:bg-[#0517B0]"
+												<DynamicProgressBar
+													rate={item.kuliah.rate}
+													pillar="kuliah"
 												/>
 											</div>
 										</TableCell>
 
 										{/* Pilar 2: Piket */}
 										<TableCell className="py-3.5">
-											<div className="space-y-1 max-w-[130px]">
+											<div className="space-y-1.5 max-w-[130px]">
 												<div className="flex items-center justify-between text-[11px]">
-													<span className="font-bold text-emerald-700">
+													<span
+														className={cn(
+															"font-bold",
+															getRateTextColor(item.piket.rate, "piket"),
+														)}
+													>
 														{item.piket.rate}%
 													</span>
 													<span className="text-slate-400 text-[10px]">
@@ -163,18 +213,23 @@ export function TabAllServiceMatrix({
 														Piket
 													</span>
 												</div>
-												<Progress
-													value={item.piket.rate}
-													className="h-1.5 bg-slate-100 [&>div]:bg-emerald-600"
+												<DynamicProgressBar
+													rate={item.piket.rate}
+													pillar="piket"
 												/>
 											</div>
 										</TableCell>
 
 										{/* Pilar 3: Baris Pagi (06.22) */}
 										<TableCell className="py-3.5">
-											<div className="space-y-1 max-w-[140px]">
+											<div className="space-y-1.5 max-w-[140px]">
 												<div className="flex items-center justify-between text-[11px]">
-													<span className="font-bold text-amber-700">
+													<span
+														className={cn(
+															"font-bold",
+															getRateTextColor(item.barisPagi.rate, "baris"),
+														)}
+													>
 														{item.barisPagi.rate}%
 													</span>
 													<span className="text-slate-400 text-[10px]">
@@ -182,9 +237,9 @@ export function TabAllServiceMatrix({
 														{item.barisPagi.totalSessions} Apel
 													</span>
 												</div>
-												<Progress
-													value={item.barisPagi.rate}
-													className="h-1.5 bg-slate-100 [&>div]:bg-amber-600"
+												<DynamicProgressBar
+													rate={item.barisPagi.rate}
+													pillar="baris"
 												/>
 												{item.barisPagi.terlambatCount > 0 && (
 													<div className="text-[10px] text-amber-700 font-medium">
@@ -194,23 +249,11 @@ export function TabAllServiceMatrix({
 											</div>
 										</TableCell>
 
-										{/* Indeks All-Service */}
+										{/* Indeks All-Service (Murni tanpa keterangan) */}
 										<TableCell className="py-3.5 text-center">
-											<div className="space-y-1">
-												<span className="text-base font-black text-slate-900 tracking-tight">
-													{item.allServiceScore}%
-												</span>
-												<div>
-													<Badge
-														className={cn(
-															"text-[10px] font-bold border",
-															badgeColor,
-														)}
-													>
-														{statusLabel}
-													</Badge>
-												</div>
-											</div>
+											<span className="text-base font-black text-slate-900 tracking-tight">
+												{item.allServiceScore}%
+											</span>
 										</TableCell>
 
 										{/* Action */}

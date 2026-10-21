@@ -3,6 +3,7 @@
 import {
 	Building2,
 	Calendar,
+	Camera,
 	CheckCircle2,
 	Clock,
 	FileText,
@@ -12,6 +13,10 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+	SelfieDetailModal,
+	type SelfieRecordDetail,
+} from "@/components/panels/kehadiran/SelfieDetailModal";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/eden";
 import { cn } from "@/lib/utils";
@@ -20,6 +25,8 @@ export function TabODS({ studentId }: { studentId: number }) {
 	const [records, setRecords] = useState<any[]>([]);
 	const [crmData, setCrmData] = useState<any | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
+	const [selectedSelfieRecord, setSelectedSelfieRecord] =
+		useState<SelfieRecordDetail | null>(null);
 
 	const fetchData = async () => {
 		setIsLoading(true);
@@ -213,31 +220,86 @@ export function TabODS({ studentId }: { studentId: number }) {
 									)}
 								</div>
 
-								<Badge
-									variant={
-										r.status === "hadir"
-											? "default"
-											: r.status === "izin" || r.status === "sakit"
-												? "secondary"
-												: "destructive"
-									}
-									className={cn(
-										"text-[10px] font-semibold px-2.5 py-0.5 rounded-md",
-										r.status === "hadir" &&
-											"bg-emerald-50 text-emerald-700 border border-emerald-200/80",
-										(r.status === "izin" || r.status === "sakit") &&
-											"bg-amber-50 text-amber-800 border border-amber-200/80",
-										r.status === "alpa" &&
-											"bg-rose-50 text-rose-700 border border-rose-200/80",
+								<div className="flex items-center gap-2">
+									<Badge
+										variant={
+											r.status === "hadir"
+												? "default"
+												: r.status === "izin" || r.status === "sakit"
+													? "secondary"
+													: "destructive"
+										}
+										className={cn(
+											"text-[10px] font-semibold px-2.5 py-0.5 rounded-md",
+											r.status === "hadir" &&
+												"bg-emerald-50 text-emerald-700 border border-emerald-200/80",
+											(r.status === "izin" || r.status === "sakit") &&
+												"bg-amber-50 text-amber-800 border border-amber-200/80",
+											r.status === "alpa" &&
+												"bg-rose-50 text-rose-700 border border-rose-200/80",
+										)}
+									>
+										{(r.status || "HADIR").toUpperCase()}
+									</Badge>
+
+									{/* Bukti Foto Selfie GPS Mahasiswa */}
+									{r.selfieUrl && (
+										<button
+											type="button"
+											onClick={() =>
+												setSelectedSelfieRecord({
+													id: r.id,
+													attendanceType: "ods",
+													title: `One Day Service - ${new Date(r.date).toLocaleDateString("id-ID")}`,
+													student: {
+														id: studentId,
+														name: "Mahasiswa",
+														nim: "",
+													},
+													status: r.status || "hadir",
+													selfieUrl: r.selfieUrl,
+													latitude: r.latitude,
+													longitude: r.longitude,
+													gpsAccuracy: r.gpsAccuracy,
+													locationName: r.locationName,
+													distanceFromCheckpoint: r.distanceFromCheckpoint,
+													isWithinRadius: r.isWithinRadius ?? true,
+													selfieTakenAt: r.selfieTakenAt || r.date,
+													verificationStatus:
+														r.verificationStatus || "auto_approved",
+												})
+											}
+											className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-blue-50 border border-blue-200/80 bg-blue-50/40 text-blue-700 transition-colors cursor-pointer group text-left"
+											title="Klik untuk melihat foto selfie & peta GPS"
+										>
+											<div className="relative w-6 h-6 rounded overflow-hidden border border-blue-300 shrink-0">
+												<img
+													src={r.selfieUrl}
+													alt="Bukti Selfie"
+													className="w-full h-full object-cover"
+												/>
+											</div>
+											<span className="font-semibold text-[10px] flex items-center gap-1">
+												<Camera className="w-2.5 h-2.5" />
+												Selfie GPS
+											</span>
+										</button>
 									)}
-								>
-									{(r.status || "HADIR").toUpperCase()}
-								</Badge>
+								</div>
 							</div>
 						))}
 					</div>
 				)}
 			</div>
+
+			{/* Modal Detail & Verifikasi Foto Selfie GPS */}
+			{selectedSelfieRecord && (
+				<SelfieDetailModal
+					record={selectedSelfieRecord}
+					onClose={() => setSelectedSelfieRecord(null)}
+					onVerifySuccess={fetchData}
+				/>
+			)}
 		</div>
 	);
 }

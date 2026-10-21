@@ -56,6 +56,7 @@ import type {
 	InterviewFormState,
 	InterviewLog,
 	PaData,
+	StudentNote,
 	TripartiteFormState,
 	TripartiteLog,
 } from "./pa/types";
@@ -75,6 +76,7 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 	const [counselingLogs, setCounselingLogs] = useState<CounselingLog[]>([]);
 	const [tripartiteLogs, setTripartiteLogs] = useState<TripartiteLog[]>([]);
 	const [interviewLogs, setInterviewLogs] = useState<InterviewLog[]>([]);
+	const [studentNotes, setStudentNotes] = useState<StudentNote[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSaving, setIsSaving] = useState(false);
 	const [loadingItem, setLoadingItem] = useState<string | null>(null);
@@ -97,6 +99,7 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 				setCounselingLogs(d.counselingLogs || []);
 				setTripartiteLogs(d.tripartiteLogs || []);
 				setInterviewLogs(d.interviewLogs || []);
+				setStudentNotes(d.studentNotes || []);
 			}
 		} catch (err) {
 			console.error("Gagal memuat data PA:", err);
@@ -119,7 +122,7 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 		setLoadingItem(null);
 	};
 
-	// Save Discipline Notes
+	// Save Discipline Notes (Legacy compatibility)
 	const handleSaveNotes = async (notes: string) => {
 		setIsSaving(true);
 		await api.students[studentId.toString()].pa.patch({
@@ -128,6 +131,64 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 		await fetchPaData();
 		onUpdate();
 		setIsSaving(false);
+	};
+
+	// Student Discipline Notes Handlers (Single Source of Truth)
+	const handleAddDisciplineNote = async (data: {
+		content: string;
+		date: string;
+		category: string;
+	}) => {
+		setIsSaving(true);
+		try {
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/pa/student-notes`,
+				{
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${getToken()}`,
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						type: "kedisiplinan",
+						content: data.content,
+						date: data.date
+							? new Date(data.date).toISOString()
+							: new Date().toISOString(),
+						category: data.category || "umum",
+					}),
+				},
+			);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			toast.success("Catatan kedisiplinan berhasil ditambahkan");
+			await fetchPaData();
+			onUpdate();
+		} catch {
+			toast.error("Gagal menambahkan catatan kedisiplinan");
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	const handleDeleteDisciplineNote = async (noteId: number) => {
+		setIsSaving(true);
+		try {
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/pa/student-notes/${noteId}`,
+				{
+					method: "DELETE",
+					headers: { Authorization: `Bearer ${getToken()}` },
+				},
+			);
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			toast.success("Catatan kedisiplinan berhasil dihapus");
+			await fetchPaData();
+			onUpdate();
+		} catch {
+			toast.error("Gagal menghapus catatan kedisiplinan");
+		} finally {
+			setIsSaving(false);
+		}
 	};
 
 	// Hafalan Handlers (Kosakata & Kalimat)
@@ -488,6 +549,9 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 					<TabChecklistPa
 						studentId={studentId}
 						paData={paData}
+						disciplineNotes={studentNotes.filter(
+							(n) => n.type === "kedisiplinan",
+						)}
 						counselingLogsCount={counselingLogs.length}
 						isPa={isPa}
 						canEdit={canEdit}
@@ -495,6 +559,8 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 						loadingItem={loadingItem}
 						onChecklistChange={handleChecklistChange}
 						onSaveNotes={handleSaveNotes}
+						onAddDisciplineNote={handleAddDisciplineNote}
+						onDeleteDisciplineNote={handleDeleteDisciplineNote}
 						onAcc={handleAcc}
 						onCancelAcc={handleCancelAcc}
 					/>

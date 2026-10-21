@@ -58,6 +58,7 @@ export interface UseStudentsListParams {
 	archived?: boolean;
 	all?: boolean;
 	enabled?: boolean;
+	refetchInterval?: number | false;
 }
 
 export function useStudentsList(params: UseStudentsListParams = {}) {
@@ -71,6 +72,7 @@ export function useStudentsList(params: UseStudentsListParams = {}) {
 		archived = false,
 		all = false,
 		enabled = true,
+		refetchInterval = 15000,
 	} = params;
 
 	const cleanCohort = cohort && cohort !== "all" ? cohort : undefined;
@@ -139,8 +141,10 @@ export function useStudentsList(params: UseStudentsListParams = {}) {
 		},
 		enabled,
 		placeholderData: keepPreviousData,
-		staleTime: 30 * 1000, // 30 seconds fresh data window
+		staleTime: 10 * 1000, // 10 seconds fresh data window
 		gcTime: 5 * 60 * 1000, // 5 minutes garbage collection
+		refetchInterval,
+		refetchOnWindowFocus: true,
 		retry: 2,
 		retryDelay: 1000,
 	});

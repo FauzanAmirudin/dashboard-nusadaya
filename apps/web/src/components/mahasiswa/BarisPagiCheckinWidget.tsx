@@ -38,6 +38,7 @@ import { Progress } from "@/components/ui/progress";
 import { API_URL, getToken } from "@/lib/eden";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store";
+import { SelfieCheckinModal } from "./SelfieCheckinModal";
 
 interface TodaySessionData {
 	hasSession: boolean;
@@ -58,9 +59,15 @@ interface TodaySessionData {
 	studentCheckin?: {
 		arrivalTime: string;
 		status: "hadir" | "terlambat" | "izin" | "sakit" | "alpha";
-		checkinMethod: "self" | "officer";
+		checkinMethod: string;
 		selfCheckinAt: string | null;
 		minutesLate: number;
+		selfieUrl?: string | null;
+		locationName?: string | null;
+		distanceFromCheckpoint?: number | null;
+		isWithinRadius?: boolean;
+		verificationStatus?: string;
+		rejectionReason?: string | null;
 	} | null;
 }
 
@@ -123,6 +130,7 @@ export function BarisPagiCheckinWidget() {
 	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 	const [historyData, setHistoryData] = useState<MyRecordsData | null>(null);
 	const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+	const [isSelfieModalOpen, setIsSelfieModalOpen] = useState(false);
 
 	// Fetch today's session
 	const fetchTodaySession = async () => {
@@ -382,13 +390,24 @@ export function BarisPagiCheckinWidget() {
 				{/* Main Action / Status Area */}
 				{isAlreadyCheckedIn ? (
 					/* STATUS: ALREADY CHECKED IN */
-					<div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-						<div className="flex items-center gap-3">
-							<div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 text-emerald-700">
-								<CheckCircle2 className="w-5 h-5" />
-							</div>
-							<div>
-								<div className="flex items-center gap-2">
+					<div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+						<div className="flex items-start sm:items-center gap-3 min-w-0">
+							{studentCheckin.selfieUrl ? (
+								<div className="relative w-12 h-12 rounded-xl overflow-hidden border-2 border-emerald-500 shrink-0 shadow-xs">
+									<img
+										src={studentCheckin.selfieUrl}
+										alt="Selfie Presensi"
+										className="w-full h-full object-cover"
+									/>
+									<span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white" />
+								</div>
+							) : (
+								<div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 text-emerald-700">
+									<CheckCircle2 className="w-5 h-5" />
+								</div>
+							)}
+							<div className="min-w-0">
+								<div className="flex items-center gap-2 flex-wrap">
 									<h4 className="text-sm font-bold text-emerald-900">
 										Anda Sudah Melakukan Presensi
 									</h4>
@@ -408,29 +427,37 @@ export function BarisPagiCheckinWidget() {
 												? `TERLAMBAT +${studentCheckin.minutesLate} MNT`
 												: studentCheckin.status.toUpperCase()}
 									</Badge>
+									{studentCheckin.verificationStatus === "pending_review" && (
+										<Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[10px] font-semibold">
+											Review Staf
+										</Badge>
+									)}
 								</div>
-								<p className="text-xs text-emerald-800/90 mt-0.5 font-medium">
-									Tercatat datang pukul{" "}
+								<p className="text-xs text-emerald-800/90 mt-0.5 font-medium truncate">
+									Tercatat hadir pukul{" "}
 									<span className="font-mono font-bold">
 										{studentCheckin.arrivalTime} WIB
 									</span>{" "}
-									melalui sistem{" "}
-									<span className="font-semibold">
-										{studentCheckin.checkinMethod === "self"
-											? "Mandiri"
-											: "Petugas Akademik"}
-									</span>
-									.
+									{studentCheckin.locationName && (
+										<span className="text-slate-600">
+											• di {studentCheckin.locationName}
+										</span>
+									)}
 								</p>
 							</div>
 						</div>
 
-						<Badge
-							variant="outline"
-							className="bg-white/80 border-emerald-300 text-emerald-800 text-xs font-semibold px-3 py-1"
-						>
-							Tervalidasi BAAK
-						</Badge>
+						<div className="flex items-center gap-2 shrink-0">
+							<Badge
+								variant="outline"
+								className="bg-white/80 border-emerald-300 text-emerald-800 text-xs font-semibold px-3 py-1"
+							>
+								{studentCheckin.verificationStatus === "approved" ||
+								studentCheckin.verificationStatus === "auto_approved"
+									? "Tervalidasi BAAK"
+									: "Menunggu ACC Staf"}
+							</Badge>
+						</div>
 					</div>
 				) : isCheckinOpen ? (
 					/* STATUS: CHECKIN WINDOW OPEN - BUTTON READY */
@@ -446,24 +473,20 @@ export function BarisPagiCheckinWidget() {
 								</Badge>
 							</div>
 							<p className="text-xs text-blue-800">
-								Pastikan Anda telah berada di lokasi apel ({session.location}).
-								Waktu kedatangan dihitung secara real-time berdasarkan jam
-								server kampus.
+								Pastikan Anda berada di lokasi apel ({session.location}).
+								Presensi menggunakan kamera selfie web dan titik koordinat GPS
+								presisi.
 							</p>
 						</div>
 
 						<Button
 							size="lg"
 							disabled={isSubmitting}
-							onClick={handleSelfCheckin}
+							onClick={() => setIsSelfieModalOpen(true)}
 							className="bg-[#0517B0] hover:bg-blue-800 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition-all gap-2 px-6 shrink-0 w-full sm:w-auto"
 						>
-							{isSubmitting ? (
-								<Loader2 className="w-4 h-4 animate-spin" />
-							) : (
-								<UserCheck className="w-4 h-4" />
-							)}
-							<span>Absen Baris Pagi Sekarang</span>
+							<Camera className="w-4 h-4" />
+							<span>Buka Kamera & Absen Selfie</span>
 						</Button>
 					</div>
 				) : windowStatus === "UPCOMING" ? (
@@ -503,6 +526,21 @@ export function BarisPagiCheckinWidget() {
 
 			{/* DIALOG RIWAYAT */}
 			{renderHistoryDialog()}
+
+			{/* SELFIE CHECK-IN MODAL */}
+			<SelfieCheckinModal
+				isOpen={isSelfieModalOpen}
+				onClose={() => setIsSelfieModalOpen(false)}
+				attendanceType="baris_pagi"
+				title="Presensi Selfie Baris Pagi"
+				subtitle={`Apel Angkatan ${data?.session?.cohort || user?.cohort || ""} • ${data?.session?.location || "Lapangan Utama"}`}
+				sessionId={data?.session?.id}
+				studentName={user?.fullName || "Mahasiswa"}
+				studentNim={user?.username || "-"}
+				onSuccess={() => {
+					fetchTodaySession();
+				}}
+			/>
 		</Card>
 	);
 

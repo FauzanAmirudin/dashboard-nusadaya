@@ -1,4 +1,7 @@
+import { eq, or } from "drizzle-orm";
 import { Elysia } from "elysia";
+import { db } from "../../../db";
+import { students } from "../../../db/schema";
 import { fileService } from "../service/file.service";
 
 /**
@@ -26,6 +29,31 @@ export const downloadRoute = new Elysia().get(
 			if (!isPublic && !user) {
 				set.status = 401;
 				return { success: false, message: "Unauthorized" };
+			}
+
+			// Task 5.5: Proteksi akses file foto selfie
+			// Mahasiswa hanya bisa akses foto miliknya sendiri; staff bisa akses semua
+			if (
+				user &&
+				user.role === "mahasiswa" &&
+				record.category === "selfie_absen"
+			) {
+				const student = await db.query.students.findFirst({
+					where: or(
+						eq(students.studentUserId, user.id),
+						eq(students.email, user.email || ""),
+						eq(students.nim, user.username || ""),
+					),
+					columns: { id: true },
+				});
+				if (!student || record.studentId !== student.id) {
+					set.status = 403;
+					return {
+						success: false,
+						message:
+							"Akses ditolak: Anda hanya dapat mengakses foto selfie milik sendiri.",
+					};
+				}
 			}
 
 			// Local path resolution

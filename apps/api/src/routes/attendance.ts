@@ -20,9 +20,23 @@ import {
 	students,
 	users,
 } from "../db/schema";
+import { cacheInvalidatePattern } from "../lib/cache";
 import { hasRole } from "../lib/permissions";
 
 export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
+	.onAfterResponse(async ({ request, set }) => {
+		if (["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) {
+			const status = typeof set.status === "number" ? set.status : 200;
+			if (status < 400) {
+				await Promise.all([
+					cacheInvalidatePattern("cache:students:*"),
+					cacheInvalidatePattern("cache:student:*"),
+					cacheInvalidatePattern("cache:attendance:*"),
+					cacheInvalidatePattern("cache:dashboard:*"),
+				]);
+			}
+		}
+	})
 	// Authentication
 	.derive((context) => {
 		const user = (context as any).user;
@@ -1626,6 +1640,12 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 					minutesLate: myRecord.minutesLate || 0,
 					checkinMethod: myRecord.checkinMethod || "officer",
 					selfCheckinAt: myRecord.selfCheckinAt || null,
+					selfieUrl: myRecord.selfieUrl || null,
+					locationName: myRecord.locationName || null,
+					distanceFromCheckpoint: myRecord.distanceFromCheckpoint ?? null,
+					isWithinRadius: myRecord.isWithinRadius ?? true,
+					verificationStatus: myRecord.verificationStatus || "auto_approved",
+					rejectionReason: myRecord.rejectionReason || null,
 				}
 			: null;
 
@@ -1836,6 +1856,15 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			minutesLate: r.minutesLate || 0,
 			notes: r.notes,
 			session: r.session,
+			hasSelfie: Boolean(r.selfieUrl),
+			selfieUrl: r.selfieUrl,
+			latitude: r.latitude,
+			longitude: r.longitude,
+			gpsAccuracy: r.gpsAccuracy,
+			locationName: r.locationName,
+			distanceFromCheckpoint: r.distanceFromCheckpoint,
+			isWithinRadius: r.isWithinRadius,
+			verificationStatus: r.verificationStatus,
 		}));
 
 		return {
@@ -1994,6 +2023,14 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				recordId: rec ? rec.id : null,
 				recordedBy: rec?.recorder?.fullName || null,
 				recordedAt: rec?.recordedAt || null,
+				selfieUrl: rec?.selfieUrl || null,
+				latitude: rec?.latitude || null,
+				longitude: rec?.longitude || null,
+				gpsAccuracy: rec?.gpsAccuracy || null,
+				locationName: rec?.locationName || null,
+				distanceFromCheckpoint: rec?.distanceFromCheckpoint || null,
+				isWithinRadius: rec?.isWithinRadius ?? true,
+				verificationStatus: rec?.verificationStatus || null,
 			};
 		});
 
@@ -2517,7 +2554,7 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				kuliahHadir += g.attendancePresent || 0;
 			});
 			const kuliahRate =
-				kuliahTotal > 0 ? Math.round((kuliahHadir / kuliahTotal) * 100) : 100;
+				kuliahTotal > 0 ? Math.round((kuliahHadir / kuliahTotal) * 100) : 0;
 
 			const acad = acadMap.get(s.id);
 
@@ -2525,19 +2562,35 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			const piketTotal = acad?.attendancePiketTotal || 0;
 			const piketHadir = acad?.attendancePiketPresent || 0;
 			const piketRate =
-				piketTotal > 0 ? Math.round((piketHadir / piketTotal) * 100) : 100;
+				piketTotal > 0 ? Math.round((piketHadir / piketTotal) * 100) : 0;
 
 			// Baris Pagi metrics (Threshold 06.22)
 			const barisTotal = acad?.attendanceBarisTotal || 0;
 			const barisTepatWaktu = acad?.attendanceBarisPresent || 0;
 			const barisTerlambat = acad?.attendanceBarisLate || 0;
 			const barisRate =
-				barisTotal > 0 ? Math.round((barisTepatWaktu / barisTotal) * 100) : 100;
+				barisTotal > 0 ? Math.round((barisTepatWaktu / barisTotal) * 100) : 0;
 
 			// Weighted All-Service Index: 50% Kuliah + 25% Piket + 25% Baris Pagi
-			const allServiceScore = Math.round(
-				kuliahRate * 0.5 + piketRate * 0.25 + barisRate * 0.25,
-			);
+			// Dihitung dinamis proporsional berdasarkan pilar yang sudah memiliki sesi terjadwal
+			let totalWeight = 0;
+			let weightedSum = 0;
+
+			if (kuliahTotal > 0) {
+				totalWeight += 50;
+				weightedSum += kuliahRate * 50;
+			}
+			if (piketTotal > 0) {
+				totalWeight += 25;
+				weightedSum += piketRate * 25;
+			}
+			if (barisTotal > 0) {
+				totalWeight += 25;
+				weightedSum += barisRate * 25;
+			}
+
+			const allServiceScore =
+				totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
 
 			let allServiceStatus: "DISIPLIN" | "PERLU_PEMBINAAN" | "KRITIS" =
 				"DISIPLIN";
@@ -2666,7 +2719,7 @@ export async function resolveValidUserId(
 }
 
 // Helper function to sync attendance aggregate for a student
-async function syncAttendanceAggregate(studentId: number) {
+export async function syncAttendanceAggregate(studentId: number) {
 	// Query all records for this student
 	const allRecords = await db.query.attendanceRecords.findMany({
 		where: eq(attendanceRecords.studentId, studentId),

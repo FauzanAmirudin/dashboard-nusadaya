@@ -1,11 +1,19 @@
 "use client";
 
 import {
+	AlertCircle,
 	ArrowLeft,
+	Award,
+	Building2,
 	CheckCircle2,
 	Copy,
+	Globe,
 	Loader2,
+	PhoneCall,
+	Sparkles,
 	UploadCloud,
+	UserCheck,
+	UserPlus,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -39,6 +47,29 @@ const TABS = [
 	"Keterangan Ayah Kandung",
 	"Keterangan Ibu Kandung",
 	"Keterangan Wali",
+	"Informasi PMB & Rekomendasi",
+];
+
+const REFERRAL_CATEGORY_OPTIONS = [
+	{ value: "sekolah", label: "Sekolah (MoU / Guru BK)" },
+	{ value: "bkk_fkks", label: "BKK / FKKS" },
+	{ value: "mitra_sponsor", label: "Mitra Sponsor" },
+	{ value: "koordinator_ro", label: "Koordinator / RO Alumni" },
+	{ value: "tim_nusadaya", label: "Staff / Tim Nusadaya" },
+	{ value: "lainnya", label: "Lainnya / Mandiri" },
+];
+
+const REKOMENDASI_OPTIONS = [
+	"Pendamping",
+	"MoU Sekolah",
+	"BKK",
+	"FKKS",
+	"RO Alumni",
+	"Staff/Team",
+	"Alumni Nusadaya",
+	"Guru BK",
+	"Mitra Sponsor",
+	"Lainnya",
 ];
 
 import { getPeminatanOption, PEMINATAN_OPTIONS } from "@/lib/peminatan";
@@ -100,6 +131,13 @@ export default function EditStudentPage() {
 		roReferral: "",
 		mitraSponsor: "",
 		koordinator: "",
+		referralCategory: "",
+		referralInstitutionName: "",
+		referralContactName: "",
+		referralContactPhone: "",
+		emergencyContactName: "",
+		emergencyContactPhone: "",
+		emergencyContactRelation: "",
 
 		// Tab 3: Kesehatan
 		bloodType: "",
@@ -238,6 +276,13 @@ export default function EditStudentPage() {
 						roReferral: pmb?.roReferral || "",
 						mitraSponsor: pmb?.mitraSponsor || "",
 						koordinator: pmb?.koordinator || "",
+						referralCategory: pmb?.referralCategory || "",
+						referralInstitutionName: pmb?.referralInstitutionName || "",
+						referralContactName: pmb?.referralContactName || "",
+						referralContactPhone: pmb?.referralContactPhone || "",
+						emergencyContactName: std.emergencyContactName || "",
+						emergencyContactPhone: std.emergencyContactPhone || "",
+						emergencyContactRelation: std.emergencyContactRelation || "",
 
 						// Tab 3 Health
 						bloodType: health?.bloodType || "",
@@ -511,6 +556,21 @@ export default function EditStudentPage() {
 				toast.error("Nomor HP Wali minimal 8 digit");
 				return false;
 			}
+		} else if (index === 6) {
+			if (
+				formData.referralContactPhone &&
+				formData.referralContactPhone.length < 8
+			) {
+				toast.error("Nomor WhatsApp Kontak Referral minimal 8 digit");
+				return false;
+			}
+			if (
+				formData.emergencyContactPhone &&
+				formData.emergencyContactPhone.length < 8
+			) {
+				toast.error("Nomor WhatsApp Kontak Darurat minimal 8 digit");
+				return false;
+			}
 		}
 		return true;
 	};
@@ -691,7 +751,10 @@ export default function EditStudentPage() {
 				parents: parents.length > 0 ? parents : undefined,
 
 				// Extras
-				paId: formData.paId ? parseInt(formData.paId, 10) : undefined,
+				paId:
+					formData.paId && formData.paId !== "unassigned"
+						? parseInt(formData.paId, 10)
+						: undefined,
 				studentStatus: formData.studentStatus || "aktif",
 				destinationCountry: formData.destinationCountry || undefined,
 				period: formData.period || undefined,
@@ -701,6 +764,14 @@ export default function EditStudentPage() {
 				roReferral: formData.roReferral || undefined,
 				mitraSponsor: formData.mitraSponsor || undefined,
 				koordinator: formData.koordinator || undefined,
+				referralCategory: formData.referralCategory || undefined,
+				referralInstitutionName: formData.referralInstitutionName || undefined,
+				referralContactName: formData.referralContactName || undefined,
+				referralContactPhone: formData.referralContactPhone || undefined,
+				emergencyContactName: formData.emergencyContactName || undefined,
+				emergencyContactPhone: formData.emergencyContactPhone || undefined,
+				emergencyContactRelation:
+					formData.emergencyContactRelation || undefined,
 			};
 
 			// 1. Upload foto profil jika ada file baru yang dipilih
@@ -2051,6 +2122,385 @@ export default function EditStudentPage() {
 									value={formData.waliAddress}
 									onChange={(e) => updateData("waliAddress", e.target.value)}
 								/>
+							</div>
+						</div>
+					</div>
+				)}
+
+				{/* TAB 7: Informasi PMB, Rekomendasi & Referral */}
+				{currentTab === 6 && (
+					<div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+						<div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-3 gap-2">
+							<div>
+								<h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
+									<Building2 className="w-5 h-5 text-[#0517B0]" />
+									Informasi PMB, Rekomendasi & Referral
+								</h3>
+								<p className="text-xs text-slate-500 mt-0.5">
+									Lengkapi data asal rekomendasi pendaftaran, tim akuisisi PMB,
+									dan kontak darurat mahasiswa.
+								</p>
+							</div>
+							<span className="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-[#0517B0] rounded-md border border-blue-100 self-start sm:self-auto">
+								Panel PMB
+							</span>
+						</div>
+
+						{/* Seksi 1: Asal Referral & Rekomendasi Terstruktur */}
+						<div className="p-5 bg-gradient-to-br from-blue-50/70 via-indigo-50/30 to-white rounded-xl border border-blue-200/70 space-y-4 shadow-xs">
+							<div className="flex items-center gap-2">
+								<div className="p-1.5 bg-blue-100 text-[#0517B0] rounded-lg">
+									<Award className="w-4 h-4" />
+								</div>
+								<div>
+									<h4 className="font-semibold text-slate-900 text-sm">
+										Asal Rekomendasi & Referral Terstruktur
+									</h4>
+									<p className="text-[11px] text-slate-500">
+										Data pihak yang merekomendasikan pendaftar untuk fee
+										sharing, komisi, dan tracking referral PMB.
+									</p>
+								</div>
+							</div>
+
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+								{/* Rekomendasi */}
+								<div className="space-y-2">
+									<Label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+										<span>Jenis Rekomendasi</span>
+										<span className="text-red-500">*</span>
+									</Label>
+									<Select
+										value={formData.rekomendasi}
+										onValueChange={(v) => updateData("rekomendasi", v)}
+									>
+										<SelectTrigger className="bg-white">
+											<SelectValue placeholder="Pilih Jenis Rekomendasi" />
+										</SelectTrigger>
+										<SelectContent>
+											{REKOMENDASI_OPTIONS.map((item) => (
+												<SelectItem key={item} value={item}>
+													{item}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+
+								{/* Kategori Referral */}
+								<div className="space-y-2">
+									<Label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+										<span>Kategori Referral</span>
+									</Label>
+									<Select
+										value={formData.referralCategory}
+										onValueChange={(v) => updateData("referralCategory", v)}
+									>
+										<SelectTrigger className="bg-white">
+											<SelectValue placeholder="Pilih Kategori Referral" />
+										</SelectTrigger>
+										<SelectContent>
+											{REFERRAL_CATEGORY_OPTIONS.map((opt) => (
+												<SelectItem key={opt.value} value={opt.value}>
+													{opt.label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+
+								{/* Nama Institusi / Lembaga Referral */}
+								<div className="space-y-2">
+									<Label className="text-xs font-semibold text-slate-700">
+										Nama Institusi / Lembaga / Sekolah Referral
+									</Label>
+									<Input
+										placeholder="Contoh: SMKN 1 Denpasar / BKK Karya Mandiri"
+										value={formData.referralInstitutionName}
+										onChange={(e) =>
+											updateData("referralInstitutionName", e.target.value)
+										}
+										className="bg-white"
+									/>
+								</div>
+
+								{/* Nama Kontak PIC Referral */}
+								<div className="space-y-2">
+									<Label className="text-xs font-semibold text-slate-700">
+										Nama Kontak / Guru / PIC yang Merekomendasikan
+									</Label>
+									<Input
+										placeholder="Nama lengkap pemberi rekomendasi"
+										value={formData.referralContactName}
+										onChange={(e) =>
+											updateData("referralContactName", e.target.value)
+										}
+										className="bg-white"
+									/>
+								</div>
+
+								{/* No HP Kontak Referral */}
+								<div className="space-y-2 md:col-span-2">
+									<Label className="text-xs font-semibold text-slate-700">
+										No. WhatsApp / HP Kontak Referral
+									</Label>
+									<Input
+										type="tel"
+										placeholder="0812xxxx (untuk komunikasi fee share atau validasi)"
+										value={formData.referralContactPhone}
+										onKeyDown={preventNonPhoneKey}
+										onChange={(e) =>
+											updateData(
+												"referralContactPhone",
+												filterPhone(e.target.value, 15),
+											)
+										}
+										className="bg-white"
+									/>
+								</div>
+							</div>
+						</div>
+
+						{/* Seksi 2: Tim Akuisisi PMB & Periode */}
+						<div className="p-5 bg-slate-50/70 rounded-xl border border-slate-200 space-y-4">
+							<div className="flex items-center gap-2">
+								<div className="p-1.5 bg-slate-200/70 text-slate-700 rounded-lg">
+									<UserPlus className="w-4 h-4" />
+								</div>
+								<div>
+									<h4 className="font-semibold text-slate-900 text-sm">
+										Tim Akuisisi PMB & Periode Studi
+									</h4>
+									<p className="text-[11px] text-slate-500">
+										Informasi penanggung jawab akuisisi dan jadwal keberangkatan
+										mahasiswa.
+									</p>
+								</div>
+							</div>
+
+							<div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+								{/* Periode Keberangkatan */}
+								<div className="space-y-2">
+									<Label className="text-xs font-semibold text-slate-700">
+										Periode Keberangkatan / Intake
+									</Label>
+									<Input
+										placeholder="Contoh: 2026/2027 atau Batch 1"
+										value={formData.period}
+										onChange={(e) => updateData("period", e.target.value)}
+										className="bg-white"
+									/>
+								</div>
+
+								{/* Tim Visit */}
+								<div className="space-y-2">
+									<Label className="text-xs font-semibold text-slate-700">
+										Tim Visit PMB
+									</Label>
+									<Input
+										placeholder="Nama tim visit (isi '-' jika tidak ada)"
+										value={formData.timVisit}
+										onChange={(e) => updateData("timVisit", e.target.value)}
+										className="bg-white"
+									/>
+								</div>
+
+								{/* Tim Sosialisasi */}
+								<div className="space-y-2">
+									<Label className="text-xs font-semibold text-slate-700">
+										Tim Sosialisasi PMB
+									</Label>
+									<Input
+										placeholder="Nama tim sosialisasi (isi '-' jika tidak ada)"
+										value={formData.timSosialisasi}
+										onChange={(e) =>
+											updateData("timSosialisasi", e.target.value)
+										}
+										className="bg-white"
+									/>
+								</div>
+
+								{/* RO Referral */}
+								<div className="space-y-2">
+									<Label className="text-xs font-semibold text-slate-700">
+										RO Referral
+									</Label>
+									<Input
+										placeholder="Nama / kode RO Referral"
+										value={formData.roReferral}
+										onChange={(e) => updateData("roReferral", e.target.value)}
+										className="bg-white"
+									/>
+								</div>
+
+								{/* Mitra Sponsor */}
+								<div className="space-y-2">
+									<Label className="text-xs font-semibold text-slate-700">
+										Mitra Sponsor
+									</Label>
+									<Input
+										placeholder="Nama mitra sponsor pembiayaan"
+										value={formData.mitraSponsor}
+										onChange={(e) => updateData("mitraSponsor", e.target.value)}
+										className="bg-white"
+									/>
+								</div>
+
+								{/* Koordinator PMB */}
+								<div className="space-y-2">
+									<Label className="text-xs font-semibold text-slate-700">
+										Koordinator PMB
+									</Label>
+									<Input
+										placeholder="Nama koordinator PMB"
+										value={formData.koordinator}
+										onChange={(e) => updateData("koordinator", e.target.value)}
+										className="bg-white"
+									/>
+								</div>
+							</div>
+						</div>
+
+						{/* Seksi 3: Pembimbing Akademik & Negara Tujuan */}
+						<div className="p-5 bg-slate-50/70 rounded-xl border border-slate-200 space-y-4">
+							<div className="flex items-center gap-2">
+								<div className="p-1.5 bg-blue-100 text-[#0517B0] rounded-lg">
+									<UserCheck className="w-4 h-4" />
+								</div>
+								<div>
+									<h4 className="font-semibold text-slate-900 text-sm">
+										Pembimbing Akademik & Negara Tujuan
+									</h4>
+									<p className="text-[11px] text-slate-500">
+										Penugasan dosen PA dan target negara magang/penempatan.
+									</p>
+								</div>
+							</div>
+
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+								{/* Pembimbing Akademik */}
+								<div className="space-y-2">
+									<Label className="text-xs font-semibold text-slate-700">
+										Pembimbing Akademik (Dosen PA)
+									</Label>
+									<Select
+										value={formData.paId}
+										onValueChange={(val) => updateData("paId", val)}
+									>
+										<SelectTrigger className="bg-white">
+											<SelectValue placeholder="Pilih Dosen PA (Opsional)" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="unassigned">
+												Belum Ditentukan
+											</SelectItem>
+											{paUsers.map((pa) => (
+												<SelectItem key={pa.id} value={pa.id.toString()}>
+													{pa.fullName}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+
+								{/* Negara Tujuan */}
+								<div className="space-y-2">
+									<Label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+										<Globe className="w-3.5 h-3.5 text-slate-500" />
+										Negara Tujuan
+									</Label>
+									<Input
+										placeholder="Malaysia / Taiwan / Timur Tengah / Indonesia"
+										value={formData.destinationCountry}
+										onChange={(e) =>
+											updateData("destinationCountry", e.target.value)
+										}
+										className="bg-white"
+									/>
+								</div>
+							</div>
+						</div>
+
+						{/* Seksi 4: Kontak Darurat Mahasiswa */}
+						<div className="p-5 bg-slate-50/70 rounded-xl border border-slate-200 space-y-4">
+							<div className="flex items-center gap-2">
+								<div className="p-1.5 bg-amber-100 text-amber-700 rounded-lg">
+									<PhoneCall className="w-4 h-4" />
+								</div>
+								<div>
+									<h4 className="font-semibold text-slate-900 text-sm">
+										Kontak Darurat Mahasiswa
+									</h4>
+									<p className="text-[11px] text-slate-500">
+										Kontak keluarga / kerabat yang dapat dihubungi oleh pihak
+										kampus dalam situasi mendesak.
+									</p>
+								</div>
+							</div>
+
+							<div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+								{/* Nama Kontak Darurat */}
+								<div className="space-y-2">
+									<Label className="text-xs font-semibold text-slate-700">
+										Nama Kontak Darurat
+									</Label>
+									<Input
+										placeholder="Nama lengkap kontak darurat"
+										value={formData.emergencyContactName}
+										onChange={(e) =>
+											updateData("emergencyContactName", e.target.value)
+										}
+										className="bg-white"
+									/>
+								</div>
+
+								{/* Nomor WA Darurat */}
+								<div className="space-y-2">
+									<Label className="text-xs font-semibold text-slate-700">
+										Nomor WhatsApp Darurat
+									</Label>
+									<Input
+										type="tel"
+										placeholder="0812xxxx"
+										value={formData.emergencyContactPhone}
+										onKeyDown={preventNonPhoneKey}
+										onChange={(e) =>
+											updateData(
+												"emergencyContactPhone",
+												filterPhone(e.target.value, 15),
+											)
+										}
+										className="bg-white"
+									/>
+								</div>
+
+								{/* Hubungan Kontak Darurat */}
+								<div className="space-y-2">
+									<Label className="text-xs font-semibold text-slate-700">
+										Hubungan dengan Mahasiswa
+									</Label>
+									<Select
+										value={formData.emergencyContactRelation}
+										onValueChange={(v) =>
+											updateData("emergencyContactRelation", v)
+										}
+									>
+										<SelectTrigger className="bg-white">
+											<SelectValue placeholder="Pilih Hubungan" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="Orang Tua">Orang Tua</SelectItem>
+											<SelectItem value="Kakak">Kakak Kandung</SelectItem>
+											<SelectItem value="Adik">Adik Kandung</SelectItem>
+											<SelectItem value="Paman / Bibi">Paman / Bibi</SelectItem>
+											<SelectItem value="Saudara Lain">
+												Saudara / Kerabat Lain
+											</SelectItem>
+											<SelectItem value="Tetangga">Tetangga</SelectItem>
+											<SelectItem value="Lainnya">Lainnya</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
 							</div>
 						</div>
 					</div>

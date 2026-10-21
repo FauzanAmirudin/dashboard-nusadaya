@@ -19,6 +19,62 @@ import {
 import { cn } from "@/lib/utils";
 import { getInitials } from "../types";
 
+function DynamicProgressBar({
+	rate,
+	pillar = "kuliah",
+}: {
+	rate: number;
+	pillar?: "kuliah" | "piket" | "baris";
+}) {
+	const validRate = Number.isFinite(rate)
+		? Math.min(Math.max(rate, 0), 100)
+		: 0;
+
+	let barColor = "bg-rose-500";
+	if (validRate >= 85) {
+		barColor =
+			pillar === "kuliah"
+				? "bg-[#0517B0]"
+				: pillar === "piket"
+					? "bg-emerald-600"
+					: "bg-amber-600";
+	} else if (validRate >= 70) {
+		barColor = "bg-amber-500";
+	} else if (validRate > 0) {
+		barColor = "bg-rose-500";
+	} else {
+		barColor = "bg-transparent";
+	}
+
+	return (
+		<div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+			<div
+				className={cn(
+					"h-full rounded-full transition-all duration-300",
+					barColor,
+				)}
+				style={{ width: `${validRate}%` }}
+			/>
+		</div>
+	);
+}
+
+function getRateTextColor(
+	rate: number,
+	pillar: "kuliah" | "piket" | "baris" = "kuliah",
+) {
+	if (rate === 0) return "text-slate-500";
+	if (rate >= 85) {
+		return pillar === "kuliah"
+			? "text-[#0517B0]"
+			: pillar === "piket"
+				? "text-emerald-700"
+				: "text-amber-700";
+	}
+	if (rate >= 70) return "text-amber-600";
+	return "text-rose-600";
+}
+
 interface TabPresensiKuliahProps {
 	students: any[];
 	isLoading: boolean;
@@ -36,7 +92,7 @@ export function TabPresensiKuliah({
 				<div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
 					<Loader2 className="w-7 h-7 animate-spin text-[#0517B0]" />
 					<span className="text-xs font-medium text-slate-500">
-						Memuat rincian perkuliahan 16 sesi dari database...
+						Memuat data presensi perkuliahan dari database...
 					</span>
 				</div>
 			) : students.length === 0 ? (
@@ -64,7 +120,7 @@ export function TabPresensiKuliah({
 									Dosen (PA)
 								</TableHead>
 								<TableHead className="text-xs font-semibold text-slate-700 min-w-[160px]">
-									Presensi Kuliah (16 Sesi)
+									Presensi Kuliah
 								</TableHead>
 								<TableHead className="text-xs font-semibold text-slate-700 min-w-[130px]">
 									Angkatan / T.A.
@@ -92,11 +148,7 @@ export function TabPresensiKuliah({
 								const studentRate =
 									studentMeetings > 0
 										? Math.round((studentPresent / studentMeetings) * 100)
-										: 100;
-
-								const isGoodAttendance = studentRate >= 80;
-								const isMediumAttendance =
-									studentRate >= 60 && studentRate < 80;
+										: 0;
 
 								return (
 									<TableRow
@@ -118,7 +170,7 @@ export function TabPresensiKuliah({
 													<p className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-[#0517B0] transition-colors truncate">
 														{s.name}
 													</p>
-													<div className="flex items-center gap-1.5">
+													<div className="flex items-center gap-1.5 flex-wrap">
 														{s.nim ? (
 															<span className="font-mono text-[11px] text-slate-500 font-medium">
 																{s.nim}
@@ -127,6 +179,17 @@ export function TabPresensiKuliah({
 															<span className="text-[11px] text-slate-400 italic">
 																NIM Belum Ada
 															</span>
+														)}
+														{(item.hasSelfie ||
+															courses.some(
+																(c: any) =>
+																	c.hasSelfie ||
+																	(c.meetings &&
+																		c.meetings.some((m: any) => m.selfieUrl)),
+															)) && (
+															<Badge className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] px-1.5 py-0 font-semibold">
+																📸 Selfie
+															</Badge>
 														)}
 													</div>
 												</div>
@@ -163,34 +226,30 @@ export function TabPresensiKuliah({
 
 										{/* Presensi Kuliah Progress */}
 										<TableCell className="py-3.5">
-											<div className="space-y-1.5 max-w-[140px]">
+											<div
+												className="space-y-1.5 max-w-[130px]"
+												title={
+													courses.length > 0
+														? `${courses.length} Mata Kuliah (${studentMeetings} Sesi)`
+														: undefined
+												}
+											>
 												<div className="flex items-center justify-between text-[11px]">
 													<span
 														className={cn(
 															"font-bold",
-															isGoodAttendance
-																? "text-emerald-700"
-																: isMediumAttendance
-																	? "text-amber-700"
-																	: "text-rose-700",
+															getRateTextColor(studentRate, "kuliah"),
 														)}
 													>
 														{studentRate}%
 													</span>
 													<span className="text-slate-400 text-[10px]">
-														{studentPresent}/{studentMeetings || 16} Hadir
+														{studentPresent}/{studentMeetings} Sesi
 													</span>
 												</div>
-												<Progress
-													value={studentRate}
-													className={cn(
-														"h-1.5 bg-slate-100",
-														isGoodAttendance
-															? "[&>div]:bg-emerald-500"
-															: isMediumAttendance
-																? "[&>div]:bg-amber-500"
-																: "[&>div]:bg-rose-500",
-													)}
+												<DynamicProgressBar
+													rate={studentRate}
+													pillar="kuliah"
 												/>
 											</div>
 										</TableCell>

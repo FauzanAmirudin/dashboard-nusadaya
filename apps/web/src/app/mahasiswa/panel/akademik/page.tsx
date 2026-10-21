@@ -329,6 +329,64 @@ export default function AcademicPanelMahasiswa() {
 						</div>
 					</div>
 
+					{/* Section 2.5: Status Terbit KHS & Koneksi Magang (AKD-06) */}
+					{data?.khsPublished ? (
+						<div className="p-5 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-emerald-50/50 rounded-2xl border border-blue-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+							<div className="flex items-start gap-3.5">
+								<div className="p-2.5 bg-[#0517B0] text-white rounded-xl shadow-xs shrink-0">
+									<Award className="w-6 h-6" />
+								</div>
+								<div>
+									<div className="flex items-center gap-2">
+										<h4 className="font-bold text-slate-900 text-sm">
+											Kartu Hasil Studi (KHS) Resmi Diterbitkan
+										</h4>
+										<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px] font-bold">
+											✓ Sah BAAK
+										</Badge>
+									</div>
+									<p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+										Diterbitkan resmi pada {formatDate(data?.khsPublishedAt)}.
+										Berkas KHS telah diverifikasi dan otomatis tersinkronisasi
+										ke modul Magang (Pra-Paspor).
+									</p>
+									{data?.pddiktiReported && (
+										<p className="text-[11px] text-blue-700 font-semibold mt-1 flex items-center gap-1">
+											<CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+											Terlapor Resmi PDDIKTI{" "}
+											{data?.pddiktiRegNo ? `(Reg: ${data.pddiktiRegNo})` : ""}
+										</p>
+									)}
+								</div>
+							</div>
+							<div className="flex items-center gap-2 self-stretch sm:self-auto shrink-0">
+								<button
+									onClick={() => window.print()}
+									className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white text-[#0517B0] font-bold text-xs rounded-xl border border-blue-200 hover:bg-blue-50 transition-colors shadow-2xs cursor-pointer"
+								>
+									<FileText className="w-3.5 h-3.5" />
+									Cetak Lembar KHS
+								</button>
+							</div>
+						</div>
+					) : (
+						<div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-slate-600">
+							<div className="flex items-center gap-2.5">
+								<Clock className="w-4 h-4 text-amber-500 shrink-0" />
+								<span>
+									KHS Resmi Semester ini dalam tahap kalkulasi akhir &
+									verifikasi BAAK.
+								</span>
+							</div>
+							<Badge
+								variant="outline"
+								className="text-slate-500 bg-white border-slate-200 text-[10px] font-medium"
+							>
+								Menunggu Penerbitan
+							</Badge>
+						</div>
+					)}
+
 					{/* Section 3: Tabel Nilai Mata Kuliah */}
 					<div className="pt-6 border-t border-slate-100 space-y-4">
 						<div className="flex items-center gap-2">
@@ -349,19 +407,22 @@ export default function AcademicPanelMahasiswa() {
 											<TableHead className="text-xs font-bold uppercase">
 												Mata Kuliah
 											</TableHead>
+											<TableHead className="text-center text-xs font-bold uppercase w-14">
+												SKS
+											</TableHead>
 											<TableHead className="text-center text-xs font-bold uppercase w-16">
 												Grade
 											</TableHead>
-											<TableHead className="text-center text-xs font-bold uppercase w-20">
+											<TableHead className="text-center text-xs font-bold uppercase w-18">
+												Nilai Akhir
+											</TableHead>
+											<TableHead className="text-center text-xs font-bold uppercase w-18">
 												Praktik
 											</TableHead>
-											<TableHead className="text-center text-xs font-bold uppercase w-20">
+											<TableHead className="text-center text-xs font-bold uppercase w-18">
 												Teori
 											</TableHead>
 											<TableHead className="text-center text-xs font-bold uppercase w-20">
-												KWU
-											</TableHead>
-											<TableHead className="text-center text-xs font-bold uppercase w-24">
 												Status
 											</TableHead>
 										</TableRow>
@@ -382,10 +443,18 @@ export default function AcademicPanelMahasiswa() {
 														</p>
 													)}
 												</TableCell>
+												<TableCell className="text-center font-mono text-xs font-semibold text-slate-700">
+													{g.sks || 2}
+												</TableCell>
 												<TableCell className="text-center font-bold text-xs">
 													<span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
 														{g.grade || "-"}
 													</span>
+												</TableCell>
+												<TableCell className="text-center font-mono text-xs font-bold text-indigo-900">
+													{g.finalScore != null
+														? (g.finalScore / 100).toFixed(1)
+														: "-"}
 												</TableCell>
 												<TableCell className="text-center font-mono text-xs text-slate-700">
 													{g.practicalScore ?? "-"}
@@ -393,11 +462,9 @@ export default function AcademicPanelMahasiswa() {
 												<TableCell className="text-center font-mono text-xs text-slate-700">
 													{g.theoryScore ?? "-"}
 												</TableCell>
-												<TableCell className="text-center font-mono text-xs text-slate-700">
-													{g.kwuScore ?? g.entrepreneurScore ?? "-"}
-												</TableCell>
 												<TableCell className="text-center">
-													{g.isAcc ? (
+													{g.isAcc ||
+													(g.grade && !["D", "E"].includes(g.grade)) ? (
 														<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px]">
 															Lulus
 														</Badge>

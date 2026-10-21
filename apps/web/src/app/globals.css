@@ -180,11 +180,11 @@
 	}
 
 	.printable-area {
-		position: absolute !important;
-		left: 0 !important;
-		top: 0 !important;
+		position: relative !important;
+		left: auto !important;
+		top: auto !important;
 		width: 100% !important;
-		margin: 0 !important;
+		margin: 0 auto !important;
 		padding: 0 !important;
 		background: #ffffff !important;
 		z-index: 999999 !important;
@@ -198,6 +198,7 @@
 		background: transparent !important;
 		padding: 0 !important;
 		margin: 0 !important;
+		overflow: visible !important;
 	}
 
 	/* Sembunyikan elemen web secara struktural */

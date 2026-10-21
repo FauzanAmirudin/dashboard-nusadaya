@@ -6,7 +6,6 @@ import {
 	ArrowRight,
 	Calendar as CalendarIcon,
 	Check,
-	CheckCircle,
 	CheckCircle2,
 	ClipboardCheck,
 	Clock,
@@ -22,10 +21,8 @@ import {
 	Search,
 	Sparkles,
 	Trash2,
-	UserCheck,
 	Users,
 	X,
-	XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -799,131 +796,6 @@ export function KehadiranPiketDashboard({
 							Export Rekap Mahasiswa
 						</Button>
 					)}
-				</div>
-			)}
-
-			{/* KPI Summary Cards */}
-			{boardData && activeTab === "board" && (
-				<div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
-					<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
-						<CardContent className="p-4 flex items-start gap-3">
-							<div className="p-2 rounded-lg bg-blue-50 text-[#0517B0] mt-0.5">
-								<Users className="h-5 w-5" />
-							</div>
-							<div>
-								<p className="text-slate-500 text-xs font-semibold">
-									Kelompok Bertugas
-								</p>
-								<p className="text-2xl font-black text-slate-900 mt-0.5">
-									{boardData.summary.totalGroups}
-								</p>
-								<p className="text-[11px] text-slate-400 font-medium">
-									{boardData.summary.recordedGroups} Sesi Tersimpan
-								</p>
-							</div>
-						</CardContent>
-					</Card>
-
-					<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-indigo-500">
-						<CardContent className="p-4 flex items-start gap-3">
-							<div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 mt-0.5">
-								<UserCheck className="h-5 w-5" />
-							</div>
-							<div>
-								<p className="text-slate-500 text-xs font-semibold">
-									Mahasiswa Piket
-								</p>
-								<p className="text-2xl font-black text-slate-900 mt-0.5">
-									{boardData.summary.totalStudents}
-								</p>
-								<p className="text-[11px] text-slate-400 font-medium">
-									Total Terjadwal
-								</p>
-							</div>
-						</CardContent>
-					</Card>
-
-					<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
-						<CardContent className="p-4 flex items-start gap-3">
-							<div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 mt-0.5">
-								<CheckCircle className="h-5 w-5" />
-							</div>
-							<div>
-								<p className="text-slate-500 text-xs font-semibold">
-									Hadir Piket
-								</p>
-								<p className="text-2xl font-black text-emerald-700 mt-0.5">
-									{boardData.summary.hadir}
-								</p>
-								<p className="text-[11px] text-emerald-600 font-medium">
-									{boardData.summary.totalStudents > 0
-										? `${Math.round((boardData.summary.hadir / boardData.summary.totalStudents) * 100)}% dari jadwal`
-										: "0%"}
-								</p>
-							</div>
-						</CardContent>
-					</Card>
-
-					<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-amber-500">
-						<CardContent className="p-4 flex items-start gap-3">
-							<div className="p-2 rounded-lg bg-amber-50 text-amber-600 mt-0.5">
-								<Clock className="h-5 w-5" />
-							</div>
-							<div>
-								<p className="text-slate-500 text-xs font-semibold">
-									Izin / Sakit
-								</p>
-								<p className="text-2xl font-black text-amber-700 mt-0.5">
-									{boardData.summary.izin + boardData.summary.sakit}
-								</p>
-								<p className="text-[11px] text-slate-400 font-medium">
-									{boardData.summary.izin} Izin, {boardData.summary.sakit} Sakit
-								</p>
-							</div>
-						</CardContent>
-					</Card>
-
-					<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-rose-500">
-						<CardContent className="p-4 flex items-start gap-3">
-							<div className="p-2 rounded-lg bg-rose-50 text-rose-600 mt-0.5">
-								<XCircle className="h-5 w-5" />
-							</div>
-							<div>
-								<p className="text-slate-500 text-xs font-semibold">
-									Alpha / Belum
-								</p>
-								<p className="text-2xl font-black text-rose-700 mt-0.5">
-									{boardData.summary.alpha + boardData.summary.unrecorded}
-								</p>
-								<p className="text-[11px] text-rose-600 font-medium">
-									{boardData.summary.alpha} Alpha,{" "}
-									{boardData.summary.unrecorded} Belum
-								</p>
-							</div>
-						</CardContent>
-					</Card>
-
-					<Card className="bg-white border-slate-200 shadow-sm border-l-4 border-l-teal-500">
-						<CardContent className="p-4 flex items-start gap-3">
-							<div className="p-2 rounded-lg bg-teal-50 text-teal-600 mt-0.5">
-								<ClipboardCheck className="h-5 w-5" />
-							</div>
-							<div>
-								<p className="text-slate-500 text-xs font-semibold">
-									Kepatuhan Hari Ini
-								</p>
-								<p className="text-2xl font-black text-slate-900 mt-0.5">
-									{boardData.summary.attendanceRate}%
-								</p>
-								<div className="w-full bg-slate-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
-									<div
-										className="bg-teal-500 h-full rounded-full transition-all duration-300"
-										style={{ width: `${boardData.summary.attendanceRate}%` }}
-									/>
-								</div>
-							</div>
-						</CardContent>
-					</Card>
 				</div>
 			)}
 

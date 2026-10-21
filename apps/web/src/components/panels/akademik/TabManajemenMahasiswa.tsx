@@ -2,7 +2,6 @@
 
 import {
 	CheckCircle,
-	ExternalLink,
 	Eye,
 	FileText,
 	Info,
@@ -16,11 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DocumentUpload } from "@/components/ui/DocumentUpload";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/eden";
-import { cn } from "@/lib/utils";
 
 interface TabManajemenMahasiswaProps {
 	studentId: number;
@@ -45,21 +41,9 @@ export function TabManajemenMahasiswa({
 		uasPassed: false,
 		attitudeIndicator: false,
 		assignmentsCompleted: false,
+		academicCommunication: false,
 		assessmentCompleted: false,
 	});
-
-	// State untuk input presensi piket
-	const [attendanceManual, setAttendanceManual] = useState({
-		attendancePiketTotal: 0,
-		attendancePiketPresent: 0,
-	});
-	const [isSavingAttendance, setIsSavingAttendance] = useState(false);
-
-	// State data monitoring CRM untuk ODS & Pra Magang
-	const [crmData, setCrmData] = useState<any | null>(null);
-	const [odsRecords, setOdsRecords] = useState<any[]>([]);
-	const [pramagangRecords, setPramagangRecords] = useState<any[]>([]);
-	const [isCrmLoading, setIsCrmLoading] = useState(false);
 
 	useEffect(() => {
 		if (acadState) {
@@ -69,47 +53,12 @@ export function TabManajemenMahasiswa({
 				uasPassed: !!acadState.uasPassed,
 				attitudeIndicator: !!acadState.attitudeIndicator,
 				assignmentsCompleted: !!acadState.assignmentsCompleted,
+				academicCommunication: !!acadState.academicCommunication,
 				assessmentCompleted: !!acadState.assessmentCompleted,
 			});
 			setNotes(acadState.notes || "");
-			setAttendanceManual({
-				attendancePiketTotal: acadState.attendancePiketTotal || 0,
-				attendancePiketPresent: acadState.attendancePiketPresent || 0,
-			});
 		}
 	}, [acadState]);
-
-	useEffect(() => {
-		const fetchCrmAndAttendance = async () => {
-			setIsCrmLoading(true);
-			try {
-				const [crmRes, odsRes, pramagangRes] = await Promise.all([
-					api.students[studentId.toString()].crm.get(),
-					(api as any).attendance.mahasiswa[studentId].ods.get(),
-					(api as any).attendance.mahasiswa[studentId].pramagang.get(),
-				]);
-
-				if (crmRes.data?.success && (crmRes.data.data as any)?.crm) {
-					setCrmData((crmRes.data.data as any).crm);
-				}
-				if (odsRes.data?.success && odsRes.data.data) {
-					setOdsRecords(odsRes.data.data);
-				}
-				if (pramagangRes.data?.success && pramagangRes.data.data) {
-					setPramagangRecords(pramagangRes.data.data);
-				}
-			} catch (err) {
-				console.error(
-					"Error fetching CRM/Attendance data for academic view:",
-					err,
-				);
-			} finally {
-				setIsCrmLoading(false);
-			}
-		};
-
-		fetchCrmAndAttendance();
-	}, [studentId]);
 
 	const handleCheckboxChange = async (id: string, checked: boolean) => {
 		if (!canEdit) return;
@@ -123,16 +72,17 @@ export function TabManajemenMahasiswa({
 					[id]: checked,
 				},
 			);
-			if (!error) {
-				toast.success("Status berhasil disimpan");
-				onRefresh();
-			} else {
+
+			if (error) {
 				setLocalChecks(prevState);
-				toast.error("Gagal menyimpan perubahan");
+				toast.error("Gagal memperbarui status checklist");
+			} else {
+				toast.success("Status checklist berhasil diperbarui");
+				onRefresh();
 			}
-		} catch (e) {
+		} catch {
 			setLocalChecks(prevState);
-			toast.error("Gagal menyimpan perubahan");
+			toast.error("Terjadi kesalahan jaringan");
 		} finally {
 			setLoadingItem(null);
 		}
@@ -147,6 +97,7 @@ export function TabManajemenMahasiswa({
 					notes,
 				},
 			);
+
 			if (!error) {
 				toast.success("Catatan akademik disimpan");
 				onRefresh();
@@ -157,27 +108,6 @@ export function TabManajemenMahasiswa({
 			toast.error("Gagal menyimpan catatan");
 		} finally {
 			setIsSavingNotes(false);
-		}
-	};
-
-	const handleSaveAttendance = async () => {
-		if (!canEdit) return;
-		setIsSavingAttendance(true);
-		try {
-			const { error } =
-				await api.students[studentId.toString()].academic.patch(
-					attendanceManual,
-				);
-			if (!error) {
-				toast.success("Data presensi berhasil disimpan");
-				onRefresh();
-			} else {
-				toast.error("Gagal menyimpan presensi");
-			}
-		} catch {
-			toast.error("Gagal menyimpan presensi");
-		} finally {
-			setIsSavingAttendance(false);
 		}
 	};
 
@@ -218,6 +148,13 @@ export function TabManajemenMahasiswa({
 			docLabel: "Dokumen Penyelesaian Tugas",
 		},
 		{
+			id: "academicCommunication",
+			label: "Komunikasi Akademik",
+			desc: "Komunikasi mahasiswa dengan dosen/PA aktif",
+			docKey: "academic_communication",
+			docLabel: "Dokumen Komunikasi Akademik",
+		},
+		{
 			id: "assessmentCompleted",
 			label: "Asesmen Pra-keberangkatan",
 			desc: "Hasil asesmen kesiapan mahasiswa sebelum berangkat",
@@ -225,12 +162,6 @@ export function TabManajemenMahasiswa({
 			docLabel: "Dokumen Asesmen",
 		},
 	];
-
-	// Hitung presensi terintegrasi dari academicData (Mata Kuliah)
-	const mkTotal = acadState?.attendanceTotal || 0;
-	const mkPresent = acadState?.attendancePresent || 0;
-	const mkPercentage =
-		mkTotal > 0 ? Math.round((mkPresent / mkTotal) * 100) : 0;
 
 	return (
 		<div className="space-y-6">
@@ -317,428 +248,14 @@ export function TabManajemenMahasiswa({
 										panel="akademik"
 										documentKey={item.docKey}
 										canEdit={canEdit}
+										onUploadSuccess={onRefresh}
+										onDeleteSuccess={onRefresh}
+										onUpdate={onRefresh}
 									/>
 								</div>
 							</div>
 						);
 					})}
-				</div>
-			</div>
-
-			{/* PRESENSI SECTION */}
-			<div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-				<div className="bg-slate-50 border-b border-slate-200 px-5 py-4">
-					<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-						PEMANTAUAN PRESENSI MAHASISWA
-					</h3>
-					<p className="text-xs text-slate-500 mt-1">
-						Data kehadiran terintegrasi dengan Panel Dosen & PA
-					</p>
-				</div>
-				<div className="p-5">
-					<Tabs defaultValue="matakuliah" className="w-full">
-						<TabsList className="grid w-full grid-cols-4 bg-slate-100 p-1.5 rounded-xl border border-slate-200 h-auto gap-1 mb-6">
-							<TabsTrigger
-								value="matakuliah"
-								className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm"
-							>
-								Mata Kuliah
-							</TabsTrigger>
-							<TabsTrigger
-								value="piket"
-								className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm"
-							>
-								Piket
-							</TabsTrigger>
-							<TabsTrigger
-								value="ods"
-								className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm"
-							>
-								One Day Service
-							</TabsTrigger>
-							<TabsTrigger
-								value="pramagang"
-								className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm"
-							>
-								PraMagang
-							</TabsTrigger>
-						</TabsList>
-
-						<TabsContent value="matakuliah" className="space-y-4">
-							<div className="bg-blue-50/50 border border-blue-100 p-6 rounded-lg text-center">
-								<h4 className="text-lg font-semibold text-slate-800 mb-2">
-									Presensi Mata Kuliah
-								</h4>
-								<p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
-									Data ini ditarik secara otomatis dari pencatatan presensi oleh
-									Dosen melalui Panel Dosen.
-								</p>
-								<div className="flex items-center justify-center gap-8">
-									<div className="text-center">
-										<p className="text-3xl font-bold text-[#0517B0]">
-											{mkPresent}
-										</p>
-										<p className="text-xs text-slate-500 font-medium uppercase mt-1">
-											Hadir
-										</p>
-									</div>
-									<div className="text-center">
-										<p className="text-3xl font-bold text-slate-700">
-											{mkTotal}
-										</p>
-										<p className="text-xs text-slate-500 font-medium uppercase mt-1">
-											Total Pertemuan
-										</p>
-									</div>
-									<div className="text-center">
-										<p
-											className={`text-3xl font-bold ${mkPercentage >= 90 ? "text-emerald-600" : "text-rose-600"}`}
-										>
-											{mkPercentage}%
-										</p>
-										<p className="text-xs text-slate-500 font-medium uppercase mt-1">
-											Persentase
-										</p>
-									</div>
-								</div>
-							</div>
-						</TabsContent>
-
-						<TabsContent value="piket" className="space-y-4">
-							<div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
-								<h4 className="text-md font-semibold text-slate-800 mb-4">
-									Input Presensi Piket
-								</h4>
-								<div className="grid grid-cols-2 gap-4 max-w-md">
-									<div>
-										<label className="text-xs font-medium text-slate-500 mb-1 block">
-											Total Kehadiran
-										</label>
-										<Input
-											type="number"
-											min={0}
-											placeholder="0"
-											value={
-												attendanceManual.attendancePiketPresent === 0
-													? ""
-													: attendanceManual.attendancePiketPresent
-											}
-											onChange={(e) =>
-												setAttendanceManual({
-													...attendanceManual,
-													attendancePiketPresent:
-														e.target.value === ""
-															? 0
-															: Math.max(0, Number(e.target.value)),
-												})
-											}
-											disabled={!canEdit}
-										/>
-									</div>
-									<div>
-										<label className="text-xs font-medium text-slate-500 mb-1 block">
-											Total Jadwal
-										</label>
-										<Input
-											type="number"
-											min={0}
-											placeholder="0"
-											value={
-												attendanceManual.attendancePiketTotal === 0
-													? ""
-													: attendanceManual.attendancePiketTotal
-											}
-											onChange={(e) =>
-												setAttendanceManual({
-													...attendanceManual,
-													attendancePiketTotal:
-														e.target.value === ""
-															? 0
-															: Math.max(0, Number(e.target.value)),
-												})
-											}
-											disabled={!canEdit}
-										/>
-									</div>
-								</div>
-								{canEdit && (
-									<Button
-										onClick={handleSaveAttendance}
-										disabled={isSavingAttendance}
-										className="mt-4 bg-[#0517B0] hover:bg-blue-800 text-white"
-									>
-										{isSavingAttendance ? (
-											<Loader2 className="w-4 h-4 mr-2 animate-spin" />
-										) : (
-											<Save className="w-4 h-4 mr-2" />
-										)}
-										Simpan Presensi
-									</Button>
-								)}
-							</div>
-						</TabsContent>
-
-						<TabsContent value="ods" className="space-y-4">
-							<div className="bg-blue-50/60 border border-blue-100 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-								<div className="flex items-center gap-2">
-									<h4 className="text-base font-bold text-blue-950">
-										One Day Service (ODS)
-									</h4>
-									<Badge
-										variant="outline"
-										className="bg-white text-blue-700 border-blue-200 text-[11px] font-semibold"
-									>
-										Divisi CRM
-									</Badge>
-								</div>
-								<Badge
-									className={
-										crmData?.isOdsReport
-											? "bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold"
-											: "bg-slate-100 text-slate-600 border-slate-200"
-									}
-								>
-									{crmData?.isOdsReport
-										? "✓ Laporan Terverifikasi CRM"
-										: "Laporan Belum Selesai"}
-								</Badge>
-							</div>
-
-							{/* 5 Milestone Pelaksanaan ODS */}
-							<div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3">
-								<h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-									5 Tahap Pelaksanaan One Day Service
-								</h5>
-								{(() => {
-									let odsList: any[] = [];
-									try {
-										let parsed = crmData?.odsDetails;
-										if (typeof parsed === "string") parsed = JSON.parse(parsed);
-										if (Array.isArray(parsed)) odsList = parsed;
-									} catch (e) {}
-
-									return (
-										<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-											{[1, 2, 3, 4, 5].map((num, idx) => {
-												const item = odsList[idx] || {};
-												const isDone = !!item.isDone;
-												return (
-													<div
-														key={num}
-														className={cn(
-															"p-3 rounded-lg border text-xs space-y-1.5 transition-all",
-															isDone
-																? "bg-emerald-50/60 border-emerald-200"
-																: "bg-slate-50 border-slate-200 text-slate-500",
-														)}
-													>
-														<div className="flex justify-between items-center">
-															<span className="font-bold text-slate-800">
-																ODS #{num}
-															</span>
-															{isDone ? (
-																<Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0 h-4">
-																	✓ Selesai
-																</Badge>
-															) : (
-																<Badge
-																	variant="outline"
-																	className="bg-white text-slate-400 text-[10px] px-1.5 py-0 h-4 border-slate-200"
-																>
-																	Belum
-																</Badge>
-															)}
-														</div>
-														<p
-															className="font-medium text-slate-700 truncate"
-															title={item.industry || "Tempat belum diisi"}
-														>
-															🏢 {item.industry || "Belum diisi"}
-														</p>
-														<p className="text-[11px] text-slate-500">
-															📅 {item.date || "-"}
-														</p>
-													</div>
-												);
-											})}
-										</div>
-									);
-								})()}
-							</div>
-
-							{/* Riwayat Catatan Presensi ODS */}
-							<div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3">
-								<h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-									Riwayat Catatan Presensi ODS ({odsRecords.length} Sesi)
-								</h5>
-								{odsRecords.length === 0 ? (
-									<div className="text-center py-6 text-slate-400 text-xs border border-dashed rounded-lg">
-										Belum ada riwayat absensi ODS tercatat dari CRM.
-									</div>
-								) : (
-									<div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
-										{odsRecords.map((r) => (
-											<div
-												key={r.id}
-												className="p-3 flex justify-between items-center text-xs hover:bg-slate-50"
-											>
-												<div>
-													<span className="font-semibold text-slate-800">
-														{new Date(r.date).toLocaleDateString("id-ID", {
-															weekday: "long",
-															day: "numeric",
-															month: "long",
-															year: "numeric",
-														})}
-													</span>
-													{r.notes && (
-														<p className="text-slate-500 text-[11px] mt-0.5">
-															Catatan: {r.notes}
-														</p>
-													)}
-												</div>
-												<Badge
-													className={
-														r.status === "hadir"
-															? "bg-emerald-100 text-emerald-800"
-															: r.status === "izin" || r.status === "sakit"
-																? "bg-amber-100 text-amber-800"
-																: "bg-rose-100 text-rose-800"
-													}
-												>
-													{r.status.toUpperCase()}
-												</Badge>
-											</div>
-										))}
-									</div>
-								)}
-							</div>
-						</TabsContent>
-
-						<TabsContent value="pramagang" className="space-y-4">
-							<div className="bg-indigo-50/60 border border-indigo-100 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-								<div className="flex items-center gap-2">
-									<h4 className="text-base font-bold text-indigo-950">
-										Program Pra-Magang
-									</h4>
-									<Badge
-										variant="outline"
-										className="bg-white text-indigo-700 border-indigo-200 text-[11px] font-semibold"
-									>
-										Divisi CRM
-									</Badge>
-								</div>
-								<Badge
-									className={
-										crmData?.isPrammagangReport
-											? "bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold"
-											: "bg-slate-100 text-slate-600 border-slate-200"
-									}
-								>
-									{crmData?.isPrammagangReport
-										? "✓ Laporan Terverifikasi CRM"
-										: "Laporan Belum Selesai"}
-								</Badge>
-							</div>
-
-							{/* Detail Pelaksanaan Pra Magang */}
-							<div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
-								<h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
-									Informasi Industri & Pelaksanaan
-								</h5>
-								<div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-									<div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-										<span className="text-slate-400 block text-[11px] mb-1">
-											Mitra Industri / Perusahaan
-										</span>
-										<span className="font-bold text-slate-800 text-sm">
-											🏢 {crmData?.pramagangIndustry || "Belum ditentukan"}
-										</span>
-									</div>
-									<div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-										<span className="text-slate-400 block text-[11px] mb-1">
-											Masa Pra-Magang
-										</span>
-										<span className="font-semibold text-slate-800">
-											📅{" "}
-											{crmData?.pramagangStartDate && crmData?.pramagangEndDate
-												? `${crmData.pramagangStartDate} s/d ${crmData.pramagangEndDate}`
-												: "Belum ditentukan"}
-										</span>
-									</div>
-									<div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-										<span className="text-slate-400 block text-[11px] mb-1">
-											Video Dokumentasi
-										</span>
-										{crmData?.pramagangVideoLink ? (
-											<a
-												href={crmData.pramagangVideoLink}
-												target="_blank"
-												rel="noreferrer"
-												className="font-semibold text-blue-600 hover:underline flex items-center gap-1"
-											>
-												<ExternalLink className="w-3.5 h-3.5" />
-												Tonton Video
-											</a>
-										) : (
-											<span className="text-slate-400">
-												Belum ada link video
-											</span>
-										)}
-									</div>
-								</div>
-							</div>
-
-							{/* Riwayat Catatan Presensi Pra Magang */}
-							<div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3">
-								<h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-									Riwayat Catatan Presensi Pra-Magang ({pramagangRecords.length}{" "}
-									Sesi)
-								</h5>
-								{pramagangRecords.length === 0 ? (
-									<div className="text-center py-6 text-slate-400 text-xs border border-dashed rounded-lg">
-										Belum ada riwayat absensi Pra-Magang tercatat dari CRM.
-									</div>
-								) : (
-									<div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
-										{pramagangRecords.map((r) => (
-											<div
-												key={r.id}
-												className="p-3 flex justify-between items-center text-xs hover:bg-slate-50"
-											>
-												<div>
-													<span className="font-semibold text-slate-800">
-														{new Date(r.date).toLocaleDateString("id-ID", {
-															weekday: "long",
-															day: "numeric",
-															month: "long",
-															year: "numeric",
-														})}
-													</span>
-													{r.notes && (
-														<p className="text-slate-500 text-[11px] mt-0.5">
-															Catatan: {r.notes}
-														</p>
-													)}
-												</div>
-												<Badge
-													className={
-														r.status === "hadir"
-															? "bg-emerald-100 text-emerald-800"
-															: r.status === "izin" || r.status === "sakit"
-																? "bg-amber-100 text-amber-800"
-																: "bg-rose-100 text-rose-800"
-													}
-												>
-													{r.status.toUpperCase()}
-												</Badge>
-											</div>
-										))}
-									</div>
-								)}
-							</div>
-						</TabsContent>
-					</Tabs>
 				</div>
 			</div>
 

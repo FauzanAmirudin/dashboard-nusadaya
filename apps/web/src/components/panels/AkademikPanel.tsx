@@ -10,9 +10,10 @@ import {
 	Trash2,
 	XCircle,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { TabMataKuliah } from "@/components/panels/kehadiran/detail/TabMataKuliah";
+import { KehadiranPanel } from "@/components/panels/KehadiranPanel";
 import { AccPanelStatusCard } from "@/components/ui/AccPanelStatusCard";
 import {
 	AlertDialog,
@@ -52,6 +53,7 @@ import type { AssessmentRecord } from "./akademik/assessment/AssessmentFormCard"
 import { AssessmentFormCard } from "./akademik/assessment/AssessmentFormCard";
 import { TabDataMahasiswa } from "./akademik/TabDataMahasiswa";
 import { TabManajemenMahasiswa } from "./akademik/TabManajemenMahasiswa";
+import { TabNilaiKhs } from "./akademik/TabNilaiKhs";
 
 interface DocFile {
 	id: number;
@@ -70,15 +72,22 @@ interface AkademikPanelProps {
 		nim?: string | null;
 		studentStatus?: string | null;
 		paId?: number | null;
+		rombel?: string | null;
 	};
 	onUpdate: () => void;
+	onProgressChange?: (completed: number, total: number) => void;
 }
 
 export function AkademikPanel({
 	studentId,
 	studentData,
 	onUpdate,
+	onProgressChange,
 }: AkademikPanelProps) {
+	const searchParams = useSearchParams();
+	const subtabParam = searchParams.get("subtab");
+	const tabParam = searchParams.get("tab");
+
 	const { user, token } = useAuthStore();
 	const isAkademikAdmin = hasRole(user, "akademik");
 	const isSuperadmin = hasRole(user, "superadmin");
@@ -89,8 +98,32 @@ export function AkademikPanel({
 	const [acadState, setAcadState] = useState<any>(null);
 	const [documents, setDocuments] = useState<Record<string, DocFile[]>>({});
 	const [isLoading, setIsLoading] = useState(true);
-	const [activeTab, setActiveTab] = useState("dokumen");
+	const [activeTab, setActiveTab] = useState(() => {
+		if (
+			subtabParam === "nilai-khs" ||
+			tabParam === "nilai-khs" ||
+			subtabParam === "khs"
+		)
+			return "nilai-khs";
+		if (subtabParam === "kehadiran" || tabParam === "kehadiran")
+			return "kehadiran";
+		if (subtabParam === "dokumen") return "dokumen";
+		if (subtabParam === "assessment") return "assessment";
+		return "data-mahasiswa";
+	});
 	const [assessment, setAssessment] = useState<AssessmentRecord | null>(null);
+
+	useEffect(() => {
+		if (subtabParam === "nilai-khs" || subtabParam === "khs") {
+			setActiveTab("nilai-khs");
+		} else if (subtabParam === "kehadiran") {
+			setActiveTab("kehadiran");
+		} else if (subtabParam === "dokumen") {
+			setActiveTab("dokumen");
+		} else if (subtabParam === "assessment") {
+			setActiveTab("assessment");
+		}
+	}, [subtabParam]);
 
 	const [isDeleteDocOpen, setIsDeleteDocOpen] = useState(false);
 	const [selectedDocToDelete, setSelectedDocToDelete] = useState<number | null>(
@@ -296,6 +329,47 @@ export function AkademikPanel({
 		);
 	}
 
+	useEffect(() => {
+		onProgressChange?.(completedCount, checklist.length);
+		if (typeof window !== "undefined") {
+			window.dispatchEvent(
+				new CustomEvent("akademik-progress-sync", {
+					detail: {
+						studentId,
+						completed: completedCount,
+						total: checklist.length,
+					},
+				}),
+			);
+			try {
+				const ch = new BroadcastChannel("dashboard-realtime-sync");
+				ch.postMessage({
+					type: "akademik-progress-sync",
+					studentId,
+					completed: completedCount,
+					total: checklist.length,
+				});
+				ch.close();
+			} catch {}
+		}
+	}, [studentId, completedCount, checklist.length, onProgressChange]);
+
+	const handleRefreshAcademic = async () => {
+		await fetchAcademicData();
+		await fetchDocuments();
+		onUpdate();
+		if (typeof window !== "undefined") {
+			window.dispatchEvent(
+				new CustomEvent("student-updated", { detail: { studentId } }),
+			);
+			try {
+				const ch = new BroadcastChannel("dashboard-realtime-sync");
+				ch.postMessage({ type: "student-updated", studentId });
+				ch.close();
+			} catch {}
+		}
+	};
+
 	const handleAcc = async () => {
 		if (!isAkademikAdmin && !isSuperadmin) return;
 		try {
@@ -437,24 +511,31 @@ export function AkademikPanel({
 				/>
 
 				{/* TABS NAVIGATION */}
-				<div className="flex space-x-2 border-b border-slate-200 mb-6">
+				<div className="flex space-x-2 border-b border-slate-200 mb-6 overflow-x-auto">
 					<button
 						onClick={() => setActiveTab("data-mahasiswa")}
-						className={`px-4 py-2 font-medium text-sm ${activeTab === "data-mahasiswa" ? "border-b-2 border-[#0517B0] text-[#0517B0]" : "text-slate-500 hover:text-slate-700"}`}
+						className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${activeTab === "data-mahasiswa" ? "border-b-2 border-[#0517B0] text-[#0517B0]" : "text-slate-500 hover:text-slate-700"}`}
 					>
 						Data Mahasiswa (Status & PA)
 					</button>
 					<button
 						onClick={() => setActiveTab("dokumen")}
-						className={`px-4 py-2 font-medium text-sm ${activeTab === "dokumen" ? "border-b-2 border-[#0517B0] text-[#0517B0]" : "text-slate-500 hover:text-slate-700"}`}
+						className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${activeTab === "dokumen" ? "border-b-2 border-[#0517B0] text-[#0517B0]" : "text-slate-500 hover:text-slate-700"}`}
 					>
 						Manajemen Mahasiswa
 					</button>
 					<button
-						onClick={() => setActiveTab("penilaian")}
-						className={`px-4 py-2 font-medium text-sm ${activeTab === "penilaian" ? "border-b-2 border-[#0517B0] text-[#0517B0]" : "text-slate-500 hover:text-slate-700"}`}
+						onClick={() => setActiveTab("nilai-khs")}
+						className={`px-4 py-2 font-medium text-sm whitespace-nowrap flex items-center gap-1.5 ${activeTab === "nilai-khs" ? "border-b-2 border-[#0517B0] text-[#0517B0]" : "text-slate-500 hover:text-slate-700"}`}
 					>
-						Penilaian Vokasi & Dosen
+						<GraduationCap className="w-4 h-4 text-[#0517B0]" />
+						Nilai & KHS (AKD-06)
+					</button>
+					<button
+						onClick={() => setActiveTab("kehadiran")}
+						className={`px-4 py-2 font-medium text-sm whitespace-nowrap ${activeTab === "kehadiran" ? "border-b-2 border-[#0517B0] text-[#0517B0]" : "text-slate-500 hover:text-slate-700"}`}
+					>
+						Manajemen Kehadiran
 					</button>
 
 					<button
@@ -482,17 +563,26 @@ export function AkademikPanel({
 							studentId={studentId}
 							canEdit={canEdit}
 							acadState={acadState}
-							onRefresh={fetchAcademicData}
+							onRefresh={handleRefreshAcademic}
 						/>
 					</div>
 				)}
 
-				{activeTab === "penilaian" && (
-					<div className="mt-2">
-						<h3 className="text-xl font-bold text-slate-800 mb-4 px-1 border-l-4 border-[#0517B0] pl-3">
-							Rekap Nilai & Kehadiran Mata Kuliah
-						</h3>
-						<TabMataKuliah studentId={studentId} />
+				{activeTab === "nilai-khs" && (
+					<div className="space-y-6">
+						<TabNilaiKhs
+							studentId={studentId}
+							canEdit={canEdit}
+							studentData={studentData}
+							acadState={acadState}
+							onRefresh={handleRefreshAcademic}
+						/>
+					</div>
+				)}
+
+				{activeTab === "kehadiran" && (
+					<div className="space-y-6">
+						<KehadiranPanel studentId={studentId} hideHeader={true} />
 					</div>
 				)}
 

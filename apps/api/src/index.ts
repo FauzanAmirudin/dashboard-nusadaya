@@ -32,6 +32,7 @@ import { exportModule } from "./modules/export";
 import { fileModule } from "./modules/file";
 import { fileService } from "./modules/file/service/file.service";
 import { academicCalendarRoutes } from "./routes/academic-calendar";
+import { academicGradesRouter } from "./routes/academic-grades";
 import { akademikPaRouter } from "./routes/akademik-pa";
 import { attendanceRoutes } from "./routes/attendance";
 import { coursesRoutes } from "./routes/courses";
@@ -44,6 +45,7 @@ import { magangRouter } from "./routes/magang";
 import { mahasiswaRouter } from "./routes/mahasiswa";
 import { paRouter } from "./routes/pa";
 import { schedulingRoutes } from "./routes/scheduling";
+import { selfieAttendanceRoutes } from "./routes/selfie-attendance";
 import { settingsRoutes } from "./routes/settings";
 import { studentsRouter } from "./routes/student";
 import { usersRoutes } from "./routes/users";
@@ -282,6 +284,7 @@ const app = new Elysia()
 	// Module Routers (existing)
 	.use(dashboardRoutes)
 	.use(studentsRouter)
+	.use(academicGradesRouter)
 	.use(formRegisterRoutes)
 	.use(dosenRouter)
 	.use(paRouter)
@@ -294,6 +297,7 @@ const app = new Elysia()
 	.use(academicCalendarRoutes)
 	.use(schedulingRoutes)
 	.use(attendanceRoutes)
+	.use(selfieAttendanceRoutes)
 	.use(usersRoutes)
 	.use(coursesRoutes)
 

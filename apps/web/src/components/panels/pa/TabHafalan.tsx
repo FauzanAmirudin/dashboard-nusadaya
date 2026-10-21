@@ -2,6 +2,7 @@
 
 import {
 	BookMarked,
+	Calendar,
 	Edit2,
 	Eye,
 	MessageSquare,
@@ -62,13 +63,13 @@ interface TabHafalanProps {
 }
 
 const LANGUAGE_LABELS: Record<string, string> = {
-	inggris: "Inggris 🇬🇧",
-	mandarin: "Mandarin 🇨🇳",
-	jepang: "Jepang 🇯🇵",
-	jerman: "Jerman 🇩🇪",
-	arab: "Arab 🇸🇦",
-	korea: "Korea 🇰🇷",
-	lainnya: "Lainnya",
+	inggris: "Bahasa Inggris",
+	mandarin: "Bahasa Mandarin",
+	jepang: "Bahasa Jepang",
+	jerman: "Bahasa Jerman",
+	arab: "Bahasa Arab",
+	korea: "Bahasa Korea",
+	lainnya: "Bahasa Lainnya",
 };
 
 const LANGUAGE_COLORS: Record<string, string> = {
@@ -85,7 +86,8 @@ function getLanguageLabel(session: HafalanSession): string {
 	if (session.language === "lainnya" && session.languageCustom) {
 		return session.languageCustom;
 	}
-	return LANGUAGE_LABELS[session.language] ?? session.language;
+	const key = (session.language || "").toLowerCase().trim();
+	return LANGUAGE_LABELS[key] ?? session.language;
 }
 
 function getLanguageBadgeClass(language: string): string {
@@ -391,16 +393,18 @@ export function TabHafalan({
 										}
 									>
 										<SelectTrigger className="bg-white">
-											<SelectValue placeholder="Pilih Bahasa" />
+											<SelectValue placeholder="Pilih Bahasa">
+												{LANGUAGE_LABELS[form.language] || form.language}
+											</SelectValue>
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="inggris">🇬🇧 Inggris</SelectItem>
-											<SelectItem value="mandarin">🇨🇳 Mandarin</SelectItem>
-											<SelectItem value="jepang">🇯🇵 Jepang</SelectItem>
-											<SelectItem value="jerman">🇩🇪 Jerman</SelectItem>
-											<SelectItem value="arab">🇸🇦 Arab</SelectItem>
-											<SelectItem value="korea">🇰🇷 Korea</SelectItem>
-											<SelectItem value="lainnya">Lainnya...</SelectItem>
+											<SelectItem value="inggris">Bahasa Inggris</SelectItem>
+											<SelectItem value="mandarin">Bahasa Mandarin</SelectItem>
+											<SelectItem value="jepang">Bahasa Jepang</SelectItem>
+											<SelectItem value="jerman">Bahasa Jerman</SelectItem>
+											<SelectItem value="arab">Bahasa Arab</SelectItem>
+											<SelectItem value="korea">Bahasa Korea</SelectItem>
+											<SelectItem value="lainnya">Bahasa Lainnya...</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>
@@ -623,13 +627,15 @@ export function TabHafalan({
 									const sentenceList = Array.isArray(session.sentenceList)
 										? session.sentenceList
 										: [];
-									const formattedDate = new Date(
-										session.createdAt,
-									).toLocaleDateString("id-ID", {
-										day: "numeric",
-										month: "short",
-										year: "numeric",
-									});
+									const rawDate = session.date || session.createdAt;
+									const formattedDate = new Date(rawDate).toLocaleDateString(
+										"id-ID",
+										{
+											day: "numeric",
+											month: "short",
+											year: "numeric",
+										},
+									);
 
 									return (
 										<TableRow
@@ -639,14 +645,15 @@ export function TabHafalan({
 											<TableCell className="align-top">
 												<Badge
 													variant="outline"
-													className={`text-xs font-semibold ${getLanguageBadgeClass(
+													className={`text-xs font-semibold px-2.5 py-1 rounded-md border ${getLanguageBadgeClass(
 														session.language,
 													)}`}
 												>
 													{getLanguageLabel(session)}
 												</Badge>
-												<p className="text-xs text-slate-500 font-medium mt-1">
-													{formattedDate}
+												<p className="text-xs text-slate-500 font-medium mt-1.5 flex items-center gap-1.5">
+													<Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+													<span>{formattedDate}</span>
 												</p>
 											</TableCell>
 

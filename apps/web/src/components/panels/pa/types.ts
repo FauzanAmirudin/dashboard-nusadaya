@@ -22,6 +22,7 @@ export interface HafalanSession {
 	vocabList?: string[];
 	sentenceList?: string[];
 	notes?: string | null;
+	date?: string;
 	createdAt: string;
 	updatedAt?: string;
 	createdByUser?: { fullName: string; username: string } | null;
@@ -78,6 +79,8 @@ export interface StudentNote {
 	id: number;
 	type: string;
 	content: string;
+	date?: string;
+	category?: string;
 	createdAt: string;
 	updatedAt?: string;
 	createdByUser?: { fullName: string; username: string } | null;
@@ -104,4 +107,51 @@ export interface InterviewFormState {
 	country: string;
 	result: string;
 	notes: string;
+}
+
+export const DISCIPLINE_CATEGORIES: Record<
+	string,
+	{ label: string; badgeClass: string; iconDesc: string }
+> = {
+	pelanggaran_ringan: {
+		label: "Pelanggaran Ringan",
+		badgeClass: "bg-amber-50 text-amber-800 border-amber-300",
+		iconDesc: "⚠️ Terlambat, Seragam, Ketidaktertiban",
+	},
+	pelanggaran_sedang: {
+		label: "Pelanggaran Sedang",
+		badgeClass: "bg-orange-50 text-orange-800 border-orange-300",
+		iconDesc: "⛔ Mangkir, Pelanggaran Jam Malam",
+	},
+	pelanggaran_berat: {
+		label: "Pelanggaran Berat",
+		badgeClass: "bg-rose-50 text-rose-800 border-rose-300",
+		iconDesc: "🚨 Indisipliner Serius / Etika",
+	},
+	pembinaan: {
+		label: "Peringatan & Pembinaan",
+		badgeClass: "bg-blue-50 text-blue-800 border-blue-300",
+		iconDesc: "📋 Pembinaan Khusus / SP",
+	},
+	apresiasi: {
+		label: "Apresiasi & Keteladanan",
+		badgeClass: "bg-emerald-50 text-emerald-800 border-emerald-300",
+		iconDesc: "⭐ Keteladanan & Prestasi Sikap",
+	},
+	umum: {
+		label: "Catatan Umum",
+		badgeClass: "bg-slate-100 text-slate-800 border-slate-300",
+		iconDesc: "📝 Catatan Harian / Pemantauan",
+	},
+};
+
+export function getDisciplineCategoryConfig(category?: string | null) {
+	if (!category) return DISCIPLINE_CATEGORIES.umum;
+	return (
+		DISCIPLINE_CATEGORIES[category] || {
+			label: category.replace(/_/g, " "),
+			badgeClass: "bg-slate-100 text-slate-800 border-slate-300",
+			iconDesc: "",
+		}
+	);
 }

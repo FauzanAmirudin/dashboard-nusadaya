@@ -193,6 +193,19 @@ export function TabPraPaspor({
 													<p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
 														{item.desc}
 													</p>
+													{[
+														"praPasporKhs",
+														"praPasporKrs",
+														"praPasporTranskrip",
+													].includes(item.key) &&
+														isChecked && (
+															<div className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-blue-700 bg-blue-50/90 px-2 py-0.5 rounded-md border border-blue-200 font-semibold">
+																<ShieldCheck className="w-3 h-3 text-blue-600 shrink-0" />
+																<span>
+																	Tersinkronisasi Otomatis dari BAAK Akademik
+																</span>
+															</div>
+														)}
 												</div>
 											</div>
 											<div className="flex items-center gap-2 shrink-0">

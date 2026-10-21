@@ -13,6 +13,7 @@ import {
 	students,
 	users,
 } from "../db/schema";
+import { cacheInvalidatePattern } from "../lib/cache";
 import { getValidUserId, hasRole } from "../lib/permissions";
 
 function addDays(baseDateStr: string, days: number): string {
@@ -21,7 +22,453 @@ function addDays(baseDateStr: string, days: number): string {
 	return d.toISOString().split("T")[0];
 }
 
+const MONTH_NAMES_ID = [
+	"Januari",
+	"Februari",
+	"Maret",
+	"April",
+	"Mei",
+	"Juni",
+	"Juli",
+	"Agustus",
+	"September",
+	"Oktober",
+	"November",
+	"Desember",
+];
+
+async function computeDosenRekap({
+	startDate,
+	endDate,
+	targetDosenId,
+	cohort,
+	periodLabel,
+	periodType,
+	periodDetails,
+}: {
+	startDate: string;
+	endDate: string;
+	targetDosenId?: number | null;
+	cohort?: number | null;
+	periodLabel: string;
+	periodType: "bulanan" | "semester";
+	periodDetails: Record<string, any>;
+}) {
+	// 1. Ambil semua mata kuliah yang aktif/ditugaskan (mendukung penambahan dinamis)
+	const courseConditions = [];
+	if (cohort) {
+		courseConditions.push(eq(courses.cohort, cohort));
+	}
+
+	const allAssignedCourses = await db.query.courses.findMany({
+		where: courseConditions.length > 0 ? and(...courseConditions) : undefined,
+		with: {
+			dosen: {
+				columns: {
+					id: true,
+					fullName: true,
+					username: true,
+					email: true,
+				},
+			},
+			dosenPendamping: {
+				columns: {
+					id: true,
+					fullName: true,
+					username: true,
+					email: true,
+				},
+			},
+		},
+		orderBy: [asc(courses.code)],
+	});
+
+	// 2. Ambil data pertemuan pada rentang tanggal periode
+	const meetingConditions = [
+		sql`${courseMeetings.meetingDate} IS NOT NULL`,
+		sql`${courseMeetings.meetingDate} >= ${startDate}`,
+		sql`${courseMeetings.meetingDate} <= ${endDate}`,
+	];
+
+	const allMeetings = await db.query.courseMeetings.findMany({
+		where: and(...meetingConditions),
+		with: {
+			course: {
+				with: {
+					dosen: {
+						columns: {
+							id: true,
+							fullName: true,
+							username: true,
+							email: true,
+						},
+					},
+					dosenPendamping: {
+						columns: {
+							id: true,
+							fullName: true,
+							username: true,
+							email: true,
+						},
+					},
+				},
+			},
+			dosenPengajar: {
+				columns: {
+					id: true,
+					fullName: true,
+					username: true,
+					email: true,
+				},
+			},
+		},
+		orderBy: [
+			asc(courseMeetings.meetingDate),
+			asc(courseMeetings.meetingNumber),
+		],
+	});
+
+	// Filter meetings by cohort if provided
+	const filteredMeetings = cohort
+		? allMeetings.filter((m) => m.course?.cohort === cohort)
+		: allMeetings;
+
+	type DosenCourseSummary = {
+		courseId: number;
+		courseCode: string;
+		courseName: string;
+		sks: number;
+		rombel: string;
+		cohort: number;
+		roleDiMatkul: "Utama" | "Pendamping" | "Pengganti";
+		totalSesi: number;
+		sesiTeori: number;
+		sesiPraktik: number;
+		sesiSolo: number;
+		sesiTeamTeaching: number;
+		sesiDetail: Array<{
+			meetingId: number;
+			meetingNumber: number;
+			meetingLabel: string;
+			meetingDate: string;
+			sessionType: string;
+			teachingStatus: string;
+			isTeamTeaching: boolean;
+			partnerDosenName: string | null;
+			teachingNotes: string | null;
+		}>;
+	};
+
+	type DosenSummary = {
+		dosenId: number;
+		fullName: string;
+		username: string;
+		email: string | null;
+		totalSesiMengajar: number;
+		sesiTeori: number;
+		sesiPraktik: number;
+		sesiSolo: number;
+		sesiTeamTeaching: number;
+		totalJamEstimasi: number;
+		mataKuliah: DosenCourseSummary[];
+	};
+
+	const dosenMap = new Map<
+		number,
+		{
+			id: number;
+			fullName: string;
+			username: string;
+			email: string | null;
+		}
+	>();
+
+	const statsByDosen = new Map<number, DosenSummary>();
+
+	// Helper function untuk mendaftarkan dosen & memastikan slot statistiknya ada
+	const ensureDosen = (u: {
+		id: number;
+		fullName?: string | null;
+		username: string;
+		email?: string | null;
+	}) => {
+		const dId = u.id;
+		if (targetDosenId && dId !== targetDosenId) return undefined;
+
+		if (!dosenMap.has(dId)) {
+			dosenMap.set(dId, {
+				id: dId,
+				fullName: u.fullName || u.username,
+				username: u.username,
+				email: u.email || null,
+			});
+		}
+
+		let dStats = statsByDosen.get(dId);
+		if (!dStats) {
+			const info = dosenMap.get(dId)!;
+			dStats = {
+				dosenId: dId,
+				fullName: info.fullName,
+				username: info.username,
+				email: info.email,
+				totalSesiMengajar: 0,
+				sesiTeori: 0,
+				sesiPraktik: 0,
+				sesiSolo: 0,
+				sesiTeamTeaching: 0,
+				totalJamEstimasi: 0,
+				mataKuliah: [],
+			};
+			statsByDosen.set(dId, dStats);
+		}
+		return dStats;
+	};
+
+	// 3. Daftarkan SEMUA dosen yang sudah ditugaskan untuk mata kuliah
+	//    (baik Dosen Utama maupun Dosen Pendamping / Team Teaching)
+	for (const c of allAssignedCourses) {
+		// Dosen Utama
+		if (c.dosen) {
+			const dStats = ensureDosen(c.dosen);
+			if (dStats) {
+				const exists = dStats.mataKuliah.some((mk) => mk.courseId === c.id);
+				if (!exists) {
+					dStats.mataKuliah.push({
+						courseId: c.id,
+						courseCode: c.code,
+						courseName: c.name,
+						sks: c.sks || 2,
+						rombel: c.rombel || "Kelas A",
+						cohort: c.cohort,
+						roleDiMatkul: "Utama",
+						totalSesi: 0,
+						sesiTeori: 0,
+						sesiPraktik: 0,
+						sesiSolo: 0,
+						sesiTeamTeaching: 0,
+						sesiDetail: [],
+					});
+				}
+			}
+		}
+
+		// Dosen Pendamping
+		if (c.dosenPendamping) {
+			const dStats = ensureDosen(c.dosenPendamping);
+			if (dStats) {
+				const exists = dStats.mataKuliah.some((mk) => mk.courseId === c.id);
+				if (!exists) {
+					dStats.mataKuliah.push({
+						courseId: c.id,
+						courseCode: c.code,
+						courseName: c.name,
+						sks: c.sks || 2,
+						rombel: c.rombel || "Kelas A",
+						cohort: c.cohort,
+						roleDiMatkul: "Pendamping",
+						totalSesi: 0,
+						sesiTeori: 0,
+						sesiPraktik: 0,
+						sesiSolo: 0,
+						sesiTeamTeaching: 0,
+						sesiDetail: [],
+					});
+				}
+			}
+		}
+	}
+
+	// 4. Proses semua pertemuan yang terlaksana dalam periode yang dipilih
+	let distinctMeetingsCount = 0;
+	let distinctTeamTeachingMeetingsCount = 0;
+
+	for (const m of filteredMeetings) {
+		if (!m.course) continue;
+		distinctMeetingsCount++;
+
+		const attendedSet = new Set<number>();
+
+		if (Array.isArray(m.attendedDosenIds) && m.attendedDosenIds.length > 0) {
+			for (const id of m.attendedDosenIds) {
+				if (typeof id === "number") attendedSet.add(id);
+			}
+		}
+
+		if (m.dosenPengajarId) {
+			attendedSet.add(m.dosenPengajarId);
+		}
+
+		if (m.isTeamTeachingAttended) {
+			if (m.course.dosenId) attendedSet.add(m.course.dosenId);
+			if (m.course.dosenPendampingId)
+				attendedSet.add(m.course.dosenPendampingId);
+		}
+
+		// Fallback for unassigned meetings: default to primary lecturer
+		if (attendedSet.size === 0) {
+			if (m.course.dosenId) attendedSet.add(m.course.dosenId);
+		}
+
+		const isTeamTeaching =
+			Boolean(m.isTeamTeachingAttended) || attendedSet.size > 1;
+		if (isTeamTeaching) {
+			distinctTeamTeachingMeetingsCount++;
+		}
+
+		const sessionType = (
+			m.sessionType ||
+			m.course.type ||
+			"teori"
+		).toLowerCase();
+		const isPraktik = sessionType === "praktik";
+
+		for (const dId of attendedSet) {
+			if (targetDosenId && dId !== targetDosenId) continue;
+
+			let dStats = statsByDosen.get(dId);
+			if (!dStats) {
+				const guestInfo =
+					m.dosenPengajar && m.dosenPengajar.id === dId
+						? m.dosenPengajar
+						: m.course.dosen && m.course.dosen.id === dId
+							? m.course.dosen
+							: m.course.dosenPendamping && m.course.dosenPendamping.id === dId
+								? m.course.dosenPendamping
+								: {
+										id: dId,
+										fullName: `Dosen #${dId}`,
+										username: `dosen_${dId}`,
+										email: null,
+									};
+				dStats = ensureDosen(guestInfo);
+				if (!dStats) continue;
+			}
+
+			dStats.totalSesiMengajar++;
+			if (isPraktik) dStats.sesiPraktik++;
+			else dStats.sesiTeori++;
+
+			if (isTeamTeaching) dStats.sesiTeamTeaching++;
+			else dStats.sesiSolo++;
+
+			dStats.totalJamEstimasi += m.course.sks || 2;
+
+			let partnerDosenName: string | null = null;
+			if (isTeamTeaching) {
+				const partnerIds = Array.from(attendedSet).filter((id) => id !== dId);
+				if (partnerIds.length > 0) {
+					partnerDosenName = partnerIds
+						.map((pid) => dosenMap.get(pid)?.fullName || `Dosen #${pid}`)
+						.join(", ");
+				}
+			}
+
+			let cSummary = dStats.mataKuliah.find((c) => c.courseId === m.courseId);
+			if (!cSummary) {
+				cSummary = {
+					courseId: m.courseId,
+					courseCode: m.course.code,
+					courseName: m.course.name,
+					sks: m.course.sks || 2,
+					rombel: m.course.rombel || "Kelas A",
+					cohort: m.course.cohort,
+					roleDiMatkul:
+						m.course.dosenId === dId
+							? "Utama"
+							: m.course.dosenPendampingId === dId
+								? "Pendamping"
+								: "Pengganti",
+					totalSesi: 0,
+					sesiTeori: 0,
+					sesiPraktik: 0,
+					sesiSolo: 0,
+					sesiTeamTeaching: 0,
+					sesiDetail: [],
+				};
+				dStats.mataKuliah.push(cSummary);
+			}
+
+			cSummary.totalSesi++;
+			if (isPraktik) cSummary.sesiPraktik++;
+			else cSummary.sesiTeori++;
+
+			if (isTeamTeaching) cSummary.sesiTeamTeaching++;
+			else cSummary.sesiSolo++;
+
+			cSummary.sesiDetail.push({
+				meetingId: m.id,
+				meetingNumber: m.meetingNumber,
+				meetingLabel: m.meetingLabel,
+				meetingDate: m.meetingDate ? String(m.meetingDate) : "",
+				sessionType: m.sessionType || m.course.type,
+				teachingStatus: m.teachingStatus || "terlaksana",
+				isTeamTeaching: isTeamTeaching,
+				partnerDosenName: partnerDosenName,
+				teachingNotes: m.teachingNotes || null,
+			});
+		}
+	}
+
+	// 5. Susun daftar dosen:
+	//    - Jika targetDosenId (dosen akses mandiri), filter untuk dosen itu saja.
+	//    - Jika monitoring akademik, tampilkan SEMUA dosen yang sudah ditugaskan mata kuliah!
+	let dosenList = Array.from(statsByDosen.values());
+	if (targetDosenId) {
+		dosenList = dosenList.filter((d) => d.dosenId === targetDosenId);
+	}
+
+	// Urutkan: Dosen dengan sesi terbanyak di atas; jika sesi sama, urutkan berdasarkan nama dosen
+	dosenList.sort((a, b) => {
+		if (b.totalSesiMengajar !== a.totalSesiMengajar) {
+			return b.totalSesiMengajar - a.totalSesiMengajar;
+		}
+		return a.fullName.localeCompare(b.fullName);
+	});
+
+	const totalDosenDitugaskan = dosenList.length;
+	const totalDosenAktif = dosenList.filter(
+		(d) => d.totalSesiMengajar > 0,
+	).length;
+	const avgSesiPerDosen =
+		totalDosenAktif > 0
+			? Number((distinctMeetingsCount / totalDosenAktif).toFixed(1))
+			: 0;
+
+	return {
+		success: true,
+		period: {
+			type: periodType,
+			label: periodLabel,
+			startDate,
+			endDate,
+			...periodDetails,
+		},
+		summary: {
+			totalDosenDitugaskan,
+			totalDosenAktif,
+			totalSesiTerlaksana: distinctMeetingsCount,
+			totalSesiTeamTeaching: distinctTeamTeachingMeetingsCount,
+			rataRataSesiPerDosen: avgSesiPerDosen,
+		},
+		dosenList,
+	};
+}
+
 export const coursesRoutes = new Elysia({ prefix: "/courses" })
+	.onAfterResponse(async ({ request, set }) => {
+		if (["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) {
+			const status = typeof set.status === "number" ? set.status : 200;
+			if (status < 400) {
+				await Promise.all([
+					cacheInvalidatePattern("cache:students:*"),
+					cacheInvalidatePattern("cache:student:*"),
+					cacheInvalidatePattern("cache:attendance:*"),
+					cacheInvalidatePattern("cache:dashboard:*"),
+				]);
+			}
+		}
+	})
 	.derive((context) => {
 		const user = (context as any).user;
 		return { user };
@@ -183,6 +630,120 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			}),
 		},
 	)
+
+	// ==========================================
+	// 1c. REKAPITULASI PRESENSI DOSEN (TEAM TEACHING)
+	// ==========================================
+	.get("/rekap-dosen/bulanan", async ({ query, user, set }: any) => {
+		if (!user) {
+			set.status = 401;
+			return { success: false, message: "Unauthorized" };
+		}
+		if (!hasRole(user, "dosen", "akademik", "finance")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		const now = new Date();
+		const mNum = query?.month
+			? parseInt(query.month as string, 10)
+			: now.getMonth() + 1;
+		const yNum = query?.year
+			? parseInt(query.year as string, 10)
+			: now.getFullYear();
+
+		if (isNaN(mNum) || mNum < 1 || mNum > 12) {
+			set.status = 400;
+			return { success: false, message: "Bulan harus antara 1 dan 12" };
+		}
+
+		const lastDay = new Date(yNum, mNum, 0).getDate();
+		const startDate = `${yNum}-${String(mNum).padStart(2, "0")}-01`;
+		const endDate = `${yNum}-${String(mNum).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+		const periodLabel = `${MONTH_NAMES_ID[mNum - 1]} ${yNum}`;
+
+		let targetDosenId = query?.dosenId
+			? parseInt(query.dosenId as string, 10)
+			: null;
+		// Jika role adalah dosen (dan bukan akademik/finance/superadmin), hanya lihat dirinya sendiri
+		if (hasRole(user, "dosen") && !hasRole(user, "akademik", "finance")) {
+			targetDosenId = user.id;
+		}
+
+		const cohortFilter = query?.cohort
+			? parseInt(query.cohort as string, 10)
+			: null;
+
+		return await computeDosenRekap({
+			startDate,
+			endDate,
+			targetDosenId,
+			cohort: cohortFilter,
+			periodLabel,
+			periodType: "bulanan",
+			periodDetails: {
+				month: mNum,
+				year: yNum,
+				monthName: MONTH_NAMES_ID[mNum - 1],
+			},
+		});
+	})
+	.get("/rekap-dosen/semester", async ({ query, user, set }: any) => {
+		if (!user) {
+			set.status = 401;
+			return { success: false, message: "Unauthorized" };
+		}
+		if (!hasRole(user, "dosen", "akademik", "finance")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		const now = new Date();
+		const semesterNum = query?.semester
+			? parseInt(query.semester as string, 10)
+			: 1;
+		const yNum = query?.year
+			? parseInt(query.year as string, 10)
+			: now.getFullYear();
+
+		let startDate = (query?.startDate as string) || "";
+		let endDate = (query?.endDate as string) || "";
+		let periodLabel = (query?.label as string) || "";
+
+		if (!startDate || !endDate) {
+			if (semesterNum === 1) {
+				startDate = `${yNum}-08-01`;
+				endDate = `${yNum + 1}-01-31`;
+				periodLabel = `Semester Ganjil ${yNum}/${yNum + 1}`;
+			} else {
+				startDate = `${yNum}-02-01`;
+				endDate = `${yNum}-07-31`;
+				periodLabel = `Semester Genap ${yNum}`;
+			}
+		}
+
+		let targetDosenId = query?.dosenId
+			? parseInt(query.dosenId as string, 10)
+			: null;
+		if (hasRole(user, "dosen") && !hasRole(user, "akademik", "finance")) {
+			targetDosenId = user.id;
+		}
+
+		const cohortFilter = query?.cohort
+			? parseInt(query.cohort as string, 10)
+			: null;
+
+		return await computeDosenRekap({
+			startDate,
+			endDate,
+			targetDosenId,
+			cohort: cohortFilter,
+			periodLabel,
+			periodType: "semester",
+			periodDetails: { semester: semesterNum, year: yNum },
+		});
+	})
+
 	.get("/:id", async ({ params, user, set }) => {
 		const id = parseInt(params.id, 10);
 		const course = await db.query.courses.findFirst({
@@ -582,8 +1143,9 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 		}
 		if (
 			hasRole(user, "dosen") &&
-			!hasRole(user, "akademik") &&
-			course.dosenId !== user.id
+			!hasRole(user, "akademik", "superadmin") &&
+			course.dosenId !== user.id &&
+			course.dosenPendampingId !== user.id
 		) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
@@ -592,6 +1154,9 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 		const data = await db.query.courseMeetings.findMany({
 			where: eq(courseMeetings.courseId, courseId),
 			with: {
+				dosenPengajar: {
+					columns: { id: true, fullName: true, username: true },
+				},
 				activities: true,
 				attendances: {
 					with: {
@@ -623,8 +1188,9 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			}
 			if (
 				hasRole(user, "dosen") &&
-				!hasRole(user, "akademik") &&
-				meeting.course.dosenId !== user.id
+				!hasRole(user, "akademik", "superadmin") &&
+				meeting.course.dosenId !== user.id &&
+				meeting.course.dosenPendampingId !== user.id
 			) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
@@ -639,6 +1205,52 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 
 			if (input.sessionType !== undefined) {
 				updatePayload.sessionType = input.sessionType;
+			}
+			if (input.teachingStatus !== undefined) {
+				updatePayload.teachingStatus = input.teachingStatus;
+			}
+			if (input.teachingNotes !== undefined) {
+				updatePayload.teachingNotes = input.teachingNotes;
+			}
+
+			// Otomatisasi Absensi Akun Dosen yang Login:
+			// Jika client tidak mengirimkan attendedDosenIds / dosenPengajarId eksplisit (seperti pada form presensi dosen),
+			// sistem secara otomatis merekam absensi sesuai akun dosen yang sedang login.
+			// Dosen tidak bisa mengabsenkan orang lain. Jika kedua dosen hadir bersamaan (keduanya menginput sesi ini),
+			// sistem otomatis menggabungkan kehadiran keduanya dan menetapkan status Hadir Bersama (Team Teaching).
+			if (
+				input.attendedDosenIds === undefined &&
+				input.dosenPengajarId === undefined
+			) {
+				const currentUserId = Number(user.id);
+				const currentAttended: number[] = Array.isArray(
+					meeting.attendedDosenIds,
+				)
+					? (meeting.attendedDosenIds.filter(
+							(id) => typeof id === "number",
+						) as number[])
+					: meeting.dosenPengajarId
+						? [meeting.dosenPengajarId]
+						: [];
+
+				const updatedAttended = Array.from(
+					new Set([...currentAttended, currentUserId]),
+				);
+
+				updatePayload.attendedDosenIds = updatedAttended;
+				updatePayload.isTeamTeachingAttended = updatedAttended.length > 1;
+				updatePayload.dosenPengajarId = currentUserId;
+			} else {
+				// Role Akademik / Superadmin tetap memiliki wewenang administratif penuh jika memberikan input eksplisit
+				if (input.dosenPengajarId !== undefined) {
+					updatePayload.dosenPengajarId = input.dosenPengajarId;
+				}
+				if (input.attendedDosenIds !== undefined) {
+					updatePayload.attendedDosenIds = input.attendedDosenIds;
+				}
+				if (input.isTeamTeachingAttended !== undefined) {
+					updatePayload.isTeamTeachingAttended = input.isTeamTeachingAttended;
+				}
 			}
 
 			const [updated] = await db
@@ -655,6 +1267,11 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				sessionType: t.Optional(t.Union([t.String(), t.Null()])),
 				description: t.Optional(t.Union([t.String(), t.Null()])),
 				meetingDate: t.Optional(t.Union([t.String(), t.Null()])),
+				dosenPengajarId: t.Optional(t.Union([t.Number(), t.Null()])),
+				attendedDosenIds: t.Optional(t.Union([t.Array(t.Number()), t.Null()])),
+				isTeamTeachingAttended: t.Optional(t.Union([t.Boolean(), t.Null()])),
+				teachingStatus: t.Optional(t.Union([t.String(), t.Null()])),
+				teachingNotes: t.Optional(t.Union([t.String(), t.Null()])),
 			}),
 		},
 	)
@@ -691,7 +1308,8 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			if (
 				hasRole(user, "dosen") &&
 				!hasRole(user, "akademik", "superadmin") &&
-				course.dosenId !== user.id
+				course.dosenId !== user.id &&
+				course.dosenPendampingId !== user.id
 			) {
 				set.status = 403;
 				return {
@@ -849,6 +1467,16 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			if (!course) {
 				set.status = 404;
 				return { success: false, message: "Course not found" };
+			}
+
+			if (
+				hasRole(user, "dosen") &&
+				!hasRole(user, "akademik", "superadmin") &&
+				course.dosenId !== user.id &&
+				course.dosenPendampingId !== user.id
+			) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
 			}
 
 			// Delete existing attendances for this meeting
@@ -1070,8 +1698,9 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 
 			if (
 				hasRole(user, "dosen") &&
-				!hasRole(user, "akademik") &&
-				course.dosenId !== user.id
+				!hasRole(user, "akademik", "superadmin") &&
+				course.dosenId !== user.id &&
+				course.dosenPendampingId !== user.id
 			) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };

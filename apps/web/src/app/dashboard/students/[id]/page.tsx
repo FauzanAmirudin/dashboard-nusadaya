@@ -128,6 +128,7 @@ type StudentDetail = {
 		profilePhotoUrl?: string | null;
 		overallStatus: string | null;
 		studentUserId?: number | null;
+		rombel?: string | null;
 	};
 	pmb: {
 		status: string | null;
@@ -199,11 +200,6 @@ const NAV_LINKS = [
 	{ id: "crm", label: "CRM", roles: ["superadmin", "crm"] },
 	{ id: "finance", label: "Finance", roles: ["superadmin", "finance"] },
 	{ id: "akademik", label: "Akademik", roles: ["superadmin", "akademik"] },
-	{
-		id: "kehadiran",
-		label: "Kehadiran",
-		roles: ["superadmin", "akademik", "dosen"],
-	},
 	{ id: "pa", label: "PA", roles: ["superadmin", "pa"] },
 	{ id: "magang", label: "Tim Magang", roles: ["superadmin", "magang"] },
 	{ id: "status", label: "Status Akhir", roles: ["superadmin", "evaluator"] },
@@ -234,8 +230,13 @@ function normalizeTabId(raw: string | null | undefined): string | null {
 	if (lower === "pmb") return "pmb";
 	if (lower === "crm") return "crm";
 	if (lower === "finance" || lower === "keuangan") return "finance";
-	if (lower === "akademik" || lower === "academic") return "akademik";
-	if (lower === "kehadiran" || lower === "attendance") return "kehadiran";
+	if (
+		lower === "akademik" ||
+		lower === "academic" ||
+		lower === "kehadiran" ||
+		lower === "attendance"
+	)
+		return "akademik";
 	if (lower === "pa") return "pa";
 	if (lower === "magang" || lower === "internship") return "magang";
 	if (lower === "status") return "status";
@@ -248,6 +249,71 @@ function normalizeTabId(raw: string | null | undefined): string | null {
 		return "final-decision";
 	if (lower === "catatan" || lower === "catatan-internal") return "catatan";
 	return lower;
+}
+
+function getStudentStatusBadgeConfig(val: string | null | undefined) {
+	if (!val) {
+		return {
+			label: "Aktif",
+			color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+			dot: "bg-emerald-500",
+		};
+	}
+	const normalized = val.toLowerCase().trim();
+	if (normalized === "aktif") {
+		return {
+			label: "Aktif",
+			color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+			dot: "bg-emerald-500",
+		};
+	}
+	if (normalized === "cuti") {
+		return {
+			label: "Cuti",
+			color: "bg-amber-50 text-amber-700 border-amber-200",
+			dot: "bg-amber-500",
+		};
+	}
+	if (
+		normalized === "dropout" ||
+		normalized === "drop_out" ||
+		normalized === "drop out"
+	) {
+		return {
+			label: "Drop Out",
+			color: "bg-rose-50 text-rose-700 border-rose-200",
+			dot: "bg-rose-500",
+		};
+	}
+	if (
+		normalized === "mengundurkan_diri" ||
+		normalized === "mengundurkan diri"
+	) {
+		return {
+			label: "Mengundurkan Diri",
+			color: "bg-orange-50 text-orange-700 border-orange-200",
+			dot: "bg-orange-500",
+		};
+	}
+	if (normalized === "lulus") {
+		return {
+			label: "Lulus",
+			color: "bg-blue-50 text-blue-700 border-blue-200",
+			dot: "bg-blue-500",
+		};
+	}
+
+	const label = val
+		.replace(/_/g, " ")
+		.split(" ")
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+		.join(" ");
+
+	return {
+		label,
+		color: "bg-slate-100 text-slate-700 border-slate-200",
+		dot: "bg-slate-500",
+	};
 }
 
 export default function StudentDetailPage() {
@@ -307,6 +373,23 @@ function StudentDetailContent() {
 	const handleCrmProgressChange = useCallback(
 		(completed: number, total: number) => {
 			setCrmProgress((prev) => {
+				if (prev && prev.completed === completed && prev.total === total) {
+					return prev;
+				}
+				return { completed, total };
+			});
+		},
+		[],
+	);
+
+	const [akademikProgress, setAkademikProgress] = useState<{
+		completed: number;
+		total: number;
+	} | null>(null);
+
+	const handleAkademikProgressChange = useCallback(
+		(completed: number, total: number) => {
+			setAkademikProgress((prev) => {
 				if (prev && prev.completed === completed && prev.total === total) {
 					return prev;
 				}
@@ -778,20 +861,28 @@ function StudentDetailContent() {
 									<h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
 										{s.name}
 									</h1>
-									{s.studentStatus && (
-										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold px-2 py-0.5">
-											● {s.studentStatus}
-										</Badge>
-									)}
+									{s.studentStatus &&
+										(() => {
+											const statusCfg = getStudentStatusBadgeConfig(
+												s.studentStatus,
+											);
+											return (
+												<Badge
+													className={`${statusCfg.color} border text-xs font-semibold px-2.5 py-0.5`}
+												>
+													<span
+														className={`w-2 h-2 rounded-full ${statusCfg.dot} mr-1.5 inline-block`}
+													/>
+													{statusCfg.label}
+												</Badge>
+											);
+										})()}
 									<Badge
 										variant="outline"
 										className="text-xs px-2 py-0.5 font-semibold text-slate-700 border-slate-200 bg-slate-100/80 font-mono"
 									>
 										Angkatan {s.cohort || "-"}
 									</Badge>
-									{s.overallStatus && (
-										<PanelStatusBadge status={s.overallStatus} size="sm" />
-									)}
 								</div>
 								{/* Essential Metadata Strip */}
 								<div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-600 pt-0.5">
@@ -885,7 +976,13 @@ function StudentDetailContent() {
 								studentId={s.id}
 								updateTrigger={updateTrigger}
 								userRole={user?.role}
-								overrideProgress={crmProgress}
+								overrideProgress={
+									user?.role === "akademik"
+										? akademikProgress
+										: user?.role === "crm"
+											? crmProgress
+											: null
+								}
 							/>
 						</div>
 					</div>
@@ -1054,11 +1151,11 @@ function StudentDetailContent() {
 											nim: s.nim,
 											studentStatus: s.studentStatus,
 											paId: s.paId,
+											rombel: (s as any).rombel,
 										}}
 										onUpdate={refetchStudent}
+										onProgressChange={handleAkademikProgressChange}
 									/>
-								) : currentLink.id === "kehadiran" ? (
-									<KehadiranPanel studentId={s.id} />
 								) : currentLink.id === "pa" ? (
 									<PaPanel studentId={s.id} onUpdate={refetchStudent} />
 								) : currentLink.id === "magang" ? (

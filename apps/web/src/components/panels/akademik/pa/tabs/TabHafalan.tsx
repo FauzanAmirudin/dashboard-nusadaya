@@ -2,6 +2,7 @@
 
 import {
 	BookMarked,
+	Calendar,
 	Edit2,
 	Eye,
 	HelpCircle,
@@ -67,6 +68,7 @@ interface HafalanSession {
 	vocabList?: string[];
 	sentenceList?: string[];
 	notes?: string | null;
+	date?: string;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -90,13 +92,13 @@ interface HafalanForm {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const LANGUAGE_LABELS: Record<string, string> = {
-	inggris: "Inggris 🇬🇧",
-	mandarin: "Mandarin 🇨🇳",
-	jepang: "Jepang 🇯🇵",
-	jerman: "Jerman 🇩🇪",
-	arab: "Arab 🇸🇦",
-	korea: "Korea 🇰🇷",
-	lainnya: "Lainnya",
+	inggris: "Bahasa Inggris",
+	mandarin: "Bahasa Mandarin",
+	jepang: "Bahasa Jepang",
+	jerman: "Bahasa Jerman",
+	arab: "Bahasa Arab",
+	korea: "Bahasa Korea",
+	lainnya: "Bahasa Lainnya",
 };
 
 const LANGUAGE_COLORS: Record<string, string> = {
@@ -109,11 +111,15 @@ const LANGUAGE_COLORS: Record<string, string> = {
 	lainnya: "bg-slate-100 text-slate-600 border-slate-200",
 };
 
-function getLanguageLabel(session: HafalanSession): string {
+function getLanguageLabel(session: {
+	language: string;
+	languageCustom?: string | null;
+}): string {
 	if (session.language === "lainnya" && session.languageCustom) {
 		return session.languageCustom;
 	}
-	return LANGUAGE_LABELS[session.language] ?? session.language;
+	const key = (session.language || "").toLowerCase().trim();
+	return LANGUAGE_LABELS[key] ?? session.language;
 }
 
 function getLanguageBadgeClass(language: string): string {
@@ -629,16 +635,23 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 											}
 										>
 											<SelectTrigger className="h-9 text-sm bg-white">
-												<SelectValue />
+												<SelectValue placeholder="Pilih Bahasa">
+													{LANGUAGE_LABELS[addForm.language] ||
+														addForm.language}
+												</SelectValue>
 											</SelectTrigger>
 											<SelectContent>
-												<SelectItem value="inggris">🇬🇧 Inggris</SelectItem>
-												<SelectItem value="mandarin">🇨🇳 Mandarin</SelectItem>
-												<SelectItem value="jepang">🇯🇵 Jepang</SelectItem>
-												<SelectItem value="jerman">🇩🇪 Jerman</SelectItem>
-												<SelectItem value="arab">🇸🇦 Arab</SelectItem>
-												<SelectItem value="korea">🇰🇷 Korea</SelectItem>
-												<SelectItem value="lainnya">Lainnya...</SelectItem>
+												<SelectItem value="inggris">Bahasa Inggris</SelectItem>
+												<SelectItem value="mandarin">
+													Bahasa Mandarin
+												</SelectItem>
+												<SelectItem value="jepang">Bahasa Jepang</SelectItem>
+												<SelectItem value="jerman">Bahasa Jerman</SelectItem>
+												<SelectItem value="arab">Bahasa Arab</SelectItem>
+												<SelectItem value="korea">Bahasa Korea</SelectItem>
+												<SelectItem value="lainnya">
+													Bahasa Lainnya...
+												</SelectItem>
 											</SelectContent>
 										</Select>
 									</div>
@@ -907,8 +920,9 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 											const sentenceList = Array.isArray(session.sentenceList)
 												? session.sentenceList
 												: [];
+											const rawDate = session.date || session.createdAt;
 											const formattedDate = new Date(
-												session.createdAt,
+												rawDate,
 											).toLocaleDateString("id-ID", {
 												day: "numeric",
 												month: "short",
@@ -923,12 +937,14 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 													{/* Bahasa & Tanggal */}
 													<TableCell className="align-top">
 														<Badge
-															className={`${getLanguageBadgeClass(session.language)} border text-xs font-semibold`}
+															variant="outline"
+															className={`${getLanguageBadgeClass(session.language)} border text-xs font-semibold px-2.5 py-1 rounded-md`}
 														>
 															{getLanguageLabel(session)}
 														</Badge>
-														<p className="text-xs text-slate-500 font-medium mt-1">
-															{formattedDate}
+														<p className="text-xs text-slate-500 font-medium mt-1.5 flex items-center gap-1.5">
+															<Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+															<span>{formattedDate}</span>
 														</p>
 													</TableCell>
 
@@ -944,7 +960,7 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 																</span>
 															</div>
 
-															{vocabList.length > 0 ? (
+															{vocabList.length > 0 && (
 																<div className="flex flex-wrap gap-1 max-w-sm">
 																	{vocabList.slice(0, 5).map((word, wIdx) => (
 																		<span
@@ -966,10 +982,6 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 																		</button>
 																	)}
 																</div>
-															) : (
-																<span className="text-xs text-slate-400 italic">
-																	- tidak ada daftar tag -
-																</span>
 															)}
 														</div>
 													</TableCell>
@@ -988,7 +1000,7 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 																</span>
 															</div>
 
-															{sentenceList.length > 0 ? (
+															{sentenceList.length > 0 && (
 																<div className="flex flex-col gap-1 max-w-md">
 																	{sentenceList
 																		.slice(0, 2)
@@ -1017,10 +1029,6 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 																		</button>
 																	)}
 																</div>
-															) : (
-																<span className="text-xs text-slate-400 italic">
-																	- tidak ada daftar tag -
-																</span>
 															)}
 														</div>
 													</TableCell>
@@ -1141,16 +1149,19 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 										}
 									>
 										<SelectTrigger className="h-9 text-sm">
-											<SelectValue />
+											<SelectValue placeholder="Pilih Bahasa">
+												{LANGUAGE_LABELS[editForm.language] ||
+													editForm.language}
+											</SelectValue>
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="inggris">🇬🇧 Inggris</SelectItem>
-											<SelectItem value="mandarin">🇨🇳 Mandarin</SelectItem>
-											<SelectItem value="jepang">🇯🇵 Jepang</SelectItem>
-											<SelectItem value="jerman">🇩🇪 Jerman</SelectItem>
-											<SelectItem value="arab">🇸🇦 Arab</SelectItem>
-											<SelectItem value="korea">🇰🇷 Korea</SelectItem>
-											<SelectItem value="lainnya">Lainnya...</SelectItem>
+											<SelectItem value="inggris">Bahasa Inggris</SelectItem>
+											<SelectItem value="mandarin">Bahasa Mandarin</SelectItem>
+											<SelectItem value="jepang">Bahasa Jepang</SelectItem>
+											<SelectItem value="jerman">Bahasa Jerman</SelectItem>
+											<SelectItem value="arab">Bahasa Arab</SelectItem>
+											<SelectItem value="korea">Bahasa Korea</SelectItem>
+											<SelectItem value="lainnya">Bahasa Lainnya...</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>

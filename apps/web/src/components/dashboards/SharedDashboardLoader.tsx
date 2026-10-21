@@ -110,6 +110,7 @@ export function SharedDashboardLoader({
 		window.addEventListener("student-updated", handleDataSync);
 		window.addEventListener("pmb-progress-sync", handleDataSync);
 		window.addEventListener("crm-progress-sync", handleDataSync);
+		window.addEventListener("akademik-progress-sync", handleDataSync);
 		window.addEventListener("focus", handleDataSync);
 
 		let channel: BroadcastChannel | null = null;
@@ -126,6 +127,7 @@ export function SharedDashboardLoader({
 			window.removeEventListener("student-updated", handleDataSync);
 			window.removeEventListener("pmb-progress-sync", handleDataSync);
 			window.removeEventListener("crm-progress-sync", handleDataSync);
+			window.removeEventListener("akademik-progress-sync", handleDataSync);
 			window.removeEventListener("focus", handleDataSync);
 			if (channel) {
 				channel.close();
@@ -223,6 +225,7 @@ export function SharedDashboardLoader({
 				searchQuery={searchQuery}
 				setSearchQuery={setSearchQuery}
 				user={user}
+				onUpdate={() => refetch()}
 			/>
 		);
 	if (module === "pa")

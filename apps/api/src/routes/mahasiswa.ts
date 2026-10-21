@@ -1145,19 +1145,36 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				taiwanLoaChecked: overseasChecklist?.loaChecked ?? false,
 				taiwanSuhhanChecked: overseasChecklist?.suhhanChecked ?? false,
 
-				// Nilai Mata Kuliah
+				// AKD-06 Status Dokumen Studi
+				khsPublished: academic?.khsPublished ?? false,
+				khsPublishedAt: academic?.khsPublishedAt,
+				krsPublished: academic?.krsPublished ?? false,
+				transcriptPublished: academic?.transcriptPublished ?? false,
+				syncedToMagang: academic?.syncedToMagang ?? false,
+				syncedToMagangAt: academic?.syncedToMagangAt,
+				pddiktiReported: academic?.pddiktiReported ?? false,
+				pddiktiReportedAt: academic?.pddiktiReportedAt,
+
+				// Nilai Mata Kuliah & Komponen AKD-06
 				grades: grades.map((g) => ({
 					id: g.id,
 					courseCode: g.courseCode,
 					courseName: g.courseName,
+					sks: g.sks || 2,
 					grade: g.grade,
+					gradePoint: g.gradePoint ? (g.gradePoint / 100).toFixed(2) : null,
 					attendanceRate: g.attendanceRate,
 					practicalScore: g.practicalScore,
 					theoryScore: g.theoryScore,
+					utsScore: g.utsScore ?? null,
+					uasScore: g.uasScore ?? null,
+					finalScore: g.finalScore ?? g.practicalScore ?? g.theoryScore ?? null,
 					entrepreneurScore: g.entrepreneurScore,
 					kwuScore: g.kwuScore,
 					attitudeNote: g.attitudeNote,
 					isAcc: g.isAcc,
+					isPublished: g.isPublished ?? false,
+					syncedToMagang: g.syncedToMagang ?? false,
 					status: g.status,
 				})),
 

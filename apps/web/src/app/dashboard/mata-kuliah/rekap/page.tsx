@@ -161,6 +161,40 @@ export default function RekapNilaiListPage() {
 						</p>
 					</div>
 				</div>
+
+				<div className="flex items-center gap-2.5 flex-wrap">
+					<Link href="/dashboard/mata-kuliah">
+						<Button
+							variant="outline"
+							size="sm"
+							className="border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs gap-1.5 h-9 shadow-xs"
+						>
+							<BookOpen className="w-3.5 h-3.5" />
+							Daftar Mata Kuliah
+						</Button>
+					</Link>
+					{user?.role === "dosen" ? (
+						<Link href="/dashboard/mata-kuliah/rekap-dosen">
+							<Button
+								size="sm"
+								className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs gap-1.5 h-9 shadow-xs"
+							>
+								<CheckSquare className="w-3.5 h-3.5" />
+								Presensi Mengajar
+							</Button>
+						</Link>
+					) : (
+						<Link href="/dashboard/akademik/absensi-dosen">
+							<Button
+								size="sm"
+								className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs gap-1.5 h-9 shadow-xs"
+							>
+								<CheckSquare className="w-3.5 h-3.5" />
+								Absensi Dosen
+							</Button>
+						</Link>
+					)}
+				</div>
 			</div>
 
 			{/* Main Table Card */}

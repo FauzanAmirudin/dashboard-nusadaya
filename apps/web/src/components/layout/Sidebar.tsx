@@ -18,6 +18,7 @@ import {
 	Settings,
 	ShieldCheck,
 	Sparkles,
+	UserCheck,
 	UserCog,
 	Users,
 	Wallet,
@@ -144,6 +145,18 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 				href: "/dashboard/mata-kuliah/rekap",
 				roles: ["superadmin", "akademik", "dosen"],
 				icon: CheckSquare,
+			},
+			{
+				label: "Presensi",
+				href: "/dashboard/mata-kuliah/rekap-dosen",
+				roles: ["dosen"],
+				icon: UserCheck,
+			},
+			{
+				label: "Absensi Dosen",
+				href: "/dashboard/akademik/absensi-dosen",
+				roles: ["superadmin", "akademik", "finance"],
+				icon: UserCheck,
 			},
 			{
 				label: "Manajemen Kehadiran",

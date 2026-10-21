@@ -26,6 +26,10 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
+	DISCIPLINE_CATEGORIES,
+	getDisciplineCategoryConfig,
+} from "@/components/panels/pa/types";
+import {
 	AlertDialog,
 	AlertDialogAction,
 	AlertDialogCancel,
@@ -85,8 +89,11 @@ interface StudentNote {
 	id: number;
 	type: string;
 	content: string;
+	date?: string;
+	category?: string;
 	createdAt: string;
 	updatedAt: string;
+	createdByUser?: { fullName: string; username: string } | null;
 }
 
 interface PAData {
@@ -1170,6 +1177,10 @@ function StudentNotesSection({
 }) {
 	const [showForm, setShowForm] = useState(false);
 	const [formContent, setFormContent] = useState("");
+	const [formDate, setFormDate] = useState(
+		() => new Date().toISOString().split("T")[0],
+	);
+	const [formCategory, setFormCategory] = useState("umum");
 	const [isSaving, setIsSaving] = useState(false);
 	const [deletingId, setDeletingId] = useState<number | null>(null);
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -1190,13 +1201,21 @@ function StudentNotesSection({
 						Authorization: `Bearer ${getToken()}`,
 						"Content-Type": "application/json",
 					},
-					body: JSON.stringify({ type: noteType, content: formContent }),
+					body: JSON.stringify({
+						type: noteType,
+						content: formContent.trim(),
+						date: formDate
+							? new Date(formDate).toISOString()
+							: new Date().toISOString(),
+						category: noteType === "kedisiplinan" ? formCategory : undefined,
+					}),
 				},
 			);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			toast.success("Catatan ditambahkan");
+			toast.success("Catatan berhasil ditambahkan");
 			setShowForm(false);
 			setFormContent("");
+			setFormCategory("umum");
 			onRefresh();
 		} catch {
 			toast.error("Gagal menyimpan catatan");
@@ -1217,7 +1236,7 @@ function StudentNotesSection({
 				},
 			);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			toast.success("Catatan dihapus");
+			toast.success("Catatan berhasil dihapus");
 			setShowDeleteDialog(false);
 			setPendingDeleteId(null);
 			onRefresh();
@@ -1278,47 +1297,106 @@ function StudentNotesSection({
 							Input {title}
 						</p>
 
-						<Textarea
-							placeholder={`Tuliskan isi ${title.toLowerCase()}...`}
-							value={formContent}
-							onChange={(e) => setFormContent(e.target.value)}
-							rows={3}
-							className="resize-none text-xs bg-white"
-							autoFocus
-						/>
+						{/* Fields: Tanggal & Kategori */}
+						{noteType === "kedisiplinan" ? (
+							<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+								<div className="space-y-1.5">
+									<Label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+										<Calendar className="w-3.5 h-3.5 text-slate-400" />
+										Tanggal Kejadian / Catatan
+									</Label>
+									<Input
+										type="date"
+										value={formDate}
+										onChange={(e) => setFormDate(e.target.value)}
+										className="h-9 text-xs bg-white border-slate-200"
+										required
+									/>
+								</div>
 
-						<div className="flex justify-between items-center pt-1">
-							<span className="text-[11px] text-slate-400">
-								{formContent.length} karakter
-							</span>
-							<div className="flex gap-2">
-								<Button
-									size="sm"
-									variant="outline"
-									onClick={() => {
-										setShowForm(false);
-										setFormContent("");
-									}}
-									className="h-8 text-xs gap-1"
-								>
-									<X className="w-3.5 h-3.5" />
-									Batal
-								</Button>
-								<Button
-									size="sm"
-									onClick={handleAdd}
-									disabled={isSaving || !formContent.trim()}
-									className="h-8 text-xs gap-1.5 text-white shadow-2xs font-semibold"
-									style={{ backgroundColor: accentColor }}
-								>
-									{isSaving ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin" />
-									) : (
-										<Save className="w-3.5 h-3.5" />
-									)}
-									Simpan Catatan
-								</Button>
+								<div className="space-y-1.5">
+									<Label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+										<AlertTriangle className="w-3.5 h-3.5 text-slate-400" />
+										Kategori / Tingkat Kedisiplinan
+									</Label>
+									<Select
+										value={formCategory}
+										onValueChange={(val) => setFormCategory(val || "umum")}
+									>
+										<SelectTrigger className="h-9 text-xs bg-white border-slate-200">
+											<SelectValue placeholder="Pilih kategori" />
+										</SelectTrigger>
+										<SelectContent>
+											{Object.entries(DISCIPLINE_CATEGORIES).map(
+												([key, cfg]) => (
+													<SelectItem key={key} value={key} className="text-xs">
+														<span className="font-medium">{cfg.label}</span>
+													</SelectItem>
+												),
+											)}
+										</SelectContent>
+									</Select>
+								</div>
 							</div>
+						) : (
+							<div className="space-y-1.5">
+								<Label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+									<Calendar className="w-3.5 h-3.5 text-slate-400" />
+									Tanggal Catatan
+								</Label>
+								<Input
+									type="date"
+									value={formDate}
+									onChange={(e) => setFormDate(e.target.value)}
+									className="h-9 text-xs bg-white border-slate-200 w-full sm:w-1/2"
+								/>
+							</div>
+						)}
+
+						<div className="space-y-1.5">
+							<Label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
+								<span>Isi {title}</span>
+								<span className="text-[10px] text-slate-400 font-normal">
+									{formContent.length} karakter
+								</span>
+							</Label>
+							<Textarea
+								placeholder={`Tuliskan isi ${title.toLowerCase()}...`}
+								value={formContent}
+								onChange={(e) => setFormContent(e.target.value)}
+								rows={3}
+								className="resize-none text-xs bg-white border-slate-200"
+								autoFocus
+							/>
+						</div>
+
+						<div className="flex justify-end items-center gap-2 pt-1">
+							<Button
+								size="sm"
+								variant="outline"
+								onClick={() => {
+									setShowForm(false);
+									setFormContent("");
+								}}
+								className="h-8 text-xs gap-1"
+							>
+								<X className="w-3.5 h-3.5" />
+								Batal
+							</Button>
+							<Button
+								size="sm"
+								onClick={handleAdd}
+								disabled={isSaving || !formContent.trim()}
+								className="h-8 text-xs gap-1.5 text-white shadow-2xs font-semibold"
+								style={{ backgroundColor: accentColor }}
+							>
+								{isSaving ? (
+									<Loader2 className="w-3.5 h-3.5 animate-spin" />
+								) : (
+									<Save className="w-3.5 h-3.5" />
+								)}
+								Simpan Catatan
+							</Button>
 						</div>
 					</div>
 				)}
@@ -1332,39 +1410,66 @@ function StudentNotesSection({
 						</p>
 					</div>
 				) : (
-					<div className="space-y-2.5">
-						{notes.map((note) => (
-							<div
-								key={note.id}
-								className="group relative p-3.5 pl-4 rounded-xl border border-slate-200/80 bg-slate-50/40 hover:bg-white hover:border-slate-300 hover:shadow-2xs transition-all duration-150"
-							>
-								<div className="flex items-start justify-between gap-2">
-									<div className="space-y-1 flex-1 min-w-0">
-										<p className="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap">
-											{note.content}
-										</p>
-										<p className="text-[10px] text-slate-400 flex items-center gap-1">
-											<Clock className="w-3 h-3" />
-											{formatDate(note.createdAt)}
-										</p>
+					<div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
+						{notes.map((note) => {
+							const catConfig =
+								noteType === "kedisiplinan"
+									? getDisciplineCategoryConfig(note.category)
+									: null;
+							return (
+								<div
+									key={note.id}
+									className="group relative p-3.5 pl-4 rounded-xl border border-slate-200/80 bg-slate-50/40 hover:bg-white hover:border-slate-300 hover:shadow-2xs transition-all duration-150"
+								>
+									<div className="flex items-start justify-between gap-2">
+										<div className="space-y-1 flex-1 min-w-0">
+											{catConfig && (
+												<div className="flex items-center flex-wrap gap-2 mb-1">
+													<span
+														className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-md border ${catConfig.badgeClass}`}
+													>
+														{catConfig.label}
+													</span>
+													{note.createdByUser?.fullName && (
+														<span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+															Oleh: {note.createdByUser.fullName}
+														</span>
+													)}
+												</div>
+											)}
+											<p className="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap">
+												{note.content}
+											</p>
+											<div className="text-[10px] text-slate-400 flex items-center gap-2 pt-0.5">
+												<span className="flex items-center gap-1">
+													<Clock className="w-3 h-3" />
+													{formatDate(note.date || note.createdAt)}
+												</span>
+												{!catConfig && note.createdByUser?.fullName && (
+													<span className="text-slate-400">
+														• Oleh: {note.createdByUser.fullName}
+													</span>
+												)}
+											</div>
+										</div>
+										{canEdit && (
+											<button
+												type="button"
+												onClick={() => {
+													setPendingDeleteId(note.id);
+													setShowDeleteDialog(true);
+												}}
+												disabled={deletingId === note.id}
+												className="shrink-0 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-rose-50 text-slate-300 hover:text-rose-600 transition-all disabled:opacity-50"
+												title="Hapus catatan"
+											>
+												<Trash2 className="w-3.5 h-3.5" />
+											</button>
+										)}
 									</div>
-									{canEdit && (
-										<button
-											type="button"
-											onClick={() => {
-												setPendingDeleteId(note.id);
-												setShowDeleteDialog(true);
-											}}
-											disabled={deletingId === note.id}
-											className="shrink-0 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-rose-50 text-slate-300 hover:text-rose-600 transition-all disabled:opacity-50"
-											title="Hapus catatan"
-										>
-											<Trash2 className="w-3.5 h-3.5" />
-										</button>
-									)}
 								</div>
-							</div>
-						))}
+							);
+						})}
 					</div>
 				)}
 			</div>

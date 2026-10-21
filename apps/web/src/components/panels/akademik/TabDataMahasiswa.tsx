@@ -7,7 +7,6 @@ import {
 	Loader2,
 	Lock,
 	Save,
-	ShieldAlert,
 	User,
 	Users2,
 	XCircle,
@@ -146,7 +145,7 @@ export function TabDataMahasiswa({
 
 	useEffect(() => {
 		fetchClearance();
-	}, [studentId]);
+	}, [studentId, studentData?.studentStatus, studentData?.nim]);
 
 	// ── 3. PA (Pembimbing Akademik) ──────────────────────
 	const [paList, setPaList] = useState<{ id: number; fullName: string }[]>([]);
@@ -196,6 +195,12 @@ export function TabDataMahasiswa({
 		return paList.find((p) => p.id === targetId) || null;
 	}, [paList, studentData?.paId]);
 
+	// Has NIM already been assigned?
+	const isAlreadyHasNim = Boolean(studentData?.nim);
+	// Can edit NIM: if clearance passed OR student already has NIM (to allow updating)
+	const canEditNim =
+		canEdit && (clearanceStatus.canReleaseNim || isAlreadyHasNim);
+
 	// ── Save Handlers ─────────────────────────────────────
 	const handleSaveStatus = async () => {
 		if (!canEdit) return;
@@ -211,6 +216,7 @@ export function TabDataMahasiswa({
 			} else {
 				toast.success("Status mahasiswa berhasil diperbarui");
 				onUpdate();
+				fetchClearance();
 			}
 		} catch (err) {
 			toast.error("Terjadi kesalahan jaringan saat menyimpan status");
@@ -220,7 +226,7 @@ export function TabDataMahasiswa({
 	};
 
 	const handleSaveNim = async () => {
-		if (!canEdit) return;
+		if (!canEditNim) return;
 		setIsSavingNim(true);
 		try {
 			const res = await api.students[studentId.toString()].nim.patch({ nim });
@@ -231,6 +237,7 @@ export function TabDataMahasiswa({
 			} else {
 				toast.success("NIM berhasil diperbarui");
 				onUpdate();
+				fetchClearance();
 			}
 		} catch (err) {
 			toast.error("Terjadi kesalahan jaringan saat menyimpan NIM");
@@ -293,23 +300,18 @@ export function TabDataMahasiswa({
 
 	return (
 		<div className="space-y-6">
-			{/* Responsive 4-card grid */}
-			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-6 items-stretch">
-				{/* 1. Status Mahasiswa */}
-				<Card className="border-slate-200 shadow-sm border-l-4 border-l-[#0517B0] flex flex-col justify-between h-full bg-white">
-					<CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
-						<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-							<div className="p-1.5 bg-blue-50 text-[#0517B0] rounded-md border border-blue-100">
-								<User className="w-4 h-4" />
-							</div>
-							Status Mahasiswa
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="p-5 flex flex-col justify-between flex-1 space-y-4">
-						<div className="h-12 flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
-							<span className="text-xs text-slate-500 font-medium">
-								Status Saat Ini:
-							</span>
+			{/* Responsive 2-Cards Per Row Grid */}
+			<div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+				{/* ── CARD 1: Status Mahasiswa ────────────────────────── */}
+				<Card className="border-slate-200/90 shadow-2xs hover:shadow-xs transition-all border-l-4 border-l-[#0517B0] flex flex-col justify-between h-full bg-white rounded-2xl overflow-hidden">
+					<CardHeader className="pb-3.5 border-b border-slate-100 bg-slate-50/40">
+						<div className="flex items-center justify-between">
+							<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2.5">
+								<div className="p-2 bg-blue-50 text-[#0517B0] rounded-xl border border-blue-100/80 shadow-2xs">
+									<User className="w-4 h-4" />
+								</div>
+								<span>Status Mahasiswa</span>
+							</CardTitle>
 							<Badge
 								className={`${currentStatusConfig.color} border text-xs font-semibold px-2.5 py-0.5`}
 							>
@@ -319,8 +321,26 @@ export function TabDataMahasiswa({
 								{currentStatusConfig.label}
 							</Badge>
 						</div>
+					</CardHeader>
 
-						<div className="space-y-1.5 flex-1 flex flex-col justify-center">
+					<CardContent className="p-5 flex flex-col justify-between flex-1 space-y-4">
+						{/* Current Status Box */}
+						<div className="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+							<span className="text-xs font-medium text-slate-500">
+								Status Saat Ini:
+							</span>
+							<Badge
+								className={`${currentStatusConfig.color} border text-xs font-bold px-3 py-1 shadow-2xs`}
+							>
+								<span
+									className={`w-2 h-2 rounded-full ${currentStatusConfig.dot} mr-1.5`}
+								/>
+								{currentStatusConfig.label}
+							</Badge>
+						</div>
+
+						{/* Form Control */}
+						<div className="space-y-2 flex-1 flex flex-col justify-center">
 							<Label className="text-xs font-semibold text-slate-700">
 								Pilih Status Mahasiswa
 							</Label>
@@ -329,7 +349,7 @@ export function TabDataMahasiswa({
 								onValueChange={(v) => setSelectedStatus(v || "aktif")}
 								disabled={!canEdit}
 							>
-								<SelectTrigger className="h-9 text-xs sm:text-sm font-medium bg-white border-slate-200">
+								<SelectTrigger className="h-10 text-xs sm:text-sm font-medium bg-white border-slate-200 rounded-xl">
 									<span className="flex items-center gap-2 truncate text-slate-800">
 										<span
 											className={`w-2 h-2 rounded-full ${getStatusConfig(selectedStatus).dot}`}
@@ -348,14 +368,19 @@ export function TabDataMahasiswa({
 									))}
 								</SelectContent>
 							</Select>
+							<p className="text-[11px] text-slate-400">
+								Perubahan status akan mempengaruhi hak akses sistem dan absensi
+								mahasiswa.
+							</p>
 						</div>
 
+						{/* Action Button */}
 						{canEdit && (
 							<Button
 								size="sm"
 								onClick={handleSaveStatus}
 								disabled={isSavingStatus}
-								className="w-full bg-[#0517B0] hover:bg-blue-800 text-white text-xs h-9 font-bold shadow-sm"
+								className="w-full bg-[#0517B0] hover:bg-blue-800 text-white text-xs h-10 font-bold rounded-xl shadow-2xs transition-all mt-2"
 							>
 								{isSavingStatus ? (
 									<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
@@ -368,37 +393,58 @@ export function TabDataMahasiswa({
 					</CardContent>
 				</Card>
 
-				{/* 2. NIM */}
-				<Card className="border-slate-200 shadow-sm border-l-4 border-l-violet-600 flex flex-col justify-between h-full bg-white">
-					<CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
-						<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-							<div className="p-1.5 bg-violet-50 text-violet-600 rounded-md border border-violet-100">
-								<Hash className="w-4 h-4" />
-							</div>
-							NIM (Nomor Induk Mahasiswa)
-						</CardTitle>
+				{/* ── CARD 2: NIM & Syarat Clearance ─────────────────── */}
+				<Card className="border-slate-200/90 shadow-2xs hover:shadow-xs transition-all border-l-4 border-l-violet-600 flex flex-col justify-between h-full bg-white rounded-2xl overflow-hidden">
+					<CardHeader className="pb-3.5 border-b border-slate-100 bg-slate-50/40">
+						<div className="flex items-center justify-between">
+							<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2.5">
+								<div className="p-2 bg-violet-50 text-violet-600 rounded-xl border border-violet-100/80 shadow-2xs">
+									<Hash className="w-4 h-4" />
+								</div>
+								<span>NIM (Nomor Induk Mahasiswa)</span>
+							</CardTitle>
+							{isAlreadyHasNim ? (
+								<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold px-2.5 py-0.5">
+									✓ Terdaftar
+								</Badge>
+							) : clearanceStatus.canReleaseNim ? (
+								<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold px-2.5 py-0.5">
+									Siap Rilis
+								</Badge>
+							) : (
+								<Badge className="bg-rose-50 text-rose-700 border-rose-200 text-xs font-semibold px-2.5 py-0.5">
+									Terkunci
+								</Badge>
+							)}
+						</div>
 					</CardHeader>
+
 					<CardContent className="p-5 flex flex-col justify-between flex-1 space-y-4">
-						<div className="h-12 flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
-							<span className="text-xs text-slate-500 font-medium">
+						{/* Current NIM Box */}
+						<div className="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+							<span className="text-xs font-medium text-slate-500">
 								NIM Terdaftar:
 							</span>
-							<span className="text-xs font-mono font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">
+							<span className="text-sm font-mono font-bold text-slate-800 bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-2xs">
 								{studentData?.nim || (
-									<span className="text-slate-400 italic font-sans font-normal">
-										Belum Diisi
+									<span className="text-slate-400 italic font-sans font-normal text-xs">
+										Belum Terbit
 									</span>
 								)}
 							</span>
 						</div>
 
 						{/* Clearance Indicator Gatekeeper */}
-						<div className="p-3 bg-slate-50 border rounded-lg space-y-2 text-xs">
+						<div className="p-3 bg-slate-50/80 border border-slate-200/80 rounded-xl space-y-2 text-xs">
 							<div className="flex items-center justify-between">
-								<span className="font-semibold text-slate-700 flex items-center gap-1.5">
-									Syarat Rilis NIM (Clearance)
+								<span className="font-semibold text-slate-700">
+									Alur Syarat Rilis NIM (Clearance):
 								</span>
-								{clearanceStatus.canReleaseNim ? (
+								{isAlreadyHasNim ? (
+									<span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+										<CheckCircle2 className="w-3.5 h-3.5" /> NIM Aktif
+									</span>
+								) : clearanceStatus.canReleaseNim ? (
 									<Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px] font-bold">
 										Siap Rilis
 									</Badge>
@@ -409,52 +455,52 @@ export function TabDataMahasiswa({
 								)}
 							</div>
 
-							<div className="space-y-1 pt-1 border-t border-slate-200/60">
-								<div className="flex items-center justify-between text-[11px]">
-									<span className="text-slate-600">PMB (Berkas & ACC):</span>
+							<div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60">
+								<div className="flex items-center justify-between bg-white px-2.5 py-1.5 rounded-lg border border-slate-100 text-[11px]">
+									<span className="text-slate-600 font-medium">PMB:</span>
 									{clearanceStatus.pmbCleared ? (
 										<span className="text-emerald-600 font-bold flex items-center gap-1">
-											<CheckCircle2 className="w-3.5 h-3.5" /> ACC
+											<CheckCircle2 className="w-3 h-3" /> ACC
 										</span>
 									) : (
 										<span className="text-rose-600 font-bold flex items-center gap-1">
-											<XCircle className="w-3.5 h-3.5" /> Belum ACC
+											<XCircle className="w-3 h-3" /> Belum ACC
 										</span>
 									)}
 								</div>
 
-								<div className="flex items-center justify-between text-[11px]">
-									<span className="text-slate-600">
-										Finance (Registrasi Awal):
-									</span>
+								<div className="flex items-center justify-between bg-white px-2.5 py-1.5 rounded-lg border border-slate-100 text-[11px]">
+									<span className="text-slate-600 font-medium">Finance:</span>
 									{clearanceStatus.financeCleared ? (
 										<span className="text-emerald-600 font-bold flex items-center gap-1">
-											<CheckCircle2 className="w-3.5 h-3.5" /> Lunas
+											<CheckCircle2 className="w-3 h-3" /> Lunas
 										</span>
 									) : (
 										<span className="text-rose-600 font-bold flex items-center gap-1">
-											<XCircle className="w-3.5 h-3.5" /> Belum Lunas
+											<XCircle className="w-3 h-3" /> Belum Lunas
 										</span>
 									)}
 								</div>
 							</div>
 
-							{!clearanceStatus.canReleaseNim && (
-								<p className="text-[10px] text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200">
-									Selesaikan clearance PMB & Finance sebelum NIM dapat dirilis.
+							{!isAlreadyHasNim && !clearanceStatus.canReleaseNim && (
+								<p className="text-[10px] text-amber-700 bg-amber-50/80 p-2 rounded-lg border border-amber-200">
+									Selesaikan clearance PMB & Finance sebelum NIM baru dapat
+									dirilis.
 								</p>
 							)}
 						</div>
 
+						{/* Form Control */}
 						<div className="space-y-1.5 flex-1 flex flex-col justify-center">
 							<Label className="text-xs font-semibold text-slate-700">
-								{studentData?.nim ? "Perbarui NIM" : "Masukkan NIM"}
+								{isAlreadyHasNim ? "Perbarui NIM" : "Masukkan NIM Baru"}
 							</Label>
 							<Input
 								placeholder={
-									clearanceStatus.canReleaseNim
-										? "Contoh: 202401001"
-										: "NIM terkunci (menunggu clearance)"
+									canEditNim
+										? "Contoh: 250001"
+										: "NIM terkunci (menunggu clearance PMB & Finance)"
 								}
 								value={nim}
 								onKeyDown={preventNonNumericKey}
@@ -467,81 +513,98 @@ export function TabDataMahasiswa({
 										),
 									)
 								}
-								disabled={!canEdit || !clearanceStatus.canReleaseNim}
-								className={`h-9 text-xs sm:text-sm font-mono bg-white border-slate-200 ${
-									!clearanceStatus.canReleaseNim
+								disabled={!canEditNim}
+								className={`h-10 text-xs sm:text-sm font-mono bg-white border-slate-200 rounded-xl ${
+									!canEditNim
 										? "bg-slate-100 text-slate-400 cursor-not-allowed"
 										: ""
 								}`}
 							/>
 						</div>
 
+						{/* Action Button */}
 						{canEdit && (
 							<Button
 								size="sm"
 								onClick={handleSaveNim}
-								disabled={isSavingNim || !clearanceStatus.canReleaseNim}
-								title={
-									!clearanceStatus.canReleaseNim
-										? "NIM terkunci hingga PMB (ACC) dan Finance (Registrasi) selesai"
-										: ""
-								}
-								className={`w-full text-xs h-9 font-bold shadow-sm transition-all ${
-									clearanceStatus.canReleaseNim
+								disabled={isSavingNim || !canEditNim}
+								className={`w-full text-xs h-10 font-bold rounded-xl shadow-2xs transition-all mt-2 ${
+									canEditNim
 										? "bg-violet-600 hover:bg-violet-700 text-white"
 										: "bg-slate-200 text-slate-400 cursor-not-allowed hover:bg-slate-200"
 								}`}
 							>
 								{isSavingNim ? (
 									<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-								) : !clearanceStatus.canReleaseNim ? (
+								) : !canEditNim ? (
 									<Lock className="w-3.5 h-3.5 mr-1.5" />
 								) : (
 									<Save className="w-3.5 h-3.5 mr-1.5" />
 								)}
-								{clearanceStatus.canReleaseNim
-									? "Simpan NIM"
+								{canEditNim
+									? isAlreadyHasNim
+										? "Simpan Pembaruan NIM"
+										: "Rilis & Simpan NIM"
 									: "NIM Terkunci (Belum Clearance)"}
 							</Button>
 						)}
 					</CardContent>
 				</Card>
 
-				{/* 3. Pembimbing Akademik (PA) */}
-				<Card className="border-slate-200 shadow-sm border-l-4 border-l-amber-600 flex flex-col justify-between h-full bg-white">
-					<CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
-						<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-							<div className="p-1.5 bg-amber-50 text-amber-600 rounded-md border border-amber-100">
-								<BookUser className="w-4 h-4" />
-							</div>
-							Dosen Pembimbing Akademik (PA)
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="p-5 flex flex-col justify-between flex-1 space-y-4">
-						<div className="h-12 flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
-							<span className="text-xs text-slate-500 font-medium">
-								PA Ditugaskan:
-							</span>
-							{currentPa ? (
-								<div className="flex items-center gap-1.5 bg-amber-100/70 border border-amber-200 px-2 py-0.5 rounded text-xs font-bold text-amber-900 truncate max-w-[180px]">
-									<div className="w-4 h-4 rounded-full bg-amber-600 text-white font-bold text-[9px] flex items-center justify-center shrink-0">
-										{currentPa.fullName
-											? currentPa.fullName.charAt(0).toUpperCase()
-											: "P"}
-									</div>
-									<span className="truncate">{currentPa.fullName}</span>
+				{/* ── CARD 3: Dosen Pembimbing Akademik (PA) ─────────── */}
+				<Card className="border-slate-200/90 shadow-2xs hover:shadow-xs transition-all border-l-4 border-l-amber-600 flex flex-col justify-between h-full bg-white rounded-2xl overflow-hidden">
+					<CardHeader className="pb-3.5 border-b border-slate-100 bg-slate-50/40">
+						<div className="flex items-center justify-between">
+							<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2.5">
+								<div className="p-2 bg-amber-50 text-amber-600 rounded-xl border border-amber-100/80 shadow-2xs">
+									<BookUser className="w-4 h-4" />
 								</div>
+								<span>Dosen Pembimbing Akademik (PA)</span>
+							</CardTitle>
+							{currentPa ? (
+								<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs font-semibold px-2.5 py-0.5">
+									Ditugaskan
+								</Badge>
 							) : (
 								<Badge
 									variant="outline"
 									className="text-slate-400 border-slate-200 text-xs"
+								>
+									Belum Ada
+								</Badge>
+							)}
+						</div>
+					</CardHeader>
+
+					<CardContent className="p-5 flex flex-col justify-between flex-1 space-y-4">
+						{/* Current PA Box */}
+						<div className="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+							<span className="text-xs font-medium text-slate-500">
+								PA Ditugaskan:
+							</span>
+							{currentPa ? (
+								<div className="flex items-center gap-2 bg-amber-100/80 border border-amber-200 px-3 py-1 rounded-lg text-xs font-bold text-amber-900 shadow-2xs">
+									<div className="w-5 h-5 rounded-full bg-amber-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
+										{currentPa.fullName
+											? currentPa.fullName.charAt(0).toUpperCase()
+											: "P"}
+									</div>
+									<span className="truncate max-w-[200px]">
+										{currentPa.fullName}
+									</span>
+								</div>
+							) : (
+								<Badge
+									variant="outline"
+									className="text-slate-400 border-slate-200 text-xs px-2.5 py-1"
 								>
 									Belum Ditentukan
 								</Badge>
 							)}
 						</div>
 
-						<div className="space-y-1.5 flex-1 flex flex-col justify-center">
+						{/* Form Control */}
+						<div className="space-y-2 flex-1 flex flex-col justify-center">
 							<Label className="text-xs font-semibold text-slate-700">
 								Pilih Dosen PA
 							</Label>
@@ -552,7 +615,7 @@ export function TabDataMahasiswa({
 								}
 								disabled={!canEdit}
 							>
-								<SelectTrigger className="h-9 text-xs sm:text-sm font-medium bg-white border-slate-200">
+								<SelectTrigger className="h-10 text-xs sm:text-sm font-medium bg-white border-slate-200 rounded-xl">
 									<span className="truncate text-slate-800">
 										{selectedPaId && selectedPaId !== "none"
 											? paList.find((p) => String(p.id) === selectedPaId)
@@ -576,14 +639,19 @@ export function TabDataMahasiswa({
 									))}
 								</SelectContent>
 							</Select>
+							<p className="text-[11px] text-slate-400">
+								PA dapat memberikan bimbingan, verifikasi absensi, dan catatan
+								karakter.
+							</p>
 						</div>
 
+						{/* Action Button */}
 						{canEdit && (
 							<Button
 								size="sm"
 								onClick={handleSavePa}
 								disabled={isSavingPa}
-								className="w-full bg-amber-600 hover:bg-amber-700 text-white text-xs h-9 font-bold shadow-sm"
+								className="w-full bg-amber-600 hover:bg-amber-700 text-white text-xs h-10 font-bold rounded-xl shadow-2xs transition-all mt-2"
 							>
 								{isSavingPa ? (
 									<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
@@ -596,28 +664,37 @@ export function TabDataMahasiswa({
 					</CardContent>
 				</Card>
 
-				{/* 4. Rombongan Belajar (Rombel) */}
-				<Card className="border-slate-200 shadow-sm border-l-4 border-l-purple-600 flex flex-col justify-between h-full bg-white">
-					<CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
-						<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-							<div className="p-1.5 bg-purple-50 text-purple-600 rounded-md border border-purple-100">
-								<Users2 className="w-4 h-4" />
-							</div>
-							Rombongan Belajar (Rombel)
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="p-5 flex flex-col justify-between flex-1 space-y-4">
-						<div className="h-12 flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
-							<span className="text-xs text-slate-500 font-medium">
-								Rombel Saat Ini:
-							</span>
-							<Badge className="bg-purple-50 text-purple-700 border-purple-200 text-xs font-semibold px-2.5 py-0.5">
+				{/* ── CARD 4: Rombongan Belajar (Rombel) ─────────────── */}
+				<Card className="border-slate-200/90 shadow-2xs hover:shadow-xs transition-all border-l-4 border-l-blue-600 flex flex-col justify-between h-full bg-white rounded-2xl overflow-hidden">
+					<CardHeader className="pb-3.5 border-b border-slate-100 bg-slate-50/40">
+						<div className="flex items-center justify-between">
+							<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2.5">
+								<div className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100/80 shadow-2xs">
+									<Users2 className="w-4 h-4" />
+								</div>
+								<span>Rombongan Belajar (Rombel)</span>
+							</CardTitle>
+							<Badge className="bg-blue-50 text-blue-700 border-blue-200 text-xs font-semibold px-2.5 py-0.5">
 								<Users2 className="w-3 h-3 mr-1" />
 								{studentData?.rombel || "Kelas A"}
 							</Badge>
 						</div>
+					</CardHeader>
 
-						<div className="space-y-1.5 flex-1 flex flex-col justify-center">
+					<CardContent className="p-5 flex flex-col justify-between flex-1 space-y-4">
+						{/* Current Rombel Box */}
+						<div className="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+							<span className="text-xs font-medium text-slate-500">
+								Rombel Saat Ini:
+							</span>
+							<Badge className="bg-blue-100/80 text-blue-800 border-blue-200 text-xs font-bold px-3 py-1 shadow-2xs">
+								<Users2 className="w-3 h-3 mr-1.5 text-blue-600" />
+								{studentData?.rombel || "Kelas A"}
+							</Badge>
+						</div>
+
+						{/* Form Control */}
+						<div className="space-y-2 flex-1 flex flex-col justify-center">
 							<div className="flex items-center justify-between">
 								<Label className="text-xs font-semibold text-slate-700">
 									Nama Rombel
@@ -631,20 +708,21 @@ export function TabDataMahasiswa({
 								onChange={(e) => setSelectedRombel(e.target.value)}
 								placeholder="Cth: Kelas A, Kelas B..."
 								disabled={!canEdit}
-								className="h-9 text-xs sm:text-sm font-medium bg-white border-slate-200"
+								className="h-10 text-xs sm:text-sm font-medium bg-white border-slate-200 rounded-xl"
 							/>
 							{/* Quick preset pills */}
-							<div className="flex flex-wrap gap-1 pt-1">
+							<div className="flex flex-wrap items-center gap-1.5 pt-1">
+								<span className="text-[11px] text-slate-400 mr-1">Preset:</span>
 								{DEFAULT_ROMBEL_OPTIONS.map((opt) => (
 									<button
 										key={opt}
 										type="button"
 										onClick={() => setSelectedRombel(opt)}
 										disabled={!canEdit}
-										className={`text-[10px] px-2 py-0.5 rounded font-medium transition-colors ${
+										className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition-all shadow-2xs ${
 											selectedRombel === opt
 												? "bg-[#0517B0] text-white"
-												: "bg-slate-100 text-slate-600 hover:bg-slate-200"
+												: "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200/60"
 										}`}
 									>
 										{opt}
@@ -653,12 +731,13 @@ export function TabDataMahasiswa({
 							</div>
 						</div>
 
+						{/* Action Button */}
 						{canEdit && (
 							<Button
 								size="sm"
 								onClick={handleSaveRombel}
 								disabled={isSavingRombel}
-								className="w-full bg-[#0517B0] hover:bg-blue-800 text-white text-xs h-9 font-bold shadow-sm"
+								className="w-full bg-[#0517B0] hover:bg-blue-800 text-white text-xs h-10 font-bold rounded-xl shadow-2xs transition-all mt-2"
 							>
 								{isSavingRombel ? (
 									<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />

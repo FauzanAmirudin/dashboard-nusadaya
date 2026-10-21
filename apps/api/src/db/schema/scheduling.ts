@@ -1,10 +1,12 @@
 import {
 	boolean,
 	date,
+	doublePrecision,
 	index,
 	integer,
 	jsonb,
 	pgTable,
+	real,
 	serial,
 	text,
 	timestamp,
@@ -157,12 +159,26 @@ export const attendanceRecords = pgTable(
 			.notNull(),
 		status: text("status").notNull(), // "hadir" | "alpha" | "sakit" | "izin"
 		notes: text("notes"),
+		selfieUrl: text("selfie_url"),
+		latitude: doublePrecision("latitude"),
+		longitude: doublePrecision("longitude"),
+		gpsAccuracy: real("gps_accuracy"),
+		locationName: text("location_name"),
+		distanceFromCheckpoint: integer("distance_from_checkpoint"),
+		checkinMethod: text("checkin_method").default("admin"), // "self_selfie" | "self_manual" | "admin"
+		isWithinRadius: boolean("is_within_radius").default(true),
+		selfieTakenAt: timestamp("selfie_taken_at"),
+		verificationStatus: text("verification_status").default("auto_approved"), // "auto_approved" | "pending_review" | "approved" | "rejected"
+		verifiedBy: integer("verified_by").references(() => users.id),
+		verifiedAt: timestamp("verified_at"),
+		rejectionReason: text("rejection_reason"),
 		recordedBy: integer("recorded_by").references(() => users.id),
 		recordedAt: timestamp("recorded_at").defaultNow().notNull(),
 	},
 	(t) => [
 		index("idx_attendance_records_session_id").on(t.sessionId),
 		index("idx_attendance_records_student_id").on(t.studentId),
+		index("idx_attendance_records_verification").on(t.verificationStatus),
 	],
 );
 
@@ -176,6 +192,19 @@ export const odsAttendanceRecords = pgTable(
 		date: date("date").notNull(),
 		status: text("status").notNull(), // "hadir" | "alpha" | "sakit" | "izin"
 		notes: text("notes"),
+		selfieUrl: text("selfie_url"),
+		latitude: doublePrecision("latitude"),
+		longitude: doublePrecision("longitude"),
+		gpsAccuracy: real("gps_accuracy"),
+		locationName: text("location_name"),
+		distanceFromCheckpoint: integer("distance_from_checkpoint"),
+		checkinMethod: text("checkin_method").default("admin"),
+		isWithinRadius: boolean("is_within_radius").default(true),
+		selfieTakenAt: timestamp("selfie_taken_at"),
+		verificationStatus: text("verification_status").default("auto_approved"),
+		verifiedBy: integer("verified_by").references(() => users.id),
+		verifiedAt: timestamp("verified_at"),
+		rejectionReason: text("rejection_reason"),
 		recordedBy: integer("recorded_by").references(() => users.id),
 		recordedAt: timestamp("recorded_at").defaultNow().notNull(),
 	},
@@ -195,6 +224,19 @@ export const pramagangAttendanceRecords = pgTable(
 		date: date("date").notNull(),
 		status: text("status").notNull(), // "hadir" | "alpha" | "sakit" | "izin"
 		notes: text("notes"),
+		selfieUrl: text("selfie_url"),
+		latitude: doublePrecision("latitude"),
+		longitude: doublePrecision("longitude"),
+		gpsAccuracy: real("gps_accuracy"),
+		locationName: text("location_name"),
+		distanceFromCheckpoint: integer("distance_from_checkpoint"),
+		checkinMethod: text("checkin_method").default("admin"),
+		isWithinRadius: boolean("is_within_radius").default(true),
+		selfieTakenAt: timestamp("selfie_taken_at"),
+		verificationStatus: text("verification_status").default("auto_approved"),
+		verifiedBy: integer("verified_by").references(() => users.id),
+		verifiedAt: timestamp("verified_at"),
+		rejectionReason: text("rejection_reason"),
 		recordedBy: integer("recorded_by").references(() => users.id),
 		recordedAt: timestamp("recorded_at").defaultNow().notNull(),
 	},
@@ -246,7 +288,20 @@ export const morningAssemblyRecords = pgTable(
 		minutesLate: integer("minutes_late").default(0), // Menit keterlambatan jika > 06.22
 		notes: text("notes"),
 		selfCheckinAt: timestamp("self_checkin_at"),
-		checkinMethod: text("checkin_method").default("admin").notNull(), // "self" | "admin"
+		checkinMethod: text("checkin_method").default("admin").notNull(), // "self" | "self_selfie" | "admin"
+		selfieUrl: text("selfie_url"),
+		latitude: doublePrecision("latitude"),
+		longitude: doublePrecision("longitude"),
+		gpsAccuracy: real("gps_accuracy"),
+		locationName: text("location_name"),
+		distanceFromCheckpoint: integer("distance_from_checkpoint"),
+		isWithinRadius: boolean("is_within_radius").default(true),
+		selfieTakenAt: timestamp("selfie_taken_at"),
+		verificationStatus: text("verification_status").default("auto_approved"),
+		verifiedBy: integer("verified_by").references(() => users.id),
+		verifiedAt: timestamp("verified_at"),
+		rejectionReason: text("rejection_reason"),
+		faceDetected: boolean("face_detected").default(true),
 		recordedBy: integer("recorded_by").references(() => users.id),
 		recordedAt: timestamp("recorded_at").defaultNow().notNull(),
 	},
@@ -275,4 +330,51 @@ export const morningAssemblyScheduleConfig = pgTable(
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
 	(t) => [index("idx_morning_assembly_config_cohort").on(t.cohort)],
+);
+
+export const attendanceCheckpointConfig = pgTable(
+	"attendance_checkpoint_config",
+	{
+		id: serial("id").primaryKey(),
+		type: text("type").notNull(), // "kuliah" | "piket" | "baris_pagi" | "ods"
+		label: text("label").notNull(), // e.g. "Gedung Utama Kampus"
+		latitude: doublePrecision("latitude").notNull(),
+		longitude: doublePrecision("longitude").notNull(),
+		radiusMeters: integer("radius_meters").default(100).notNull(),
+		isActive: boolean("is_active").default(true).notNull(),
+		cohort: integer("cohort"), // null = berlaku untuk semua angkatan
+		notes: text("notes"),
+		createdBy: integer("created_by").references(() => users.id),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(t) => [
+		index("idx_attendance_checkpoint_type").on(t.type),
+		index("idx_attendance_checkpoint_cohort").on(t.cohort),
+	],
+);
+
+export const selfieFraudFlags = pgTable(
+	"selfie_fraud_flags",
+	{
+		id: serial("id").primaryKey(),
+		attendanceType: text("attendance_type").notNull(), // "kuliah" | "piket" | "baris_pagi" | "ods"
+		attendanceRecordId: integer("attendance_record_id").notNull(),
+		studentId: integer("student_id")
+			.references(() => students.id)
+			.notNull(),
+		flagReason: text("flag_reason").notNull(), // "gps_accuracy_too_low" | "outside_radius" | "virtual_camera_suspected" | "gps_spoofing_suspected" | "duplicate_submission"
+		flagDetail: jsonb("flag_detail"),
+		reviewedBy: integer("reviewed_by").references(() => users.id),
+		reviewedAt: timestamp("reviewed_at"),
+		isDismissed: boolean("is_dismissed").default(false).notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(t) => [
+		index("idx_selfie_fraud_student_id").on(t.studentId),
+		index("idx_selfie_fraud_type_record").on(
+			t.attendanceType,
+			t.attendanceRecordId,
+		),
+	],
 );

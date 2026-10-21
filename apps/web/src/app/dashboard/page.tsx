@@ -106,6 +106,7 @@ const PmbDashboard = dynamic(
 	{ ssr: false },
 );
 
+import { SelfieAttendanceNotificationWidget } from "@/components/dashboards/SelfieAttendanceNotificationWidget";
 import { SharedDashboardLoader } from "@/components/dashboards/SharedDashboardLoader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -524,6 +525,9 @@ export default function DashboardPage() {
 					</Button>
 				</div>
 			</div>
+
+			{/* Selfie Attendance Verification & Fraud Alerts */}
+			<SelfieAttendanceNotificationWidget />
 
 			{/* KPI Summary Cards */}
 			<div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">

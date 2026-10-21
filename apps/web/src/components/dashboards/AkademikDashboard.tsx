@@ -1,29 +1,45 @@
 "use client";
 
 import {
+	Award,
 	BookOpen,
+	Calculator,
 	CheckCircle,
 	CheckCircle2,
 	Clock,
 	Download,
 	Eye,
+	FileCheck,
+	FileSpreadsheet,
 	GraduationCap,
 	HelpCircle,
 	MessageCircle,
 	RotateCcw,
 	Search,
+	Send,
 	ShieldAlert,
 	ShieldCheck,
 	User,
+	UserCheck,
 	Users,
 	XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { SelfieAttendanceNotificationWidget } from "@/components/dashboards/SelfieAttendanceNotificationWidget";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { NeumorphicStatCard } from "@/components/ui/NeumorphicStatCard";
 import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
@@ -51,6 +67,7 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { getToken } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 import { normalizeStatus } from "@/utils/status";
 
@@ -67,6 +84,7 @@ export function AkademikDashboard({
 	searchQuery,
 	setSearchQuery,
 	user,
+	onUpdate,
 }: any) {
 	const router = useRouter();
 	const [selectedCohort, setSelectedCohort] = useState<string>("all");
@@ -75,6 +93,94 @@ export function AkademikDashboard({
 	const [localSearch, setLocalSearch] = useState(searchQuery || "");
 	const [currentPage, setCurrentPage] = useState(1);
 	const pageSize = 20;
+
+	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+	// AKD-06 Batch Operation Modals
+	const [isBatchCalcOpen, setIsBatchCalcOpen] = useState(false);
+	const [isCalculating, setIsCalculating] = useState(false);
+	const [targetCalcCohort, setTargetCalcCohort] = useState<string>("14");
+	const [targetCalcRombel, setTargetCalcRombel] = useState<string>("all");
+
+	const [isBatchSyncMagangOpen, setIsBatchSyncMagangOpen] = useState(false);
+	const [isSyncingMagang, setIsSyncingMagang] = useState(false);
+	const [targetSyncCohort, setTargetSyncCohort] = useState<string>("14");
+
+	const [isPddiktiExportOpen, setIsPddiktiExportOpen] = useState(false);
+	const [pddiktiExportType, setPddiktiExportType] = useState<
+		"krs" | "khs" | "kelulusan"
+	>("khs");
+	const [pddiktiCohort, setPddiktiCohort] = useState<string>("all");
+
+	const handleRunBatchCalculation = async () => {
+		setIsCalculating(true);
+		try {
+			const res = await fetch(`${API_URL}/academic/calculate-all-grades`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${getToken()}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					cohort: Number(targetCalcCohort),
+					rombel: targetCalcRombel === "all" ? undefined : targetCalcRombel,
+				}),
+			});
+			const json = await res.json();
+			if (json.success) {
+				toast.success(
+					json.message || "Kalkulasi nilai otomatis massal selesai!",
+				);
+				setIsBatchCalcOpen(false);
+				onUpdate?.();
+			} else {
+				toast.error(json.message || "Gagal menghitung nilai massal");
+			}
+		} catch {
+			toast.error("Terjadi kesalahan jaringan saat menghitung nilai massal");
+		} finally {
+			setIsCalculating(false);
+		}
+	};
+
+	const handleRunBatchSyncMagang = async () => {
+		setIsSyncingMagang(true);
+		try {
+			const res = await fetch(`${API_URL}/academic/sync-all-to-magang`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${getToken()}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					cohort: Number(targetSyncCohort),
+				}),
+			});
+			const json = await res.json();
+			if (json.success) {
+				toast.success(
+					json.message || "Sinkronisasi KHS ke Modul Magang berhasil!",
+				);
+				setIsBatchSyncMagangOpen(false);
+				onUpdate?.();
+			} else {
+				toast.error(json.message || "Gagal menyinkronkan ke Magang");
+			}
+		} catch {
+			toast.error("Terjadi kesalahan jaringan saat sinkronisasi Magang");
+		} finally {
+			setIsSyncingMagang(false);
+		}
+	};
+
+	const handleDownloadPddikti = () => {
+		const cohortParam =
+			pddiktiCohort === "all" ? "" : `&cohort=${pddiktiCohort}`;
+		const url = `${API_URL}/academic/pddikti/export?type=${pddiktiExportType}${cohortParam}`;
+		window.open(url, "_blank");
+		setIsPddiktiExportOpen(false);
+		toast.success("File CSV Feeder PDDIKTI sedang diunduh");
+	};
 
 	// Available cohorts dynamically derived strictly from student data
 	const availableCohorts = useMemo(() => {
@@ -200,17 +306,20 @@ export function AkademikDashboard({
 
 		const items = [
 			{ name: "Input PDDIKTI", done: Boolean(s.academic?.pddiktiInput) },
-			{ name: "Presensi Hadir (≥ 80%)", done: attendanceOk },
 			{ name: "Lulus UTS", done: Boolean(s.academic?.utsPassed) },
 			{ name: "Lulus UAS", done: Boolean(s.academic?.uasPassed) },
+			{ name: "Indikator Sikap", done: Boolean(s.academic?.attitudeIndicator) },
 			{
 				name: "Tugas Kuliah Selesai",
 				done: Boolean(s.academic?.assignmentsCompleted),
 			},
-			{ name: "Indikator Sikap", done: Boolean(s.academic?.attitudeIndicator) },
 			{
 				name: "Komunikasi Akademik",
 				done: Boolean(s.academic?.academicCommunication),
+			},
+			{
+				name: "Asesmen Pra-keberangkatan",
+				done: Boolean(s.academic?.assessmentCompleted),
 			},
 		];
 		const completed = items.filter((i) => i.done).length;
@@ -220,6 +329,7 @@ export function AkademikDashboard({
 			total: items.length,
 			isDone: completed === items.length,
 			attendancePct,
+			attendanceOk,
 		};
 	};
 
@@ -242,8 +352,15 @@ export function AkademikDashboard({
 				"Input PDDIKTI": s.academic?.pddiktiInput ? "Sudah" : "Belum",
 				"Lulus UTS": s.academic?.utsPassed ? "Ya" : "Tidak",
 				"Lulus UAS": s.academic?.uasPassed ? "Ya" : "Tidak",
+				"Indikator Sikap": s.academic?.attitudeIndicator ? "Ya" : "Tidak",
 				"Tugas Selesai": s.academic?.assignmentsCompleted ? "Ya" : "Tidak",
-				"Indikator Sikap": s.academic?.attitudeIndicator || "-",
+				"Komunikasi Akademik": s.academic?.academicCommunication
+					? "Ya"
+					: "Tidak",
+				"Asesmen Pra-keberangkatan": s.academic?.assessmentCompleted
+					? "Ya"
+					: "Tidak",
+				"Presensi (≥80%)": checklist.attendanceOk ? "Memenuhi" : "Belum",
 				"Status Akademik": s.academic?.isAcc
 					? "Sudah ACC"
 					: s.academic?.status === "AMAN"
@@ -284,6 +401,54 @@ export function AkademikDashboard({
 					<Button
 						variant="outline"
 						size="sm"
+						onClick={() => setIsBatchCalcOpen(true)}
+						className="border-indigo-200 text-indigo-700 bg-indigo-50/60 hover:bg-indigo-100 text-xs gap-1.5 h-9 font-semibold shadow-2xs"
+					>
+						<Calculator className="w-3.5 h-3.5 text-indigo-600" />
+						Kalkulasi Nilai Otomatis
+					</Button>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => setIsBatchSyncMagangOpen(true)}
+						className="border-emerald-200 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100 text-xs gap-1.5 h-9 font-semibold shadow-2xs"
+					>
+						<Send className="w-3.5 h-3.5 text-emerald-600" />
+						Sync KHS ke Magang
+					</Button>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => setIsPddiktiExportOpen(true)}
+						className="border-blue-200 text-blue-700 bg-blue-50/60 hover:bg-blue-100 text-xs gap-1.5 h-9 font-semibold shadow-2xs"
+					>
+						<FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
+						Feeder PDDIKTI
+					</Button>
+					<Link href="/dashboard/akademik/absensi-dosen">
+						<Button
+							variant="outline"
+							size="sm"
+							className="border-purple-200 text-purple-700 bg-purple-50/40 hover:bg-purple-100/70 text-xs gap-1.5 h-9 font-semibold"
+						>
+							<UserCheck className="w-3.5 h-3.5 text-purple-600" />
+							Absensi Dosen
+						</Button>
+					</Link>
+					{onUpdate && (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => onUpdate()}
+							className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
+						>
+							<RotateCcw className="w-3.5 h-3.5" />
+							Segarkan Data
+						</Button>
+					)}
+					<Button
+						variant="outline"
+						size="sm"
 						onClick={handleExport}
 						className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
 					>
@@ -292,6 +457,9 @@ export function AkademikDashboard({
 					</Button>
 				</div>
 			</div>
+
+			{/* Selfie Attendance Verification & Fraud Alerts */}
+			<SelfieAttendanceNotificationWidget />
 
 			{/* KPI Summary Cards */}
 			<div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
@@ -678,6 +846,19 @@ export function AkademikDashboard({
 														</Button>
 													</Link>
 													<Link
+														href={`/dashboard/students/${s.student.id}?tab=akademik&subtab=nilai-khs`}
+													>
+														<Button
+															size="sm"
+															variant="outline"
+															className="h-8 text-xs border-amber-200 text-amber-700 hover:bg-amber-50 hover:border-amber-300 gap-1 font-semibold"
+															title="Buka Lembar Nilai & KHS (AKD-06)"
+														>
+															<Award className="w-3.5 h-3.5 text-amber-600" />
+															KHS
+														</Button>
+													</Link>
+													<Link
 														href={`/dashboard/students/${s.student.id}?tab=akademik`}
 													>
 														<Button
@@ -719,6 +900,292 @@ export function AkademikDashboard({
 					</div>
 				</CardContent>
 			</Card>
+
+			{/* Modal Batch Kalkulasi Nilai Otomatis (AKD-06) */}
+			<Dialog open={isBatchCalcOpen} onOpenChange={setIsBatchCalcOpen}>
+				<DialogContent className="max-w-md bg-white">
+					<DialogHeader>
+						<DialogTitle className="flex items-center gap-2 text-slate-900">
+							<Calculator className="w-5 h-5 text-indigo-600" />
+							Kalkulasi Nilai Otomatis Massal (AKD-06)
+						</DialogTitle>
+						<DialogDescription className="text-xs text-slate-500 leading-relaxed">
+							Sistem akan menghitung nilai akhir mahasiswa (Presensi 15%, Teori
+							25%, Praktik 40%, UTS 10%, UAS 10%) untuk seluruh mata kuliah
+							dalam angkatan/rombel yang dipilih, menghasilkan huruf mutu, SKS
+							lulus, dan IPK/IPS berbobot secara otomatis.
+						</DialogDescription>
+					</DialogHeader>
+
+					<div className="space-y-4 py-2">
+						<div className="space-y-1.5">
+							<label className="text-xs font-semibold text-slate-700">
+								Pilih Angkatan Target:
+							</label>
+							<Select
+								value={targetCalcCohort}
+								onValueChange={(val) => setTargetCalcCohort(val || "14")}
+							>
+								<SelectTrigger className="h-9 text-xs">
+									<SelectValue placeholder="Pilih Angkatan" />
+								</SelectTrigger>
+								<SelectContent>
+									{availableCohorts.map((cohort) => (
+										<SelectItem key={cohort} value={cohort}>
+											Angkatan {cohort}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="space-y-1.5">
+							<label className="text-xs font-semibold text-slate-700">
+								Filter Rombel / Kelas:
+							</label>
+							<Select
+								value={targetCalcRombel}
+								onValueChange={(val) => setTargetCalcRombel(val || "all")}
+							>
+								<SelectTrigger className="h-9 text-xs">
+									<SelectValue placeholder="Pilih Rombel" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="all">
+										Semua Rombel (Seluruh Kelas)
+									</SelectItem>
+									{availableRombels.map((rombel) => (
+										<SelectItem key={rombel} value={rombel}>
+											{rombel}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-lg text-xs text-indigo-900 space-y-1">
+							<div className="font-semibold flex items-center gap-1.5">
+								<CheckCircle2 className="w-4 h-4 text-indigo-600" />
+								Otomatisasi BAAK Nusadaya:
+							</div>
+							<p className="text-[11px] text-indigo-700 leading-relaxed">
+								Nilai akhir yang telah terkalkulasi akan memperbarui status
+								indikator UTS, UAS, dan IPK mahasiswa di dashboard serta
+								mempersiapkan KHS siap terbit.
+							</p>
+						</div>
+					</div>
+
+					<DialogFooter className="gap-2 sm:gap-0">
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => setIsBatchCalcOpen(false)}
+							disabled={isCalculating}
+						>
+							Batal
+						</Button>
+						<Button
+							size="sm"
+							onClick={handleRunBatchCalculation}
+							disabled={isCalculating}
+							className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5"
+						>
+							{isCalculating ? (
+								<>
+									<Clock className="w-3.5 h-3.5 animate-spin" />
+									Menghitung Nilai...
+								</>
+							) : (
+								<>
+									<Calculator className="w-3.5 h-3.5" />
+									Mulai Kalkulasi Nilai
+								</>
+							)}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Modal Batch Sinkronisasi ke Modul Magang (AKD-06 & Segmen 19) */}
+			<Dialog
+				open={isBatchSyncMagangOpen}
+				onOpenChange={setIsBatchSyncMagangOpen}
+			>
+				<DialogContent className="max-w-md bg-white">
+					<DialogHeader>
+						<DialogTitle className="flex items-center gap-2 text-slate-900">
+							<Send className="w-5 h-5 text-emerald-600" />
+							Sinkronisasi KHS ke Modul Magang
+						</DialogTitle>
+						<DialogDescription className="text-xs text-slate-500 leading-relaxed">
+							Menghubungkan rekapitulasi KHS dan transkrip akademik mahasiswa
+							yang telah tervalidasi ke modul Magang (Pra-Paspor: KHS, KRS, dan
+							Transkrip Akademik). Mahasiswa tidak perlu mengunggah ulang
+							dokumen KHS secara manual.
+						</DialogDescription>
+					</DialogHeader>
+
+					<div className="space-y-4 py-2">
+						<div className="space-y-1.5">
+							<label className="text-xs font-semibold text-slate-700">
+								Pilih Angkatan Mahasiswa:
+							</label>
+							<Select
+								value={targetSyncCohort}
+								onValueChange={(val) => setTargetSyncCohort(val || "14")}
+							>
+								<SelectTrigger className="h-9 text-xs">
+									<SelectValue placeholder="Pilih Angkatan" />
+								</SelectTrigger>
+								<SelectContent>
+									{availableCohorts.map((cohort) => (
+										<SelectItem key={cohort} value={cohort}>
+											Angkatan {cohort}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="p-3 bg-emerald-50/70 border border-emerald-100 rounded-lg text-xs text-emerald-900 space-y-1">
+							<div className="font-semibold flex items-center gap-1.5">
+								<CheckCircle2 className="w-4 h-4 text-emerald-600" />
+								Eliminasi Redundansi Dokumen (Segmen 19):
+							</div>
+							<p className="text-[11px] text-emerald-700 leading-relaxed">
+								Sistem secara otomatis menandai checklist Pra-Paspor Magang
+								untuk KHS, KRS, dan Transkrip serta melampirkan berkas resmi
+								yang diterbitkan divisi Akademik.
+							</p>
+						</div>
+					</div>
+
+					<DialogFooter className="gap-2 sm:gap-0">
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => setIsBatchSyncMagangOpen(false)}
+							disabled={isSyncingMagang}
+						>
+							Batal
+						</Button>
+						<Button
+							size="sm"
+							onClick={handleRunBatchSyncMagang}
+							disabled={isSyncingMagang}
+							className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+						>
+							{isSyncingMagang ? (
+								<>
+									<Clock className="w-3.5 h-3.5 animate-spin" />
+									Menyinkronkan...
+								</>
+							) : (
+								<>
+									<Send className="w-3.5 h-3.5" />
+									Sinkronkan Seluruh Mahasiswa
+								</>
+							)}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Modal Ekspor Feeder PDDIKTI (Segmen 14) */}
+			<Dialog open={isPddiktiExportOpen} onOpenChange={setIsPddiktiExportOpen}>
+				<DialogContent className="max-w-md bg-white">
+					<DialogHeader>
+						<DialogTitle className="flex items-center gap-2 text-slate-900">
+							<FileSpreadsheet className="w-5 h-5 text-blue-600" />
+							Ekspor Feeder PDDIKTI (Standar Resmi)
+						</DialogTitle>
+						<DialogDescription className="text-xs text-slate-500 leading-relaxed">
+							Unduh berkas CSV format Neo Feeder PDDIKTI untuk pelaporan berkala
+							aktivitas perkuliahan mahasiswa Nusadaya Academy ke pangkalan data
+							perguruan tinggi.
+						</DialogDescription>
+					</DialogHeader>
+
+					<div className="space-y-4 py-2">
+						<div className="space-y-1.5">
+							<label className="text-xs font-semibold text-slate-700">
+								Jenis Data Ekspor:
+							</label>
+							<Select
+								value={pddiktiExportType}
+								onValueChange={(val: any) => setPddiktiExportType(val)}
+							>
+								<SelectTrigger className="h-9 text-xs">
+									<SelectValue placeholder="Pilih Jenis Data" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="khs">
+										KHS & Nilai Akhir Perkuliahan (Feeder KHS)
+									</SelectItem>
+									<SelectItem value="krs">
+										KRS & Aktivitas Perkuliahan (Feeder KRS)
+									</SelectItem>
+									<SelectItem value="kelulusan">
+										Rekap Kelulusan & IPK Akhir Mahasiswa
+									</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="space-y-1.5">
+							<label className="text-xs font-semibold text-slate-700">
+								Filter Angkatan:
+							</label>
+							<Select
+								value={pddiktiCohort}
+								onValueChange={(val) => setPddiktiCohort(val || "all")}
+							>
+								<SelectTrigger className="h-9 text-xs">
+									<SelectValue placeholder="Semua Angkatan" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="all">Semua Angkatan</SelectItem>
+									{availableCohorts.map((cohort) => (
+										<SelectItem key={cohort} value={cohort}>
+											Angkatan {cohort}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+
+						<div className="p-3 bg-blue-50/70 border border-blue-100 rounded-lg text-xs text-blue-900 space-y-1">
+							<div className="font-semibold flex items-center gap-1.5">
+								<CheckCircle2 className="w-4 h-4 text-blue-600" />
+								Format Standar Neo Feeder:
+							</div>
+							<p className="text-[11px] text-blue-700 leading-relaxed">
+								Header kolom dan pemisah koma sesuai format import Neo Feeder
+								PDDIKTI Kemendikbudristek RI.
+							</p>
+						</div>
+					</div>
+
+					<DialogFooter className="gap-2 sm:gap-0">
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => setIsPddiktiExportOpen(false)}
+						>
+							Batal
+						</Button>
+						<Button
+							size="sm"
+							onClick={handleDownloadPddikti}
+							className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+						>
+							<Download className="w-3.5 h-3.5" />
+							Unduh Berkas CSV
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

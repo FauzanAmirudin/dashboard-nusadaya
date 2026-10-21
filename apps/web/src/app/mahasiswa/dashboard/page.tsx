@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { AbsenHariIniWidget } from "@/components/mahasiswa/AbsenHariIniWidget";
 import { BarisPagiCheckinWidget } from "@/components/mahasiswa/BarisPagiCheckinWidget";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -267,6 +268,9 @@ export default function MahasiswaDashboard() {
 					</div>
 				</CardContent>
 			</Card>
+
+			{/* WIDGET STATUS ABSEN HARI INI 4 LAYANAN */}
+			<AbsenHariIniWidget />
 
 			{/* WIDGET APEL BARIS PAGI & ABSEN MANDIRI */}
 			<BarisPagiCheckinWidget />

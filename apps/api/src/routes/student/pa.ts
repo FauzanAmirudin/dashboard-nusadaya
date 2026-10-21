@@ -80,7 +80,10 @@ export const paRoutes = new Elysia()
 					with: {
 						createdByUser: { columns: { fullName: true, username: true } },
 					},
-					orderBy: [desc(paHafalanSessions.createdAt)],
+					orderBy: [
+						desc(paHafalanSessions.date),
+						desc(paHafalanSessions.createdAt),
+					],
 				})
 				.catch(() =>
 					db
@@ -94,7 +97,7 @@ export const paRoutes = new Elysia()
 					with: {
 						createdByUser: { columns: { fullName: true, username: true } },
 					},
-					orderBy: [desc(paStudentNotes.createdAt)],
+					orderBy: [desc(paStudentNotes.date), desc(paStudentNotes.createdAt)],
 				})
 				.catch(() =>
 					db
@@ -399,6 +402,10 @@ export const paRoutes = new Elysia()
 					languageCustom: languageCustom ?? null,
 					vocabCount: finalVocabCount,
 					sentenceCount: finalSentenceCount,
+					vocabList: cleanVocabList,
+					sentenceList: cleanSentenceList,
+					notes: notes ? String(notes).trim() : null,
+					date: date ? new Date(date) : new Date(),
 					createdAt: date ? new Date(date) : new Date(),
 					createdBy: user.id,
 				})
@@ -437,8 +444,16 @@ export const paRoutes = new Elysia()
 			}
 			const id = Number(params.id);
 			const logId = Number(params.logId);
-			const { language, languageCustom, vocabCount, sentenceCount, date } =
-				body as any;
+			const {
+				language,
+				languageCustom,
+				vocabCount,
+				sentenceCount,
+				vocabList,
+				sentenceList,
+				notes,
+				date,
+			} = body as any;
 
 			const updateData: any = {
 				updatedAt: new Date(),
@@ -458,7 +473,21 @@ export const paRoutes = new Elysia()
 			if (sentenceCount !== undefined) {
 				updateData.sentenceCount = Number(sentenceCount) || 0;
 			}
+			if (vocabList !== undefined) {
+				updateData.vocabList = Array.isArray(vocabList)
+					? vocabList.map((v: any) => String(v).trim()).filter(Boolean)
+					: [];
+			}
+			if (sentenceList !== undefined) {
+				updateData.sentenceList = Array.isArray(sentenceList)
+					? sentenceList.map((s: any) => String(s).trim()).filter(Boolean)
+					: [];
+			}
+			if (notes !== undefined) {
+				updateData.notes = notes ? String(notes).trim() : null;
+			}
 			if (date) {
+				updateData.date = new Date(date);
 				updateData.createdAt = new Date(date);
 			}
 
@@ -520,13 +549,19 @@ export const paRoutes = new Elysia()
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
-			const { type, content } = body as any;
+			const { type, content, date, category } = body as any;
+			const noteDate = date ? new Date(date) : new Date();
+			const noteCategory = category ? String(category).trim() : "umum";
+
 			const inserted = await db
 				.insert(paStudentNotes)
 				.values({
 					studentId: id,
 					type,
 					content,
+					date: noteDate,
+					category: noteCategory,
+					createdAt: noteDate,
 					createdBy: user.id,
 				})
 				.returning();
@@ -544,6 +579,8 @@ export const paRoutes = new Elysia()
 			body: t.Object({
 				type: t.String(),
 				content: t.String(),
+				date: t.Optional(t.Nullable(t.String())),
+				category: t.Optional(t.Nullable(t.String())),
 			}),
 		},
 	)
@@ -558,10 +595,17 @@ export const paRoutes = new Elysia()
 			}
 			const id = Number(params.id);
 			const noteId = Number(params.noteId);
-			const { content } = body as any;
+			const { content, date, category } = body as any;
+			const updateData: any = { updatedAt: new Date() };
+			if (content !== undefined) updateData.content = content;
+			if (date !== undefined)
+				updateData.date = date ? new Date(date) : new Date();
+			if (category !== undefined)
+				updateData.category = category ? String(category).trim() : "umum";
+
 			await db
 				.update(paStudentNotes)
-				.set({ content, updatedAt: new Date() })
+				.set(updateData)
 				.where(eq(paStudentNotes.id, noteId));
 
 			await Promise.all([
@@ -574,7 +618,11 @@ export const paRoutes = new Elysia()
 			return { success: true };
 		},
 		{
-			body: t.Object({ content: t.String() }),
+			body: t.Object({
+				content: t.Optional(t.String()),
+				date: t.Optional(t.Nullable(t.String())),
+				category: t.Optional(t.Nullable(t.String())),
+			}),
 		},
 	)
 	.delete("/:id/pa/student-notes/:noteId", async (context) => {
