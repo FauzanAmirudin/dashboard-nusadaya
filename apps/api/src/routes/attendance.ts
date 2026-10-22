@@ -506,7 +506,10 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				});
 
 			// Real-time calculation from actual attendances in DB
-			const presentCount = cMeetings.filter((m) => m.status === "hadir").length;
+			// Real-time calculation from actual attendances in DB
+			const presentCount = cMeetings.filter(
+				(m) => m.status === "hadir" || m.status === "susulan",
+			).length;
 			const totalMeetings = 16;
 			const attendanceRate = Math.min(
 				100,
@@ -549,18 +552,31 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				else calculatedGrade = "E";
 			}
 
-			const hasActualAttendances = cMeetings.some((m) => m.status !== null);
-			const finalPresent = hasActualAttendances
-				? presentCount
-				: g.attendancePresent || 0;
-			const finalRate = hasActualAttendances
-				? attendanceRate
-				: g.attendanceRate || 0;
-			const finalTheory = hasActualAttendances ? avgTheory : g.theoryScore;
-			const finalPractical = hasActualAttendances
-				? avgPractical
-				: g.practicalScore;
-			const finalGrade = hasActualAttendances ? calculatedGrade : g.grade;
+			// Real data precedence: When course meetings exist in DB, attendance always comes from real meeting records
+			const finalPresent =
+				cMeetings.length > 0 ? presentCount : g.attendancePresent || 0;
+			const finalRate =
+				cMeetings.length > 0 ? attendanceRate : g.attendanceRate || 0;
+			const finalTheory =
+				avgTheory !== null
+					? avgTheory
+					: cMeetings.length > 0
+						? null
+						: g.theoryScore;
+			const finalPractical =
+				avgPractical !== null
+					? avgPractical
+					: cMeetings.length > 0
+						? null
+						: g.practicalScore;
+			const finalGrade =
+				calculatedGrade !== null
+					? calculatedGrade
+					: cMeetings.length > 0
+						? null
+						: g.grade;
+			const isAcc =
+				cMeetings.length > 0 && presentCount === 0 ? false : g.isAcc || false;
 
 			return {
 				id: g.id || c.id,
@@ -571,7 +587,7 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				dosenId: c.dosenId,
 				dosen: c.dosen || g.dosen || { fullName: "Dosen Pengajar" },
 				course: c,
-				isAcc: g.isAcc || false,
+				isAcc: isAcc,
 				attitudeNote: g.attitudeNote || "",
 				totalMeetings: 16,
 				attendancePresent: finalPresent,

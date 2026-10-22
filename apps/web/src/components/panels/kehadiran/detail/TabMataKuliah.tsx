@@ -369,10 +369,15 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 				const isExpanded = expandedCourse === g.id;
 				const isEditing = editingCourse === g.id;
 
+				const meetingsList = g.meetings || [];
+				const realHadir = meetingsList.filter(
+					(m: any) => m.status === "hadir" || m.status === "susulan",
+				).length;
+				const realTotal = g.totalMeetings || 16;
+				const presentCount =
+					meetingsList.length > 0 ? realHadir : g.attendancePresent || 0;
 				const rate =
-					g.totalMeetings > 0
-						? Math.round((g.attendancePresent / g.totalMeetings) * 100)
-						: 0;
+					realTotal > 0 ? Math.round((presentCount / realTotal) * 100) : 0;
 				const isGood = rate >= 80;
 				const isMedium = rate >= 60 && rate < 80;
 
@@ -412,7 +417,7 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 												• Dosen: {g.dosen.fullName}
 											</span>
 										)}
-										{g.isAcc && (
+										{g.isAcc && presentCount > 0 && (
 											<Badge
 												variant="secondary"
 												className="bg-amber-50 text-amber-700 text-[10px] font-semibold flex items-center gap-1"
@@ -440,8 +445,7 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 															: "text-rose-700",
 												)}
 											>
-												{rate}% ({g.attendancePresent}/{g.totalMeetings || 16}{" "}
-												Sesi)
+												{rate}% ({presentCount}/{realTotal} Sesi)
 											</span>
 											{isGood ? (
 												<CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
@@ -453,12 +457,7 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 										{/* Rincian Sesi Kehadiran */}
 										<div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-xs font-medium">
 											<span className="text-emerald-700 font-bold">
-												{
-													(g.meetings || []).filter(
-														(m: any) => m.status === "hadir",
-													).length
-												}{" "}
-												Hadir
+												{realHadir} Hadir
 											</span>
 											<span className="text-slate-300">•</span>
 											<span className="text-blue-700 font-bold">
