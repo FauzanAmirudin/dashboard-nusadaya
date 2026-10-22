@@ -614,9 +614,6 @@ function AnnouncementDialog({
 							<DialogTitle className="text-base font-bold text-slate-900">
 								{announcement ? "Edit Pengumuman" : "Buat Pengumuman Baru"}
 							</DialogTitle>
-							<p className="text-xs text-slate-500 mt-0.5">
-								Publikasikan siaran informasi akademik untuk mahasiswa
-							</p>
 						</div>
 					</div>
 				</DialogHeader>

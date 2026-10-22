@@ -1578,9 +1578,6 @@ function EditPeriodDialog({
 						<Pencil className="w-4 h-4 text-[#0517B0]" />
 						<span>Edit Periode: {period.title}</span>
 					</DialogTitle>
-					<DialogDescription className="text-xs text-slate-500">
-						Atur rentang tanggal dan catatan deskripsi khusus untuk minggu ini
-					</DialogDescription>
 				</DialogHeader>
 				<div className="space-y-3.5 py-2">
 					<div className="grid grid-cols-2 gap-3">
@@ -1706,9 +1703,6 @@ function CreateEventDialog({
 						<Sparkles className="w-4 h-4 text-[#0517B0]" />
 						<span>Tambah Kegiatan & Acara Tambahan</span>
 					</DialogTitle>
-					<DialogDescription className="text-xs text-slate-500">
-						Tambahkan agenda seminar, workshop, atau acara khusus kampus
-					</DialogDescription>
 				</DialogHeader>
 				<div className="space-y-3.5 py-2">
 					<div className="space-y-1.5">

@@ -1037,10 +1037,6 @@ export function TabAnggaranPraktik({
 								? "Revisi Pengajuan Anggaran Praktik"
 								: "Pengajuan Anggaran Praktik Baru"}
 						</DialogTitle>
-						<DialogDescription className="text-xs text-slate-500">
-							Isi detail kelas, mata kuliah, dan rincian barang/bahan beserta
-							nominal harganya secara lengkap.
-						</DialogDescription>
 					</DialogHeader>
 
 					<div className="space-y-5 py-3">
@@ -1259,10 +1255,6 @@ export function TabAnggaranPraktik({
 								? "Edit Laporan Sisa Bahan Praktikum"
 								: "Unggah Laporan Sisa Bahan Praktikum"}
 						</DialogTitle>
-						<DialogDescription className="text-xs text-slate-500">
-							Pendataan sisa material dan upload berkas bukti pelaksanaan
-							praktik.
-						</DialogDescription>
 					</DialogHeader>
 
 					<div className="space-y-5 py-3">

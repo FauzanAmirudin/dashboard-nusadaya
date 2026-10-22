@@ -580,10 +580,6 @@ export function TabNilaiKhs({
 							<FileCheck className="w-5 h-5 text-indigo-600" />
 							Pelaporan Feeder PDDIKTI Mahasiswa
 						</DialogTitle>
-						<DialogDescription className="text-xs">
-							Tandai status mahasiswa telah terdaftar dan terlapor di Feeder
-							PDDIKTI Kemendikbud.
-						</DialogDescription>
 					</DialogHeader>
 
 					<div className="space-y-4 py-3 text-xs">

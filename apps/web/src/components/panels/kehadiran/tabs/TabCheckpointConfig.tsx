@@ -339,17 +339,11 @@ export function TabCheckpointConfig() {
 
 			{/* Modal Form Tambah / Edit */}
 			<Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-				<DialogContent
-					className="w-full max-w-lg rounded-2xl p-6 bg-white shadow-2xl"
-					aria-describedby="checkpoint-dialog-desc"
-				>
+				<DialogContent className="w-full max-w-lg rounded-2xl p-6 bg-white shadow-2xl">
 					<DialogHeader>
 						<DialogTitle className="text-base font-bold text-slate-900">
 							{editingId ? "Edit Checkpoint Lokasi" : "Tambah Checkpoint Baru"}
 						</DialogTitle>
-						<p id="checkpoint-dialog-desc" className="text-xs text-slate-500">
-							Konfigurasikan titik koordinat GPS dan radius toleransi presensi
-						</p>
 					</DialogHeader>
 
 					<form onSubmit={handleSave} className="space-y-4 pt-2">
@@ -357,7 +351,10 @@ export function TabCheckpointConfig() {
 							<Label className="text-xs font-bold text-slate-700">
 								Jenis Layanan Absensi
 							</Label>
-							<Select value={formType} onValueChange={setFormType}>
+							<Select
+								value={formType}
+								onValueChange={(val) => setFormType(val || "baris_pagi")}
+							>
 								<SelectTrigger className="h-9 text-xs bg-slate-50 border-slate-200">
 									<SelectValue placeholder="Pilih Jenis" />
 								</SelectTrigger>
@@ -429,7 +426,10 @@ export function TabCheckpointConfig() {
 								<Label className="text-xs font-bold text-slate-700">
 									Angkatan Khusus (Opsional)
 								</Label>
-								<Select value={formCohort} onValueChange={setFormCohort}>
+								<Select
+									value={formCohort}
+									onValueChange={(val) => setFormCohort(val || "all")}
+								>
 									<SelectTrigger className="h-9 text-xs bg-slate-50 border-slate-200">
 										<SelectValue placeholder="Semua" />
 									</SelectTrigger>

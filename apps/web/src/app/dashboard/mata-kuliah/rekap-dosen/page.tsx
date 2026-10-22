@@ -844,19 +844,15 @@ export default function PresensiMengajarDosenPage() {
 									`Pertemuan ${meetingForm.meetingNumber}`}
 							</DialogTitle>
 						</div>
-						<DialogDescription className="text-xs text-slate-500 mt-1">
-							{selectedCourse ? (
-								<span>
-									Mata Kuliah:{" "}
-									<strong>
-										[{selectedCourse.code}] {selectedCourse.name}
-									</strong>{" "}
-									• Kelas {selectedCourse.rombel} ({selectedCourse.sks} SKS)
-								</span>
-							) : (
-								"Lakukan absensi pengajar dan pengisian jurnal perkuliahan sesi ini."
-							)}
-						</DialogDescription>
+						{selectedCourse && (
+							<DialogDescription className="text-xs text-slate-500 mt-1">
+								Mata Kuliah:{" "}
+								<strong>
+									[{selectedCourse.code}] {selectedCourse.name}
+								</strong>{" "}
+								• Kelas {selectedCourse.rombel} ({selectedCourse.sks} SKS)
+							</DialogDescription>
+						)}
 					</DialogHeader>
 
 					<div className="space-y-4 py-2">

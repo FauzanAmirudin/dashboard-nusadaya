@@ -987,10 +987,6 @@ export default function MataKuliahPage() {
 								<DialogTitle className="text-base font-bold text-slate-900">
 									{isAddOpen ? "Tambah Mata Kuliah Baru" : "Edit Mata Kuliah"}
 								</DialogTitle>
-								<p className="text-xs text-slate-500 mt-0.5">
-									Konfigurasi kode, bobot SKS, angkatan, rombongan belajar, dan
-									dosen pengampu
-								</p>
 							</div>
 						</div>
 					</DialogHeader>
@@ -1230,7 +1226,7 @@ export default function MataKuliahPage() {
 								<div className="space-y-1.5">
 									<div className="flex items-center justify-between">
 										<Label className="text-xs font-semibold text-slate-700">
-											Dosen Pendamping / Team Teaching{" "}
+											Dosen Pendamping{" "}
 											<span className="text-[11px] font-normal text-slate-400">
 												(Opsional)
 											</span>

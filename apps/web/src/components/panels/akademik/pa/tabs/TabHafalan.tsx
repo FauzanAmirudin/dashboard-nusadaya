@@ -1108,10 +1108,6 @@ export function TabHafalan({ studentId, canEdit }: Props) {
 								<Edit2 className="w-4 h-4 text-[#0517B0]" />
 								Edit Setoran Hafalan & Daftar Tag
 							</DialogTitle>
-							<DialogDescription className="text-xs">
-								Perbarui data bahasa, tanggal, serta daftar tag kosakata dan
-								kalimat yang dihafal.
-							</DialogDescription>
 						</DialogHeader>
 
 						<div className="space-y-4 py-2">

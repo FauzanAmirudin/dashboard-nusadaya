@@ -55,7 +55,18 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { STANDARDIZED_ROOMS } from "@/constants/rooms";
 import { api } from "@/lib/eden";
+
+const DEFAULT_PIKET_AREAS = [
+	"Seluruh Lantai 1 & Lobby",
+	"Lantai 2 & Selasar",
+	"Lantai 3 & Area Belajar",
+	"Perpustakaan & Ruang Baca",
+	"Laboratorium Komputer",
+	"Halaman & Area Parkir Depan",
+	"Kantin & Selasar Belakang",
+];
 
 const DAYS_OF_WEEK = [
 	"Senin",
@@ -92,6 +103,8 @@ export function TabJadwalPiket({ canEdit }: { canEdit: boolean }) {
 	const [editingSchedule, setEditingSchedule] = useState<any>(null);
 	const [deleteId, setDeleteId] = useState<number | null>(null);
 
+	const [registeredCohorts, setRegisteredCohorts] = useState<number[]>([]);
+
 	const fetchSchedules = async () => {
 		setIsLoading(true);
 		try {
@@ -127,22 +140,48 @@ export function TabJadwalPiket({ canEdit }: { canEdit: boolean }) {
 		}
 	};
 
+	const fetchRegisteredCohorts = async () => {
+		try {
+			const res = await (api as any).students.cohorts.get();
+			if (res.data?.success && Array.isArray(res.data.data)) {
+				setRegisteredCohorts(res.data.data);
+				return;
+			}
+			const summaryRes = await (api as any).dashboard.summary.get({
+				$query: { archived: "false" },
+			});
+			if (summaryRes.data?.data?.cohorts) {
+				setRegisteredCohorts(summaryRes.data.data.cohorts);
+			}
+		} catch (error) {
+			console.error("Error fetching registered cohorts:", error);
+		}
+	};
+
 	useEffect(() => {
 		fetchStudents();
+		fetchRegisteredCohorts();
 	}, []);
 
 	useEffect(() => {
 		fetchSchedules();
 	}, [cohortFilter, dayFilter]);
 
-	// Extract unique cohorts dynamically
+	// Extract unique cohorts dynamically from registered cohorts, students, and schedules
 	const dynamicCohorts = useMemo(() => {
 		const cohorts = new Set<string>();
+		registeredCohorts.forEach((c) => cohorts.add(c.toString()));
+		students.forEach((s) => {
+			if (s.cohort) cohorts.add(s.cohort.toString());
+		});
 		schedules.forEach((s) => {
 			if (s.cohort) cohorts.add(s.cohort.toString());
 		});
+		if (cohorts.size === 0) {
+			[17, 16, 15, 14].forEach((c) => cohorts.add(c.toString()));
+		}
 		return Array.from(cohorts).sort((a, b) => Number(b) - Number(a));
-	}, [schedules]);
+	}, [registeredCohorts, students, schedules]);
 
 	// Filter schedules client side
 	const filteredSchedules = useMemo(() => {
@@ -481,6 +520,7 @@ export function TabJadwalPiket({ canEdit }: { canEdit: boolean }) {
 					students={students}
 					schedule={editingSchedule}
 					existingSchedules={schedules}
+					cohortOptions={dynamicCohorts}
 					onClose={() => setIsModalOpen(false)}
 					onSuccess={() => {
 						setIsModalOpen(false);
@@ -525,12 +565,14 @@ function DutyScheduleDialog({
 	students,
 	schedule,
 	existingSchedules = [],
+	cohortOptions = [],
 	onClose,
 	onSuccess,
 }: {
 	students: any[];
 	schedule: any;
 	existingSchedules?: any[];
+	cohortOptions?: string[];
 	onClose: () => void;
 	onSuccess: () => void;
 }) {
@@ -542,6 +584,38 @@ function DutyScheduleDialog({
 		dayOfWeek: schedule?.dayOfWeek || "",
 		startTime: schedule?.startTime || "",
 		endTime: schedule?.endTime || "",
+	});
+
+	const modalCohorts = useMemo(() => {
+		const set = new Set<string>(cohortOptions.map(String));
+		if (form.cohort) set.add(form.cohort.toString());
+		if (schedule?.cohort) set.add(schedule.cohort.toString());
+		students.forEach((s) => {
+			if (s.cohort) set.add(s.cohort.toString());
+		});
+		if (set.size === 0) {
+			[17, 16, 15, 14].forEach((c) => set.add(c.toString()));
+		}
+		return Array.from(set).sort((a, b) => Number(b) - Number(a));
+	}, [cohortOptions, form.cohort, schedule?.cohort, students]);
+
+	const availableRooms = useMemo(() => {
+		const rooms = new Set<string>([
+			...STANDARDIZED_ROOMS,
+			...DEFAULT_PIKET_AREAS,
+		]);
+		if (schedule?.room && schedule.room.trim()) {
+			rooms.add(schedule.room.trim());
+		}
+		existingSchedules.forEach((s) => {
+			if (s.room && s.room.trim()) rooms.add(s.room.trim());
+		});
+		return Array.from(rooms);
+	}, [existingSchedules, schedule?.room]);
+
+	const [isManualRoom, setIsManualRoom] = useState<boolean>(() => {
+		if (!schedule?.room) return false;
+		return !availableRooms.includes(schedule.room);
 	});
 
 	const [selectedMembers, setSelectedMembers] = useState<any[]>(
@@ -724,9 +798,6 @@ function DutyScheduleDialog({
 							<DialogTitle className="text-base font-bold text-slate-900">
 								{schedule ? "Edit Jadwal Piket" : "Tambah Jadwal Piket"}
 							</DialogTitle>
-							<p className="text-xs text-slate-500 mt-0.5">
-								Atur kelompok piket, hari penugasan, area, dan anggota mahasiswa
-							</p>
 						</div>
 					</div>
 				</DialogHeader>
@@ -736,16 +807,27 @@ function DutyScheduleDialog({
 						<Label className="text-xs font-semibold text-slate-700">
 							Angkatan <span className="text-rose-500">*</span>
 						</Label>
-						<Input
-							type="number"
+						<Select
 							value={form.cohort}
-							onChange={(e) => {
-								setForm({ ...form, cohort: e.target.value });
-								if (form.cohort !== e.target.value) setSelectedMembers([]);
+							onValueChange={(val) => {
+								const cleanVal = val || "";
+								setForm({ ...form, cohort: cleanVal });
+								if (form.cohort !== cleanVal) setSelectedMembers([]);
 							}}
-							placeholder="Contoh: 16"
-							className="h-9 text-xs rounded-xl"
-						/>
+						>
+							<SelectTrigger className="h-9 text-xs rounded-xl">
+								<SelectValue placeholder="Pilih Angkatan">
+									{form.cohort ? `Angkatan ${form.cohort}` : "Pilih Angkatan"}
+								</SelectValue>
+							</SelectTrigger>
+							<SelectContent className="max-h-56">
+								{modalCohorts.map((c) => (
+									<SelectItem key={c} value={c}>
+										Angkatan {c}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</div>
 
 					<div className="space-y-1.5 col-span-2 sm:col-span-1">
@@ -933,15 +1015,80 @@ function DutyScheduleDialog({
 					</div>
 
 					<div className="space-y-1.5 col-span-2 sm:col-span-1">
-						<Label className="text-xs font-semibold text-slate-700">
-							Area / Ruangan <span className="text-rose-500">*</span>
-						</Label>
-						<Input
-							value={form.room}
-							onChange={(e) => setForm({ ...form, room: e.target.value })}
-							placeholder="Contoh: Seluruh Lantai 1 & Lobby"
-							className="h-9 text-xs rounded-xl"
-						/>
+						<div className="flex items-center justify-between">
+							<Label className="text-xs font-semibold text-slate-700">
+								Area / Ruangan <span className="text-rose-500">*</span>
+							</Label>
+							<button
+								type="button"
+								onClick={() => setIsManualRoom((prev) => !prev)}
+								className="text-[11px] font-medium text-[#0517B0] hover:underline cursor-pointer"
+							>
+								{isManualRoom ? "Pilih dari Dropdown" : "+ Input Manual"}
+							</button>
+						</div>
+
+						{isManualRoom ? (
+							<Input
+								value={form.room}
+								onChange={(e) => setForm({ ...form, room: e.target.value })}
+								placeholder="Contoh: Seluruh Lantai 1 & Lobby"
+								className="h-9 text-xs rounded-xl"
+							/>
+						) : (
+							<Select
+								value={form.room || undefined}
+								onValueChange={(val) => {
+									if (val === "custom") {
+										setIsManualRoom(true);
+									} else {
+										setForm({ ...form, room: val || "" });
+									}
+								}}
+							>
+								<SelectTrigger className="h-9 text-xs rounded-xl">
+									<SelectValue placeholder="Pilih Ruangan / Area">
+										{form.room || "Pilih Ruangan / Area"}
+									</SelectValue>
+								</SelectTrigger>
+								<SelectContent className="max-h-60">
+									<SelectItem
+										value="custom"
+										className="font-semibold text-[#0517B0]"
+									>
+										+ Input Teks Manual / Kustom...
+									</SelectItem>
+									<div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50">
+										Ruang Standar Kampus
+									</div>
+									{STANDARDIZED_ROOMS.map((r) => (
+										<SelectItem key={r} value={r}>
+											{r}
+										</SelectItem>
+									))}
+									<div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50">
+										Area Piket Umum
+									</div>
+									{DEFAULT_PIKET_AREAS.map((r) => (
+										<SelectItem key={r} value={r}>
+											{r}
+										</SelectItem>
+									))}
+									{availableRooms
+										.filter(
+											(r) =>
+												!(STANDARDIZED_ROOMS as readonly string[]).includes(
+													r,
+												) && !DEFAULT_PIKET_AREAS.includes(r),
+										)
+										.map((r) => (
+											<SelectItem key={r} value={r}>
+												{r}
+											</SelectItem>
+										))}
+								</SelectContent>
+							</Select>
+						)}
 					</div>
 
 					<div className="space-y-1.5 col-span-1">

@@ -2242,12 +2242,7 @@ export default function MataKuliahDetailPage() {
 							Tambah Mahasiswa ke Kelas
 						</DialogTitle>
 						<DialogDescription className="text-xs text-slate-500">
-							Pilih satu atau lebih mahasiswa untuk ditambahkan ke mata kuliah{" "}
-							<strong>
-								{course.name} ({course.code})
-							</strong>
-							. Mahasiswa yang dipilih akan otomatis masuk ke daftar presensi
-							dan penilaian.
+							Mata kuliah: {course.name} ({course.code})
 						</DialogDescription>
 					</DialogHeader>
 
@@ -2492,10 +2487,6 @@ export default function MataKuliahDetailPage() {
 							<Calendar className="w-5 h-5 text-blue-600" />
 							Generate Tanggal Perkuliahan Otomatis
 						</DialogTitle>
-						<DialogDescription className="text-xs text-slate-600">
-							Sistem akan menghitung tanggal untuk Pertemuan 1 s.d. 16 secara
-							berkala (setiap 7 hari) dan memperbarui kalender sesi perkuliahan.
-						</DialogDescription>
 					</DialogHeader>
 
 					<div className="space-y-4 py-2">

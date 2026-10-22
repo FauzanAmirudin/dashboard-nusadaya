@@ -525,9 +525,6 @@ export function TabPiket({ studentId }: { studentId: number }) {
 							<Sparkles className="w-4 h-4 text-[#0517B0]" />
 							<span>Catat Kehadiran Piket</span>
 						</DialogTitle>
-						<DialogDescription className="text-xs text-slate-500">
-							Input riwayat presensi piket harian mahasiswa
-						</DialogDescription>
 					</DialogHeader>
 					<div className="space-y-3.5 py-2">
 						{schedules.length > 0 && (

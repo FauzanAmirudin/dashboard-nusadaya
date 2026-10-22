@@ -956,9 +956,6 @@ function ClassScheduleDialog({
 							<DialogTitle className="text-base font-bold text-slate-900">
 								{schedule ? "Edit Jadwal Kelas" : "Tambah Jadwal Kelas"}
 							</DialogTitle>
-							<p className="text-xs text-slate-500 mt-0.5">
-								Konfigurasi mata kuliah, rombel, waktu, dan standarisasi ruangan
-							</p>
 						</div>
 					</div>
 				</DialogHeader>

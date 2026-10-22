@@ -1368,7 +1368,7 @@ export function BarisPagiDashboard({
 																				nim: m.nim,
 																			},
 																			status: m.status || "hadir",
-																			selfieUrl: m.selfieUrl,
+																			selfieUrl: m.selfieUrl || undefined,
 																			latitude: m.latitude || undefined,
 																			longitude: m.longitude || undefined,
 																			gpsAccuracy: m.gpsAccuracy || undefined,
@@ -2162,10 +2162,6 @@ export function BarisPagiDashboard({
 							<ShieldCheck className="w-5 h-5 text-[#0517B0]" />
 							Buat Sesi Baris Pagi Baru
 						</DialogTitle>
-						<DialogDescription className="text-xs text-slate-500">
-							Atur sesi apel baris pagi mingguan dengan batas jam kedatangan
-							baku 06.22 WIB.
-						</DialogDescription>
 					</DialogHeader>
 
 					<div className="space-y-4 py-2">
@@ -2343,10 +2339,6 @@ export function BarisPagiDashboard({
 							<RotateCcw className="w-5 h-5 text-amber-600" />
 							Jadwal Ulang / Undur Sesi Baris Pagi
 						</DialogTitle>
-						<DialogDescription className="text-xs text-slate-500">
-							Ubah tanggal pelaksanaan sesi baris pagi bila berhalangan atau
-							terjadi penyesuaian agenda kampus.
-						</DialogDescription>
 					</DialogHeader>
 
 					{sessionToReschedule && (
@@ -2439,10 +2431,6 @@ export function BarisPagiDashboard({
 							<Settings className="w-5 h-5 text-indigo-600" />
 							Konfigurasi Jadwal Rutin Baris Pagi
 						</DialogTitle>
-						<DialogDescription className="text-xs text-slate-500">
-							Atur aturan pembuatan sesi otomatis (default: setiap Senin) dan
-							jendela waktu absensi mandiri mahasiswa.
-						</DialogDescription>
 					</DialogHeader>
 
 					<div className="space-y-4 py-2">
@@ -2619,7 +2607,8 @@ export function BarisPagiDashboard({
 					onClose={() => setSelectedSelfieRecord(null)}
 					onVerifySuccess={() => {
 						if (selectedSessionId) {
-							fetchSessionMembers(selectedSessionId);
+							fetchBoardData(selectedSessionId);
+							fetchSessions();
 						}
 					}}
 				/>

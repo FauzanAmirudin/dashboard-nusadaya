@@ -956,10 +956,6 @@ function PracticumScheduleDialog({
 							<DialogTitle className="text-base font-bold text-slate-900">
 								{schedule ? "Edit Jadwal Praktikum" : "Tambah Jadwal Praktikum"}
 							</DialogTitle>
-							<p className="text-xs text-slate-500 mt-0.5">
-								Konfigurasi mata kuliah praktik, rombel, waktu, dan standarisasi
-								ruangan
-							</p>
 						</div>
 					</div>
 				</DialogHeader>
@@ -1095,7 +1091,7 @@ function PracticumScheduleDialog({
 					<div className="space-y-1.5 col-span-2 sm:col-span-1">
 						<div className="flex items-center justify-between">
 							<Label className="text-xs font-semibold text-slate-700">
-								Dosen Pendamping / Asisten Lab{" "}
+								Dosen Pendamping{" "}
 								<span className="text-[11px] font-normal text-slate-400">
 									(Opsional)
 								</span>

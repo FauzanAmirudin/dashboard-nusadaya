@@ -99,12 +99,15 @@ export const crmRoutes = new Elysia()
 					db
 						.select()
 						.from(paHafalanSessions)
-						.where(eq(paHafalanSessions.studentId, id)),
+						.where(eq(paHafalanSessions.studentId, id))
+						.catch(() => [] as any[]),
 				),
-			db.query.vocabLogs.findMany({
-				where: eq(vocabLogs.studentId, id),
-				orderBy: (logs, { desc }) => [desc(logs.date)],
-			}),
+			db.query.vocabLogs
+				.findMany({
+					where: eq(vocabLogs.studentId, id),
+					orderBy: (logs, { desc }) => [desc(logs.date)],
+				})
+				.catch(() => [] as any[]),
 		]);
 
 		return {

@@ -689,8 +689,12 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			};
 		},
 	)
-	.get("/mahasiswa/:studentId/piket", async ({ params }) => {
+	.get("/mahasiswa/:studentId/piket", async ({ params, set }) => {
 		const studentId = parseInt(params.studentId, 10);
+		if (isNaN(studentId)) {
+			set.status = 400;
+			return { success: false, message: "ID mahasiswa tidak valid" };
+		}
 
 		// Get actual attendance records
 		const records = await db.query.attendanceRecords.findMany({
@@ -1253,8 +1257,12 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 		return { success: true, data: filtered };
 	})
 	// ODS Routes
-	.get("/mahasiswa/:studentId/ods", async ({ params }) => {
+	.get("/mahasiswa/:studentId/ods", async ({ params, set }) => {
 		const studentId = parseInt(params.studentId, 10);
+		if (isNaN(studentId)) {
+			set.status = 400;
+			return { success: false, message: "ID mahasiswa tidak valid" };
+		}
 		const records = await db.query.odsAttendanceRecords.findMany({
 			where: eq(odsAttendanceRecords.studentId, studentId),
 			with: { recorder: { columns: { fullName: true } } },
@@ -1314,8 +1322,12 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 		},
 	)
 	// Pramagang Routes
-	.get("/mahasiswa/:studentId/pramagang", async ({ params }) => {
+	.get("/mahasiswa/:studentId/pramagang", async ({ params, set }) => {
 		const studentId = parseInt(params.studentId, 10);
+		if (isNaN(studentId)) {
+			set.status = 400;
+			return { success: false, message: "ID mahasiswa tidak valid" };
+		}
 		const records = await db.query.pramagangAttendanceRecords.findMany({
 			where: eq(pramagangAttendanceRecords.studentId, studentId),
 			with: { recorder: { columns: { fullName: true } } },
@@ -1972,6 +1984,10 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 	// 7. SESSION DETAIL (MEMBERS & STATS)
 	.get("/baris-pagi/sessions/:id", async ({ params, set }) => {
 		const id = parseInt(params.id, 10);
+		if (isNaN(id)) {
+			set.status = 400;
+			return { success: false, message: "ID sesi tidak valid" };
+		}
 		const session = await db.query.morningAssemblySessions.findFirst({
 			where: eq(morningAssemblySessions.id, id),
 			with: {
@@ -2475,8 +2491,12 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 		return { success: true, data: filtered };
 	})
 
-	.get("/mahasiswa/:studentId/baris-pagi", async ({ params }) => {
+	.get("/mahasiswa/:studentId/baris-pagi", async ({ params, set }) => {
 		const studentId = parseInt(params.studentId, 10);
+		if (isNaN(studentId)) {
+			set.status = 400;
+			return { success: false, message: "ID mahasiswa tidak valid" };
+		}
 		const records = await db.query.morningAssemblyRecords.findMany({
 			where: eq(morningAssemblyRecords.studentId, studentId),
 			with: {
