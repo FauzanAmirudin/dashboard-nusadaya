@@ -6,12 +6,15 @@ import {
 	CheckCircle,
 	CheckSquare,
 	ChevronDown,
+	ChevronLeft,
+	ChevronRight,
 	Download,
 	Eye,
 	FileText,
 	GraduationCap,
 	Layers,
 	Loader2,
+	RefreshCw,
 	Search,
 	Settings,
 	Sparkles,
@@ -20,7 +23,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,7 +44,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api } from "@/lib/eden";
+import { API_URL, api, getToken } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 import { useAuthStore } from "@/store";
 
@@ -49,6 +52,7 @@ type CourseDetail = {
 	id: number;
 	code: string;
 	name: string;
+	rombel?: string | null;
 	peminatan: string | null;
 	cohort: number;
 	type: "teori" | "praktik";
@@ -78,6 +82,7 @@ type StudentItem = {
 	nim: string;
 	name: string;
 	peminatan?: string | null;
+	rombel?: string | null;
 	cohort?: number;
 };
 
@@ -92,11 +97,37 @@ export default function RekapMataKuliahDetailPage() {
 	const [students, setStudents] = useState<StudentItem[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 
+	// Horizontal Table Scroll Container Ref
+	const matrixTableContainerRef = useRef<HTMLDivElement>(null);
+
 	// Filter
 	const [searchQuery, setSearchQuery] = useState("");
 
-	const fetchData = async () => {
-		setIsLoading(true);
+	const fetchApi = (endpoint: string, options: RequestInit = {}) => {
+		const token = getToken();
+		const headers = new Headers(options.headers || {});
+		if (token) headers.set("Authorization", `Bearer ${token}`);
+		if (
+			options.body &&
+			!(options.body instanceof FormData) &&
+			!headers.has("Content-Type")
+		) {
+			headers.set("Content-Type", "application/json");
+		}
+		return fetch(`${API_URL}${endpoint}`, { ...options, headers });
+	};
+
+	const scrollToPosition = (pos: number) => {
+		if (matrixTableContainerRef.current) {
+			matrixTableContainerRef.current.scrollTo({
+				left: pos,
+				behavior: "smooth",
+			});
+		}
+	};
+
+	const fetchData = async (silent = false) => {
+		if (!silent) setIsLoading(true);
 		try {
 			// 1. Get course info
 			const { data: cData, error: cErr } = await api.courses[courseId].get();
@@ -110,7 +141,7 @@ export default function RekapMataKuliahDetailPage() {
 			const courseInfo = cData?.data as any;
 			setCourse(courseInfo);
 
-			// 2. Get meetings with attendances
+			// 2. Get meetings with attendances strictly 1..16
 			const { data: mData, error: mErr } =
 				await api.courses[courseId].meetings.get();
 			if (!mErr && mData?.success) {
@@ -121,7 +152,8 @@ export default function RekapMataKuliahDetailPage() {
 				setMeetings(meets);
 			}
 
-			// 3. Get students in cohort
+			// 3. Get students with full integration: Cohort (with rombel filter) + Custom Enrollments
+			let cohortList: StudentItem[] = [];
 			if (courseInfo?.cohort) {
 				const { data: sData, error: sErr } = await api.students.get({
 					$query: {
@@ -130,11 +162,70 @@ export default function RekapMataKuliahDetailPage() {
 					},
 				});
 				if (!sErr && sData?.data) {
-					const sList = (sData.data as any[]).map((item) => item.student);
-					sList.sort((a, b) => a.name.localeCompare(b.name));
-					setStudents(sList);
+					cohortList = (sData.data as any[]).map((item) => item.student);
+					// Filter students by rombel if course has a specific rombel
+					if (
+						courseInfo.rombel &&
+						courseInfo.rombel.trim().toLowerCase() !== "gabungan" &&
+						courseInfo.rombel.trim().toLowerCase() !== "semua"
+					) {
+						const targetRombel = courseInfo.rombel.trim().toLowerCase();
+						cohortList = cohortList.filter(
+							(s) =>
+								!s.rombel || s.rombel.trim().toLowerCase() === targetRombel,
+						);
+					}
 				}
 			}
+
+			// 4. Get custom enrollments (lintas angkatan/rombel)
+			let customList: any[] = [];
+			try {
+				const res = await fetchApi(`/courses/${courseId}/enrollments`);
+				if (res.ok) {
+					const json = await res.json();
+					if (json.success && Array.isArray(json.data)) {
+						customList = json.data;
+					}
+				}
+			} catch (e) {
+				console.error("Gagal memuat enrollments:", e);
+			}
+
+			// 5. Combine and de-duplicate students
+			const studentMap = new Map<number, StudentItem>();
+			for (const s of cohortList) {
+				studentMap.set(s.id, {
+					id: s.id,
+					nim: s.nim || "-",
+					name: s.name,
+					peminatan: (s as any).subProgram || s.peminatan || null,
+					rombel: s.rombel || null,
+					cohort: s.cohort,
+				});
+			}
+			for (const e of customList) {
+				if (e.student) {
+					studentMap.set(e.student.id, {
+						id: e.student.id,
+						nim: e.student.nim || "-",
+						name: e.student.name,
+						peminatan: e.student.subProgram || e.student.peminatan || null,
+						rombel: e.student.rombel || null,
+						cohort: e.student.cohort,
+					});
+				}
+			}
+
+			const combinedStudents = Array.from(studentMap.values()).sort((a, b) =>
+				a.name.localeCompare(b.name),
+			);
+			setStudents(combinedStudents);
+
+			// Reset scroll to Pertemuan 1 on load
+			setTimeout(() => {
+				scrollToPosition(0);
+			}, 100);
 		} catch (err) {
 			console.error(err);
 			toast.error("Terjadi kesalahan saat memuat data rekap perkuliahan");
@@ -149,7 +240,39 @@ export default function RekapMataKuliahDetailPage() {
 		}
 	}, [hasHydrated, user, courseId]);
 
-	// Process calculations
+	// Realtime cross-panel synchronization listener
+	useEffect(() => {
+		const handleSync = (e: any) => {
+			if (
+				!e.detail?.courseId ||
+				String(e.detail.courseId) === String(courseId)
+			) {
+				fetchData(true);
+			}
+		};
+		window.addEventListener("academic-data-updated", handleSync);
+
+		let channel: BroadcastChannel | null = null;
+		try {
+			channel = new BroadcastChannel("dashboard-realtime-sync");
+			channel.onmessage = (event) => {
+				if (
+					event.data?.type === "academic-data-updated" &&
+					(!event.data.courseId ||
+						String(event.data.courseId) === String(courseId))
+				) {
+					fetchData(true);
+				}
+			};
+		} catch {}
+
+		return () => {
+			window.removeEventListener("academic-data-updated", handleSync);
+			if (channel) channel.close();
+		};
+	}, [courseId]);
+
+	// Process calculations strictly aligned with AKD-06 GradeCalculationService
 	const studentRecaps = useMemo(() => {
 		if (!course || students.length === 0) return [];
 
@@ -160,8 +283,8 @@ export default function RekapMataKuliahDetailPage() {
 			let alphaCount = 0;
 			let unassignedCount = 0;
 
-			const validTheoryScores: number[] = [];
-			const validPracticalScores: number[] = [];
+			const regularTheoryScores: number[] = [];
+			const regularPracticalScores: number[] = [];
 
 			const meetingResults: Record<
 				number,
@@ -172,6 +295,9 @@ export default function RekapMataKuliahDetailPage() {
 					notes: string | null;
 				}
 			> = {};
+
+			let utsScore = 0;
+			let uasScore = 0;
 
 			meetings.forEach((m) => {
 				const att = m.attendances?.find((a) => a.studentId === student.id);
@@ -198,8 +324,20 @@ export default function RekapMataKuliahDetailPage() {
 				else if (status === "alpha") alphaCount++;
 				else unassignedCount++;
 
-				if (theoryScore !== null) validTheoryScores.push(theoryScore);
-				if (practicalScore !== null) validPracticalScores.push(practicalScore);
+				const isUts = m.meetingNumber === 8 || m.meetingType === "uts";
+				const isUas = m.meetingNumber === 16 || m.meetingType === "uas";
+
+				if (isUts) {
+					utsScore =
+						practicalScore ?? theoryScore ?? (status === "hadir" ? 75 : 0);
+				} else if (isUas) {
+					uasScore =
+						practicalScore ?? theoryScore ?? (status === "hadir" ? 75 : 0);
+				} else {
+					if (theoryScore !== null) regularTheoryScores.push(theoryScore);
+					if (practicalScore !== null)
+						regularPracticalScores.push(practicalScore);
+				}
 			});
 
 			const totalMeetings = 16;
@@ -209,25 +347,53 @@ export default function RekapMataKuliahDetailPage() {
 			);
 
 			const avgTheory =
-				validTheoryScores.length > 0
+				regularTheoryScores.length > 0
 					? Math.round(
-							validTheoryScores.reduce((acc, curr) => acc + curr, 0) /
-								validTheoryScores.length,
+							regularTheoryScores.reduce((acc, curr) => acc + curr, 0) /
+								regularTheoryScores.length,
 						)
 					: 0;
 
 			const avgPractical =
-				validPracticalScores.length > 0
+				regularPracticalScores.length > 0
 					? Math.round(
-							validPracticalScores.reduce((acc, curr) => acc + curr, 0) /
-								validPracticalScores.length,
+							regularPracticalScores.reduce((acc, curr) => acc + curr, 0) /
+								regularPracticalScores.length,
 						)
 					: 0;
 
-			const isPracticalCourse = course.type === "praktik";
-			const finalScore = isPracticalCourse
-				? Math.round(avgPractical * 0.8 + avgTheory * 0.2)
-				: avgTheory;
+			const effectiveUts =
+				utsScore > 0 ? utsScore : Math.max(avgTheory, avgPractical, 70);
+			const effectiveUas =
+				uasScore > 0 ? uasScore : Math.max(avgTheory, avgPractical, 70);
+			const effectiveTheory =
+				avgTheory > 0
+					? avgTheory
+					: course.type === "praktik"
+						? avgPractical
+						: 70;
+			const effectivePractical = avgPractical > 0 ? avgPractical : avgTheory;
+
+			// Standar Pembobotan Vokasi Nusadaya (AKD-06):
+			// - Praktik: Presensi 10% + Teori 20% + Praktik 40% + UTS 15% + UAS 15%
+			// - Teori:   Presensi 15% + Teori/Tugas 25% + UTS 30% + UAS 30%
+			let finalScore = 0;
+			if (course.type === "praktik") {
+				finalScore = Math.round(
+					attendanceRate * 0.1 +
+						effectiveTheory * 0.2 +
+						effectivePractical * 0.4 +
+						effectiveUts * 0.15 +
+						effectiveUas * 0.15,
+				);
+			} else {
+				finalScore = Math.round(
+					attendanceRate * 0.15 +
+						effectiveTheory * 0.25 +
+						effectiveUts * 0.3 +
+						effectiveUas * 0.3,
+				);
+			}
 
 			let grade = "E";
 			if (finalScore >= 85) grade = "A";
@@ -509,7 +675,7 @@ export default function RekapMataKuliahDetailPage() {
 							value="matrix"
 							className="data-[state=active]:bg-white data-[state=active]:shadow-2xs font-semibold text-xs sm:text-sm px-4"
 						>
-							Matriks Lengkap (18 Sesi & Nilai)
+							Matriks Lengkap (16 Sesi & Nilai)
 						</TabsTrigger>
 						<TabsTrigger
 							value="transcript"
@@ -525,67 +691,141 @@ export default function RekapMataKuliahDetailPage() {
 						</TabsTrigger>
 					</TabsList>
 
-					<div className="text-xs text-slate-500 font-medium">
-						Menampilkan <strong>{filteredRecaps.length}</strong> dari{" "}
-						{studentRecaps.length} Mahasiswa
+					<div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => fetchData(true)}
+							className="h-7 text-xs text-slate-600 hover:text-slate-900"
+							title="Sinkronisasi Data Real-time"
+						>
+							<RefreshCw className="h-3.5 w-3.5 mr-1 text-slate-500" />
+							Sinkronkan
+						</Button>
+						<span>
+							Menampilkan <strong>{filteredRecaps.length}</strong> dari{" "}
+							{studentRecaps.length} Mahasiswa
+						</span>
 					</div>
 				</div>
 
-				{/* TAB 1: FULL MATRIX (18 MEETINGS + SCORES) */}
+				{/* TAB 1: FULL MATRIX (16 MEETINGS + SCORES) */}
 				<TabsContent value="matrix" className="space-y-4">
 					<Card className="border-slate-200 shadow-xs overflow-hidden">
 						<CardHeader className="bg-slate-50/70 border-b border-slate-200 p-4">
-							<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+							<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
 								<div>
-									<CardTitle className="text-base font-bold text-slate-800">
-										Matriks Presensi & Nilai Harian Per Pertemuan
-									</CardTitle>
-									<CardDescription className="text-xs text-slate-500">
-										Kolom menampilkan status kehadiran serta nilai teori dan
-										praktik per pertemuan
+									<div className="flex items-center gap-2 flex-wrap">
+										<CardTitle className="text-base font-bold text-slate-800">
+											Matriks Presensi & Nilai Harian Per Pertemuan
+										</CardTitle>
+										<Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[11px] font-semibold">
+											16 Sesi Terintegrasi P1 - P16
+										</Badge>
+									</div>
+									<CardDescription className="text-xs text-slate-500 mt-0.5">
+										Status kehadiran serta rincian nilai teori dan praktik per
+										pertemuan
 									</CardDescription>
 								</div>
-								<div className="flex items-center gap-2">
-									<Badge
-										variant="outline"
-										className="bg-white border-slate-200 text-slate-700 text-xs"
-									>
-										Hadir:{" "}
-										<span className="font-bold text-emerald-600 ml-1">H</span> |
-										Izin:{" "}
-										<span className="font-bold text-amber-600 ml-1">I</span> |
-										Sakit:{" "}
-										<span className="font-bold text-blue-600 ml-1">S</span> |
-										Alpha:{" "}
-										<span className="font-bold text-rose-600 ml-1">A</span>
-									</Badge>
-									<Button
-										variant="outline"
-										size="sm"
-										onClick={handleExportMatrix}
-										className="h-8 text-xs border-slate-300"
-									>
-										<Download className="h-3.5 w-3.5 mr-1" /> Unduh Matriks
-									</Button>
+
+								{/* Quick Jump Bar & Actions */}
+								<div className="flex items-center gap-2 flex-wrap w-full lg:w-auto justify-between lg:justify-end">
+									<div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
+										<span className="text-[11px] font-semibold text-slate-400 px-2 select-none">
+											Lompat:
+										</span>
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => scrollToPosition(0)}
+											className="h-7 px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+											title="Gulir ke Sesi Awal (Pertemuan 1 - 7)"
+										>
+											<ChevronLeft className="h-3 w-3 mr-0.5" /> P1 - P7
+										</Button>
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => scrollToPosition(450)}
+											className="h-7 px-2 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+											title="Gulir ke Sesi UTS (Pertemuan 8)"
+										>
+											P8 (UTS)
+										</Button>
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => scrollToPosition(900)}
+											className="h-7 px-2 text-xs font-semibold text-purple-700 hover:bg-purple-50"
+											title="Gulir ke Sesi UAS (Pertemuan 16)"
+										>
+											P16 (UAS)
+										</Button>
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => scrollToPosition(9999)}
+											className="h-7 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+											title="Gulir ke Rekap Nilai Akhir"
+										>
+											Nilai Akhir <ChevronRight className="h-3 w-3 ml-0.5" />
+										</Button>
+									</div>
+
+									<div className="flex items-center gap-1.5">
+										<Badge
+											variant="outline"
+											className="bg-white border-slate-200 text-slate-700 text-xs hidden sm:inline-flex"
+										>
+											H:{" "}
+											<span className="font-bold text-emerald-600 mx-0.5">
+												Hadir
+											</span>{" "}
+											| I:{" "}
+											<span className="font-bold text-amber-600 mx-0.5">
+												Izin
+											</span>{" "}
+											| S:{" "}
+											<span className="font-bold text-blue-600 mx-0.5">
+												Sakit
+											</span>{" "}
+											| A:{" "}
+											<span className="font-bold text-rose-600 mx-0.5">
+												Alpha
+											</span>
+										</Badge>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={handleExportMatrix}
+											className="h-8 text-xs border-slate-300"
+										>
+											<Download className="h-3.5 w-3.5 mr-1" /> Unduh Matriks
+										</Button>
+									</div>
 								</div>
 							</div>
 						</CardHeader>
 						<CardContent className="p-0">
-							<div className="overflow-x-auto">
+							<div
+								ref={matrixTableContainerRef}
+								className="overflow-x-auto scroll-smooth relative"
+							>
 								<Table className="w-full border-collapse text-xs">
 									<TableHeader>
-										<TableRow className="bg-slate-100/80 border-b border-slate-200 text-slate-700">
-											<TableHead className="w-12 text-center font-bold sticky left-0 bg-slate-100 z-10">
+										<TableRow className="bg-slate-100/90 border-b border-slate-200 text-slate-700">
+											<TableHead className="w-12 min-w-[48px] max-w-[48px] text-center font-bold sticky left-0 bg-slate-100 z-20">
 												No
 											</TableHead>
-											<TableHead className="w-28 font-bold sticky left-12 bg-slate-100 z-10">
+											<TableHead className="w-24 min-w-[96px] max-w-[96px] font-bold sticky left-[48px] bg-slate-100 z-20">
 												NIM
 											</TableHead>
-											<TableHead className="min-w-[180px] font-bold sticky left-40 bg-slate-100 z-10">
+											<TableHead className="w-52 min-w-[200px] max-w-[220px] font-bold sticky left-[144px] bg-slate-100 z-20 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] border-r border-slate-200">
 												Nama Mahasiswa
 											</TableHead>
 
-											{/* Meeting Headers */}
+											{/* Meeting Headers Strictly 1..16 */}
 											{meetings.map((m) => {
 												const isUts = m.meetingNumber === 8;
 												const isUas = m.meetingNumber === 16;
@@ -594,7 +834,9 @@ export default function RekapMataKuliahDetailPage() {
 													? "bg-amber-100 text-amber-800 border-amber-300"
 													: isUas
 														? "bg-purple-100 text-purple-800 border-purple-300"
-														: "bg-blue-50 text-blue-700 border-blue-200";
+														: m.meetingNumber === 1
+															? "bg-blue-600 text-white border-blue-600 font-bold"
+															: "bg-blue-50 text-blue-700 border-blue-200";
 
 												const shortLabel = isUts
 													? "UTS"
@@ -605,18 +847,22 @@ export default function RekapMataKuliahDetailPage() {
 												return (
 													<TableHead
 														key={m.id}
-														className="text-center font-semibold border-l border-slate-200 px-2 min-w-[70px]"
+														className={`text-center font-semibold border-l border-slate-200 px-1 w-16 min-w-[64px] max-w-[64px] ${
+															m.meetingNumber === 1 ? "bg-blue-50/40" : ""
+														}`}
 														title={m.meetingLabel}
 													>
 														<div className="flex flex-col items-center gap-0.5">
 															<span
-																className={`px-1.5 py-0.2 rounded text-[10px] font-bold border ${badgeColor}`}
+																className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${badgeColor}`}
 															>
 																{shortLabel}
 															</span>
-															<span className="text-[9px] text-slate-400">
+															<span className="text-[9px] text-slate-400 font-medium">
 																{m.sessionType
-																	? m.sessionType[0].toUpperCase()
+																	? m.sessionType === "keduanya"
+																		? "T/P"
+																		: m.sessionType[0].toUpperCase()
 																	: "-"}
 															</span>
 														</div>
@@ -661,13 +907,16 @@ export default function RekapMataKuliahDetailPage() {
 													key={item.student.id}
 													className="hover:bg-blue-50/40 border-b border-slate-200 transition-colors"
 												>
-													<TableCell className="text-center font-medium sticky left-0 bg-white z-10">
+													<TableCell className="w-12 min-w-[48px] max-w-[48px] text-center font-medium sticky left-0 bg-white z-20">
 														{idx + 1}
 													</TableCell>
-													<TableCell className="font-mono text-slate-600 font-medium sticky left-12 bg-white z-10">
+													<TableCell className="w-24 min-w-[96px] max-w-[96px] font-mono text-slate-600 font-medium sticky left-[48px] bg-white z-20">
 														{item.student.nim}
 													</TableCell>
-													<TableCell className="font-semibold text-slate-800 sticky left-40 bg-white z-10 whitespace-nowrap">
+													<TableCell
+														className="w-52 min-w-[200px] max-w-[220px] font-semibold text-slate-800 sticky left-[144px] bg-white z-20 truncate shadow-[3px_0_6px_-2px_rgba(0,0,0,0.12)] border-r border-slate-200"
+														title={item.student.name}
+													>
 														{item.student.name}
 													</TableCell>
 
@@ -702,7 +951,9 @@ export default function RekapMataKuliahDetailPage() {
 														return (
 															<TableCell
 																key={m.id}
-																className="text-center p-1.5 border-l border-slate-100"
+																className={`text-center p-1 border-l border-slate-100 w-16 min-w-[64px] max-w-[64px] ${
+																	m.meetingNumber === 1 ? "bg-blue-50/20" : ""
+																}`}
 															>
 																<div className="flex flex-col items-center gap-0.5">
 																	<span
@@ -711,7 +962,7 @@ export default function RekapMataKuliahDetailPage() {
 																		{statusBadge}
 																	</span>
 																	{(tScore !== null || pScore !== null) && (
-																		<span className="text-[9px] text-slate-600 font-semibold font-mono">
+																		<span className="text-[9px] text-slate-600 font-semibold font-mono leading-tight">
 																			{tScore !== null ? `T:${tScore}` : ""}
 																			{tScore !== null && pScore !== null
 																				? " "
@@ -944,7 +1195,7 @@ export default function RekapMataKuliahDetailPage() {
 									</CardTitle>
 									<CardDescription className="text-xs text-slate-500">
 										Perincian jumlah Hadir (H), Izin (I), Sakit (S), Alpha (A)
-										mahasiswa di 18 sesi perkuliahan
+										mahasiswa di 16 sesi perkuliahan
 									</CardDescription>
 								</div>
 								<Button

@@ -851,6 +851,15 @@ export default function MataKuliahDetailPage() {
 					</div>
 				</div>
 				<div className="flex flex-wrap items-center gap-2">
+					<Link href={`/dashboard/mata-kuliah/rekap/${course.id}`}>
+						<Button
+							variant="outline"
+							className="border-emerald-300 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100 shadow-xs font-semibold"
+						>
+							<CheckCircle className="mr-2 h-4 w-4 text-emerald-600" />
+							Rekap Nilai & Presensi
+						</Button>
+					</Link>
 					<Button
 						variant="outline"
 						onClick={() => setIsGenerateDatesOpen(true)}
