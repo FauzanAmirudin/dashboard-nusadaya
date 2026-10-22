@@ -404,117 +404,27 @@ async function seed() {
 				.returning();
 			createdMasterCourses.push(inserted);
 
-			// Generate 18 meetings (PKKMB, Beginning, 1-14, UTS, UAS)
-			const meetingsToInsert = [
-				{
+			// Generate 16 meetings (1-7 regular, 8 UTS, 9-15 regular, 16 UAS)
+			const meetingsToInsert = [];
+			for (let i = 1; i <= 16; i++) {
+				let mType: "regular" | "uts" | "uas" = "regular";
+				let mLabel = `Pertemuan ${i}`;
+
+				if (i === 8) {
+					mType = "uts";
+					mLabel = "Ujian Tengah Semester (UTS)";
+				} else if (i === 16) {
+					mType = "uas";
+					mLabel = "Ujian Akhir Semester (UAS)";
+				}
+
+				meetingsToInsert.push({
 					courseId: inserted.id,
-					meetingNumber: 0,
-					meetingType: "pkkmb" as const,
-					meetingLabel: "PKKMB - Pengenalan Program",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 1,
-					meetingType: "beginning" as const,
-					meetingLabel: "Beginning Class & Kontrak Kuliah",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 2,
-					meetingType: "regular" as const,
-					meetingLabel: "Pertemuan 1: Pengantar & Teori Dasar",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 3,
-					meetingType: "regular" as const,
-					meetingLabel: "Pertemuan 2: SOP & Standar Operasional",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 4,
-					meetingType: "regular" as const,
-					meetingLabel: "Pertemuan 3: Praktik Mandiri Tahap 1",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 5,
-					meetingType: "regular" as const,
-					meetingLabel: "Pertemuan 4: Praktik Terbimbing",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 6,
-					meetingType: "regular" as const,
-					meetingLabel: "Pertemuan 5: Studi Kasus Lapangan",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 7,
-					meetingType: "regular" as const,
-					meetingLabel: "Pertemuan 6: Simulasi & Roleplay",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 8,
-					meetingType: "regular" as const,
-					meetingLabel: "Pertemuan 7: Review & Evaluasi Tengah",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 9,
-					meetingType: "uts" as const,
-					meetingLabel: "Ujian Tengah Semester (UTS)",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 10,
-					meetingType: "regular" as const,
-					meetingLabel: "Pertemuan 8: Pendalaman Materi Lanjutan",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 11,
-					meetingType: "regular" as const,
-					meetingLabel: "Pertemuan 9: Praktik Lanjutan Tahap 2",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 12,
-					meetingType: "regular" as const,
-					meetingLabel: "Pertemuan 10: Service Excellence & Quality",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 13,
-					meetingType: "regular" as const,
-					meetingLabel: "Pertemuan 11: Problem Solving & Handling",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 14,
-					meetingType: "regular" as const,
-					meetingLabel: "Pertemuan 12: Project Work Kelompok",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 15,
-					meetingType: "regular" as const,
-					meetingLabel: "Pertemuan 13: Presentasi Project",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 16,
-					meetingType: "regular" as const,
-					meetingLabel: "Pertemuan 14: Review Akhir Semester",
-				},
-				{
-					courseId: inserted.id,
-					meetingNumber: 17,
-					meetingType: "uas" as const,
-					meetingLabel: "Ujian Akhir Semester (UAS)",
-				},
-			];
+					meetingNumber: i,
+					meetingType: mType,
+					meetingLabel: mLabel,
+				});
+			}
 			await db.insert(courseMeetings).values(meetingsToInsert);
 		}
 

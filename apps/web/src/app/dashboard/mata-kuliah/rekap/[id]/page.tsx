@@ -299,9 +299,9 @@ export default function RekapMataKuliahDetailPage() {
 			meetings.forEach((m) => {
 				const mRes = item.meetingResults[m.id];
 				const label =
-					m.meetingType === "uts" || m.meetingNumber === 8
+					m.meetingNumber === 8
 						? "UTS (P8)"
-						: m.meetingType === "uas" || m.meetingNumber === 16
+						: m.meetingNumber === 16
 							? "UAS (P16)"
 							: `P${m.meetingNumber}`;
 
@@ -310,11 +310,7 @@ export default function RekapMataKuliahDetailPage() {
 				const pScore =
 					mRes?.practicalScore !== null ? mRes?.practicalScore : "-";
 
-				const isExam =
-					m.meetingType === "uts" ||
-					m.meetingType === "uas" ||
-					m.meetingNumber === 8 ||
-					m.meetingNumber === 16;
+				const isExam = m.meetingNumber === 8 || m.meetingNumber === 16;
 
 				row[`${label} (Presensi)`] = statusText;
 				if (isExam) {
@@ -591,10 +587,8 @@ export default function RekapMataKuliahDetailPage() {
 
 											{/* Meeting Headers */}
 											{meetings.map((m) => {
-												const isUts =
-													m.meetingType === "uts" || m.meetingNumber === 8;
-												const isUas =
-													m.meetingType === "uas" || m.meetingNumber === 16;
+												const isUts = m.meetingNumber === 8;
+												const isUas = m.meetingNumber === 16;
 
 												const badgeColor = isUts
 													? "bg-amber-100 text-amber-800 border-amber-300"

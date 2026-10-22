@@ -602,10 +602,7 @@ export default function MataKuliahDetailPage() {
 		try {
 			const targetMeet = meetings.find((m) => m.id === meetingId);
 			const isExamMeet =
-				targetMeet?.meetingType === "uts" ||
-				targetMeet?.meetingType === "uas" ||
-				targetMeet?.meetingNumber === 8 ||
-				targetMeet?.meetingNumber === 16;
+				targetMeet?.meetingNumber === 8 || targetMeet?.meetingNumber === 16;
 
 			const meetingAtt = attendanceData[meetingId] || {};
 			const payload = students.map((s) => {
@@ -703,8 +700,8 @@ export default function MataKuliahDetailPage() {
 				Deskripsi: m.description || "-",
 			};
 
-			const isUts = m.meetingType === "uts" || m.meetingNumber === 8;
-			const isUas = m.meetingType === "uas" || m.meetingNumber === 16;
+			const isUts = m.meetingNumber === 8;
+			const isUas = m.meetingNumber === 16;
 			const isExam = isUts || isUas;
 
 			if (students.length === 0) {
@@ -1000,10 +997,8 @@ export default function MataKuliahDetailPage() {
 							<Accordion type="single" collapsible className="w-full space-y-3">
 								{meetings.map((meet) => {
 									const isEditingInfo = editingMeeting === meet.id;
-									const isUts =
-										meet.meetingType === "uts" || meet.meetingNumber === 8;
-									const isUas =
-										meet.meetingType === "uas" || meet.meetingNumber === 16;
+									const isUts = meet.meetingNumber === 8;
+									const isUas = meet.meetingNumber === 16;
 									const isExam = isUts || isUas;
 
 									// Only count 'hadir' / 'mengikuti ujian' for students currently enrolled in the course
