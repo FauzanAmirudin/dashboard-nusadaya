@@ -95,26 +95,27 @@ export function KehadiranDashboard({
 	const [searchQuery, setSearchQuery] = useState("");
 	const [isExporting, setIsExporting] = useState(false);
 
-	const fetchStudents = async () => {
-		setIsLoading(true);
+	const fetchStudents = async (isSilent = false) => {
+		if (!isSilent) setIsLoading(true);
 		try {
 			const { data, error } = await api.students.get({
 				$query: { all: "true" },
 			});
 			if (!error && data?.data) {
 				setStudents(data.data);
-			} else {
+			} else if (!isSilent) {
 				toast.error("Gagal memuat daftar mahasiswa");
 			}
 		} catch {
-			toast.error("Terjadi kesalahan sistem saat memuat data mahasiswa");
+			if (!isSilent)
+				toast.error("Terjadi kesalahan sistem saat memuat data mahasiswa");
 		} finally {
-			setIsLoading(false);
+			if (!isSilent) setIsLoading(false);
 		}
 	};
 
-	const fetchAllServiceData = async () => {
-		setIsLoadingAllService(true);
+	const fetchAllServiceData = async (isSilent = false) => {
+		if (!isSilent) setIsLoadingAllService(true);
 		try {
 			const token = getToken();
 			const params = new URLSearchParams();
@@ -133,9 +134,9 @@ export function KehadiranDashboard({
 				setAllServiceList(json.data || []);
 			}
 		} catch {
-			toast.error("Gagal memuat matriks All-Service");
+			if (!isSilent) toast.error("Gagal memuat matriks All-Service");
 		} finally {
-			setIsLoadingAllService(false);
+			if (!isSilent) setIsLoadingAllService(false);
 		}
 	};
 
@@ -145,6 +146,53 @@ export function KehadiranDashboard({
 
 	useEffect(() => {
 		fetchAllServiceData();
+	}, [cohortFilter, rombelFilter, searchQuery]);
+
+	// Auto-sync real-time listeners across dashboard tabs & window events
+	useEffect(() => {
+		const handleRealtimeSync = () => {
+			fetchStudents(true);
+			fetchAllServiceData(true);
+		};
+
+		window.addEventListener("academic-data-updated", handleRealtimeSync);
+		window.addEventListener("attendance-updated", handleRealtimeSync);
+		window.addEventListener("student-updated", handleRealtimeSync);
+		window.addEventListener("course-updated", handleRealtimeSync);
+
+		let bc: BroadcastChannel | null = null;
+		try {
+			bc = new BroadcastChannel("dashboard-realtime-sync");
+			bc.onmessage = (msg) => {
+				const type = msg.data?.type;
+				if (
+					type === "academic-data-updated" ||
+					type === "attendance-updated" ||
+					type === "student-updated" ||
+					type === "course-updated"
+				) {
+					handleRealtimeSync();
+				}
+			};
+		} catch {}
+
+		const handleVisibilityOrFocus = () => {
+			if (document.visibilityState === "visible") {
+				handleRealtimeSync();
+			}
+		};
+		document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+		window.addEventListener("focus", handleVisibilityOrFocus);
+
+		return () => {
+			window.removeEventListener("academic-data-updated", handleRealtimeSync);
+			window.removeEventListener("attendance-updated", handleRealtimeSync);
+			window.removeEventListener("student-updated", handleRealtimeSync);
+			window.removeEventListener("course-updated", handleRealtimeSync);
+			document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+			window.removeEventListener("focus", handleVisibilityOrFocus);
+			if (bc) bc.close();
+		};
 	}, [cohortFilter, rombelFilter, searchQuery]);
 
 	// Dynamic Cohort List from student data

@@ -24,8 +24,8 @@ export function TabPramagang({ studentId }: { studentId: number }) {
 	const [crmData, setCrmData] = useState<any | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 
-	const fetchData = async () => {
-		setIsLoading(true);
+	const fetchData = async (isSilent = false) => {
+		if (!isSilent) setIsLoading(true);
 		try {
 			const [pramagangRes, crmRes] = await Promise.all([
 				(api as any).attendance.mahasiswa[studentId].pramagang.get(),
@@ -39,15 +39,62 @@ export function TabPramagang({ studentId }: { studentId: number }) {
 				setCrmData((crmRes.data.data as any).crm);
 			}
 		} catch (error) {
-			console.error("Failed to fetch Pra-Magang data:", error);
-			toast.error("Terjadi kesalahan mengambil data Pra-Magang");
+			if (!isSilent) {
+				console.error("Failed to fetch Pra-Magang data:", error);
+				toast.error("Terjadi kesalahan mengambil data Pra-Magang");
+			}
 		} finally {
-			setIsLoading(false);
+			if (!isSilent) setIsLoading(false);
 		}
 	};
 
 	useEffect(() => {
 		fetchData();
+
+		const handleRealtimeSync = (e: any) => {
+			if (!e?.detail?.studentId || e.detail.studentId === studentId) {
+				fetchData(true);
+			}
+		};
+
+		window.addEventListener("attendance-updated", handleRealtimeSync);
+		window.addEventListener("academic-data-updated", handleRealtimeSync);
+		window.addEventListener("student-updated", handleRealtimeSync);
+
+		let bc: BroadcastChannel | null = null;
+		try {
+			bc = new BroadcastChannel("dashboard-realtime-sync");
+			bc.onmessage = (msg) => {
+				const type = msg.data?.type;
+				const targetId = msg.data?.studentId;
+				if (
+					type === "attendance-updated" ||
+					type === "academic-data-updated" ||
+					type === "student-updated"
+				) {
+					if (!targetId || targetId === studentId) {
+						fetchData(true);
+					}
+				}
+			};
+		} catch {}
+
+		const handleVisibilityOrFocus = () => {
+			if (document.visibilityState === "visible") {
+				fetchData(true);
+			}
+		};
+		document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+		window.addEventListener("focus", handleVisibilityOrFocus);
+
+		return () => {
+			window.removeEventListener("attendance-updated", handleRealtimeSync);
+			window.removeEventListener("academic-data-updated", handleRealtimeSync);
+			window.removeEventListener("student-updated", handleRealtimeSync);
+			document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+			window.removeEventListener("focus", handleVisibilityOrFocus);
+			if (bc) bc.close();
+		};
 	}, [studentId]);
 
 	if (isLoading) {

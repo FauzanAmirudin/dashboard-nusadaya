@@ -68,8 +68,28 @@ export function TabPiket({ studentId }: { studentId: number }) {
 	});
 	const [isAdding, setIsAdding] = useState(false);
 
-	const fetchData = async () => {
-		setIsLoading(true);
+	const broadcastAttendanceUpdate = () => {
+		if (typeof window !== "undefined") {
+			window.dispatchEvent(
+				new CustomEvent("academic-data-updated", { detail: { studentId } }),
+			);
+			window.dispatchEvent(
+				new CustomEvent("attendance-updated", { detail: { studentId } }),
+			);
+			window.dispatchEvent(
+				new CustomEvent("student-updated", { detail: { studentId } }),
+			);
+			try {
+				const ch = new BroadcastChannel("dashboard-realtime-sync");
+				ch.postMessage({ type: "attendance-updated", studentId });
+				ch.postMessage({ type: "academic-data-updated", studentId });
+				ch.close();
+			} catch {}
+		}
+	};
+
+	const fetchData = async (isSilent = false) => {
+		if (!isSilent) setIsLoading(true);
 		try {
 			const res = await (api as any).attendance.mahasiswa[
 				studentId
@@ -86,14 +106,59 @@ export function TabPiket({ studentId }: { studentId: number }) {
 				}
 			}
 		} catch (error) {
-			toast.error("Terjadi kesalahan koneksi");
+			if (!isSilent) toast.error("Terjadi kesalahan koneksi");
 		} finally {
-			setIsLoading(false);
+			if (!isSilent) setIsLoading(false);
 		}
 	};
 
 	useEffect(() => {
 		fetchData();
+
+		const handleRealtimeSync = (e: any) => {
+			if (!e?.detail?.studentId || e.detail.studentId === studentId) {
+				fetchData(true);
+			}
+		};
+
+		window.addEventListener("attendance-updated", handleRealtimeSync);
+		window.addEventListener("academic-data-updated", handleRealtimeSync);
+		window.addEventListener("student-updated", handleRealtimeSync);
+
+		let bc: BroadcastChannel | null = null;
+		try {
+			bc = new BroadcastChannel("dashboard-realtime-sync");
+			bc.onmessage = (msg) => {
+				const type = msg.data?.type;
+				const targetId = msg.data?.studentId;
+				if (
+					type === "attendance-updated" ||
+					type === "academic-data-updated" ||
+					type === "student-updated"
+				) {
+					if (!targetId || targetId === studentId) {
+						fetchData(true);
+					}
+				}
+			};
+		} catch {}
+
+		const handleVisibilityOrFocus = () => {
+			if (document.visibilityState === "visible") {
+				fetchData(true);
+			}
+		};
+		document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+		window.addEventListener("focus", handleVisibilityOrFocus);
+
+		return () => {
+			window.removeEventListener("attendance-updated", handleRealtimeSync);
+			window.removeEventListener("academic-data-updated", handleRealtimeSync);
+			window.removeEventListener("student-updated", handleRealtimeSync);
+			document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+			window.removeEventListener("focus", handleVisibilityOrFocus);
+			if (bc) bc.close();
+		};
 	}, [studentId]);
 
 	const handleEditClick = (record: any) => {
@@ -114,6 +179,7 @@ export function TabPiket({ studentId }: { studentId: number }) {
 				toast.success("Status piket berhasil diperbarui");
 				setEditingRecord(null);
 				fetchData();
+				broadcastAttendanceUpdate();
 			} else {
 				toast.error("Gagal menyimpan perubahan");
 			}
@@ -149,6 +215,7 @@ export function TabPiket({ studentId }: { studentId: number }) {
 					notes: "",
 				}));
 				fetchData();
+				broadcastAttendanceUpdate();
 			} else {
 				toast.error(res.data?.error || "Gagal menambah catatan piket");
 			}
