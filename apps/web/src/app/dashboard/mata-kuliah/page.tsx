@@ -542,40 +542,6 @@ export default function MataKuliahPage() {
 				</div>
 
 				<div className="flex items-center gap-2.5 flex-wrap">
-					{user?.role === "dosen" ? (
-						<Link href="/dashboard/mata-kuliah/rekap-dosen">
-							<Button
-								variant="outline"
-								size="sm"
-								className="border-purple-200 bg-purple-50/50 hover:bg-purple-100/70 text-purple-800 font-semibold text-xs gap-1.5 h-9 shadow-xs"
-							>
-								<Users2 className="w-3.5 h-3.5 text-purple-600" />
-								Presensi
-							</Button>
-						</Link>
-					) : (
-						<Link href="/dashboard/akademik/absensi-dosen">
-							<Button
-								variant="outline"
-								size="sm"
-								className="border-purple-200 bg-purple-50/50 hover:bg-purple-100/70 text-purple-800 font-semibold text-xs gap-1.5 h-9 shadow-xs"
-							>
-								<Users2 className="w-3.5 h-3.5 text-purple-600" />
-								Absensi Dosen
-							</Button>
-						</Link>
-					)}
-					<Link href="/dashboard/mata-kuliah/rekap">
-						<Button
-							variant="outline"
-							size="sm"
-							className="border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs gap-1.5 h-9 shadow-xs"
-						>
-							<GraduationCap className="w-3.5 h-3.5 text-slate-600" />
-							Rekap Nilai
-						</Button>
-					</Link>
-
 					{(user?.role === "superadmin" || user?.role === "akademik") && (
 						<Button
 							size="sm"
