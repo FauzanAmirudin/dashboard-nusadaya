@@ -5,6 +5,7 @@ import {
 	academicDocuments,
 	academicKhsTranscripts,
 	auditLogs,
+	courseEnrollments,
 	courseGrades,
 	courseMeetingAttendances,
 	courseMeetings,
@@ -132,6 +133,36 @@ export class GradeCalculationService {
 		// gunakan seluruh mata kuliah kurikulum angkatan tersebut
 		if (relevantCourses.length === 0 && allRelevantCourses.length > 0) {
 			relevantCourses = allRelevantCourses;
+		}
+
+		// Tambahkan juga mata kuliah custom enrollments (lintas angkatan)
+		const customEnrollments = await db.query.courseEnrollments.findMany({
+			where: eq(courseEnrollments.studentId, studentId),
+			with: {
+				course: {
+					with: {
+						dosen: { columns: { fullName: true } },
+						meetings: {
+							where: and(
+								gte(courseMeetings.meetingNumber, 1),
+								lte(courseMeetings.meetingNumber, 16),
+							),
+						},
+					},
+				},
+			},
+		});
+
+		const customCourses = customEnrollments
+			.map((e) => e.course)
+			.filter((c): c is NonNullable<typeof c> => c !== null && c !== undefined);
+
+		const courseIdSet = new Set(relevantCourses.map((c) => c.id));
+		for (const cc of customCourses) {
+			if (!courseIdSet.has(cc.id)) {
+				relevantCourses.push(cc as any);
+				courseIdSet.add(cc.id);
+			}
 		}
 
 		const gradesResult: GradeItem[] = [];

@@ -1121,6 +1121,24 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			.delete(courseEnrollments)
 			.where(eq(courseEnrollments.id, enrollId));
 
+		// Hapus juga record courseGrades terkait jika mahasiswa bukan bagian dari cohort reguler mata kuliah ini
+		const course = await db.query.courses.findFirst({
+			where: eq(courses.id, existing.courseId),
+		});
+		const student = await db.query.students.findFirst({
+			where: eq(students.id, existing.studentId),
+		});
+		if (course && student && student.cohort !== course.cohort) {
+			await db
+				.delete(courseGrades)
+				.where(
+					and(
+						eq(courseGrades.courseId, existing.courseId),
+						eq(courseGrades.studentId, existing.studentId),
+					),
+				);
+		}
+
 		return {
 			success: true,
 			message: "Pendaftaran mahasiswa berhasil dihapus dari mata kuliah",

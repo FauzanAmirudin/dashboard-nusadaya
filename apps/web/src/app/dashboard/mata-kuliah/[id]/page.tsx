@@ -468,6 +468,21 @@ export default function MataKuliahDetailPage() {
 		}
 	};
 
+	const broadcastAcademicSync = (studentIds?: number[]) => {
+		if (typeof window !== "undefined") {
+			window.dispatchEvent(
+				new CustomEvent("academic-data-updated", {
+					detail: { studentIds, courseId },
+				}),
+			);
+			try {
+				const ch = new BroadcastChannel("dashboard-realtime-sync");
+				ch.postMessage({ type: "academic-data-updated", studentIds, courseId });
+				ch.close();
+			} catch {}
+		}
+	};
+
 	// Add manual enrollment (batch multi-student)
 	const handleAddEnrollment = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -490,12 +505,14 @@ export default function MataKuliahDetailPage() {
 				toast.success(
 					`${selectedCandidates.length} mahasiswa berhasil ditambahkan ke mata kuliah!`,
 				);
+				const candidateIds = selectedCandidates.map((c) => c.id);
 				setIsAddEnrollOpen(false);
 				setSelectedCandidates([]);
 				setEnrollNotes("");
 				setEnrollSearchQuery("");
 				setCandidateStudents([]);
 				fetchData();
+				broadcastAcademicSync(candidateIds);
 			} else {
 				toast.error(json.message || "Gagal menambahkan mahasiswa");
 			}
@@ -509,6 +526,7 @@ export default function MataKuliahDetailPage() {
 	// Delete manual enrollment
 	const handleDeleteEnrollment = async () => {
 		if (!enrollToDelete) return;
+		const targetStudentId = enrollToDelete.studentId;
 		setIsDeletingEnroll(true);
 		try {
 			const res = await fetchApi(
@@ -523,6 +541,7 @@ export default function MataKuliahDetailPage() {
 				setDeleteEnrollConfirmOpen(false);
 				setEnrollToDelete(null);
 				fetchData();
+				broadcastAcademicSync(targetStudentId ? [targetStudentId] : undefined);
 			} else {
 				toast.error(json.message || "Gagal menghapus pendaftaran");
 			}
@@ -621,6 +640,7 @@ export default function MataKuliahDetailPage() {
 				"Presensi dan nilai harian berhasil disimpan & disinkronisasi!",
 			);
 			fetchData();
+			broadcastAcademicSync();
 		} catch (err) {
 			toast.error("Gagal menyimpan presensi");
 		} finally {

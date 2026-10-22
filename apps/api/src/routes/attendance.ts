@@ -6,6 +6,7 @@ import {
 	attendanceRecords,
 	attendanceSessions,
 	classSchedules,
+	courseEnrollments,
 	courseGrades,
 	courseMeetingAttendances,
 	courseMeetings,
@@ -311,9 +312,73 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 	// ==========================================
 	.get("/mahasiswa/:studentId/mata-kuliah", async ({ params }) => {
 		const studentId = parseInt(params.studentId, 10);
-		const grades = await db.query.courseGrades.findMany({
+		const student = await db.query.students.findFirst({
+			where: eq(students.id, studentId),
+		});
+
+		if (!student) {
+			return { success: true, data: { grades: [], records: [] } };
+		}
+
+		// 1. Ambil seluruh mata kuliah relevan untuk kohort & rombel mahasiswa
+		const cohortCourses = await db.query.courses.findMany({
+			where: eq(courses.cohort, student.cohort),
+			with: {
+				dosen: {
+					columns: { fullName: true },
+				},
+			},
+		});
+
+		// Filter rombel jika terikat rombel tertentu
+		let filteredCohortCourses = cohortCourses.filter((c) => {
+			if (
+				!c.rombel ||
+				c.rombel.toLowerCase() === "gabungan" ||
+				c.rombel.toLowerCase() === "semua"
+			)
+				return true;
+			if (!student.rombel) return true;
+			return (
+				c.rombel.trim().toLowerCase() === student.rombel.trim().toLowerCase()
+			);
+		});
+		if (filteredCohortCourses.length === 0 && cohortCourses.length > 0) {
+			filteredCohortCourses = cohortCourses;
+		}
+
+		// 2. Ambil juga mata kuliah lintas angkatan (custom enrollment)
+		const customEnrollments = await db.query.courseEnrollments.findMany({
+			where: eq(courseEnrollments.studentId, studentId),
+			with: {
+				course: {
+					with: {
+						dosen: {
+							columns: { fullName: true },
+						},
+					},
+				},
+			},
+		});
+
+		const customCourses = customEnrollments
+			.map((e) => e.course)
+			.filter((c): c is NonNullable<typeof c> => c !== null && c !== undefined);
+
+		// Satukan semua mata kuliah aktif mahasiswa (tanpa duplikasi ID)
+		const courseMap = new Map<number, any>();
+		for (const c of filteredCohortCourses) {
+			courseMap.set(c.id, c);
+		}
+		for (const c of customCourses) {
+			courseMap.set(c.id, c);
+		}
+		const activeCourses = Array.from(courseMap.values());
+		const courseIds = activeCourses.map((c) => c.id);
+
+		// 3. Ambil data nilai tersimpan di course_grades untuk mahasiswa ini
+		const existingGrades = await db.query.courseGrades.findMany({
 			where: eq(courseGrades.studentId, studentId),
-			orderBy: (grades, { asc }) => [asc(grades.id)],
 			with: {
 				dosen: {
 					columns: { fullName: true },
@@ -322,9 +387,63 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			},
 		});
 
-		const courseIds = grades
-			.map((g) => g.courseId)
-			.filter((id): id is number => typeof id === "number");
+		const gradeMap = new Map<number, any>();
+		for (const g of existingGrades) {
+			if (g.courseId) {
+				gradeMap.set(g.courseId, g);
+			}
+		}
+
+		// Sinkronisasi otomatis: Jika ada mata kuliah aktif di Manajemen Mata Kuliah yang belum ada baris di course_grades,
+		// buatkan record default agar terintegrasi penuh ke modul KHS & Penilaian
+		for (const c of activeCourses) {
+			if (!gradeMap.has(c.id)) {
+				try {
+					const inserted = await db
+						.insert(courseGrades)
+						.values({
+							studentId,
+							courseId: c.id,
+							courseCode: c.code,
+							courseName: c.name,
+							dosenId: c.dosenId,
+							sks: c.sks || 2,
+							attendancePresent: 0,
+							totalMeetings: 16,
+							attendanceRate: 0,
+							theoryScore: null,
+							practicalScore: null,
+							grade: null,
+							isAcc: false,
+							status: "AMAN",
+						})
+						.returning();
+					if (inserted[0]) {
+						gradeMap.set(c.id, { ...inserted[0], course: c, dosen: c.dosen });
+					}
+				} catch {
+					gradeMap.set(c.id, {
+						id: c.id,
+						studentId,
+						courseId: c.id,
+						courseCode: c.code,
+						courseName: c.name,
+						dosenId: c.dosenId,
+						sks: c.sks || 2,
+						attendancePresent: 0,
+						totalMeetings: 16,
+						attendanceRate: 0,
+						theoryScore: null,
+						practicalScore: null,
+						grade: null,
+						isAcc: false,
+						status: "AMAN",
+						course: c,
+						dosen: c.dosen,
+					});
+				}
+			}
+		}
 
 		let allMeetings: any[] = [];
 		let allAttendances: any[] = [];
@@ -355,10 +474,11 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			attendanceMap.set(att.meetingId, att);
 		}
 
-		// Map meetings to each course
-		const enrichedGrades = grades.map((g) => {
+		// Map meetings to each active course
+		const enrichedGrades = activeCourses.map((c) => {
+			const g = gradeMap.get(c.id) || {};
 			const cMeetings = allMeetings
-				.filter((m) => m.courseId === g.courseId)
+				.filter((m) => m.courseId === c.id)
 				.map((m) => {
 					const att = attendanceMap.get(m.id);
 					return {
@@ -373,6 +493,15 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 						theoryScore: att ? att.theoryScore : null,
 						practicalScore: att ? att.practicalScore : null,
 						notes: att ? att.notes : null,
+						selfieUrl: att?.selfieUrl || null,
+						latitude: att?.latitude || null,
+						longitude: att?.longitude || null,
+						gpsAccuracy: att?.gpsAccuracy || null,
+						locationName: att?.locationName || null,
+						distanceFromCheckpoint: att?.distanceFromCheckpoint || null,
+						isWithinRadius: att?.isWithinRadius ?? true,
+						selfieTakenAt: att?.selfieTakenAt || null,
+						verificationStatus: att?.verificationStatus || null,
 					};
 				});
 
@@ -407,7 +536,7 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 						)
 					: null;
 
-			const isPractical = g.course?.type === "praktik";
+			const isPractical = c.type === "praktik";
 			let calculatedGrade: string | null = null;
 			if (avgTheory !== null || avgPractical !== null) {
 				const p = avgPractical ?? avgTheory ?? 0;
@@ -434,7 +563,16 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			const finalGrade = hasActualAttendances ? calculatedGrade : g.grade;
 
 			return {
-				...g,
+				id: g.id || c.id,
+				studentId,
+				courseId: c.id,
+				courseCode: c.code || g.courseCode,
+				courseName: c.name || g.courseName,
+				dosenId: c.dosenId,
+				dosen: c.dosen || g.dosen || { fullName: "Dosen Pengajar" },
+				course: c,
+				isAcc: g.isAcc || false,
+				attitudeNote: g.attitudeNote || "",
 				totalMeetings: 16,
 				attendancePresent: finalPresent,
 				attendanceRate: finalRate,
@@ -448,7 +586,7 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 		// Backwards-compatible session logs for TabMataKuliah
 		const mkRecords = allMeetings.map((m) => {
 			const att = attendanceMap.get(m.id);
-			const courseObj = grades.find((g) => g.courseId === m.courseId);
+			const courseObj = activeCourses.find((c) => c.id === m.courseId);
 			return {
 				id: att?.id || m.id,
 				meetingId: m.id,
@@ -457,9 +595,18 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				notes: att?.notes || null,
 				theoryScore: att?.theoryScore ?? null,
 				practicalScore: att?.practicalScore ?? null,
+				selfieUrl: att?.selfieUrl || null,
+				latitude: att?.latitude || null,
+				longitude: att?.longitude || null,
+				gpsAccuracy: att?.gpsAccuracy || null,
+				locationName: att?.locationName || null,
+				distanceFromCheckpoint: att?.distanceFromCheckpoint || null,
+				isWithinRadius: att?.isWithinRadius ?? true,
+				selfieTakenAt: att?.selfieTakenAt || null,
+				verificationStatus: att?.verificationStatus || null,
 				session: {
 					id: m.id,
-					subject: courseObj?.courseName || "Perkuliahan",
+					subject: courseObj?.name || "Perkuliahan",
 					sessionDate: m.meetingDate,
 					startTime: "08:00",
 					endTime: "10:00",

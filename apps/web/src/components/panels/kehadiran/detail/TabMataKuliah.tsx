@@ -101,26 +101,95 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 	const [selectedSelfieRecord, setSelectedSelfieRecord] =
 		useState<SelfieRecordDetail | null>(null);
 
-	const fetchData = async () => {
-		setIsLoading(true);
+	const broadcastAcademicUpdate = () => {
+		if (typeof window !== "undefined") {
+			window.dispatchEvent(
+				new CustomEvent("academic-data-updated", { detail: { studentId } }),
+			);
+			window.dispatchEvent(
+				new CustomEvent("student-updated", { detail: { studentId } }),
+			);
+			try {
+				const ch = new BroadcastChannel("dashboard-realtime-sync");
+				ch.postMessage({ type: "academic-data-updated", studentId });
+				ch.close();
+			} catch {}
+		}
+	};
+
+	const fetchData = async (isSilent = false) => {
+		if (!isSilent) setIsLoading(true);
 		try {
 			const res = await (api as any).attendance.mahasiswa[studentId][
 				"mata-kuliah"
 			].get();
 			if (res.data?.success) {
 				setData(res.data.data);
-			} else {
+			} else if (!isSilent) {
 				toast.error("Gagal memuat data mata kuliah");
 			}
 		} catch (error) {
-			toast.error("Terjadi kesalahan koneksi memuat data");
+			if (!isSilent) toast.error("Terjadi kesalahan koneksi memuat data");
 		} finally {
-			setIsLoading(false);
+			if (!isSilent) setIsLoading(false);
 		}
 	};
 
 	useEffect(() => {
 		fetchData();
+
+		// 1. Listen to local custom window events across panels
+		const handleLocalSync = (e: any) => {
+			if (!e?.detail?.studentId || e.detail.studentId === studentId) {
+				fetchData(true);
+			}
+		};
+		window.addEventListener("academic-data-updated", handleLocalSync);
+		window.addEventListener("student-updated", handleLocalSync);
+
+		// 2. Listen to BroadcastChannel across browser tabs
+		let bc: BroadcastChannel | null = null;
+		try {
+			bc = new BroadcastChannel("dashboard-realtime-sync");
+			bc.onmessage = (msg) => {
+				const type = msg.data?.type;
+				const targetStudentId = msg.data?.studentId;
+				if (
+					type === "academic-data-updated" ||
+					type === "student-updated" ||
+					type === "course-updated"
+				) {
+					if (!targetStudentId || targetStudentId === studentId) {
+						fetchData(true);
+					}
+				}
+			};
+		} catch {}
+
+		// 3. Tab visibility & focus handler (auto revalidate when switching back)
+		const handleVisibilityOrFocus = () => {
+			if (document.visibilityState === "visible") {
+				fetchData(true);
+			}
+		};
+		document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+		window.addEventListener("focus", handleVisibilityOrFocus);
+
+		// 4. Background lightweight auto-polling (every 15s) so updates from other lecturers/devices sync live
+		const interval = setInterval(() => {
+			if (document.visibilityState === "visible") {
+				fetchData(true);
+			}
+		}, 15000);
+
+		return () => {
+			window.removeEventListener("academic-data-updated", handleLocalSync);
+			window.removeEventListener("student-updated", handleLocalSync);
+			document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+			window.removeEventListener("focus", handleVisibilityOrFocus);
+			clearInterval(interval);
+			if (bc) bc.close();
+		};
 	}, [studentId]);
 
 	const handleEditClick = (course: any) => {
@@ -149,6 +218,7 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 				toast.success("Berhasil memperbarui data presensi mata kuliah");
 				setEditingCourse(null);
 				await fetchData();
+				broadcastAcademicUpdate();
 			} else {
 				toast.error(res.data?.message || "Gagal menyimpan perubahan");
 			}
@@ -173,7 +243,8 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 			});
 			if (res.data?.success) {
 				toast.success("Presensi pertemuan berhasil diperbarui");
-				await fetchData();
+				await fetchData(true);
+				broadcastAcademicUpdate();
 			} else {
 				toast.error(res.data?.message || "Gagal memperbarui status");
 			}
@@ -213,6 +284,7 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 				toast.success("Presensi & catatan sesi perkuliahan berhasil disimpan");
 				setMeetingModal((prev) => ({ ...prev, isOpen: false }));
 				await fetchData();
+				broadcastAcademicUpdate();
 			} else {
 				toast.error(res.data?.message || "Gagal menyimpan rincian sesi");
 			}

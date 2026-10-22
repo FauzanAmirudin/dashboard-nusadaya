@@ -50,15 +50,8 @@ export default function AcademicPanelMahasiswa() {
 	const [data, setData] = useState<any>(null);
 	const [loading, setLoading] = useState(true);
 
-	useEffect(() => {
-		setMounted(true);
-		if (hasHydrated && isAuthenticated && user?.role === "mahasiswa") {
-			fetchData();
-		}
-	}, [user, hasHydrated, isAuthenticated]);
-
-	const fetchData = async () => {
-		setLoading(true);
+	const fetchData = async (isSilent = false) => {
+		if (!isSilent) setLoading(true);
 		try {
 			const res = await api.mahasiswa.panel.akademik.get();
 			if (res.data?.success) {
@@ -67,9 +60,53 @@ export default function AcademicPanelMahasiswa() {
 		} catch (err) {
 			console.error("Gagal memuat data Akademik:", err);
 		} finally {
-			setLoading(false);
+			if (!isSilent) setLoading(false);
 		}
 	};
+
+	useEffect(() => {
+		setMounted(true);
+		if (hasHydrated && isAuthenticated && user?.role === "mahasiswa") {
+			fetchData();
+		}
+
+		const handleSync = () => {
+			if (hasHydrated && isAuthenticated && user?.role === "mahasiswa") {
+				fetchData(true);
+			}
+		};
+		window.addEventListener("academic-data-updated", handleSync);
+		window.addEventListener("course-updated", handleSync);
+
+		let bc: BroadcastChannel | null = null;
+		try {
+			bc = new BroadcastChannel("dashboard-realtime-sync");
+			bc.onmessage = (msg) => {
+				if (
+					msg.data?.type === "academic-data-updated" ||
+					msg.data?.type === "course-updated"
+				) {
+					fetchData(true);
+				}
+			};
+		} catch {}
+
+		const handleVisibilityOrFocus = () => {
+			if (document.visibilityState === "visible") {
+				fetchData(true);
+			}
+		};
+		document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+		window.addEventListener("focus", handleVisibilityOrFocus);
+
+		return () => {
+			window.removeEventListener("academic-data-updated", handleSync);
+			window.removeEventListener("course-updated", handleSync);
+			document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+			window.removeEventListener("focus", handleVisibilityOrFocus);
+			if (bc) bc.close();
+		};
+	}, [user, hasHydrated, isAuthenticated]);
 
 	if (!mounted) return null;
 

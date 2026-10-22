@@ -214,6 +214,30 @@ export default function MataKuliahPage() {
 		}
 	};
 
+	const broadcastCourseChange = () => {
+		if (typeof window !== "undefined") {
+			window.dispatchEvent(
+				new CustomEvent("academic-data-updated", {
+					detail: { action: "course-changed" },
+				}),
+			);
+			window.dispatchEvent(
+				new CustomEvent("course-updated", {
+					detail: { action: "course-changed" },
+				}),
+			);
+			try {
+				const ch = new BroadcastChannel("dashboard-realtime-sync");
+				ch.postMessage({
+					type: "academic-data-updated",
+					action: "course-changed",
+				});
+				ch.postMessage({ type: "course-updated", action: "course-changed" });
+				ch.close();
+			} catch {}
+		}
+	};
+
 	useEffect(() => {
 		if (hasHydrated && user) {
 			setIsLoading(true);
@@ -223,6 +247,40 @@ export default function MataKuliahPage() {
 				fetchDosen();
 			}
 		}
+
+		// Auto sync if courses updated from other tabs / sessions
+		const handleCourseSync = () => {
+			fetchCourses();
+		};
+		window.addEventListener("course-updated", handleCourseSync);
+
+		let bc: BroadcastChannel | null = null;
+		try {
+			bc = new BroadcastChannel("dashboard-realtime-sync");
+			bc.onmessage = (msg) => {
+				if (
+					msg.data?.type === "course-updated" ||
+					msg.data?.type === "academic-data-updated"
+				) {
+					fetchCourses();
+				}
+			};
+		} catch {}
+
+		const handleFocus = () => {
+			if (document.visibilityState === "visible") {
+				fetchCourses();
+			}
+		};
+		document.addEventListener("visibilitychange", handleFocus);
+		window.addEventListener("focus", handleFocus);
+
+		return () => {
+			window.removeEventListener("course-updated", handleCourseSync);
+			document.removeEventListener("visibilitychange", handleFocus);
+			window.removeEventListener("focus", handleFocus);
+			if (bc) bc.close();
+		};
 	}, [
 		hasHydrated,
 		user,
@@ -361,6 +419,7 @@ export default function MataKuliahPage() {
 					toast.success("Mata kuliah berhasil diperbarui");
 					setIsEditOpen(false);
 					fetchCourses();
+					broadcastCourseChange();
 				}
 			} else {
 				const { data, error } = await api.courses.post({
@@ -388,6 +447,7 @@ export default function MataKuliahPage() {
 					setIsAddOpen(false);
 					setFormData(initialForm);
 					fetchCourses();
+					broadcastCourseChange();
 				}
 			}
 		} catch (err: any) {
@@ -406,6 +466,7 @@ export default function MataKuliahPage() {
 				toast.success("Mata kuliah berhasil dihapus");
 				setDeleteConfirmOpen(false);
 				fetchCourses();
+				broadcastCourseChange();
 			}
 		} catch (err: any) {
 			toast.error(err.message || "Gagal menghapus data");

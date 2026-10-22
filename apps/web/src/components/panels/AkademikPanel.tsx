@@ -174,6 +174,33 @@ export function AkademikPanel({
 		fetchAcademicData();
 		fetchDocuments();
 		fetchAssessment();
+
+		const handleAcademicSync = (e: any) => {
+			if (!e?.detail?.studentId || e.detail.studentId === studentId) {
+				fetchAcademicData();
+			}
+		};
+		window.addEventListener("academic-data-updated", handleAcademicSync);
+
+		let bc: BroadcastChannel | null = null;
+		try {
+			bc = new BroadcastChannel("dashboard-realtime-sync");
+			bc.onmessage = (msg) => {
+				if (
+					msg.data?.type === "academic-data-updated" ||
+					msg.data?.type === "course-updated"
+				) {
+					if (!msg.data?.studentId || msg.data?.studentId === studentId) {
+						fetchAcademicData();
+					}
+				}
+			};
+		} catch {}
+
+		return () => {
+			window.removeEventListener("academic-data-updated", handleAcademicSync);
+			if (bc) bc.close();
+		};
 	}, [studentId, fetchDocuments]);
 
 	// Status perhitungan sekarang berdasarkan acadState langsung

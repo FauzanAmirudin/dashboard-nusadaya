@@ -82,38 +82,83 @@ export function TabNilaiKhs({
 	const [isPddiktiModalOpen, setIsPddiktiModalOpen] = useState(false);
 	const [pddiktiRegNo, setPddiktiRegNo] = useState("");
 
-	const fetchKhsData = useCallback(async () => {
-		setIsLoading(true);
-		try {
-			const res = await fetch(
-				`${API_URL}/students/${studentId}/academic/khs?semester=${selectedSemester}&_t=${Date.now()}`,
-				{
-					headers: {
-						Authorization: `Bearer ${getToken()}`,
-						"Cache-Control": "no-cache",
-						Pragma: "no-cache",
+	const fetchKhsData = useCallback(
+		async (isSilent = false) => {
+			if (!isSilent) setIsLoading(true);
+			try {
+				const res = await fetch(
+					`${API_URL}/students/${studentId}/academic/khs?semester=${selectedSemester}&_t=${Date.now()}`,
+					{
+						headers: {
+							Authorization: `Bearer ${getToken()}`,
+							"Cache-Control": "no-cache",
+							Pragma: "no-cache",
+						},
+						cache: "no-store",
 					},
-					cache: "no-store",
-				},
-			);
-			const json = await res.json();
-			if (json.success && json.data) {
-				setSummaryData(json.data);
-				if (json.data.pddiktiRegNo) {
-					setPddiktiRegNo(json.data.pddiktiRegNo);
+				);
+				const json = await res.json();
+				if (json.success && json.data) {
+					setSummaryData(json.data);
+					if (json.data.pddiktiRegNo) {
+						setPddiktiRegNo(json.data.pddiktiRegNo);
+					}
 				}
+			} catch (err) {
+				console.error("Gagal memuat KHS:", err);
+				if (!isSilent) toast.error("Gagal mengambil data KHS mahasiswa");
+			} finally {
+				if (!isSilent) setIsLoading(false);
 			}
-		} catch (err) {
-			console.error("Gagal memuat KHS:", err);
-			toast.error("Gagal mengambil data KHS mahasiswa");
-		} finally {
-			setIsLoading(false);
-		}
-	}, [API_URL, studentId, selectedSemester]);
+		},
+		[API_URL, studentId, selectedSemester],
+	);
 
 	useEffect(() => {
 		fetchKhsData();
-	}, [fetchKhsData]);
+
+		const handleSync = (e: any) => {
+			if (!e?.detail?.studentId || e.detail.studentId === studentId) {
+				fetchKhsData(true);
+			}
+		};
+		window.addEventListener("academic-data-updated", handleSync);
+		window.addEventListener("student-updated", handleSync);
+
+		let bc: BroadcastChannel | null = null;
+		try {
+			bc = new BroadcastChannel("dashboard-realtime-sync");
+			bc.onmessage = (msg) => {
+				const type = msg.data?.type;
+				const targetStudentId = msg.data?.studentId;
+				if (
+					type === "academic-data-updated" ||
+					type === "student-updated" ||
+					type === "course-updated"
+				) {
+					if (!targetStudentId || targetStudentId === studentId) {
+						fetchKhsData(true);
+					}
+				}
+			};
+		} catch {}
+
+		const handleFocus = () => {
+			if (document.visibilityState === "visible") {
+				fetchKhsData(true);
+			}
+		};
+		document.addEventListener("visibilitychange", handleFocus);
+		window.addEventListener("focus", handleFocus);
+
+		return () => {
+			window.removeEventListener("academic-data-updated", handleSync);
+			window.removeEventListener("student-updated", handleSync);
+			document.removeEventListener("visibilitychange", handleFocus);
+			window.removeEventListener("focus", handleFocus);
+			if (bc) bc.close();
+		};
+	}, [fetchKhsData, studentId]);
 
 	// 4. Update Status Pelaporan PDDIKTI (Segmen 14)
 	const handleSavePddiktiReport = async () => {

@@ -42,6 +42,7 @@ import {
 	cacheInvalidatePattern,
 	cacheSet,
 } from "../lib/cache";
+import { GradeCalculationService } from "../modules/academic/grade-calculation.service";
 import { fileService } from "../modules/file/service/file.service";
 
 function computeFinanceProgress(
@@ -1087,6 +1088,12 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				accAt: finance?.accAt,
 			};
 		} else if (panelKey === "akademik") {
+			// Sinkronisasi otomatis nilai & mata kuliah terkini dari database
+			await GradeCalculationService.calculateStudentGrades(
+				studentData.id,
+				1,
+			).catch(() => {});
+
 			const [academic, documents, overseasChecklist, grades, assessment] =
 				await Promise.all([
 					db.query.academicData.findFirst({
