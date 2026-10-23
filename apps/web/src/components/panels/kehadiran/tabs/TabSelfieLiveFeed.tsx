@@ -183,7 +183,10 @@ export function TabSelfieLiveFeed() {
 			{/* Filter & Live Status Bar */}
 			<div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs">
 				<div className="flex items-center gap-2.5 flex-wrap">
-					<Select value={typeFilter} onValueChange={setTypeFilter}>
+					<Select
+						value={typeFilter}
+						onValueChange={(val) => setTypeFilter(val || "all")}
+					>
 						<SelectTrigger className="h-9 text-xs bg-slate-50 border-slate-200 font-medium w-40">
 							<SelectValue placeholder="Tipe Absensi" />
 						</SelectTrigger>
@@ -196,7 +199,10 @@ export function TabSelfieLiveFeed() {
 						</SelectContent>
 					</Select>
 
-					<Select value={statusFilter} onValueChange={setStatusFilter}>
+					<Select
+						value={statusFilter}
+						onValueChange={(val) => setStatusFilter(val || "all")}
+					>
 						<SelectTrigger className="h-9 text-xs bg-slate-50 border-slate-200 font-medium w-44">
 							<SelectValue placeholder="Status Verifikasi" />
 						</SelectTrigger>

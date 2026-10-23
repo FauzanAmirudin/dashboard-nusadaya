@@ -3,16 +3,13 @@
 import {
 	Award,
 	CalendarDays,
-	Camera,
 	ClipboardCheck,
 	Clock,
 	Download,
 	GraduationCap,
 	Loader2,
-	MapPin,
 	RotateCcw,
 	Search,
-	ShieldAlert,
 	ShieldCheck,
 	X,
 } from "lucide-react";
@@ -32,12 +29,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { API_URL, api, getToken } from "@/lib/eden";
 import { TabAllServiceMatrix } from "./tabs/TabAllServiceMatrix";
-import { TabCheckpointConfig } from "./tabs/TabCheckpointConfig";
-import { TabFraudFlagsReview } from "./tabs/TabFraudFlagsReview";
 import { TabKehadiranPiket } from "./tabs/TabKehadiranPiket";
 import { TabKepatuhanBarisPagi } from "./tabs/TabKepatuhanBarisPagi";
 import { TabPresensiKuliah } from "./tabs/TabPresensiKuliah";
-import { TabSelfieLiveFeed } from "./tabs/TabSelfieLiveFeed";
 import type { AllServiceStudentItem, KehadiranTabKey } from "./types";
 
 interface KehadiranDashboardProps {
@@ -51,17 +45,14 @@ export function KehadiranDashboard({
 	const searchParams = useSearchParams();
 
 	const tabQuery = searchParams.get("tab") as KehadiranTabKey | null;
-	const allowedTabs = [
+	const allowedTabs: KehadiranTabKey[] = [
 		"all-service",
-		"selfie-feed",
 		"kuliah",
 		"piket",
 		"baris-pagi",
-		"fraud-review",
-		"checkpoint-config",
 	];
 	const initialTab: KehadiranTabKey =
-		tabQuery && (allowedTabs as any).includes(tabQuery) ? tabQuery : defaultTab;
+		tabQuery && allowedTabs.includes(tabQuery) ? tabQuery : defaultTab;
 
 	const [activeTab, setActiveTab] = useState<KehadiranTabKey>(initialTab);
 
@@ -388,11 +379,6 @@ export function KehadiranDashboard({
 								Panel Akademik
 							</Badge>
 						</div>
-						<p className="text-xs sm:text-sm text-slate-500 mt-1">
-							Monitoring menyeluruh (All-Service) mencakup 3 pilar: Presensi
-							Perkuliahan (50%), Piket Kebersihan (25%), dan Apel Baris Pagi
-							06.22 (25%).
-						</p>
 					</div>
 				</div>
 
@@ -431,13 +417,6 @@ export function KehadiranDashboard({
 							<span className="truncate">Semua</span>
 						</TabsTrigger>
 						<TabsTrigger
-							value="selfie-feed"
-							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-xs rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold cursor-pointer gap-2 transition-all"
-						>
-							<Camera className="w-4 h-4 text-blue-600 shrink-0" />
-							<span className="truncate">Live Feed Selfie</span>
-						</TabsTrigger>
-						<TabsTrigger
 							value="kuliah"
 							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-xs rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold cursor-pointer gap-2 transition-all"
 						>
@@ -457,20 +436,6 @@ export function KehadiranDashboard({
 						>
 							<ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
 							<span className="truncate">Baris Pagi</span>
-						</TabsTrigger>
-						<TabsTrigger
-							value="fraud-review"
-							className="data-[state=active]:bg-white data-[state=active]:text-rose-700 data-[state=active]:shadow-xs rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold cursor-pointer gap-2 transition-all"
-						>
-							<ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
-							<span className="truncate">Audit Fraud</span>
-						</TabsTrigger>
-						<TabsTrigger
-							value="checkpoint-config"
-							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-xs rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold cursor-pointer gap-2 transition-all"
-						>
-							<MapPin className="w-4 h-4 text-indigo-600 shrink-0" />
-							<span className="truncate">Checkpoint GPS</span>
 						</TabsTrigger>
 					</TabsList>
 
@@ -582,30 +547,6 @@ export function KehadiranDashboard({
 					className="space-y-4 focus-visible:outline-hidden"
 				>
 					<TabKepatuhanBarisPagi />
-				</TabsContent>
-
-				{/* TAB 5: LIVE FEED SELFIE & MONITORING */}
-				<TabsContent
-					value="selfie-feed"
-					className="space-y-4 focus-visible:outline-hidden"
-				>
-					<TabSelfieLiveFeed />
-				</TabsContent>
-
-				{/* TAB 6: FRAUD REVIEW */}
-				<TabsContent
-					value="fraud-review"
-					className="space-y-4 focus-visible:outline-hidden"
-				>
-					<TabFraudFlagsReview />
-				</TabsContent>
-
-				{/* TAB 7: CHECKPOINT CONFIG */}
-				<TabsContent
-					value="checkpoint-config"
-					className="space-y-4 focus-visible:outline-hidden"
-				>
-					<TabCheckpointConfig />
 				</TabsContent>
 			</Tabs>
 		</div>

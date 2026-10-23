@@ -23,6 +23,7 @@ import {
 } from "../db/schema";
 import { cacheInvalidatePattern } from "../lib/cache";
 import { hasRole } from "../lib/permissions";
+import { GradeCalculationService } from "../modules/academic/grade-calculation.service";
 
 export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 	.onAfterResponse(async ({ request, set }) => {
@@ -320,7 +321,7 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			return { success: true, data: { grades: [], records: [] } };
 		}
 
-		// 1. Ambil seluruh mata kuliah relevan untuk kohort & rombel mahasiswa
+		// 1. Ambil seluruh mata kuliah relevan untuk kohort mahasiswa
 		const cohortCourses = await db.query.courses.findMany({
 			where: eq(courses.cohort, student.cohort),
 			with: {
@@ -330,24 +331,43 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			},
 		});
 
-		// Filter rombel jika terikat rombel tertentu
-		let filteredCohortCourses = cohortCourses.filter((c) => {
-			if (
+		// Filter rombel dan peminatan secara ketat dan konsisten dengan AKD-06
+		const filteredCohortCourses = cohortCourses.filter((c) => {
+			// Rombel check
+			const isOpenRombel =
 				!c.rombel ||
-				c.rombel.toLowerCase() === "gabungan" ||
-				c.rombel.toLowerCase() === "semua"
-			)
-				return true;
-			if (!student.rombel) return true;
-			return (
-				c.rombel.trim().toLowerCase() === student.rombel.trim().toLowerCase()
-			);
-		});
-		if (filteredCohortCourses.length === 0 && cohortCourses.length > 0) {
-			filteredCohortCourses = cohortCourses;
-		}
+				c.rombel.trim().toLowerCase() === "gabungan" ||
+				c.rombel.trim().toLowerCase() === "semua";
+			const matchesRombel =
+				isOpenRombel ||
+				(student.rombel &&
+					c.rombel.trim().toLowerCase() ===
+						student.rombel.trim().toLowerCase());
+			if (!matchesRombel) return false;
 
-		// 2. Ambil juga mata kuliah lintas angkatan (custom enrollment)
+			// Peminatan check
+			if (c.peminatan && c.peminatan.trim()) {
+				const cPem = c.peminatan.trim().toLowerCase();
+				if (
+					cPem === "indonesia-reguler" ||
+					cPem === "umum" ||
+					cPem === "gabungan" ||
+					cPem === "semua"
+				) {
+					return true;
+				}
+				const sSub = (student.subProgram || "").trim().toLowerCase();
+				const sProg = (student.program || "").trim().toLowerCase();
+				const matchesPem =
+					(sSub && sSub === cPem) ||
+					(sProg && cPem.includes(sProg)) ||
+					(sSub && cPem.includes(sSub));
+				if (!matchesPem) return false;
+			}
+			return true;
+		});
+
+		// 2. Ambil juga mata kuliah pendaftaran tambahan (custom enrollment / lintas angkatan/rombel)
 		const customEnrollments = await db.query.courseEnrollments.findMany({
 			where: eq(courseEnrollments.studentId, studentId),
 			with: {
@@ -360,6 +380,13 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				},
 			},
 		});
+
+		const customEnrollmentCourseIds = new Set(
+			customEnrollments.map((e) => e.courseId),
+		);
+		const customEnrollmentNotesMap = new Map(
+			customEnrollments.map((e) => [e.courseId, e.notes]),
+		);
 
 		const customCourses = customEnrollments
 			.map((e) => e.course)
@@ -552,31 +579,38 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				else calculatedGrade = "E";
 			}
 
-			// Real data precedence: When course meetings exist in DB, attendance always comes from real meeting records
+			// Real data precedence: Nilai resmi berasal dari hasil kalkulasi standar AKD-06 di tabel course_grades
 			const finalPresent =
 				cMeetings.length > 0 ? presentCount : g.attendancePresent || 0;
 			const finalRate =
 				cMeetings.length > 0 ? attendanceRate : g.attendanceRate || 0;
 			const finalTheory =
-				avgTheory !== null
-					? avgTheory
-					: cMeetings.length > 0
-						? null
-						: g.theoryScore;
+				g.theoryScore !== null && g.theoryScore !== undefined
+					? g.theoryScore
+					: avgTheory;
 			const finalPractical =
-				avgPractical !== null
-					? avgPractical
-					: cMeetings.length > 0
-						? null
-						: g.practicalScore;
+				g.practicalScore !== null && g.practicalScore !== undefined
+					? g.practicalScore
+					: avgPractical;
 			const finalGrade =
-				calculatedGrade !== null
-					? calculatedGrade
-					: cMeetings.length > 0
-						? null
-						: g.grade;
+				g.grade && g.grade.trim() !== ""
+					? g.grade
+					: calculatedGrade !== null
+						? calculatedGrade
+						: "-";
+			const finalScore =
+				g.finalScore !== null && g.finalScore !== undefined
+					? g.finalScore
+					: null;
+			const gradePoint =
+				g.gradePoint !== null && g.gradePoint !== undefined
+					? (g.gradePoint / 100).toFixed(2)
+					: null;
 			const isAcc =
 				cMeetings.length > 0 && presentCount === 0 ? false : g.isAcc || false;
+
+			const isCustom = customEnrollmentCourseIds.has(c.id);
+			const customNotes = customEnrollmentNotesMap.get(c.id) || null;
 
 			return {
 				id: g.id || c.id,
@@ -584,6 +618,7 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				courseId: c.id,
 				courseCode: c.code || g.courseCode,
 				courseName: c.name || g.courseName,
+				sks: c.sks || g.sks || 2,
 				dosenId: c.dosenId,
 				dosen: c.dosen || g.dosen || { fullName: "Dosen Pengajar" },
 				course: c,
@@ -594,7 +629,12 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				attendanceRate: finalRate,
 				theoryScore: finalTheory,
 				practicalScore: finalPractical,
+				finalScore: finalScore,
 				grade: finalGrade,
+				gradePoint: gradePoint,
+				status: g.status || "AMAN",
+				isCustomEnrollment: isCustom,
+				enrollmentNotes: customNotes,
 				meetings: cMeetings,
 			};
 		});
@@ -640,6 +680,7 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 	.patch(
 		"/mahasiswa/:studentId/mata-kuliah/:courseGradeId",
 		async ({ params, body }) => {
+			const studentId = parseInt(params.studentId, 10);
 			const courseGradeId = parseInt(params.courseGradeId, 10);
 			const payload = body as any;
 			const updateData: any = { updatedAt: new Date() };
@@ -703,6 +744,16 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				.set(updateData)
 				.where(eq(courseGrades.id, courseGradeId))
 				.returning();
+
+			try {
+				await GradeCalculationService.calculateStudentGrades(studentId, 1);
+			} catch (calcErr) {
+				console.error(
+					`Gagal menghitung ulang nilai student ${studentId}:`,
+					calcErr,
+				);
+			}
+
 			return { success: true, data: result[0] };
 		},
 	)
@@ -765,85 +816,11 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				});
 			}
 
-			// Recalculate aggregates in courseGrades
-			const allCourseMeetings = await db.query.courseMeetings.findMany({
-				where: and(
-					eq(courseMeetings.courseId, courseId),
-					gte(courseMeetings.meetingNumber, 1),
-					lte(courseMeetings.meetingNumber, 16),
-				),
-				columns: { id: true },
-			});
-			const allMeetingIds = allCourseMeetings.map((m) => m.id);
-
-			if (allMeetingIds.length > 0) {
-				const studentAtts = await db.query.courseMeetingAttendances.findMany({
-					where: and(
-						eq(courseMeetingAttendances.studentId, studentId),
-						inArray(courseMeetingAttendances.meetingId, allMeetingIds),
-					),
-				});
-				const presentCount = studentAtts.filter(
-					(a) => a.status === "hadir",
-				).length;
-				const rate = Math.min(100, Math.round((presentCount / 16) * 100));
-
-				// Calculate average scores if meetings have scores
-				const validTheory = studentAtts
-					.filter((a) => a.theoryScore !== null && a.theoryScore !== undefined)
-					.map((a) => a.theoryScore as number);
-				const avgTheory =
-					validTheory.length > 0
-						? Math.round(
-								validTheory.reduce((acc, curr) => acc + curr, 0) /
-									validTheory.length,
-							)
-						: null;
-
-				const validPractical = studentAtts
-					.filter(
-						(a) => a.practicalScore !== null && a.practicalScore !== undefined,
-					)
-					.map((a) => a.practicalScore as number);
-				const avgPractical =
-					validPractical.length > 0
-						? Math.round(
-								validPractical.reduce((acc, curr) => acc + curr, 0) /
-									validPractical.length,
-							)
-						: null;
-
-				const gradeUpdate: any = {
-					attendancePresent: presentCount,
-					totalMeetings: 16,
-					attendanceRate: rate,
-					updatedAt: new Date(),
-				};
-
-				if (avgTheory !== null) gradeUpdate.theoryScore = avgTheory;
-				if (avgPractical !== null) gradeUpdate.practicalScore = avgPractical;
-
-				if (avgTheory !== null || avgPractical !== null) {
-					const p = avgPractical ?? avgTheory ?? 0;
-					const t = avgTheory ?? avgPractical ?? 0;
-					const finalScore = Math.round(p * 0.8 + t * 0.2);
-					let displayGrade = "E";
-					if (finalScore >= 85) displayGrade = "A";
-					else if (finalScore >= 75) displayGrade = "B";
-					else if (finalScore >= 65) displayGrade = "C";
-					else if (finalScore >= 50) displayGrade = "D";
-					gradeUpdate.grade = displayGrade;
-				}
-
-				await db
-					.update(courseGrades)
-					.set(gradeUpdate)
-					.where(
-						and(
-							eq(courseGrades.studentId, studentId),
-							eq(courseGrades.courseId, courseId),
-						),
-					);
+			// Recalculate full AKD-06 academic grades and attendance in real time
+			try {
+				await GradeCalculationService.calculateStudentGrades(studentId, 1);
+			} catch (calcErr) {
+				console.error(`Gagal menghitung nilai student ${studentId}:`, calcErr);
 			}
 
 			return {
@@ -1769,7 +1746,12 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			sql`${morningAssemblySessions.sessionStatus} != 'cancelled'`,
 		];
 		if (student) {
-			sessionConds.push(eq(morningAssemblySessions.cohort, student.cohort));
+			sessionConds.push(
+				or(
+					eq(morningAssemblySessions.cohort, student.cohort),
+					eq(morningAssemblySessions.cohort, 0),
+				)!,
+			);
 		}
 
 		const session = await db.query.morningAssemblySessions.findFirst({
@@ -2065,8 +2047,12 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 		const conditions = [];
 
 		if (cohort && cohort !== "all") {
+			const cNum = parseInt(cohort as string, 10);
 			conditions.push(
-				eq(morningAssemblySessions.cohort, parseInt(cohort as string, 10)),
+				or(
+					eq(morningAssemblySessions.cohort, cNum),
+					eq(morningAssemblySessions.cohort, 0),
+				)!,
 			);
 		}
 		if (rombel && rombel !== "all" && rombel !== "Semua") {
@@ -2163,10 +2149,10 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			return { success: false, message: "Sesi baris pagi tidak ditemukan" };
 		}
 
-		const studentConds = [
-			eq(students.cohort, session.cohort),
-			eq(students.isArchived, false),
-		];
+		const studentConds = [eq(students.isArchived, false)];
+		if (session.cohort && session.cohort !== 0) {
+			studentConds.push(eq(students.cohort, session.cohort));
+		}
 		if (session.rombel && session.rombel !== "Semua") {
 			studentConds.push(eq(students.rombel, session.rombel));
 		}
@@ -2263,15 +2249,81 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			};
 		}
 
-		const cohortNum = parseInt(payload.cohort.toString(), 10);
+		const isAllCohorts =
+			payload.cohort === "all" ||
+			payload.cohort === "semua" ||
+			payload.cohort === "Semua" ||
+			payload.cohort === 0 ||
+			payload.cohort === "0";
+
+		const cohortNum = isAllCohorts
+			? 0
+			: parseInt(payload.cohort.toString(), 10);
 		const targetTime = payload.targetTime?.trim() || "06:22";
 		const location = payload.location?.trim() || "Lapangan Utama Kampus";
+		const targetRombel = payload.rombel?.trim() || "Semua";
+
+		// DUPLICATE & CONFLICT CHECK:
+		// Cek sesi aktif di tanggal yang sama
+		const existingActiveSessions =
+			await db.query.morningAssemblySessions.findMany({
+				where: and(
+					eq(morningAssemblySessions.sessionDate, payload.sessionDate),
+					sql`${morningAssemblySessions.sessionStatus} != 'cancelled'`,
+				),
+			});
+
+		// 1. Jika membuat sesi untuk "Semua Angkatan" (cohortNum === 0):
+		if (cohortNum === 0 && existingActiveSessions.length > 0) {
+			const conflict = existingActiveSessions[0];
+			const conflictLabel =
+				conflict.cohort === 0
+					? "Semua Angkatan"
+					: `Angkatan ${conflict.cohort}`;
+			set.status = 400;
+			return {
+				success: false,
+				message: `Jadwal baris pagi untuk ${conflictLabel} pada tanggal ${payload.sessionDate} sudah terdaftar! Harap batalkan atau ubah jadwal sebelumnya terlebih dahulu jika ingin membuat jadwal untuk Semua Angkatan.`,
+			};
+		}
+
+		// 2. Jika membuat sesi untuk angkatan tertentu (cohortNum > 0):
+		if (cohortNum > 0) {
+			const conflictAll = existingActiveSessions.find((s) => s.cohort === 0);
+			if (conflictAll) {
+				set.status = 400;
+				return {
+					success: false,
+					message: `Sudah ada jadwal baris pagi untuk 'Semua Angkatan' pada tanggal ${payload.sessionDate}. Tidak dapat membuat jadwal terpisah lagi.`,
+				};
+			}
+
+			const conflictCohort = existingActiveSessions.find((s) => {
+				if (s.cohort !== cohortNum) return false;
+				if (
+					s.rombel === "Semua" ||
+					targetRombel === "Semua" ||
+					s.rombel === targetRombel
+				) {
+					return true;
+				}
+				return false;
+			});
+
+			if (conflictCohort) {
+				set.status = 400;
+				return {
+					success: false,
+					message: `Jadwal baris pagi untuk Angkatan ${cohortNum} (${conflictCohort.rombel}) pada tanggal ${payload.sessionDate} sudah terdaftar!`,
+				};
+			}
+		}
 
 		const [newSession] = await db
 			.insert(morningAssemblySessions)
 			.values({
 				cohort: cohortNum,
-				rombel: payload.rombel || "Semua",
+				rombel: targetRombel,
 				sessionDate: payload.sessionDate,
 				targetTime,
 				checkInWindowStart: payload.checkInWindowStart || "05:30",
@@ -2313,6 +2365,41 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			if (!session) {
 				set.status = 404;
 				return { success: false, message: "Sesi baris pagi tidak ditemukan" };
+			}
+
+			// Duplicate check pada tanggal tujuan baru
+			const existingActive = await db.query.morningAssemblySessions.findMany({
+				where: and(
+					eq(morningAssemblySessions.sessionDate, payload.newDate),
+					sql`${morningAssemblySessions.sessionStatus} != 'cancelled'`,
+					sql`${morningAssemblySessions.id} != ${id}`,
+				),
+			});
+
+			if (session.cohort === 0 && existingActive.length > 0) {
+				set.status = 400;
+				return {
+					success: false,
+					message: `Gagal reschedule: sudah ada jadwal baris pagi di tanggal ${payload.newDate}`,
+				};
+			}
+
+			if (session.cohort > 0) {
+				const conflict = existingActive.find(
+					(s) =>
+						s.cohort === 0 ||
+						(s.cohort === session.cohort &&
+							(s.rombel === "Semua" ||
+								session.rombel === "Semua" ||
+								s.rombel === session.rombel)),
+				);
+				if (conflict) {
+					set.status = 400;
+					return {
+						success: false,
+						message: `Gagal reschedule: sudah ada jadwal baris pagi untuk Angkatan ${session.cohort} di tanggal ${payload.newDate}`,
+					};
+				}
 			}
 
 			const oldDate = session.sessionDate;
@@ -2388,10 +2475,10 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				return { success: false, message: "Sesi baris pagi tidak ditemukan" };
 			}
 
-			const studentConds = [
-				eq(students.cohort, session.cohort),
-				eq(students.isArchived, false),
-			];
+			const studentConds = [eq(students.isArchived, false)];
+			if (session.cohort && session.cohort !== 0) {
+				studentConds.push(eq(students.cohort, session.cohort));
+			}
 			if (session.rombel && session.rombel !== "Semua") {
 				studentConds.push(eq(students.rombel, session.rombel));
 			}
@@ -2455,7 +2542,98 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			return { success: false, message: "Sesi tidak ditemukan" };
 		}
 
+		const targetDate = payload.sessionDate || existing.sessionDate;
+		const isTargetAll =
+			payload.cohort === "all" ||
+			payload.cohort === "semua" ||
+			payload.cohort === 0 ||
+			payload.cohort === "0";
+		const targetCohort =
+			payload.cohort !== undefined
+				? isTargetAll
+					? 0
+					: parseInt(payload.cohort.toString(), 10)
+				: existing.cohort;
+		const targetRombel = payload.rombel || existing.rombel;
+		const targetStatus = payload.sessionStatus || existing.sessionStatus;
+
+		if (
+			targetStatus !== "cancelled" &&
+			(payload.sessionDate || payload.cohort !== undefined || payload.rombel)
+		) {
+			const existingActive = await db.query.morningAssemblySessions.findMany({
+				where: and(
+					eq(morningAssemblySessions.sessionDate, targetDate),
+					sql`${morningAssemblySessions.sessionStatus} != 'cancelled'`,
+					sql`${morningAssemblySessions.id} != ${id}`,
+				),
+			});
+
+			if (targetCohort === 0 && existingActive.length > 0) {
+				set.status = 400;
+				return {
+					success: false,
+					message: `Sudah ada jadwal baris pagi lain pada tanggal ${targetDate}. Tidak dapat mengubah ke Semua Angkatan.`,
+				};
+			}
+
+			if (targetCohort > 0) {
+				const conflict = existingActive.find(
+					(s) =>
+						s.cohort === 0 ||
+						(s.cohort === targetCohort &&
+							(s.rombel === "Semua" ||
+								targetRombel === "Semua" ||
+								s.rombel === targetRombel)),
+				);
+				if (conflict) {
+					set.status = 400;
+					return {
+						success: false,
+						message: `Sudah ada jadwal baris pagi untuk Angkatan ${targetCohort} (${conflict.rombel}) pada tanggal ${targetDate}.`,
+					};
+				}
+			}
+		}
+
 		const updateData: any = { updatedAt: new Date() };
+		if (payload.sessionDate) updateData.sessionDate = payload.sessionDate;
+		if (payload.cohort !== undefined) updateData.cohort = targetCohort;
+		if (payload.targetTime) updateData.targetTime = payload.targetTime;
+		if (payload.location) updateData.location = payload.location;
+		if (payload.notes !== undefined) updateData.notes = payload.notes;
+		if (payload.rombel) updateData.rombel = payload.rombel;
+		if (payload.checkInWindowStart)
+			updateData.checkInWindowStart = payload.checkInWindowStart;
+		if (payload.checkInWindowEnd)
+			updateData.checkInWindowEnd = payload.checkInWindowEnd;
+		if (payload.sessionStatus) updateData.sessionStatus = payload.sessionStatus;
+
+		const [updated] = await db
+			.update(morningAssemblySessions)
+			.set(updateData)
+			.where(eq(morningAssemblySessions.id, id))
+			.returning();
+
+		return { success: true, data: updated };
+	})
+	.put("/baris-pagi/sessions/:id", async ({ params, body, set }) => {
+		const id = parseInt(params.id, 10);
+		const payload = body as any;
+
+		const existing = await db.query.morningAssemblySessions.findFirst({
+			where: eq(morningAssemblySessions.id, id),
+		});
+
+		if (!existing) {
+			set.status = 404;
+			return { success: false, message: "Sesi tidak ditemukan" };
+		}
+
+		const updateData: any = { updatedAt: new Date() };
+		if (payload.sessionDate) updateData.sessionDate = payload.sessionDate;
+		if (payload.cohort)
+			updateData.cohort = parseInt(payload.cohort.toString(), 10);
 		if (payload.targetTime) updateData.targetTime = payload.targetTime;
 		if (payload.location) updateData.location = payload.location;
 		if (payload.notes !== undefined) updateData.notes = payload.notes;

@@ -8,12 +8,11 @@ import {
 	GraduationCap,
 	Loader2,
 	Printer,
-	RefreshCw,
 	ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,8 +32,9 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { API_URL, getToken } from "@/lib/eden";
+import { exportToCSV } from "@/lib/export";
 
-export default function StudentKhsPrintPage() {
+function StudentKhsPrintContent() {
 	const params = useParams();
 	const searchParams = useSearchParams();
 	const router = useRouter();
@@ -78,6 +78,55 @@ export default function StudentKhsPrintPage() {
 		if (studentId) {
 			fetchKhsData();
 		}
+
+		const handleSync = (e: any) => {
+			const targetId = e?.detail?.studentId;
+			const targetIds = e?.detail?.studentIds;
+			if (
+				(!targetId && !targetIds) ||
+				targetId === studentId ||
+				(Array.isArray(targetIds) && targetIds.includes(studentId))
+			) {
+				fetchKhsData();
+			}
+		};
+		window.addEventListener("academic-data-updated", handleSync);
+		window.addEventListener("student-updated", handleSync);
+		window.addEventListener("course-updated", handleSync);
+		window.addEventListener("course-attendance-updated", handleSync);
+
+		let bc: BroadcastChannel | null = null;
+		try {
+			bc = new BroadcastChannel("dashboard-realtime-sync");
+			bc.onmessage = (msg) => {
+				const type = msg.data?.type;
+				const targetStudentId = msg.data?.studentId;
+				const targetStudentIds = msg.data?.studentIds;
+				if (
+					type === "academic-data-updated" ||
+					type === "student-updated" ||
+					type === "course-updated" ||
+					type === "course-attendance-updated"
+				) {
+					if (
+						(!targetStudentId && !targetStudentIds) ||
+						targetStudentId === studentId ||
+						(Array.isArray(targetStudentIds) &&
+							targetStudentIds.includes(studentId))
+					) {
+						fetchKhsData();
+					}
+				}
+			};
+		} catch {}
+
+		return () => {
+			window.removeEventListener("academic-data-updated", handleSync);
+			window.removeEventListener("student-updated", handleSync);
+			window.removeEventListener("course-updated", handleSync);
+			window.removeEventListener("course-attendance-updated", handleSync);
+			if (bc) bc.close();
+		};
 	}, [studentId, selectedSemester, fetchKhsData]);
 
 	const grades = summaryData?.grades || [];
@@ -90,6 +139,39 @@ export default function StudentKhsPrintPage() {
 		month: "long",
 		year: "numeric",
 	});
+
+	const handleExportCsv = () => {
+		if (!grades || grades.length === 0) {
+			toast.error("Tidak ada data nilai untuk diexport");
+			return;
+		}
+		const exportRows = grades.map((item: any, idx: number) => ({
+			No: idx + 1,
+			"Kode MK": item.code || "-",
+			"Mata Kuliah": item.name || "-",
+			SKS: item.sks || 0,
+			"Presensi (%)": `${item.attendanceRate || 0}%`,
+			"Nilai Teori": item.theoryScore ?? "-",
+			"Nilai Praktik": item.practicalScore ?? "-",
+			UTS: item.utsScore ?? "-",
+			UAS: item.uasScore ?? "-",
+			"Nilai Akhir": item.finalScore ?? "-",
+			Grade: item.grade || "-",
+			Bobot: ((item.gradePoint || 0) / 100).toFixed(2),
+			Mutu: item.qualityScore?.toFixed(2) || "0.00",
+			Status: item.isPassed ? "Lulus" : "Tidak Lulus",
+		}));
+		const studentNameSlug = (
+			summaryData?.studentName ||
+			summaryData?.name ||
+			`Mahasiswa_${studentId}`
+		).replace(/[^a-zA-Z0-9]/g, "_");
+		exportToCSV(
+			exportRows,
+			`KHS_${studentNameSlug}_Semester_${selectedSemester}`,
+		);
+		toast.success("Dokumen KHS berhasil diexport ke CSV");
+	};
 
 	return (
 		<div className="min-h-screen bg-slate-100/70 p-4 sm:p-6 lg:p-8 print:p-0 print:bg-white text-slate-900">
@@ -147,7 +229,7 @@ export default function StudentKhsPrintPage() {
 			/>
 
 			{/* Top Control Bar - Hidden in Print */}
-			<div className="max-w-4xl mx-auto mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs print:hidden">
+			<div className="max-w-4xl mx-auto mb-6 flex items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs print:hidden">
 				<div className="flex items-center gap-3">
 					<Link
 						href={`/dashboard/students/${studentId}?tab=akademik&subtab=nilai-khs`}
@@ -155,23 +237,15 @@ export default function StudentKhsPrintPage() {
 						<Button
 							variant="outline"
 							size="sm"
-							className="gap-1.5 text-xs text-slate-600 hover:text-slate-900"
+							className="gap-1.5 text-xs text-slate-600 hover:text-slate-900 border-slate-200"
 						>
 							<ArrowLeft className="w-3.5 h-3.5" />
 							Kembali ke Panel Akademik
 						</Button>
 					</Link>
-					<div>
-						<h1 className="text-sm font-bold text-slate-900">
-							Pratinjau Cetak Kartu Hasil Studi (KHS)
-						</h1>
-						<p className="text-[11px] text-slate-500">
-							Dokumen resmi BAAK Nusadaya Academy — Real-Time Database Sync
-						</p>
-					</div>
 				</div>
 
-				<div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+				<div className="flex flex-wrap items-center gap-2.5 justify-end">
 					<div className="flex items-center gap-1.5">
 						<span className="text-xs font-semibold text-slate-600">
 							Semester:
@@ -186,7 +260,7 @@ export default function StudentKhsPrintPage() {
 								);
 							}}
 						>
-							<SelectTrigger className="w-28 h-8 text-xs bg-slate-50 border-slate-200">
+							<SelectTrigger className="w-28 h-8 text-xs bg-slate-50 border-slate-200 font-medium">
 								<SelectValue placeholder="Semester" />
 							</SelectTrigger>
 							<SelectContent>
@@ -201,17 +275,13 @@ export default function StudentKhsPrintPage() {
 					<Button
 						variant="outline"
 						size="sm"
-						onClick={() => fetchKhsData()}
-						disabled={isLoading}
-						className="h-8 text-xs gap-1.5 text-slate-700 hover:bg-slate-50 border-slate-200"
-						title="Muat ulang nilai real-time dari database"
+						onClick={handleExportCsv}
+						disabled={isLoading || grades.length === 0}
+						className="h-8 text-xs gap-1.5 text-slate-700 hover:bg-slate-50 border-slate-200 font-semibold"
+						title="Export data nilai KHS ke format file CSV / Excel"
 					>
-						<RefreshCw
-							className={`w-3.5 h-3.5 ${
-								isLoading ? "animate-spin text-[#0517B0]" : "text-slate-600"
-							}`}
-						/>
-						<span className="hidden sm:inline">Perbarui</span>
+						<Download className="w-3.5 h-3.5 text-emerald-600" />
+						<span>Export CSV</span>
 					</Button>
 
 					<Button
@@ -390,34 +460,63 @@ export default function StudentKhsPrintPage() {
 											{item.code}
 										</TableCell>
 										<TableCell className="font-medium py-2">
-											{item.name}
+											<div className="flex items-center gap-2">
+												<span>{item.name}</span>
+												{item.isCustomEnrollment && (
+													<span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
+														Tambahan
+													</span>
+												)}
+											</div>
 										</TableCell>
 										<TableCell className="text-center font-mono font-bold py-2">
 											{item.sks}
 										</TableCell>
 										<TableCell className="text-center font-mono font-bold py-2">
-											{item.finalScore}
+											{item.grade &&
+											item.grade !== "-" &&
+											item.status !== "BELUM_DINILAI"
+												? item.finalScore
+												: "-"}
 										</TableCell>
 										<TableCell className="text-center font-bold py-2">
 											<span className="px-1.5 py-0.5 rounded bg-slate-100 font-bold border border-slate-300">
-												{item.grade}
+												{item.grade || "-"}
 											</span>
 										</TableCell>
 										<TableCell className="text-center font-mono py-2">
-											{((item.gradePoint || 0) / 100).toFixed(2)}
+											{item.grade &&
+											item.grade !== "-" &&
+											item.status !== "BELUM_DINILAI"
+												? ((item.gradePoint || 0) / 100).toFixed(2)
+												: "-"}
 										</TableCell>
 										<TableCell className="text-center font-mono font-bold py-2">
-											{item.qualityScore?.toFixed(2) || "0.00"}
+											{item.grade &&
+											item.grade !== "-" &&
+											item.status !== "BELUM_DINILAI"
+												? item.qualityScore?.toFixed(2) || "0.00"
+												: "-"}
 										</TableCell>
 										<TableCell className="text-center font-semibold py-2">
 											<span
 												className={`text-[11px] px-2 py-0.5 rounded font-bold ${
-													item.isPassed
-														? "text-emerald-800 bg-emerald-50 border border-emerald-300"
-														: "text-rose-800 bg-rose-50 border border-rose-300"
+													!item.grade ||
+													item.grade === "-" ||
+													item.status === "BELUM_DINILAI"
+														? "text-slate-700 bg-slate-100 border border-slate-300"
+														: item.isPassed
+															? "text-emerald-800 bg-emerald-50 border border-emerald-300"
+															: "text-rose-800 bg-rose-50 border border-rose-300"
 												}`}
 											>
-												{item.isPassed ? "LULUS" : "MENGULANG"}
+												{!item.grade ||
+												item.grade === "-" ||
+												item.status === "BELUM_DINILAI"
+													? "BELUM DINILAI"
+													: item.isPassed
+														? "LULUS"
+														: "MENGULANG"}
 											</span>
 										</TableCell>
 									</TableRow>
@@ -545,5 +644,19 @@ export default function StudentKhsPrintPage() {
 				</div>
 			)}
 		</div>
+	);
+}
+
+export default function StudentKhsPrintPage() {
+	return (
+		<Suspense
+			fallback={
+				<div className="min-h-screen bg-slate-50 flex items-center justify-center p-8 text-slate-500">
+					Memuat Kartu Hasil Studi (KHS)...
+				</div>
+			}
+		>
+			<StudentKhsPrintContent />
+		</Suspense>
 	);
 }

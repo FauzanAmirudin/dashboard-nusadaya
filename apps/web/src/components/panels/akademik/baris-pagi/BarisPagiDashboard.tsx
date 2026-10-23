@@ -13,6 +13,7 @@ import {
 	ChevronRight,
 	Clock,
 	Download,
+	ExternalLink,
 	Eye,
 	Filter,
 	HelpCircle,
@@ -215,8 +216,10 @@ interface StudentSummaryItem {
 
 export function BarisPagiDashboard({
 	hidePageHeader = false,
+	canCreate = true,
 }: {
 	hidePageHeader?: boolean;
+	canCreate?: boolean;
 } = {}) {
 	const { user } = useAuthStore();
 	const isStaff = user?.role === "superadmin" || user?.role === "akademik";
@@ -254,7 +257,7 @@ export function BarisPagiDashboard({
 	// Create Session Dialog
 	const [isCreateOpen, setIsCreateOpen] = useState(false);
 	const [createForm, setCreateForm] = useState({
-		cohort: "16",
+		cohort: "all",
 		rombel: "Semua",
 		sessionDate: new Date().toISOString().split("T")[0],
 		targetTime: "06:22",
@@ -617,6 +620,38 @@ export function BarisPagiDashboard({
 			toast.error("Tanggal dan Angkatan wajib diisi");
 			return;
 		}
+
+		// Validasi duplikasi jadwal baris pagi
+		const isAll = createForm.cohort === "all" || createForm.cohort === "0";
+		const targetCohortNum = isAll ? 0 : parseInt(createForm.cohort, 10);
+		const targetRombel = createForm.rombel || "Semua";
+
+		const conflict = sessions.find((s) => {
+			if (s.sessionStatus === "cancelled") return false;
+			if (s.sessionDate !== createForm.sessionDate) return false;
+
+			const cohortCollides =
+				targetCohortNum === 0 || s.cohort === 0 || s.cohort === targetCohortNum;
+			if (!cohortCollides) return false;
+
+			const rombelCollides =
+				s.rombel === "Semua" ||
+				targetRombel === "Semua" ||
+				s.rombel === targetRombel;
+			return rombelCollides;
+		});
+
+		if (conflict) {
+			const conflictLabel =
+				conflict.cohort === 0
+					? "Semua Angkatan"
+					: `Angkatan ${conflict.cohort}`;
+			toast.error(
+				`Jadwal baris pagi untuk ${conflictLabel} (${conflict.rombel}) pada tanggal ${createForm.sessionDate} sudah terdaftar! Harap gunakan tanggal lain atau batalkan sesi sebelumnya.`,
+			);
+			return;
+		}
+
 		setIsCreating(true);
 		try {
 			const token = getToken();
@@ -916,7 +951,7 @@ export function BarisPagiDashboard({
 					</div>
 
 					<div className="flex items-center gap-2.5 w-full sm:w-auto">
-						{isStaff && (
+						{isStaff && canCreate && (
 							<Button
 								onClick={() => setIsCreateOpen(true)}
 								className="bg-[#0517B0] hover:bg-blue-800 text-white shadow-xs rounded-xl font-semibold text-xs sm:text-sm gap-2"
@@ -924,6 +959,17 @@ export function BarisPagiDashboard({
 								<Plus className="w-4 h-4" />
 								<span>Buat Sesi Baris Pagi</span>
 							</Button>
+						)}
+						{isStaff && !canCreate && (
+							<Link href="/dashboard/penjadwalan?tab=baris-pagi">
+								<Button
+									variant="outline"
+									className="border-blue-200 text-[#0517B0] hover:bg-blue-50/70 rounded-xl font-semibold text-xs sm:text-sm gap-2"
+								>
+									<ExternalLink className="w-4 h-4" />
+									<span>Kelola Jadwal di Penjadwalan</span>
+								</Button>
+							</Link>
 						)}
 						<Button
 							variant="outline"
@@ -942,30 +988,49 @@ export function BarisPagiDashboard({
 					</div>
 				</div>
 			) : (
-				<div className="flex items-center justify-end gap-2.5 w-full">
-					{isStaff && (
+				<div className="flex items-center justify-between gap-2.5 w-full">
+					<div className="flex items-center gap-2 text-xs text-slate-500">
+						<ShieldCheck className="w-4 h-4 text-[#0517B0]" />
+						<span className="font-medium text-slate-700">
+							Manajemen Presensi Baris Pagi
+						</span>
+					</div>
+					<div className="flex items-center gap-2.5">
+						{isStaff && canCreate && (
+							<Button
+								onClick={() => setIsCreateOpen(true)}
+								className="bg-[#0517B0] hover:bg-blue-800 text-white shadow-xs rounded-xl font-semibold text-xs sm:text-sm gap-2"
+							>
+								<Plus className="w-4 h-4" />
+								<span>Buat Sesi Baris Pagi</span>
+							</Button>
+						)}
+						{isStaff && !canCreate && (
+							<Link href="/dashboard/penjadwalan?tab=baris-pagi">
+								<Button
+									variant="outline"
+									className="border-blue-200 text-[#0517B0] hover:bg-blue-50/70 rounded-xl font-semibold text-xs sm:text-sm gap-2"
+								>
+									<ExternalLink className="w-4 h-4" />
+									<span>Jadwal Baris Pagi</span>
+								</Button>
+							</Link>
+						)}
 						<Button
-							onClick={() => setIsCreateOpen(true)}
-							className="bg-[#0517B0] hover:bg-blue-800 text-white shadow-xs rounded-xl font-semibold text-xs sm:text-sm gap-2"
+							variant="outline"
+							size="icon"
+							onClick={() => {
+								fetchSessions();
+								if (selectedSessionId) fetchBoardData(selectedSessionId);
+								if (activeTab === "rekap") fetchSummary();
+								toast.info("Data diperbarui");
+							}}
+							className="rounded-xl border-slate-200"
+							title="Segarkan Data"
 						>
-							<Plus className="w-4 h-4" />
-							<span>Buat Sesi Baris Pagi</span>
+							<RefreshCw className="w-4 h-4 text-slate-600" />
 						</Button>
-					)}
-					<Button
-						variant="outline"
-						size="icon"
-						onClick={() => {
-							fetchSessions();
-							if (selectedSessionId) fetchBoardData(selectedSessionId);
-							if (activeTab === "rekap") fetchSummary();
-							toast.info("Data diperbarui");
-						}}
-						className="rounded-xl border-slate-200"
-						title="Segarkan Data"
-					>
-						<RefreshCw className="w-4 h-4 text-slate-600" />
-					</Button>
+					</div>
 				</div>
 			)}
 
@@ -1016,7 +1081,11 @@ export function BarisPagiDashboard({
 								<SelectContent>
 									{sessions.map((s) => (
 										<SelectItem key={s.id} value={s.id.toString()}>
-											{s.sessionDate} • Angkatan {s.cohort} ({s.rombel})
+											{s.sessionDate} •{" "}
+											{s.cohort === 0
+												? "Semua Angkatan"
+												: `Angkatan ${s.cohort}`}{" "}
+											({s.rombel})
 										</SelectItem>
 									))}
 								</SelectContent>
@@ -1052,7 +1121,7 @@ export function BarisPagiDashboard({
 									pencatatan kehadiran dan jam kedatangan mahasiswa.
 								</p>
 							</div>
-							{isStaff && (
+							{isStaff && canCreate && (
 								<Button
 									onClick={() => setIsCreateOpen(true)}
 									className="bg-[#0517B0] hover:bg-blue-800 text-white rounded-xl text-xs font-semibold gap-2"
@@ -1060,6 +1129,14 @@ export function BarisPagiDashboard({
 									<Plus className="w-4 h-4" />
 									Buat Sesi Pertama
 								</Button>
+							)}
+							{isStaff && !canCreate && (
+								<Link href="/dashboard/penjadwalan?tab=baris-pagi">
+									<Button className="bg-[#0517B0] hover:bg-blue-800 text-white rounded-xl text-xs font-semibold gap-2">
+										<ExternalLink className="w-4 h-4" />
+										Buka Penjadwalan Baris Pagi
+									</Button>
+								</Link>
 							)}
 						</div>
 					) : isLoadingBoard ? (
@@ -1482,28 +1559,43 @@ export function BarisPagiDashboard({
 
 						{isStaff && (
 							<div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
-								<Button
-									size="sm"
-									disabled={isAutoGenerating}
-									onClick={handleGenerateSessions}
-									className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold gap-1.5 shadow-xs flex-1 sm:flex-initial"
-								>
-									{isAutoGenerating ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin" />
-									) : (
-										<Sparkles className="w-3.5 h-3.5" />
-									)}
-									<span>Generate Sesi (4 Pekan)</span>
-								</Button>
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={() => setIsConfigModalOpen(true)}
-									className="rounded-xl text-xs font-semibold border-slate-300 text-slate-700 hover:bg-white gap-1.5"
-								>
-									<Settings className="w-3.5 h-3.5 text-slate-500" />
-									<span>Atur Jadwal Rutin</span>
-								</Button>
+								{canCreate ? (
+									<>
+										<Button
+											size="sm"
+											disabled={isAutoGenerating}
+											onClick={handleGenerateSessions}
+											className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold gap-1.5 shadow-xs flex-1 sm:flex-initial"
+										>
+											{isAutoGenerating ? (
+												<Loader2 className="w-3.5 h-3.5 animate-spin" />
+											) : (
+												<Sparkles className="w-3.5 h-3.5" />
+											)}
+											<span>Generate Sesi (4 Pekan)</span>
+										</Button>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => setIsConfigModalOpen(true)}
+											className="rounded-xl text-xs font-semibold border-slate-300 text-slate-700 hover:bg-white gap-1.5"
+										>
+											<Settings className="w-3.5 h-3.5 text-slate-500" />
+											<span>Atur Jadwal Rutin</span>
+										</Button>
+									</>
+								) : (
+									<Link href="/dashboard/penjadwalan?tab=baris-pagi">
+										<Button
+											variant="outline"
+											size="sm"
+											className="rounded-xl text-xs font-semibold border-blue-200 text-[#0517B0] hover:bg-blue-50/70 gap-1.5"
+										>
+											<ExternalLink className="w-3.5 h-3.5" />
+											<span>Kelola Jadwal & Sesi di Penjadwalan</span>
+										</Button>
+									</Link>
+								)}
 							</div>
 						)}
 					</div>
@@ -1552,17 +1644,30 @@ export function BarisPagiDashboard({
 								</Button>
 							</div>
 
-							{isStaff && (
-								<Button
-									size="sm"
-									onClick={() => setIsCreateOpen(true)}
-									className="bg-[#0517B0] hover:bg-blue-800 text-white rounded-xl text-xs font-semibold gap-1.5"
-								>
-									<Plus className="w-3.5 h-3.5" />
-									<span className="hidden sm:inline">Tambah Sesi Manual</span>
-									<span className="sm:hidden">Tambah</span>
-								</Button>
-							)}
+							{isStaff &&
+								(canCreate ? (
+									<Button
+										size="sm"
+										onClick={() => setIsCreateOpen(true)}
+										className="bg-[#0517B0] hover:bg-blue-800 text-white rounded-xl text-xs font-semibold gap-1.5"
+									>
+										<Plus className="w-3.5 h-3.5" />
+										<span className="hidden sm:inline">Tambah Sesi Manual</span>
+										<span className="sm:hidden">Tambah</span>
+									</Button>
+								) : (
+									<Link href="/dashboard/penjadwalan?tab=baris-pagi">
+										<Button
+											size="sm"
+											variant="outline"
+											className="border-blue-200 text-[#0517B0] hover:bg-blue-50/70 rounded-xl text-xs font-semibold gap-1.5"
+										>
+											<ExternalLink className="w-3.5 h-3.5" />
+											<span className="hidden sm:inline">Buat Jadwal Baru</span>
+											<span className="sm:hidden">Buat Jadwal</span>
+										</Button>
+									</Link>
+								))}
 						</div>
 					</div>
 
@@ -1648,7 +1753,11 @@ export function BarisPagiDashboard({
 											</div>
 
 											<div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
-												<span>Angkatan {s.cohort}</span>
+												<span>
+													{s.cohort === 0
+														? "Semua Angkatan"
+														: `Angkatan ${s.cohort}`}
+												</span>
 												<span>•</span>
 												<Badge
 													variant="outline"
@@ -1876,7 +1985,9 @@ export function BarisPagiDashboard({
 												</td>
 												<td className="py-3 px-4 text-slate-700 whitespace-nowrap">
 													<span className="font-semibold">
-														Angkatan {s.cohort}
+														{s.cohort === 0
+															? "Semua Angkatan"
+															: `Angkatan ${s.cohort}`}
 													</span>{" "}
 													•{" "}
 													<Badge
@@ -2183,16 +2294,18 @@ export function BarisPagiDashboard({
 								<Select
 									value={createForm.cohort}
 									onValueChange={(val) =>
-										setCreateForm((p) => ({ ...p, cohort: val || "16" }))
+										setCreateForm((p) => ({ ...p, cohort: val || "all" }))
 									}
 								>
 									<SelectTrigger className="rounded-xl text-xs">
 										<SelectValue placeholder="Pilih angkatan" />
 									</SelectTrigger>
 									<SelectContent>
+										<SelectItem value="all">Semua Angkatan</SelectItem>
+										<SelectItem value="14">Angkatan 14</SelectItem>
+										<SelectItem value="15">Angkatan 15</SelectItem>
 										<SelectItem value="16">Angkatan 16</SelectItem>
 										<SelectItem value="17">Angkatan 17</SelectItem>
-										<SelectItem value="15">Angkatan 15</SelectItem>
 									</SelectContent>
 								</Select>
 							</div>

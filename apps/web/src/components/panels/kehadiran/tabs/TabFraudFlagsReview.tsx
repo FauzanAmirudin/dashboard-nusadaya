@@ -176,7 +176,10 @@ export function TabFraudFlagsReview() {
 
 			{/* Filters */}
 			<div className="flex items-center gap-3 bg-white p-3.5 rounded-2xl border border-slate-200">
-				<Select value={typeFilter} onValueChange={setTypeFilter}>
+				<Select
+					value={typeFilter}
+					onValueChange={(val) => setTypeFilter(val || "all")}
+				>
 					<SelectTrigger className="h-9 text-xs bg-slate-50 border-slate-200 font-medium w-40">
 						<SelectValue placeholder="Layanan" />
 					</SelectTrigger>
@@ -189,7 +192,10 @@ export function TabFraudFlagsReview() {
 					</SelectContent>
 				</Select>
 
-				<Select value={statusFilter} onValueChange={setStatusFilter}>
+				<Select
+					value={statusFilter}
+					onValueChange={(val) => setStatusFilter(val || "all")}
+				>
 					<SelectTrigger className="h-9 text-xs bg-slate-50 border-slate-200 font-medium w-44">
 						<SelectValue placeholder="Status Review" />
 					</SelectTrigger>

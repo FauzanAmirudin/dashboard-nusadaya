@@ -287,8 +287,8 @@ export default function MataKuliahDetailPage() {
 		return fetch(`${API_URL}${endpoint}`, { ...options, headers });
 	};
 
-	const fetchData = async () => {
-		setIsLoading(true);
+	const fetchData = async (isSilent = false) => {
+		if (!isSilent) setIsLoading(true);
 		try {
 			// 1. Get course info
 			const { data: cData, error: cErr } = await api.courses[courseId].get();
@@ -301,10 +301,11 @@ export default function MataKuliahDetailPage() {
 			setCourse(courseInfo);
 
 			// 2. Get meetings
+			let meets: any[] = [];
 			const { data: mData, error: mErr } =
 				await api.courses[courseId].meetings.get();
 			if (!mErr && mData?.success) {
-				const meets = ((mData.data as any[]) || []).filter(
+				meets = ((mData.data as any[]) || []).filter(
 					(m: any) => m.meetingNumber >= 1 && m.meetingNumber <= 16,
 				);
 				meets.sort((a, b) => (a.meetingNumber ?? 0) - (b.meetingNumber ?? 0));
@@ -333,7 +334,10 @@ export default function MataKuliahDetailPage() {
 						});
 					}
 				});
-				setAttendanceData(attState);
+				setAttendanceData((prev) => ({
+					...prev,
+					...attState,
+				}));
 			}
 
 			// 3. Get students in this cohort
@@ -355,12 +359,24 @@ export default function MataKuliahDetailPage() {
 								!s.rombel || s.rombel.trim().toLowerCase() === targetRombel,
 						);
 					}
+					// Filter students by peminatan if course is for a specific peminatan
+					if (
+						courseInfo.peminatan &&
+						courseInfo.peminatan.trim().toLowerCase() !== "umum" &&
+						courseInfo.peminatan.trim().toLowerCase() !== "semua"
+					) {
+						const targetPem = courseInfo.peminatan.trim().toLowerCase();
+						cohortList = cohortList.filter(
+							(s) =>
+								s.subProgram && s.subProgram.trim().toLowerCase() === targetPem,
+						);
+					}
 					cohortList.sort((a, b) => a.name.localeCompare(b.name));
 					setCohortStudents(cohortList);
 				}
 			}
 
-			// 4. Get custom enrollments (lintas angkatan)
+			// 4. Get custom enrollments (peserta tambahan lintas angkatan/rombel)
 			let customList: CustomEnrollment[] = [];
 			const res = await fetchApi(`/courses/${courseId}/enrollments`);
 			if (res.ok) {
@@ -371,7 +387,7 @@ export default function MataKuliahDetailPage() {
 				}
 			}
 
-			// 5. Combine students from cohort + custom enrollments (de-duplicate by studentId)
+			// 5. Combine students from cohort + custom enrollments + meeting attendees (de-duplicate by studentId)
 			const studentMap = new Map<number, StudentRecord>();
 			for (const s of cohortList) {
 				studentMap.set(s.id, {
@@ -379,6 +395,8 @@ export default function MataKuliahDetailPage() {
 					nim: s.nim || "-",
 					name: s.name,
 					cohort: s.cohort,
+					rombel: s.rombel,
+					program: s.program,
 					subProgram: s.subProgram,
 					studentStatus: s.studentStatus,
 				});
@@ -390,12 +408,15 @@ export default function MataKuliahDetailPage() {
 						nim: e.student.nim || "-",
 						name: e.student.name,
 						cohort: e.student.cohort,
+						rombel: (e.student as any).rombel || null,
+						program: e.student.program,
 						subProgram: e.student.subProgram,
 						studentStatus: e.student.studentStatus,
 					});
 				}
 			}
 
+			// Daftar peserta kelas murni gabungan sah antara peserta reguler (cohortStudents) dan mahasiswa tambahan (enrollments)
 			const combined = Array.from(studentMap.values()).sort((a, b) =>
 				a.name.localeCompare(b.name),
 			);
@@ -403,7 +424,7 @@ export default function MataKuliahDetailPage() {
 		} catch (err) {
 			console.error(err);
 		} finally {
-			setIsLoading(false);
+			if (!isSilent) setIsLoading(false);
 		}
 	};
 
@@ -411,6 +432,62 @@ export default function MataKuliahDetailPage() {
 		if (hasHydrated && user) {
 			fetchData();
 		}
+
+		// Realtime sync via BroadcastChannel and window events
+		let bc: BroadcastChannel | null = null;
+		try {
+			bc = new BroadcastChannel("dashboard-realtime-sync");
+			bc.onmessage = (event) => {
+				const data = event.data;
+				if (
+					data &&
+					(data.type === "academic-data-updated" ||
+						data.type === "course-attendance-updated" ||
+						data.type === "course-enrollment-updated" ||
+						data.type === "course-updated")
+				) {
+					if (
+						!data.courseId ||
+						data.courseId.toString() === courseId.toString()
+					) {
+						fetchData(true);
+					}
+				}
+			};
+		} catch {}
+
+		const handleRealtimeEvent = (e: any) => {
+			const detail = e?.detail;
+			if (
+				!detail?.courseId ||
+				detail.courseId.toString() === courseId.toString()
+			) {
+				fetchData(true);
+			}
+		};
+
+		window.addEventListener("academic-data-updated", handleRealtimeEvent);
+		window.addEventListener("course-attendance-updated", handleRealtimeEvent);
+		window.addEventListener("course-enrollment-updated", handleRealtimeEvent);
+
+		const handleFocus = () => {
+			fetchData(true);
+		};
+		window.addEventListener("focus", handleFocus);
+
+		return () => {
+			if (bc) bc.close();
+			window.removeEventListener("academic-data-updated", handleRealtimeEvent);
+			window.removeEventListener(
+				"course-attendance-updated",
+				handleRealtimeEvent,
+			);
+			window.removeEventListener(
+				"course-enrollment-updated",
+				handleRealtimeEvent,
+			);
+			window.removeEventListener("focus", handleFocus);
+		};
 	}, [hasHydrated, user, courseId]);
 
 	// Search candidate students for manual enrollment
@@ -475,9 +552,25 @@ export default function MataKuliahDetailPage() {
 					detail: { studentIds, courseId },
 				}),
 			);
+			window.dispatchEvent(
+				new CustomEvent("course-attendance-updated", {
+					detail: { studentIds, courseId },
+				}),
+			);
+			window.dispatchEvent(
+				new CustomEvent("course-enrollment-updated", {
+					detail: { studentIds, courseId },
+				}),
+			);
 			try {
 				const ch = new BroadcastChannel("dashboard-realtime-sync");
 				ch.postMessage({ type: "academic-data-updated", studentIds, courseId });
+				ch.postMessage({ type: "course-attendance-updated", courseId });
+				ch.postMessage({
+					type: "course-enrollment-updated",
+					studentIds,
+					courseId,
+				});
 				ch.close();
 			} catch {}
 		}
@@ -851,15 +944,6 @@ export default function MataKuliahDetailPage() {
 					</div>
 				</div>
 				<div className="flex flex-wrap items-center gap-2">
-					<Link href={`/dashboard/mata-kuliah/rekap/${course.id}`}>
-						<Button
-							variant="outline"
-							className="border-emerald-300 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100 shadow-xs font-semibold"
-						>
-							<CheckCircle className="mr-2 h-4 w-4 text-emerald-600" />
-							Rekap Nilai & Presensi
-						</Button>
-					</Link>
 					<Button
 						variant="outline"
 						onClick={() => setIsGenerateDatesOpen(true)}
@@ -947,7 +1031,16 @@ export default function MataKuliahDetailPage() {
 			</div>
 
 			{/* Main Content Tabs */}
-			<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+			<Tabs
+				value={activeTab}
+				onValueChange={(val) => {
+					setActiveTab(val);
+					if (val === "jadwal" || val === "peserta") {
+						fetchData(true);
+					}
+				}}
+				className="w-full"
+			>
 				<TabsList className="mb-4 bg-slate-100 p-1 rounded-xl border border-slate-200 flex flex-wrap h-auto gap-1">
 					<TabsTrigger
 						value="jadwal"
@@ -1437,6 +1530,9 @@ export default function MataKuliahDetailPage() {
 																		<TableHead className="w-44 text-xs font-bold text-slate-700">
 																			{isExam ? "Kehadiran Ujian" : "Kehadiran"}
 																		</TableHead>
+																		<TableHead className="w-36 text-center text-xs font-bold text-slate-700">
+																			Bukti Kehadiran
+																		</TableHead>
 																		{isExam ? (
 																			<TableHead className="w-32 text-xs font-bold text-slate-700">
 																				{isUts ? "Nilai UTS" : "Nilai UAS"}
@@ -1487,91 +1583,25 @@ export default function MataKuliahDetailPage() {
 																					{s.nim || "-"}
 																				</TableCell>
 																				<TableCell className="text-xs font-bold text-slate-900">
-																					{(() => {
-																						const att = (
-																							meet.attendances || []
-																						).find(
-																							(a: any) => a.studentId === s.id,
-																						);
-																						return (
-																							<div className="flex items-center justify-between gap-2">
-																								<div className="flex items-center gap-2">
-																									<span>{s.name}</span>
-																									{s.cohort &&
-																										s.cohort !==
-																											course.cohort && (
-																											<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] px-1.5 py-0 font-medium">
-																												Angkatan {s.cohort}
-																											</Badge>
-																										)}
-																								</div>
-																								{att?.selfieUrl && (
-																									<button
-																										type="button"
-																										onClick={() =>
-																											setSelectedSelfieRecord({
-																												id: att.id || 0,
-																												attendanceType:
-																													"kuliah",
-																												title: `${course.name} - ${meet.meetingLabel}`,
-																												student: {
-																													id: s.id,
-																													name: s.name,
-																													nim: s.nim,
-																													cohort: s.cohort,
-																												},
-																												status:
-																													currentEntry.status ||
-																													att.status ||
-																													"hadir",
-																												selfieUrl:
-																													att.selfieUrl ||
-																													undefined,
-																												latitude:
-																													att.latitude ||
-																													undefined,
-																												longitude:
-																													att.longitude ||
-																													undefined,
-																												gpsAccuracy:
-																													att.gpsAccuracy ||
-																													undefined,
-																												locationName:
-																													att.locationName ||
-																													undefined,
-																												distanceFromCheckpoint:
-																													att.distanceFromCheckpoint ||
-																													undefined,
-																												isWithinRadius:
-																													att.isWithinRadius ??
-																													true,
-																												selfieTakenAt:
-																													att.selfieTakenAt ||
-																													undefined,
-																												verificationStatus:
-																													att.verificationStatus ||
-																													"auto_approved",
-																											})
-																										}
-																										className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-blue-50 border border-blue-200/80 bg-blue-50/40 text-blue-700 transition-colors cursor-pointer group text-left shrink-0"
-																										title="Lihat foto selfie & peta lokasi GPS mahasiswa"
-																									>
-																										<div className="relative w-5 h-5 rounded overflow-hidden border border-blue-300 shrink-0">
-																											<img
-																												src={att.selfieUrl}
-																												alt="Selfie"
-																												className="w-full h-full object-cover"
-																											/>
-																										</div>
-																										<span className="font-semibold text-[10px] flex items-center gap-0.5">
-																											<Camera className="w-2.5 h-2.5" />
-																											Foto GPS
-																										</span>
-																									</button>
-																								)}
-																							</div>
-																						);
-																					})()}
+																					<div className="flex items-center gap-2">
+																						<span>{s.name}</span>
+																						{enrollments.some(
+																							(e) => e.studentId === s.id,
+																						) ? (
+																							<Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[10px] px-1.5 py-0 font-semibold">
+																								Peserta Tambahan
+																								{s.cohort &&
+																								s.cohort !== course.cohort
+																									? ` • Angkatan ${s.cohort}`
+																									: ""}
+																							</Badge>
+																						) : s.cohort &&
+																							s.cohort !== course.cohort ? (
+																							<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] px-1.5 py-0 font-medium">
+																								Angkatan {s.cohort}
+																							</Badge>
+																						) : null}
+																					</div>
 																				</TableCell>
 																				<TableCell>
 																					<Select
@@ -1691,6 +1721,79 @@ export default function MataKuliahDetailPage() {
 																							)}
 																						</SelectContent>
 																					</Select>
+																				</TableCell>
+
+																				{/* Kolom Bukti Kehadiran (Selfie GPS) */}
+																				<TableCell className="text-center">
+																					{(() => {
+																						const att = (
+																							meet.attendances || []
+																						).find(
+																							(a: any) => a.studentId === s.id,
+																						);
+																						if (!att?.selfieUrl) {
+																							return (
+																								<span className="text-[11px] text-slate-400 italic">
+																									Tanpa Bukti
+																								</span>
+																							);
+																						}
+																						return (
+																							<Button
+																								type="button"
+																								variant="outline"
+																								size="sm"
+																								onClick={() =>
+																									setSelectedSelfieRecord({
+																										id: att.id || 0,
+																										attendanceType: "kuliah",
+																										title: `${course.name} - ${meet.meetingLabel}`,
+																										student: {
+																											id: s.id,
+																											name: s.name,
+																											nim: s.nim,
+																											cohort: s.cohort,
+																										},
+																										status:
+																											currentEntry.status ||
+																											att.status ||
+																											"hadir",
+																										selfieUrl:
+																											att.selfieUrl ||
+																											undefined,
+																										latitude:
+																											att.latitude || undefined,
+																										longitude:
+																											att.longitude ||
+																											undefined,
+																										gpsAccuracy:
+																											att.gpsAccuracy ||
+																											undefined,
+																										locationName:
+																											att.locationName ||
+																											undefined,
+																										distanceFromCheckpoint:
+																											att.distanceFromCheckpoint ||
+																											undefined,
+																										isWithinRadius:
+																											att.isWithinRadius ??
+																											true,
+																										selfieTakenAt:
+																											att.selfieTakenAt ||
+																											undefined,
+																										verificationStatus:
+																											att.verificationStatus ||
+																											"auto_approved",
+																									})
+																								}
+																								className="h-7 px-2.5 text-xs text-blue-700 border-blue-200 bg-blue-50/70 hover:bg-blue-100 font-semibold gap-1.5 rounded-lg shadow-2xs inline-flex items-center cursor-pointer"
+																								title="Lihat foto selfie & peta lokasi GPS mahasiswa"
+																							>
+																								<Camera className="w-3.5 h-3.5 text-blue-600" />
+																								<span>Lihat Bukti</span>
+																							</Button>
+																						);
+																					})()}
 																				</TableCell>
 
 																				{isExam ? (

@@ -12,6 +12,7 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { api } from "@/lib/eden";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store";
@@ -308,8 +309,10 @@ export function TabBarisPagi({ studentId }: { studentId: number }) {
 											</td>
 											<td className="py-3 px-4 whitespace-nowrap">
 												{rec.selfieUrl ? (
-													<button
+													<Button
 														type="button"
+														variant="outline"
+														size="sm"
 														onClick={() =>
 															setSelectedRecord({
 																id: rec.id,
@@ -321,7 +324,7 @@ export function TabBarisPagi({ studentId }: { studentId: number }) {
 																	nim: "",
 																},
 																status: rec.status,
-																selfieUrl: rec.selfieUrl,
+																selfieUrl: rec.selfieUrl || undefined,
 																latitude: rec.latitude,
 																longitude: rec.longitude,
 																gpsAccuracy: rec.gpsAccuracy,
@@ -334,32 +337,16 @@ export function TabBarisPagi({ studentId }: { studentId: number }) {
 																	rec.verificationStatus || "auto_approved",
 															})
 														}
-														className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer group text-left"
-														title="Klik untuk melihat foto & peta lokasi"
+														className="h-7 px-2.5 text-xs text-blue-700 border-blue-200 bg-blue-50/70 hover:bg-blue-100 font-semibold gap-1.5 rounded-lg shadow-2xs inline-flex items-center cursor-pointer"
+														title="Lihat foto selfie & peta lokasi GPS baris pagi"
 													>
-														<div className="relative w-8 h-8 rounded-lg overflow-hidden border border-slate-300 group-hover:border-blue-500 shrink-0">
-															<img
-																src={rec.selfieUrl}
-																alt="Bukti Selfie"
-																className="w-full h-full object-cover"
-															/>
-														</div>
-														<div>
-															<span className="font-semibold text-[11px] text-blue-600 group-hover:underline flex items-center gap-1">
-																<Camera className="w-3 h-3" />
-																Selfie GPS
-															</span>
-															<span className="text-[10px] text-slate-400 block">
-																{rec.isWithinRadius
-																	? "Dalam Area"
-																	: "Luar Area"}
-															</span>
-														</div>
-													</button>
+														<Camera className="w-3.5 h-3.5 text-blue-600" />
+														<span>Lihat Bukti Kehadiran</span>
+													</Button>
 												) : (
 													<Badge
 														variant="outline"
-														className="text-[10px] text-slate-500 border-slate-200"
+														className="text-[10px] text-slate-400 border-slate-200 bg-slate-50 font-normal"
 													>
 														{rec.checkinMethod === "self"
 															? "Mandiri Web"

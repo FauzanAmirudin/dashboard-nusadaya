@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte, notInArray } from "drizzle-orm";
 import { db } from "../../db";
 import {
 	academicData,
@@ -29,22 +29,25 @@ export interface GradeItem {
 	attendancePresent: number;
 	totalMeetings: number;
 	attendanceRate: number;
-	theoryScore: number;
-	practicalScore: number;
-	utsScore: number;
-	uasScore: number;
+	theoryScore: number | null;
+	practicalScore: number | null;
+	utsScore: number | null;
+	uasScore: number | null;
 	finalScore: number;
 	grade: string;
 	gradePoint: number; // scaled by 100: 400 for 4.00, etc.
 	qualityScore: number; // sks * (gradePoint / 100)
-	status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN";
+	status: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" | "PROSES";
 	isPassed: boolean;
+	isCustomEnrollment?: boolean;
+	enrollmentNotes?: string | null;
 }
 
 export interface StudentAcademicSummary {
 	studentId: number;
 	nim: string;
 	name: string;
+	gender?: string;
 	cohort: number;
 	rombel: string;
 	program: string;
@@ -57,6 +60,10 @@ export interface StudentAcademicSummary {
 	gpaDisplay: string; // e.g. "3.75"
 	allUtsPassed: boolean;
 	allUasPassed: boolean;
+	utsStatus: "LULUS" | "REMEDIAL" | "BELUM_ADA_NILAI";
+	uasStatus: "LULUS" | "REMEDIAL" | "BELUM_ADA_NILAI";
+	evaluatedUtsCount: number;
+	evaluatedUasCount: number;
 	assignmentsCompleted: boolean;
 	khsPublished: boolean;
 	khsPublishedAt?: Date | null;
@@ -101,41 +108,7 @@ export class GradeCalculationService {
 		});
 		if (!student) throw new Error(`Mahasiswa ID ${studentId} tidak ditemukan`);
 
-		// Ambil seluruh mata kuliah relevan untuk kohort dan rombel mahasiswa
-		const allRelevantCourses = await db.query.courses.findMany({
-			where: eq(courses.cohort, student.cohort),
-			with: {
-				dosen: { columns: { fullName: true } },
-				meetings: {
-					where: and(
-						gte(courseMeetings.meetingNumber, 1),
-						lte(courseMeetings.meetingNumber, 16),
-					),
-				},
-			},
-		});
-
-		// Filter sesuai rombel jika mata kuliah terikat rombel tertentu
-		let relevantCourses = allRelevantCourses.filter((c) => {
-			if (
-				!c.rombel ||
-				c.rombel.toLowerCase() === "gabungan" ||
-				c.rombel.toLowerCase() === "semua"
-			)
-				return true;
-			if (!student.rombel) return true;
-			return (
-				c.rombel.trim().toLowerCase() === student.rombel.trim().toLowerCase()
-			);
-		});
-
-		// Fallback: Jika tidak ada mata kuliah yang cocok dengan rombel spesifik (misal nama kelas kustom),
-		// gunakan seluruh mata kuliah kurikulum angkatan tersebut
-		if (relevantCourses.length === 0 && allRelevantCourses.length > 0) {
-			relevantCourses = allRelevantCourses;
-		}
-
-		// Tambahkan juga mata kuliah custom enrollments (lintas angkatan)
+		// 1. Ambil seluruh mata kuliah pendaftaran khusus (course_enrollments / didaftarkan / ditambahkan)
 		const customEnrollments = await db.query.courseEnrollments.findMany({
 			where: eq(courseEnrollments.studentId, studentId),
 			with: {
@@ -157,13 +130,110 @@ export class GradeCalculationService {
 			.map((e) => e.course)
 			.filter((c): c is NonNullable<typeof c> => c !== null && c !== undefined);
 
-		const courseIdSet = new Set(relevantCourses.map((c) => c.id));
-		for (const cc of customCourses) {
-			if (!courseIdSet.has(cc.id)) {
-				relevantCourses.push(cc as any);
-				courseIdSet.add(cc.id);
+		// 2. Ambil mata kuliah di mana mahasiswa aktif hadir atau memiliki nilai perkuliahan
+		const studentAttendances = await db.query.courseMeetingAttendances.findMany(
+			{
+				where: eq(courseMeetingAttendances.studentId, studentId),
+			},
+		);
+		const activeAttendances = studentAttendances.filter(
+			(a) =>
+				a.status === "hadir" ||
+				(a.theoryScore !== null && a.theoryScore !== undefined) ||
+				(a.practicalScore !== null && a.practicalScore !== undefined),
+		);
+		const activeMeetingIds = activeAttendances.map((a) => a.meetingId);
+		let attendedCourses: any[] = [];
+		if (activeMeetingIds.length > 0) {
+			const meetingsWithAtt = await db.query.courseMeetings.findMany({
+				where: inArray(courseMeetings.id, activeMeetingIds),
+				columns: { courseId: true },
+			});
+			const attendedCourseIds = Array.from(
+				new Set(meetingsWithAtt.map((m) => m.courseId)),
+			);
+			if (attendedCourseIds.length > 0) {
+				attendedCourses = await db.query.courses.findMany({
+					where: inArray(courses.id, attendedCourseIds),
+					with: {
+						dosen: { columns: { fullName: true } },
+						meetings: {
+							where: and(
+								gte(courseMeetings.meetingNumber, 1),
+								lte(courseMeetings.meetingNumber, 16),
+							),
+						},
+					},
+				});
 			}
 		}
+
+		// 3. Ambil mata kuliah reguler yang sesuai dengan kohort, rombel, dan peminatan mahasiswa
+		let regularCourses: any[] = [];
+		if (student.cohort) {
+			const allCohortCourses = await db.query.courses.findMany({
+				where: eq(courses.cohort, student.cohort),
+				with: {
+					dosen: { columns: { fullName: true } },
+					meetings: {
+						where: and(
+							gte(courseMeetings.meetingNumber, 1),
+							lte(courseMeetings.meetingNumber, 16),
+						),
+					},
+				},
+			});
+
+			regularCourses = allCohortCourses.filter((c) => {
+				// Rombel check: hanya cocok jika terbuka (gabungan/semua) atau rombel mahasiswa sama persis
+				const isOpenRombel =
+					!c.rombel ||
+					c.rombel.trim().toLowerCase() === "gabungan" ||
+					c.rombel.trim().toLowerCase() === "semua";
+				const matchesRombel =
+					isOpenRombel ||
+					(student.rombel &&
+						c.rombel.trim().toLowerCase() ===
+							student.rombel.trim().toLowerCase());
+				if (!matchesRombel) return false;
+
+				// Peminatan check: filter peminatan spesifik agar tidak tercampur lintas jurusan
+				if (c.peminatan && c.peminatan.trim()) {
+					const cPem = c.peminatan.trim().toLowerCase();
+					if (
+						cPem === "indonesia-reguler" ||
+						cPem === "umum" ||
+						cPem === "gabungan" ||
+						cPem === "semua"
+					) {
+						return true;
+					}
+					const sSub = (student.subProgram || "").trim().toLowerCase();
+					const sProg = (student.program || "").trim().toLowerCase();
+					const matchesPem =
+						(sSub && sSub === cPem) ||
+						(sProg && cPem.includes(sProg)) ||
+						(sSub && cPem.includes(sSub));
+					if (!matchesPem) return false;
+				}
+
+				return true;
+			});
+		}
+
+		// Gabungkan mata kuliah tanpa duplikasi: murni mata kuliah sah (reguler sesuai peminatan/rombel + pendaftaran tambahan)
+		const customCourseIds = new Set(customCourses.map((c) => c.id));
+		const customEnrollmentNotes = new Map(
+			customEnrollments.map((e) => [e.courseId, e.notes]),
+		);
+
+		const courseMap = new Map<number, any>();
+		for (const c of regularCourses) courseMap.set(c.id, c);
+		for (const c of customCourses) courseMap.set(c.id, c);
+
+		const relevantCourses = Array.from(courseMap.values()).sort((a, b) =>
+			(a.code || "").localeCompare(b.code || ""),
+		);
 
 		const gradesResult: GradeItem[] = [];
 		let totalQualityPoints = 0;
@@ -173,9 +243,19 @@ export class GradeCalculationService {
 		let countUasUnderStandard = 0;
 		let totalTheoryAvgSum = 0;
 		let evaluatedTheoryCount = 0;
+		let totalUtsEvaluated = 0;
+		let totalUasEvaluated = 0;
 
 		for (const course of relevantCourses) {
-			const meetingIds = (course.meetings || []).map((m) => m.id);
+			// Ambil data nilai yang sudah ada di course_grades terlebih dahulu
+			const existingGrade = await db.query.courseGrades.findFirst({
+				where: and(
+					eq(courseGrades.studentId, studentId),
+					eq(courseGrades.courseId, course.id),
+				),
+			});
+
+			const meetingIds = (course.meetings || []).map((m: any) => m.id);
 			let attendances: any[] = [];
 			if (meetingIds.length > 0) {
 				attendances = await db.query.courseMeetingAttendances.findMany({
@@ -187,9 +267,10 @@ export class GradeCalculationService {
 			}
 
 			// 1. Presensi (Pertemuan 1 - 16)
-			const presentCount = attendances.filter(
-				(a) => a.status === "hadir",
-			).length;
+			let presentCount = attendances.filter((a) => a.status === "hadir").length;
+			if (attendances.length === 0 && existingGrade?.attendancePresent) {
+				presentCount = existingGrade.attendancePresent;
+			}
 			const totalMeetings = 16;
 			const attendanceRate = Math.min(
 				100,
@@ -197,33 +278,63 @@ export class GradeCalculationService {
 			);
 
 			// 2. Evaluasi UTS (Pertemuan 8 / meetingType == 'uts')
-			const utsMeeting = course.meetings.find(
-				(m) => m.meetingNumber === 8 || m.meetingType === "uts",
+			const utsMeeting = (course.meetings || []).find(
+				(m: any) => m.meetingNumber === 8 || m.meetingType === "uts",
 			);
 			const utsAtt = utsMeeting
 				? attendances.find((a) => a.meetingId === utsMeeting.id)
 				: null;
-			let utsScore = 0;
+			let utsScore: number | null = null;
 			if (utsAtt) {
-				utsScore =
-					utsAtt.practicalScore ??
-					utsAtt.theoryScore ??
-					(utsAtt.status === "hadir" ? 75 : 0);
+				if (
+					utsAtt.practicalScore !== null &&
+					utsAtt.practicalScore !== undefined
+				) {
+					utsScore = Number(utsAtt.practicalScore);
+				} else if (
+					utsAtt.theoryScore !== null &&
+					utsAtt.theoryScore !== undefined
+				) {
+					utsScore = Number(utsAtt.theoryScore);
+				}
+			}
+			if (
+				utsScore === null &&
+				existingGrade?.utsScore !== null &&
+				existingGrade?.utsScore !== undefined &&
+				Number(existingGrade.utsScore) > 0
+			) {
+				utsScore = Number(existingGrade.utsScore);
 			}
 
 			// 3. Evaluasi UAS (Pertemuan 16 / meetingType == 'uas')
-			const uasMeeting = course.meetings.find(
-				(m) => m.meetingNumber === 16 || m.meetingType === "uas",
+			const uasMeeting = (course.meetings || []).find(
+				(m: any) => m.meetingNumber === 16 || m.meetingType === "uas",
 			);
 			const uasAtt = uasMeeting
 				? attendances.find((a) => a.meetingId === uasMeeting.id)
 				: null;
-			let uasScore = 0;
+			let uasScore: number | null = null;
 			if (uasAtt) {
-				uasScore =
-					uasAtt.practicalScore ??
-					uasAtt.theoryScore ??
-					(uasAtt.status === "hadir" ? 75 : 0);
+				if (
+					uasAtt.practicalScore !== null &&
+					uasAtt.practicalScore !== undefined
+				) {
+					uasScore = Number(uasAtt.practicalScore);
+				} else if (
+					uasAtt.theoryScore !== null &&
+					uasAtt.theoryScore !== undefined
+				) {
+					uasScore = Number(uasAtt.theoryScore);
+				}
+			}
+			if (
+				uasScore === null &&
+				existingGrade?.uasScore !== null &&
+				existingGrade?.uasScore !== undefined &&
+				Number(existingGrade.uasScore) > 0
+			) {
+				uasScore = Number(existingGrade.uasScore);
 			}
 
 			// 4. Rata-rata Teori & Tugas (Reguler di luar UTS & UAS)
@@ -234,16 +345,22 @@ export class GradeCalculationService {
 					a.theoryScore !== null &&
 					a.theoryScore !== undefined,
 			);
-			const theoryScores = regularTheoryAttendances.map(
-				(a) => a.theoryScore as number,
-			);
-			const avgTheory =
-				theoryScores.length > 0
-					? Math.round(
-							theoryScores.reduce((acc, curr) => acc + curr, 0) /
-								theoryScores.length,
-						)
-					: 0;
+			let avgTheory: number | null = null;
+			if (regularTheoryAttendances.length > 0) {
+				const theoryScores = regularTheoryAttendances.map((a) =>
+					Number(a.theoryScore),
+				);
+				avgTheory = Math.round(
+					theoryScores.reduce((acc, curr) => acc + curr, 0) /
+						theoryScores.length,
+				);
+			} else if (
+				existingGrade?.theoryScore !== null &&
+				existingGrade?.theoryScore !== undefined &&
+				Number(existingGrade.theoryScore) > 0
+			) {
+				avgTheory = Number(existingGrade.theoryScore);
+			}
 
 			// 5. Rata-rata Praktik / Unjuk Kerja (Reguler di luar UTS & UAS)
 			const regularPracticalAttendances = attendances.filter(
@@ -253,75 +370,117 @@ export class GradeCalculationService {
 					a.practicalScore !== null &&
 					a.practicalScore !== undefined,
 			);
-			const practicalScores = regularPracticalAttendances.map(
-				(a) => a.practicalScore as number,
-			);
-			const avgPractical =
-				practicalScores.length > 0
-					? Math.round(
-							practicalScores.reduce((acc, curr) => acc + curr, 0) /
-								practicalScores.length,
-						)
-					: 0;
-
-			// Fallback cerdas: Jika belum ada skor UTS/UAS eksplisit, gunakan rata-rata teori/praktik yang ada
-			const effectiveUts =
-				utsScore > 0 ? utsScore : Math.max(avgTheory, avgPractical, 70);
-			const effectiveUas =
-				uasScore > 0 ? uasScore : Math.max(avgTheory, avgPractical, 70);
-			const effectiveTheory =
-				avgTheory > 0
-					? avgTheory
-					: course.type === "praktik"
-						? avgPractical
-						: 70;
-			const effectivePractical = avgPractical > 0 ? avgPractical : avgTheory;
+			let avgPractical: number | null = null;
+			if (regularPracticalAttendances.length > 0) {
+				const practicalScores = regularPracticalAttendances.map((a) =>
+					Number(a.practicalScore),
+				);
+				avgPractical = Math.round(
+					practicalScores.reduce((acc, curr) => acc + curr, 0) /
+						practicalScores.length,
+				);
+			} else if (
+				existingGrade?.practicalScore !== null &&
+				existingGrade?.practicalScore !== undefined &&
+				Number(existingGrade.practicalScore) > 0
+			) {
+				avgPractical = Number(existingGrade.practicalScore);
+			}
 
 			// 6. Formula Pembobotan Vokasi Nusadaya (AKD-06):
 			// - Praktik: Presensi 10% + Teori 20% + Praktik 40% + UTS 15% + UAS 15%
 			// - Teori:   Presensi 15% + Teori/Tugas 25% + UTS 30% + UAS 30%
+			// Normalisasi Dinamis Proporsional:
+			// Jika ujian atau komponen belum diselenggarakan (null), dinormalisasi secara proporsional
+			// terhadap bobot aktif sehingga mahasiswa tidak dirugikan dengan skor 0 untuk ujian yang belum ada.
 			let finalScore = 0;
+			const hasAcademicScore =
+				avgTheory !== null ||
+				avgPractical !== null ||
+				utsScore !== null ||
+				uasScore !== null;
+
 			if (course.type === "praktik") {
-				finalScore = Math.round(
-					attendanceRate * 0.1 +
-						effectiveTheory * 0.2 +
-						effectivePractical * 0.4 +
-						effectiveUts * 0.15 +
-						effectiveUas * 0.15,
-				);
+				let activeWeight = 10; // Presensi 10%
+				let weightedSum = attendanceRate * 0.1;
+
+				if (avgTheory !== null) {
+					activeWeight += 20;
+					weightedSum += avgTheory * 0.2;
+				}
+				if (avgPractical !== null) {
+					activeWeight += 40;
+					weightedSum += avgPractical * 0.4;
+				}
+				if (utsScore !== null) {
+					activeWeight += 15;
+					weightedSum += utsScore * 0.15;
+				}
+				if (uasScore !== null) {
+					activeWeight += 15;
+					weightedSum += uasScore * 0.15;
+				}
+
+				finalScore =
+					activeWeight > 0 ? Math.round((weightedSum / activeWeight) * 100) : 0;
 			} else {
-				finalScore = Math.round(
-					attendanceRate * 0.15 +
-						effectiveTheory * 0.25 +
-						effectiveUts * 0.3 +
-						effectiveUas * 0.3,
-				);
+				let activeWeight = 15; // Presensi 15%
+				let weightedSum = attendanceRate * 0.15;
+
+				if (avgTheory !== null) {
+					activeWeight += 25;
+					weightedSum += avgTheory * 0.25;
+				}
+				if (utsScore !== null) {
+					activeWeight += 30;
+					weightedSum += utsScore * 0.3;
+				}
+				if (uasScore !== null) {
+					activeWeight += 30;
+					weightedSum += uasScore * 0.3;
+				}
+
+				finalScore =
+					activeWeight > 0 ? Math.round((weightedSum / activeWeight) * 100) : 0;
 			}
 
 			// Batas sanitasi skor 0 - 100
 			finalScore = Math.max(0, Math.min(100, finalScore));
 
-			const { grade, gradePoint, isPassed } = convertScoreToGrade(finalScore);
+			// Jika belum ada nilai akademik sama sekali dan presensi 0, status belum dinilai
+			const isEvaluated = hasAcademicScore || attendanceRate > 0;
+			const { grade, gradePoint, isPassed } = isEvaluated
+				? convertScoreToGrade(finalScore)
+				: { grade: "-", gradePoint: 0, isPassed: false };
+
 			const sks = course.sks || 2;
-			const qualityScore = sks * (gradePoint / 100);
+			const qualityScore = isEvaluated ? sks * (gradePoint / 100) : 0;
 
 			totalSksTaken += sks;
 			if (isPassed) totalSksPassed += sks;
 			totalQualityPoints += qualityScore;
 
-			if (effectiveUts < 60) countUtsUnderStandard++;
-			if (effectiveUas < 60) countUasUnderStandard++;
-			if (avgTheory > 0) {
+			if (utsScore !== null) {
+				totalUtsEvaluated++;
+				if (utsScore < 60) countUtsUnderStandard++;
+			}
+			if (uasScore !== null) {
+				totalUasEvaluated++;
+				if (uasScore < 60) countUasUnderStandard++;
+			}
+			if (avgTheory !== null) {
 				totalTheoryAvgSum += avgTheory;
 				evaluatedTheoryCount++;
 			}
 
-			const courseStatus =
-				attendanceRate >= 90 && isPassed
-					? "AMAN"
-					: attendanceRate >= 75
-						? "PERLU_PERHATIAN"
-						: "TIDAK_AMAN";
+			const courseStatus: "AMAN" | "PERLU_PERHATIAN" | "TIDAK_AMAN" | "PROSES" =
+				!isEvaluated
+					? "PROSES"
+					: attendanceRate >= 90 && isPassed
+						? "AMAN"
+						: attendanceRate >= 75
+							? "PERLU_PERHATIAN"
+							: "TIDAK_AMAN";
 
 			const gradeItem: GradeItem = {
 				courseId: course.id,
@@ -335,28 +494,23 @@ export class GradeCalculationService {
 				attendancePresent: presentCount,
 				totalMeetings: 16,
 				attendanceRate,
-				theoryScore: effectiveTheory,
-				practicalScore: effectivePractical,
-				utsScore: effectiveUts,
-				uasScore: effectiveUas,
+				theoryScore: avgTheory,
+				practicalScore: avgPractical,
+				utsScore: utsScore,
+				uasScore: uasScore,
 				finalScore,
 				grade,
 				gradePoint,
 				qualityScore,
 				status: courseStatus,
 				isPassed,
+				isCustomEnrollment: customCourseIds.has(course.id),
+				enrollmentNotes: customEnrollmentNotes.get(course.id) || null,
 			};
 
 			gradesResult.push(gradeItem);
 
-			// Upsert ke courseGrades di database
-			const existingGrade = await db.query.courseGrades.findFirst({
-				where: and(
-					eq(courseGrades.studentId, studentId),
-					eq(courseGrades.courseId, course.id),
-				),
-			});
-
+			// Upsert ke courseGrades di database dengan nilai murni (null jika belum diisi)
 			if (existingGrade) {
 				await db
 					.update(courseGrades)
@@ -368,10 +522,10 @@ export class GradeCalculationService {
 						attendancePresent: presentCount,
 						totalMeetings: 16,
 						attendanceRate,
-						theoryScore: effectiveTheory,
-						practicalScore: effectivePractical,
-						utsScore: effectiveUts,
-						uasScore: effectiveUas,
+						theoryScore: avgTheory ?? 0,
+						practicalScore: avgPractical ?? 0,
+						utsScore: utsScore,
+						uasScore: uasScore,
 						finalScore,
 						grade,
 						gradePoint,
@@ -391,10 +545,10 @@ export class GradeCalculationService {
 					attendancePresent: presentCount,
 					totalMeetings: 16,
 					attendanceRate,
-					theoryScore: effectiveTheory,
-					practicalScore: effectivePractical,
-					utsScore: effectiveUts,
-					uasScore: effectiveUas,
+					theoryScore: avgTheory ?? 0,
+					practicalScore: avgPractical ?? 0,
+					utsScore: utsScore,
+					uasScore: uasScore,
 					finalScore,
 					grade,
 					gradePoint,
@@ -406,14 +560,51 @@ export class GradeCalculationService {
 			}
 		}
 
+		// Bersihkan record course_grades usang yang bukan lagi mata kuliah peserta sah mahasiswa ini
+		const validCourseIds = relevantCourses.map((c) => c.id);
+		if (validCourseIds.length > 0) {
+			await db
+				.delete(courseGrades)
+				.where(
+					and(
+						eq(courseGrades.studentId, studentId),
+						eq(courseGrades.semester, targetSemester),
+						notInArray(courseGrades.courseId, validCourseIds),
+					),
+				);
+		} else {
+			await db
+				.delete(courseGrades)
+				.where(
+					and(
+						eq(courseGrades.studentId, studentId),
+						eq(courseGrades.semester, targetSemester),
+					),
+				);
+		}
+
 		// Hitung Indeks Prestasi Kumulatif (IPK)
 		const calculatedGpa =
 			totalSksTaken > 0
 				? Math.round((totalQualityPoints / totalSksTaken) * 100)
 				: 0;
 
-		const allUtsPassed = countUtsUnderStandard === 0;
-		const allUasPassed = countUasUnderStandard === 0;
+		const utsStatus =
+			totalUtsEvaluated === 0
+				? "BELUM_ADA_NILAI"
+				: countUtsUnderStandard === 0
+					? "LULUS"
+					: "REMEDIAL";
+
+		const uasStatus =
+			totalUasEvaluated === 0
+				? "BELUM_ADA_NILAI"
+				: countUasUnderStandard === 0
+					? "LULUS"
+					: "REMEDIAL";
+
+		const allUtsPassed = utsStatus === "LULUS";
+		const allUasPassed = uasStatus === "LULUS";
 		const assignmentsCompleted =
 			evaluatedTheoryCount === 0 ||
 			totalTheoryAvgSum / evaluatedTheoryCount >= 65;
@@ -471,6 +662,7 @@ export class GradeCalculationService {
 			studentId: student.id,
 			nim: student.nim || "-",
 			name: student.name,
+			gender: student.gender || "Laki-laki",
 			cohort: student.cohort,
 			rombel: student.rombel || "Kelas A",
 			program: student.program || "Hospitality",
@@ -485,6 +677,10 @@ export class GradeCalculationService {
 			gpaDisplay: (calculatedGpa / 100).toFixed(2),
 			allUtsPassed,
 			allUasPassed,
+			utsStatus,
+			uasStatus,
+			evaluatedUtsCount: totalUtsEvaluated,
+			evaluatedUasCount: totalUasEvaluated,
 			assignmentsCompleted,
 			khsPublished: currentAcademic?.khsPublished ?? false,
 			khsPublishedAt: currentAcademic?.khsPublishedAt,
@@ -520,13 +716,18 @@ export class GradeCalculationService {
 
 		const transcriptItems = allGrades.map((g, idx) => {
 			const sks = g.sks || 2;
+			const isEvaluated = g.grade !== "-" && g.status !== "PROSES";
 			const finalScore = g.finalScore ?? 0;
-			const { grade, gradePoint, isPassed } = convertScoreToGrade(finalScore);
-			const qualityScore = sks * (gradePoint / 100);
+			const { grade, gradePoint, isPassed } = isEvaluated
+				? convertScoreToGrade(finalScore)
+				: { grade: "-", gradePoint: 0, isPassed: false };
+			const qualityScore = isEvaluated ? sks * (gradePoint / 100) : 0;
 
-			totalSksTaken += sks;
-			if (isPassed) totalSksPassed += sks;
-			totalQualityPoints += qualityScore;
+			if (isEvaluated) {
+				totalSksTaken += sks;
+				if (isPassed) totalSksPassed += sks;
+				totalQualityPoints += qualityScore;
+			}
 
 			return {
 				no: idx + 1,

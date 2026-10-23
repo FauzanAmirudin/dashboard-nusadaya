@@ -57,9 +57,9 @@ export default function AbsenKuliahPage() {
 			});
 			const json = await res.json();
 			if (json.success && Array.isArray(json.data)) {
-				// Filter for user's cohort if available
-				const filtered = user?.cohort
-					? json.data.filter((s: ClassSchedule) => s.cohort === user.cohort)
+				const userCohort = (user as any)?.cohort;
+				const filtered = userCohort
+					? json.data.filter((s: ClassSchedule) => s.cohort === userCohort)
 					: json.data;
 				setSchedules(filtered);
 				if (filtered.length > 0) {

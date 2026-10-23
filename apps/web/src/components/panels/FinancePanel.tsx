@@ -36,7 +36,6 @@ import { api } from "@/lib/eden";
 import { hasRole, useAuthStore } from "@/store";
 import { formatDeviceDateTime } from "@/utils/format";
 import { calculateFinanceChecklist } from "@/utils/panel-logic";
-import { TabAnggaran } from "./finance/TabAnggaran";
 import { TabFeeSharing } from "./finance/TabFeeSharing";
 import { TabKeuangan } from "./finance/TabKeuangan";
 
@@ -161,7 +160,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 				/>
 
 				<Tabs defaultValue="keuangan" className="w-full space-y-4">
-					<TabsList className="w-full grid grid-cols-3 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 h-10">
+					<TabsList className="w-full grid grid-cols-2 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 h-10">
 						<TabsTrigger
 							value="keuangan"
 							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:font-bold data-[state=active]:shadow-xs rounded-lg text-xs transition-all"
@@ -173,12 +172,6 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:font-bold data-[state=active]:shadow-xs rounded-lg text-xs transition-all"
 						>
 							2. Distribusi Fee (Sharing)
-						</TabsTrigger>
-						<TabsTrigger
-							value="anggaran"
-							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:font-bold data-[state=active]:shadow-xs rounded-lg text-xs transition-all"
-						>
-							3. Anggaran Praktik
 						</TabsTrigger>
 					</TabsList>
 
@@ -195,10 +188,6 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 
 					<TabsContent value="fee-sharing">
 						<TabFeeSharing studentId={studentId} canEdit={canEdit} />
-					</TabsContent>
-
-					<TabsContent value="anggaran">
-						<TabAnggaran canEdit={canEdit} />
 					</TabsContent>
 				</Tabs>
 

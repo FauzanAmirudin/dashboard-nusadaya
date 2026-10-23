@@ -1,29 +1,8 @@
 "use client";
 
-import {
-	ArrowLeft,
-	BookOpen,
-	CheckCircle,
-	CheckSquare,
-	ChevronDown,
-	ChevronLeft,
-	ChevronRight,
-	Download,
-	Eye,
-	FileText,
-	GraduationCap,
-	Layers,
-	Loader2,
-	RefreshCw,
-	Search,
-	Settings,
-	Sparkles,
-	TrendingUp,
-	Users,
-} from "lucide-react";
-import Link from "next/link";
+import { ArrowLeft, Download, Loader2, Search } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,9 +76,6 @@ export default function RekapMataKuliahDetailPage() {
 	const [students, setStudents] = useState<StudentItem[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 
-	// Horizontal Table Scroll Container Ref
-	const matrixTableContainerRef = useRef<HTMLDivElement>(null);
-
 	// Filter
 	const [searchQuery, setSearchQuery] = useState("");
 
@@ -115,15 +91,6 @@ export default function RekapMataKuliahDetailPage() {
 			headers.set("Content-Type", "application/json");
 		}
 		return fetch(`${API_URL}${endpoint}`, { ...options, headers });
-	};
-
-	const scrollToPosition = (pos: number) => {
-		if (matrixTableContainerRef.current) {
-			matrixTableContainerRef.current.scrollTo({
-				left: pos,
-				behavior: "smooth",
-			});
-		}
 	};
 
 	const fetchData = async (silent = false) => {
@@ -175,6 +142,20 @@ export default function RekapMataKuliahDetailPage() {
 								!s.rombel || s.rombel.trim().toLowerCase() === targetRombel,
 						);
 					}
+					// Filter students by peminatan if course has a specific peminatan
+					if (
+						courseInfo.peminatan &&
+						courseInfo.peminatan.trim().toLowerCase() !== "umum" &&
+						courseInfo.peminatan.trim().toLowerCase() !== "semua" &&
+						courseInfo.peminatan.trim().toLowerCase() !== "gabungan"
+					) {
+						const targetPem = courseInfo.peminatan.trim().toLowerCase();
+						cohortList = cohortList.filter(
+							(s) =>
+								(s as any).subProgram &&
+								(s as any).subProgram.trim().toLowerCase() === targetPem,
+						);
+					}
 				}
 			}
 
@@ -221,11 +202,6 @@ export default function RekapMataKuliahDetailPage() {
 				a.name.localeCompare(b.name),
 			);
 			setStudents(combinedStudents);
-
-			// Reset scroll to Pertemuan 1 on load
-			setTimeout(() => {
-				scrollToPosition(0);
-			}, 100);
 		} catch (err) {
 			console.error(err);
 			toast.error("Terjadi kesalahan saat memuat data rekap perkuliahan");
@@ -240,7 +216,7 @@ export default function RekapMataKuliahDetailPage() {
 		}
 	}, [hasHydrated, user, courseId]);
 
-	// Realtime cross-panel synchronization listener
+	// Realtime cross-panel synchronization listener (Auto-update on event, broadcast, or tab focus)
 	useEffect(() => {
 		const handleSync = (e: any) => {
 			if (
@@ -251,6 +227,16 @@ export default function RekapMataKuliahDetailPage() {
 			}
 		};
 		window.addEventListener("academic-data-updated", handleSync);
+
+		const handleFocus = () => {
+			fetchData(true);
+		};
+		window.addEventListener("focus", handleFocus);
+		document.addEventListener("visibilitychange", () => {
+			if (document.visibilityState === "visible") {
+				fetchData(true);
+			}
+		});
 
 		let channel: BroadcastChannel | null = null;
 		try {
@@ -268,13 +254,16 @@ export default function RekapMataKuliahDetailPage() {
 
 		return () => {
 			window.removeEventListener("academic-data-updated", handleSync);
+			window.removeEventListener("focus", handleFocus);
 			if (channel) channel.close();
 		};
 	}, [courseId]);
 
-	// Process calculations strictly aligned with AKD-06 GradeCalculationService
+	// Process calculations: Dynamic calculation strictly derived from all meetings (1..16)
 	const studentRecaps = useMemo(() => {
 		if (!course || students.length === 0) return [];
+
+		const totalMeetings = 16;
 
 		return students.map((student) => {
 			let presentCount = 0;
@@ -283,8 +272,9 @@ export default function RekapMataKuliahDetailPage() {
 			let alphaCount = 0;
 			let unassignedCount = 0;
 
-			const regularTheoryScores: number[] = [];
-			const regularPracticalScores: number[] = [];
+			let sumTheory = 0;
+			let sumPractical = 0;
+			let hasAnyScore = false;
 
 			const meetingResults: Record<
 				number,
@@ -296,19 +286,16 @@ export default function RekapMataKuliahDetailPage() {
 				}
 			> = {};
 
-			let utsScore = 0;
-			let uasScore = 0;
-
 			meetings.forEach((m) => {
 				const att = m.attendances?.find((a) => a.studentId === student.id);
 				const status = att?.status || null;
 				const theoryScore =
 					att?.theoryScore !== null && att?.theoryScore !== undefined
-						? att.theoryScore
+						? Number(att.theoryScore)
 						: null;
 				const practicalScore =
 					att?.practicalScore !== null && att?.practicalScore !== undefined
-						? att.practicalScore
+						? Number(att.practicalScore)
 						: null;
 
 				meetingResults[m.id] = {
@@ -324,82 +311,76 @@ export default function RekapMataKuliahDetailPage() {
 				else if (status === "alpha") alphaCount++;
 				else unassignedCount++;
 
-				const isUts = m.meetingNumber === 8 || m.meetingType === "uts";
-				const isUas = m.meetingNumber === 16 || m.meetingType === "uas";
-
-				if (isUts) {
-					utsScore =
-						practicalScore ?? theoryScore ?? (status === "hadir" ? 75 : 0);
-				} else if (isUas) {
-					uasScore =
-						practicalScore ?? theoryScore ?? (status === "hadir" ? 75 : 0);
-				} else {
-					if (theoryScore !== null) regularTheoryScores.push(theoryScore);
-					if (practicalScore !== null)
-						regularPracticalScores.push(practicalScore);
+				// Nilai per pertemuan: jika diinput tambahkan, jika belum diinput nilainya adalah 0
+				if (theoryScore !== null && !Number.isNaN(theoryScore)) {
+					sumTheory += theoryScore;
+					hasAnyScore = true;
+				}
+				if (practicalScore !== null && !Number.isNaN(practicalScore)) {
+					sumPractical += practicalScore;
+					hasAnyScore = true;
 				}
 			});
 
-			const totalMeetings = 16;
 			const attendanceRate = Math.min(
 				100,
 				Math.round((presentCount / totalMeetings) * 100),
 			);
 
-			const avgTheory =
-				regularTheoryScores.length > 0
-					? Math.round(
-							regularTheoryScores.reduce((acc, curr) => acc + curr, 0) /
-								regularTheoryScores.length,
-						)
-					: 0;
+			// Rata-rata dinamis dari total 16 sesi (yang belum diinput bernilai 0 dan tetap terhitung sebagai pembagi)
+			const avgTheory = Math.round(sumTheory / totalMeetings);
+			const avgPractical = Math.round(sumPractical / totalMeetings);
 
-			const avgPractical =
-				regularPracticalScores.length > 0
-					? Math.round(
-							regularPracticalScores.reduce((acc, curr) => acc + curr, 0) /
-								regularPracticalScores.length,
-						)
-					: 0;
+			const isPracticalCourse = course.type === "praktik";
 
-			const effectiveUts =
-				utsScore > 0 ? utsScore : Math.max(avgTheory, avgPractical, 70);
-			const effectiveUas =
-				uasScore > 0 ? uasScore : Math.max(avgTheory, avgPractical, 70);
-			const effectiveTheory =
-				avgTheory > 0
-					? avgTheory
-					: course.type === "praktik"
-						? avgPractical
-						: 70;
-			const effectivePractical = avgPractical > 0 ? avgPractical : avgTheory;
-
-			// Standar Pembobotan Vokasi Nusadaya (AKD-06):
-			// - Praktik: Presensi 10% + Teori 20% + Praktik 40% + UTS 15% + UAS 15%
-			// - Teori:   Presensi 15% + Teori/Tugas 25% + UTS 30% + UAS 30%
+			// Perhitungan Nilai Akhir murni dinamis tanpa data statis/fallback dummy
 			let finalScore = 0;
-			if (course.type === "praktik") {
-				finalScore = Math.round(
-					attendanceRate * 0.1 +
-						effectiveTheory * 0.2 +
-						effectivePractical * 0.4 +
-						effectiveUts * 0.15 +
-						effectiveUas * 0.15,
-				);
+			if (isPracticalCourse) {
+				if (sumPractical > 0 && sumTheory > 0) {
+					// Standar praktik: 80% praktik + 20% teori
+					finalScore = Math.round(avgPractical * 0.8 + avgTheory * 0.2);
+				} else if (sumPractical > 0) {
+					finalScore = avgPractical;
+				} else if (sumTheory > 0) {
+					finalScore = avgTheory;
+				} else {
+					finalScore = 0;
+				}
 			} else {
-				finalScore = Math.round(
-					attendanceRate * 0.15 +
-						effectiveTheory * 0.25 +
-						effectiveUts * 0.3 +
-						effectiveUas * 0.3,
-				);
+				// Standar teori: 80% teori + 20% praktik (atau 100% teori jika tidak ada praktik)
+				if (sumTheory > 0 && sumPractical > 0) {
+					finalScore = Math.round(avgTheory * 0.8 + avgPractical * 0.2);
+				} else if (sumTheory > 0) {
+					finalScore = avgTheory;
+				} else if (sumPractical > 0) {
+					finalScore = avgPractical;
+				} else {
+					finalScore = 0;
+				}
 			}
 
-			let grade = "E";
-			if (finalScore >= 85) grade = "A";
-			else if (finalScore >= 75) grade = "B";
-			else if (finalScore >= 65) grade = "C";
-			else if (finalScore >= 50) grade = "D";
+			let grade = "-";
+			let statusKelulusan = "BELUM DINILAI";
+
+			if (hasAnyScore) {
+				if (finalScore >= 85) grade = "A";
+				else if (finalScore >= 75) grade = "B";
+				else if (finalScore >= 65) grade = "C";
+				else if (finalScore >= 50) grade = "D";
+				else grade = "E";
+
+				if (attendanceRate < 75 && totalMeetings - unassignedCount > 10) {
+					statusKelulusan = "TIDAK MEMENUHI PRESENSI";
+				} else if (grade === "A") {
+					statusKelulusan = "LULUS MEMUASKAN";
+				} else if (grade === "B") {
+					statusKelulusan = "LULUS SANGAT BAIK";
+				} else if (grade === "C") {
+					statusKelulusan = "LULUS CUKUP";
+				} else if (grade === "D" || grade === "E") {
+					statusKelulusan = "REMEDIAL / TIDAK LULUS";
+				}
+			}
 
 			const status =
 				attendanceRate >= 90
@@ -407,15 +388,6 @@ export default function RekapMataKuliahDetailPage() {
 					: attendanceRate >= 75
 						? "PERLU_PERHATIAN"
 						: "KURANG";
-
-			let statusKelulusan = "LULUS";
-			if (attendanceRate < 75) {
-				statusKelulusan = "TIDAK MEMENUHI PRESENSI";
-			} else if (grade === "A") {
-				statusKelulusan = "LULUS MEMUASKAN";
-			} else if (grade === "D" || grade === "E") {
-				statusKelulusan = "REMEDIAL / TIDAK LULUS";
-			}
 
 			return {
 				student,
@@ -433,6 +405,7 @@ export default function RekapMataKuliahDetailPage() {
 				status,
 				statusKelulusan,
 				meetingResults,
+				hasAnyScore,
 			};
 		});
 	}, [course, students, meetings]);
@@ -643,11 +616,6 @@ export default function RekapMataKuliahDetailPage() {
 					>
 						<Download className="mr-2 h-4 w-4 text-emerald-600" /> Export Excel
 					</Button>
-					<Link href={`/dashboard/mata-kuliah/${course.id}`}>
-						<Button className="bg-blue-600 hover:bg-blue-700 text-white h-9 shadow-xs">
-							<Settings className="mr-2 h-4 w-4" /> Kelola Sesi & Input Nilai
-						</Button>
-					</Link>
 				</div>
 			</div>
 
@@ -691,21 +659,9 @@ export default function RekapMataKuliahDetailPage() {
 						</TabsTrigger>
 					</TabsList>
 
-					<div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => fetchData(true)}
-							className="h-7 text-xs text-slate-600 hover:text-slate-900"
-							title="Sinkronisasi Data Real-time"
-						>
-							<RefreshCw className="h-3.5 w-3.5 mr-1 text-slate-500" />
-							Sinkronkan
-						</Button>
-						<span>
-							Menampilkan <strong>{filteredRecaps.length}</strong> dari{" "}
-							{studentRecaps.length} Mahasiswa
-						</span>
+					<div className="text-xs text-slate-500 font-medium">
+						Menampilkan <strong>{filteredRecaps.length}</strong> dari{" "}
+						{studentRecaps.length} Mahasiswa
 					</div>
 				</div>
 
@@ -713,105 +669,18 @@ export default function RekapMataKuliahDetailPage() {
 				<TabsContent value="matrix" className="space-y-4">
 					<Card className="border-slate-200 shadow-xs overflow-hidden">
 						<CardHeader className="bg-slate-50/70 border-b border-slate-200 p-4">
-							<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
-								<div>
-									<div className="flex items-center gap-2 flex-wrap">
-										<CardTitle className="text-base font-bold text-slate-800">
-											Matriks Presensi & Nilai Harian Per Pertemuan
-										</CardTitle>
-										<Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[11px] font-semibold">
-											16 Sesi Terintegrasi P1 - P16
-										</Badge>
-									</div>
-									<CardDescription className="text-xs text-slate-500 mt-0.5">
-										Status kehadiran serta rincian nilai teori dan praktik per
-										pertemuan
-									</CardDescription>
-								</div>
-
-								{/* Quick Jump Bar & Actions */}
-								<div className="flex items-center gap-2 flex-wrap w-full lg:w-auto justify-between lg:justify-end">
-									<div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
-										<span className="text-[11px] font-semibold text-slate-400 px-2 select-none">
-											Lompat:
-										</span>
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() => scrollToPosition(0)}
-											className="h-7 px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
-											title="Gulir ke Sesi Awal (Pertemuan 1 - 7)"
-										>
-											<ChevronLeft className="h-3 w-3 mr-0.5" /> P1 - P7
-										</Button>
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() => scrollToPosition(450)}
-											className="h-7 px-2 text-xs font-semibold text-amber-700 hover:bg-amber-50"
-											title="Gulir ke Sesi UTS (Pertemuan 8)"
-										>
-											P8 (UTS)
-										</Button>
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() => scrollToPosition(900)}
-											className="h-7 px-2 text-xs font-semibold text-purple-700 hover:bg-purple-50"
-											title="Gulir ke Sesi UAS (Pertemuan 16)"
-										>
-											P16 (UAS)
-										</Button>
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() => scrollToPosition(9999)}
-											className="h-7 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-											title="Gulir ke Rekap Nilai Akhir"
-										>
-											Nilai Akhir <ChevronRight className="h-3 w-3 ml-0.5" />
-										</Button>
-									</div>
-
-									<div className="flex items-center gap-1.5">
-										<Badge
-											variant="outline"
-											className="bg-white border-slate-200 text-slate-700 text-xs hidden sm:inline-flex"
-										>
-											H:{" "}
-											<span className="font-bold text-emerald-600 mx-0.5">
-												Hadir
-											</span>{" "}
-											| I:{" "}
-											<span className="font-bold text-amber-600 mx-0.5">
-												Izin
-											</span>{" "}
-											| S:{" "}
-											<span className="font-bold text-blue-600 mx-0.5">
-												Sakit
-											</span>{" "}
-											| A:{" "}
-											<span className="font-bold text-rose-600 mx-0.5">
-												Alpha
-											</span>
-										</Badge>
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={handleExportMatrix}
-											className="h-8 text-xs border-slate-300"
-										>
-											<Download className="h-3.5 w-3.5 mr-1" /> Unduh Matriks
-										</Button>
-									</div>
-								</div>
+							<div>
+								<CardTitle className="text-base font-bold text-slate-800">
+									Matriks Presensi & Nilai Harian Per Pertemuan
+								</CardTitle>
+								<CardDescription className="text-xs text-slate-500 mt-0.5">
+									Status kehadiran serta rincian nilai teori dan praktik per
+									pertemuan
+								</CardDescription>
 							</div>
 						</CardHeader>
 						<CardContent className="p-0">
-							<div
-								ref={matrixTableContainerRef}
-								className="overflow-x-auto scroll-smooth relative"
-							>
+							<div className="overflow-x-auto scroll-smooth relative">
 								<Table className="w-full border-collapse text-xs">
 									<TableHeader>
 										<TableRow className="bg-slate-100/90 border-b border-slate-200 text-slate-700">
@@ -988,28 +857,34 @@ export default function RekapMataKuliahDetailPage() {
 														</span>
 													</TableCell>
 													<TableCell className="text-center font-mono font-medium text-slate-700 bg-slate-50/50">
-														{item.avgTheory > 0 ? item.avgTheory : "-"}
+														{item.avgTheory}
 													</TableCell>
 													<TableCell className="text-center font-mono font-medium text-slate-700 bg-slate-50/50">
-														{item.avgPractical > 0 ? item.avgPractical : "-"}
+														{item.avgPractical}
 													</TableCell>
 													<TableCell className="text-center font-mono font-bold text-slate-900 bg-slate-100/50 text-sm">
 														{item.finalScore}
 													</TableCell>
 													<TableCell className="text-center font-bold bg-slate-100/50">
-														<Badge
-															className={
-																item.grade === "A"
-																	? "bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-																	: item.grade === "B"
-																		? "bg-blue-600 hover:bg-blue-700 text-white font-bold"
-																		: item.grade === "C"
-																			? "bg-amber-500 hover:bg-amber-600 text-white font-bold"
-																			: "bg-rose-600 hover:bg-rose-700 text-white font-bold"
-															}
-														>
-															{item.grade}
-														</Badge>
+														{item.grade !== "-" ? (
+															<Badge
+																className={
+																	item.grade === "A"
+																		? "bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+																		: item.grade === "B"
+																			? "bg-blue-600 hover:bg-blue-700 text-white font-bold"
+																			: item.grade === "C"
+																				? "bg-amber-500 hover:bg-amber-600 text-white font-bold"
+																				: "bg-rose-600 hover:bg-rose-700 text-white font-bold"
+																}
+															>
+																{item.grade}
+															</Badge>
+														) : (
+															<span className="text-slate-400 font-mono">
+																-
+															</span>
+														)}
 													</TableCell>
 													<TableCell className="text-center bg-slate-50/50">
 														<Badge
@@ -1078,13 +953,13 @@ export default function RekapMataKuliahDetailPage() {
 												Peminatan
 											</TableHead>
 											<TableHead className="text-center font-bold">
-												Presensi (18 Sesi)
+												Presensi (16 Sesi)
 											</TableHead>
 											<TableHead className="text-center font-bold">
-												Rerata Teori (20%)
+												Rerata Teori
 											</TableHead>
 											<TableHead className="text-center font-bold">
-												Rerata Praktik (80%)
+												Rerata Praktik
 											</TableHead>
 											<TableHead className="text-center font-bold">
 												Nilai Akhir
@@ -1146,19 +1021,25 @@ export default function RekapMataKuliahDetailPage() {
 														{item.finalScore}
 													</TableCell>
 													<TableCell className="text-center">
-														<Badge
-															className={
-																item.grade === "A"
-																	? "bg-emerald-600 text-white font-bold"
-																	: item.grade === "B"
-																		? "bg-blue-600 text-white font-bold"
-																		: item.grade === "C"
-																			? "bg-amber-500 text-white font-bold"
-																			: "bg-rose-600 text-white font-bold"
-															}
-														>
-															{item.grade}
-														</Badge>
+														{item.grade !== "-" ? (
+															<Badge
+																className={
+																	item.grade === "A"
+																		? "bg-emerald-600 text-white font-bold"
+																		: item.grade === "B"
+																			? "bg-blue-600 text-white font-bold"
+																			: item.grade === "C"
+																				? "bg-amber-500 text-white font-bold"
+																				: "bg-rose-600 text-white font-bold"
+																}
+															>
+																{item.grade}
+															</Badge>
+														) : (
+															<span className="text-slate-400 font-mono">
+																-
+															</span>
+														)}
 													</TableCell>
 													<TableCell className="text-center">
 														<Badge
@@ -1166,9 +1047,19 @@ export default function RekapMataKuliahDetailPage() {
 															className={
 																item.statusKelulusan.includes("MEMUASKAN")
 																	? "bg-emerald-50 text-emerald-700 border-emerald-300 font-semibold text-xs"
-																	: item.statusKelulusan === "LULUS"
+																	: item.statusKelulusan.includes("SANGAT BAIK")
 																		? "bg-blue-50 text-blue-700 border-blue-300 font-semibold text-xs"
-																		: "bg-rose-50 text-rose-700 border-rose-300 font-semibold text-xs"
+																		: item.statusKelulusan === "LULUS CUKUP"
+																			? "bg-teal-50 text-teal-700 border-teal-300 font-semibold text-xs"
+																			: item.statusKelulusan.includes(
+																						"REMEDIAL",
+																					)
+																				? "bg-amber-50 text-amber-700 border-amber-300 font-semibold text-xs"
+																				: item.statusKelulusan.includes(
+																							"TIDAK MEMENUHI",
+																						)
+																					? "bg-rose-50 text-rose-700 border-rose-300 font-semibold text-xs"
+																					: "bg-slate-50 text-slate-600 border-slate-300 font-semibold text-xs"
 															}
 														>
 															{item.statusKelulusan}

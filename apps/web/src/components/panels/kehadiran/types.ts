@@ -1,11 +1,4 @@
-export type KehadiranTabKey =
-	| "all-service"
-	| "selfie-feed"
-	| "kuliah"
-	| "piket"
-	| "baris-pagi"
-	| "fraud-review"
-	| "checkpoint-config";
+export type KehadiranTabKey = "all-service" | "kuliah" | "piket" | "baris-pagi";
 
 export interface AllServiceStudentItem {
 	id: number;

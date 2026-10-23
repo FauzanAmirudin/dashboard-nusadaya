@@ -4,6 +4,7 @@ import {
 	AlertCircle,
 	Award,
 	Calendar,
+	Camera,
 	CheckCircle2,
 	Clock,
 	Compass,
@@ -533,7 +534,7 @@ export function BarisPagiCheckinWidget() {
 				onClose={() => setIsSelfieModalOpen(false)}
 				attendanceType="baris_pagi"
 				title="Presensi Selfie Baris Pagi"
-				subtitle={`Apel Angkatan ${data?.session?.cohort || user?.cohort || ""} • ${data?.session?.location || "Lapangan Utama"}`}
+				subtitle={`Apel Angkatan ${(data?.session as any)?.cohort || (user as any)?.cohort || ""} • ${data?.session?.location || "Lapangan Utama"}`}
 				sessionId={data?.session?.id}
 				studentName={user?.fullName || "Mahasiswa"}
 				studentNim={user?.username || "-"}

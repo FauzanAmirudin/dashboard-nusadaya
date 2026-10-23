@@ -556,7 +556,7 @@ export function AkademikPanel({
 						className={`px-4 py-2 font-medium text-sm whitespace-nowrap flex items-center gap-1.5 ${activeTab === "nilai-khs" ? "border-b-2 border-[#0517B0] text-[#0517B0]" : "text-slate-500 hover:text-slate-700"}`}
 					>
 						<GraduationCap className="w-4 h-4 text-[#0517B0]" />
-						Nilai & KHS (AKD-06)
+						Nilai Mahasiswa
 					</button>
 					<button
 						onClick={() => setActiveTab("kehadiran")}

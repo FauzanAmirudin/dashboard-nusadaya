@@ -1,6 +1,15 @@
 "use client";
 
-import { BookOpen, CalendarDays, Clock, Megaphone } from "lucide-react";
+import {
+	BookOpen,
+	CalendarDays,
+	Clock,
+	Megaphone,
+	ShieldCheck,
+} from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { TabJadwalBarisPagi } from "@/components/panels/penjadwalan/TabJadwalBarisPagi";
 import { TabJadwalKelas } from "@/components/panels/penjadwalan/TabJadwalKelas";
 import { TabJadwalPiket } from "@/components/panels/penjadwalan/TabJadwalPiket";
 import { TabJadwalPraktikum } from "@/components/panels/penjadwalan/TabJadwalPraktikum";
@@ -9,9 +18,43 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthStore } from "@/store";
 
+type PenjadwalanTabKey =
+	| "kelas"
+	| "baris-pagi"
+	| "praktikum"
+	| "piket"
+	| "pengumuman";
+
 export function PenjadwalanDashboard() {
 	const { user } = useAuthStore();
 	const canEdit = user?.role === "superadmin" || user?.role === "akademik";
+	const router = useRouter();
+	const searchParams = useSearchParams();
+
+	const tabQuery = searchParams.get("tab") as PenjadwalanTabKey | null;
+	const allowedTabs: PenjadwalanTabKey[] = [
+		"kelas",
+		"baris-pagi",
+		"praktikum",
+		"piket",
+		"pengumuman",
+	];
+	const initialTab: PenjadwalanTabKey =
+		tabQuery && allowedTabs.includes(tabQuery) ? tabQuery : "kelas";
+
+	const [activeTab, setActiveTab] = useState<PenjadwalanTabKey>(initialTab);
+
+	useEffect(() => {
+		if (tabQuery && allowedTabs.includes(tabQuery)) {
+			setActiveTab(tabQuery);
+		}
+	}, [tabQuery]);
+
+	const handleTabChange = (val: string) => {
+		const nextTab = val as PenjadwalanTabKey;
+		setActiveTab(nextTab);
+		router.replace(`/dashboard/penjadwalan?tab=${nextTab}`, { scroll: false });
+	};
 
 	return (
 		<div className="space-y-6">
@@ -24,7 +67,7 @@ export function PenjadwalanDashboard() {
 					<div>
 						<div className="flex items-center gap-2.5">
 							<h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-								Penjadwalan & Pengumuman
+								Penjadwalan & Info
 							</h1>
 							<Badge
 								variant="secondary"
@@ -34,22 +77,33 @@ export function PenjadwalanDashboard() {
 							</Badge>
 						</div>
 						<p className="text-xs text-slate-500 mt-0.5">
-							Pusat tata kelola jadwal kelas, praktikum, piket harian mahasiswa,
-							dan siaran pengumuman
+							Pusat tata kelola jadwal perkuliahan, pembuatan jadwal baris pagi,
+							praktikum, piket harian, dan informasi pengumuman
 						</p>
 					</div>
 				</div>
 			</div>
 
 			{/* Subtab Segmented Navigation */}
-			<Tabs defaultValue="kelas" className="w-full space-y-6">
-				<TabsList className="no-print w-full bg-slate-100/90 p-1 rounded-2xl border border-slate-200/60 shadow-2xs grid grid-cols-2 sm:grid-cols-4 gap-1 h-auto">
+			<Tabs
+				value={activeTab}
+				onValueChange={handleTabChange}
+				className="w-full space-y-6"
+			>
+				<TabsList className="no-print w-full bg-slate-100/90 p-1 rounded-2xl border border-slate-200/60 shadow-2xs grid grid-cols-2 sm:grid-cols-5 gap-1 h-auto">
 					<TabsTrigger
 						value="kelas"
 						className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-xs rounded-xl py-2.5 px-3 transition-all flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold cursor-pointer"
 					>
 						<BookOpen className="w-4 h-4 shrink-0" />
 						<span>Jadwal Kelas</span>
+					</TabsTrigger>
+					<TabsTrigger
+						value="baris-pagi"
+						className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-xs rounded-xl py-2.5 px-3 transition-all flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold cursor-pointer"
+					>
+						<ShieldCheck className="w-4 h-4 shrink-0" />
+						<span>Jadwal Baris Pagi</span>
 					</TabsTrigger>
 					<TabsTrigger
 						value="praktikum"
@@ -80,6 +134,12 @@ export function PenjadwalanDashboard() {
 						className="animate-in fade-in-50 duration-200"
 					>
 						<TabJadwalKelas canEdit={canEdit} />
+					</TabsContent>
+					<TabsContent
+						value="baris-pagi"
+						className="animate-in fade-in-50 duration-200"
+					>
+						<TabJadwalBarisPagi canEdit={canEdit} />
 					</TabsContent>
 					<TabsContent
 						value="praktikum"

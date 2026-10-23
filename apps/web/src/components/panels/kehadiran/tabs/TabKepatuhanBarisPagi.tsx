@@ -5,7 +5,7 @@ import { BarisPagiDashboard } from "@/components/panels/akademik/baris-pagi/Bari
 export function TabKepatuhanBarisPagi() {
 	return (
 		<div className="w-full">
-			<BarisPagiDashboard hidePageHeader={true} />
+			<BarisPagiDashboard hidePageHeader={true} canCreate={false} />
 		</div>
 	);
 }

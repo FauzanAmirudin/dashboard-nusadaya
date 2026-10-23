@@ -401,54 +401,6 @@ export function AkademikDashboard({
 					<Button
 						variant="outline"
 						size="sm"
-						onClick={() => setIsBatchCalcOpen(true)}
-						className="border-indigo-200 text-indigo-700 bg-indigo-50/60 hover:bg-indigo-100 text-xs gap-1.5 h-9 font-semibold shadow-2xs"
-					>
-						<Calculator className="w-3.5 h-3.5 text-indigo-600" />
-						Kalkulasi Nilai Otomatis
-					</Button>
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => setIsBatchSyncMagangOpen(true)}
-						className="border-emerald-200 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100 text-xs gap-1.5 h-9 font-semibold shadow-2xs"
-					>
-						<Send className="w-3.5 h-3.5 text-emerald-600" />
-						Sync KHS ke Magang
-					</Button>
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => setIsPddiktiExportOpen(true)}
-						className="border-blue-200 text-blue-700 bg-blue-50/60 hover:bg-blue-100 text-xs gap-1.5 h-9 font-semibold shadow-2xs"
-					>
-						<FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
-						Feeder PDDIKTI
-					</Button>
-					<Link href="/dashboard/akademik/absensi-dosen">
-						<Button
-							variant="outline"
-							size="sm"
-							className="border-purple-200 text-purple-700 bg-purple-50/40 hover:bg-purple-100/70 text-xs gap-1.5 h-9 font-semibold"
-						>
-							<UserCheck className="w-3.5 h-3.5 text-purple-600" />
-							Absensi Dosen
-						</Button>
-					</Link>
-					{onUpdate && (
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => onUpdate()}
-							className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
-						>
-							<RotateCcw className="w-3.5 h-3.5" />
-							Segarkan Data
-						</Button>
-					)}
-					<Button
-						variant="outline"
-						size="sm"
 						onClick={handleExport}
 						className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
 					>

@@ -522,8 +522,10 @@ export function TabPiket({ studentId }: { studentId: number }) {
 
 												{/* Bukti Foto Selfie GPS Mahasiswa */}
 												{r.selfieUrl && (
-													<button
+													<Button
 														type="button"
+														variant="outline"
+														size="sm"
 														onClick={() =>
 															setSelectedSelfieRecord({
 																id: r.id,
@@ -548,21 +550,12 @@ export function TabPiket({ studentId }: { studentId: number }) {
 																	r.verificationStatus || "auto_approved",
 															})
 														}
-														className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-blue-50 border border-blue-200/80 bg-blue-50/40 text-blue-700 transition-colors cursor-pointer group text-left"
-														title="Klik untuk melihat foto selfie & peta GPS"
+														className="h-7 px-2.5 text-xs text-blue-700 border-blue-200 bg-blue-50/70 hover:bg-blue-100 font-semibold gap-1.5 rounded-lg shadow-2xs inline-flex items-center cursor-pointer"
+														title="Lihat foto selfie & peta GPS piket mahasiswa"
 													>
-														<div className="relative w-6 h-6 rounded overflow-hidden border border-blue-300 shrink-0">
-															<img
-																src={r.selfieUrl}
-																alt="Bukti Selfie"
-																className="w-full h-full object-cover"
-															/>
-														</div>
-														<span className="font-semibold text-[10px] flex items-center gap-1">
-															<Camera className="w-2.5 h-2.5" />
-															Selfie GPS
-														</span>
-													</button>
+														<Camera className="w-3.5 h-3.5 text-blue-600" />
+														<span>Lihat Bukti Kehadiran</span>
+													</Button>
 												)}
 												{canEdit && (
 													<Button

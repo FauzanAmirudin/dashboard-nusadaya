@@ -118,7 +118,10 @@ export const selfieAttendanceRoutes = new Elysia({ prefix: "/attendance" })
 				session = await db.query.morningAssemblySessions.findFirst({
 					where: and(
 						eq(morningAssemblySessions.sessionDate, dateStr),
-						eq(morningAssemblySessions.cohort, student.cohort),
+						or(
+							eq(morningAssemblySessions.cohort, student.cohort),
+							eq(morningAssemblySessions.cohort, 0),
+						),
 						sql`${morningAssemblySessions.sessionStatus} != 'cancelled'`,
 					),
 					orderBy: [desc(morningAssemblySessions.id)],

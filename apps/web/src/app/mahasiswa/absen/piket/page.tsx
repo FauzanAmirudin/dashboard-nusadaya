@@ -75,7 +75,7 @@ export default function AbsenPiketPage() {
 								JADWAL PIKET HARI INI
 							</Badge>
 							<CardTitle className="text-lg font-extrabold text-slate-900">
-								Kelompok Piket Angkatan {user?.cohort || ""}
+								Kelompok Piket Angkatan {(user as any)?.cohort || ""}
 							</CardTitle>
 							<p className="text-xs text-slate-500 mt-0.5">
 								Area Kampus Nusadaya Academy
@@ -158,7 +158,7 @@ export default function AbsenPiketPage() {
 				onClose={() => setIsModalOpen(false)}
 				attendanceType="piket"
 				title="Presensi Selfie Piket Kampus"
-				subtitle={`Piket Angkatan ${user?.cohort || ""} • Area Kampus Nusadaya`}
+				subtitle={`Piket Angkatan ${(user as any)?.cohort || ""} • Area Kampus Nusadaya`}
 				studentName={user?.fullName || "Mahasiswa"}
 				studentNim={user?.username || "-"}
 				onSuccess={(data) => {

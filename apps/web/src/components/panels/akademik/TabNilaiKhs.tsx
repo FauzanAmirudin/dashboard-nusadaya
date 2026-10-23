@@ -9,7 +9,6 @@ import {
 	CheckCircle2,
 	Download,
 	ExternalLink,
-	FileCheck,
 	FileText,
 	GraduationCap,
 	Layers,
@@ -54,6 +53,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { getToken } from "@/lib/eden";
+import { exportToCSV } from "@/lib/export";
 
 interface TabNilaiKhsProps {
 	studentId: number;
@@ -73,14 +73,9 @@ export function TabNilaiKhs({
 	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 	const [isLoading, setIsLoading] = useState(true);
-	const [isUpdatingPddikti, setIsUpdatingPddikti] = useState(false);
 
 	const [selectedSemester, setSelectedSemester] = useState<number>(1);
 	const [summaryData, setSummaryData] = useState<any>(null);
-
-	// Modals
-	const [isPddiktiModalOpen, setIsPddiktiModalOpen] = useState(false);
-	const [pddiktiRegNo, setPddiktiRegNo] = useState("");
 
 	const fetchKhsData = useCallback(
 		async (isSilent = false) => {
@@ -100,9 +95,6 @@ export function TabNilaiKhs({
 				const json = await res.json();
 				if (json.success && json.data) {
 					setSummaryData(json.data);
-					if (json.data.pddiktiRegNo) {
-						setPddiktiRegNo(json.data.pddiktiRegNo);
-					}
 				}
 			} catch (err) {
 				console.error("Gagal memuat KHS:", err);
@@ -114,16 +106,53 @@ export function TabNilaiKhs({
 		[API_URL, studentId, selectedSemester],
 	);
 
+	const handleManualRecalculate = async () => {
+		setIsLoading(true);
+		try {
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/academic/calculate-grades`,
+				{
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${getToken()}`,
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({ semester: selectedSemester }),
+				},
+			);
+			const json = await res.json();
+			if (json.success && json.data) {
+				setSummaryData(json.data);
+				toast.success("Kalkulasi nilai real-time berhasil diperbarui");
+				onRefresh();
+			} else {
+				await fetchKhsData();
+			}
+		} catch {
+			await fetchKhsData();
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
 	useEffect(() => {
 		fetchKhsData();
 
 		const handleSync = (e: any) => {
-			if (!e?.detail?.studentId || e.detail.studentId === studentId) {
+			const targetId = e?.detail?.studentId;
+			const targetIds = e?.detail?.studentIds;
+			if (
+				(!targetId && !targetIds) ||
+				targetId === studentId ||
+				(Array.isArray(targetIds) && targetIds.includes(studentId))
+			) {
 				fetchKhsData(true);
 			}
 		};
 		window.addEventListener("academic-data-updated", handleSync);
 		window.addEventListener("student-updated", handleSync);
+		window.addEventListener("course-updated", handleSync);
+		window.addEventListener("course-attendance-updated", handleSync);
 
 		let bc: BroadcastChannel | null = null;
 		try {
@@ -131,12 +160,19 @@ export function TabNilaiKhs({
 			bc.onmessage = (msg) => {
 				const type = msg.data?.type;
 				const targetStudentId = msg.data?.studentId;
+				const targetStudentIds = msg.data?.studentIds;
 				if (
 					type === "academic-data-updated" ||
 					type === "student-updated" ||
-					type === "course-updated"
+					type === "course-updated" ||
+					type === "course-attendance-updated"
 				) {
-					if (!targetStudentId || targetStudentId === studentId) {
+					if (
+						(!targetStudentId && !targetStudentIds) ||
+						targetStudentId === studentId ||
+						(Array.isArray(targetStudentIds) &&
+							targetStudentIds.includes(studentId))
+					) {
 						fetchKhsData(true);
 					}
 				}
@@ -151,48 +187,24 @@ export function TabNilaiKhs({
 		document.addEventListener("visibilitychange", handleFocus);
 		window.addEventListener("focus", handleFocus);
 
+		// Polling interval ringan setiap 8 detik saat tab aktif
+		const pollInterval = setInterval(() => {
+			if (document.visibilityState === "visible") {
+				fetchKhsData(true);
+			}
+		}, 8000);
+
 		return () => {
 			window.removeEventListener("academic-data-updated", handleSync);
 			window.removeEventListener("student-updated", handleSync);
+			window.removeEventListener("course-updated", handleSync);
+			window.removeEventListener("course-attendance-updated", handleSync);
 			document.removeEventListener("visibilitychange", handleFocus);
 			window.removeEventListener("focus", handleFocus);
+			clearInterval(pollInterval);
 			if (bc) bc.close();
 		};
 	}, [fetchKhsData, studentId]);
-
-	// 4. Update Status Pelaporan PDDIKTI (Segmen 14)
-	const handleSavePddiktiReport = async () => {
-		setIsUpdatingPddikti(true);
-		try {
-			const res = await fetch(
-				`${API_URL}/students/${studentId}/academic/pddikti-report`,
-				{
-					method: "POST",
-					headers: {
-						Authorization: `Bearer ${getToken()}`,
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify({
-						isReported: true,
-						regNo: pddiktiRegNo,
-					}),
-				},
-			);
-			const json = await res.json();
-			if (json.success) {
-				toast.success("Status pelaporan PDDIKTI berhasil diperbarui");
-				setIsPddiktiModalOpen(false);
-				await fetchKhsData();
-				onRefresh();
-			} else {
-				toast.error(json.message || "Gagal menyimpan status PDDIKTI");
-			}
-		} catch (err) {
-			toast.error("Gagal menghubungi server");
-		} finally {
-			setIsUpdatingPddikti(false);
-		}
-	};
 
 	if (isLoading) {
 		return (
@@ -212,7 +224,51 @@ export function TabNilaiKhs({
 	const totalSksPassed = summaryData?.totalSksPassed || 0;
 	const isKhsPublished = summaryData?.khsPublished ?? false;
 	const isSyncedMagang = summaryData?.syncedToMagang ?? false;
-	const isPddiktiReported = summaryData?.pddiktiReported ?? false;
+
+	const handleExportKhsCsv = () => {
+		if (!grades || grades.length === 0) {
+			toast.error("Tidak ada data nilai untuk diexport");
+			return;
+		}
+		const exportRows = grades.map((item: any, idx: number) => ({
+			No: idx + 1,
+			"Kode MK": item.code || "-",
+			"Mata Kuliah": item.name || "-",
+			SKS: item.sks || 0,
+			"Presensi (%)": `${item.attendanceRate || 0}%`,
+			"Nilai Teori":
+				item.theoryScore !== null && item.theoryScore !== undefined
+					? item.theoryScore
+					: "-",
+			"Nilai Praktik":
+				item.practicalScore !== null && item.practicalScore !== undefined
+					? item.practicalScore
+					: "-",
+			UTS:
+				item.utsScore !== null && item.utsScore !== undefined
+					? item.utsScore
+					: "-",
+			UAS:
+				item.uasScore !== null && item.uasScore !== undefined
+					? item.uasScore
+					: "-",
+			"Nilai Akhir": item.finalScore ?? "-",
+			Grade: item.grade || "-",
+			Bobot: ((item.gradePoint || 0) / 100).toFixed(2),
+			Mutu: item.qualityScore?.toFixed(2) || "0.00",
+			Status: item.isPassed ? "Lulus" : "Tidak Lulus",
+		}));
+		const studentNameSlug = (
+			studentData?.name ||
+			summaryData?.studentName ||
+			`Mahasiswa_${studentId}`
+		).replace(/[^a-zA-Z0-9]/g, "_");
+		exportToCSV(
+			exportRows,
+			`KHS_${studentNameSlug}_Semester_${selectedSemester}`,
+		);
+		toast.success("Data KHS semester berhasil diexport ke CSV");
+	};
 
 	return (
 		<div className="space-y-6">
@@ -225,7 +281,7 @@ export function TabNilaiKhs({
 						</span>
 						<div>
 							<h3 className="text-base font-bold text-slate-900">
-								Perhitungan Nilai Otomatis & Dokumen KHS/KRS (AKD-06)
+								Nilai Mahasiswa
 							</h3>
 						</div>
 					</div>
@@ -252,22 +308,6 @@ export function TabNilaiKhs({
 						</Select>
 					</div>
 
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => fetchKhsData()}
-						disabled={isLoading}
-						className="h-9 text-xs gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold"
-						title="Perbarui data nilai langsung secara real-time dari database"
-					>
-						<RefreshCw
-							className={`w-3.5 h-3.5 ${
-								isLoading ? "animate-spin text-[#0517B0]" : "text-slate-600"
-							}`}
-						/>
-						<span>Perbarui</span>
-					</Button>
-
 					<Link
 						href={`/dashboard/students/${studentId}/khs?semester=${selectedSemester}`}
 						target="_blank"
@@ -276,11 +316,38 @@ export function TabNilaiKhs({
 							variant="outline"
 							size="sm"
 							className="h-9 text-xs gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold"
+							title="Buka / Cetak Kartu Hasil Studi (KHS) Resmi"
 						>
 							<Printer className="w-3.5 h-3.5 text-slate-600" />
 							Cetak KHS
 						</Button>
 					</Link>
+
+					<Link
+						href={`/dashboard/students/${studentId}/krs?semester=${selectedSemester}`}
+						target="_blank"
+					>
+						<Button
+							variant="outline"
+							size="sm"
+							className="h-9 text-xs gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold"
+							title="Buka / Cetak Kartu Rencana Studi (KRS) Resmi"
+						>
+							<Printer className="w-3.5 h-3.5 text-[#0517B0]" />
+							Cetak KRS
+						</Button>
+					</Link>
+
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={handleExportKhsCsv}
+						className="h-9 text-xs gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold"
+						title="Export data nilai KHS semester ini ke format file CSV / Excel"
+					>
+						<Download className="w-3.5 h-3.5 text-emerald-600" />
+						Export KHS
+					</Button>
 
 					<Link
 						href={`/dashboard/students/${studentId}/transkrip`}
@@ -299,7 +366,7 @@ export function TabNilaiKhs({
 			</div>
 
 			{/* KPI Performance Cards */}
-			<div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+			<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 				{/* IPK / GPA */}
 				<div className="p-4 bg-gradient-to-br from-indigo-50/80 to-blue-50/40 rounded-2xl border border-indigo-100 flex flex-col justify-between">
 					<p className="text-[11px] font-bold text-indigo-900 uppercase tracking-wider">
@@ -347,7 +414,15 @@ export function TabNilaiKhs({
 					<div className="my-1.5 space-y-1">
 						<div className="flex items-center justify-between text-xs font-semibold">
 							<span className="text-slate-600">UTS:</span>
-							{summaryData?.allUtsPassed ? (
+							{summaryData?.utsStatus === "BELUM_ADA_NILAI" ||
+							summaryData?.evaluatedUtsCount === 0 ? (
+								<Badge
+									variant="outline"
+									className="bg-white text-slate-500 border-slate-200 text-[10px] py-0 font-medium"
+								>
+									Belum Ada Nilai
+								</Badge>
+							) : summaryData?.allUtsPassed ? (
 								<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px] py-0">
 									Lulus
 								</Badge>
@@ -359,7 +434,15 @@ export function TabNilaiKhs({
 						</div>
 						<div className="flex items-center justify-between text-xs font-semibold">
 							<span className="text-slate-600">UAS:</span>
-							{summaryData?.allUasPassed ? (
+							{summaryData?.uasStatus === "BELUM_ADA_NILAI" ||
+							summaryData?.evaluatedUasCount === 0 ? (
+								<Badge
+									variant="outline"
+									className="bg-white text-slate-500 border-slate-200 text-[10px] py-0 font-medium"
+								>
+									Belum Ada Nilai
+								</Badge>
+							) : summaryData?.allUasPassed ? (
 								<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px] py-0">
 									Lulus
 								</Badge>
@@ -371,38 +454,6 @@ export function TabNilaiKhs({
 						</div>
 					</div>
 					<p className="text-[10px] text-sky-700 italic">Standar Min. 60</p>
-				</div>
-
-				{/* Feeder PDDIKTI (Segmen 14) */}
-				<div className="p-4 bg-white rounded-2xl border border-slate-200 flex flex-col justify-between">
-					<p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-						Feeder PDDIKTI
-					</p>
-					<div className="my-1.5">
-						{isPddiktiReported ? (
-							<Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 font-semibold gap-1 text-[11px]">
-								<FileCheck className="w-3 h-3 text-indigo-600" />
-								Terlapor Dikti
-							</Badge>
-						) : (
-							<Badge
-								variant="outline"
-								className="text-slate-500 border-slate-200 text-[11px]"
-							>
-								Belum Terlapor
-							</Badge>
-						)}
-					</div>
-					{canEdit && (
-						<Button
-							size="sm"
-							variant="outline"
-							onClick={() => setIsPddiktiModalOpen(true)}
-							className="h-7 text-[11px] w-full mt-1 border-slate-200 text-slate-700 hover:bg-slate-50"
-						>
-							Input No. Dikti
-						</Button>
-					)}
 				</div>
 			</div>
 
@@ -506,15 +557,27 @@ export function TabNilaiKhs({
 													{item.code}
 												</TableCell>
 												<TableCell>
-													<div className="font-semibold text-slate-900">
-														{item.name}
+													<div className="flex items-center gap-2 flex-wrap">
+														<span className="font-semibold text-slate-900">
+															{item.name}
+														</span>
+														{item.isCustomEnrollment && (
+															<Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[10px] px-1.5 py-0 font-bold">
+																Peserta Tambahan
+															</Badge>
+														)}
 													</div>
 													<div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
 														<span className="capitalize text-slate-600">
 															{item.type}
 														</span>
 														<span>•</span>
-														<span>{item.dosenName}</span>
+														<span>{item.dosenName || "Dosen Pengampu"}</span>
+														{item.enrollmentNotes && (
+															<span className="italic text-slate-400">
+																({item.enrollmentNotes})
+															</span>
+														)}
 													</div>
 												</TableCell>
 												<TableCell className="text-center font-mono font-bold text-slate-800">
@@ -535,43 +598,79 @@ export function TabNilaiKhs({
 													</div>
 												</TableCell>
 												<TableCell className="text-center font-mono text-slate-700">
-													{item.theoryScore || "-"}
+													{item.theoryScore !== null &&
+													item.theoryScore !== undefined
+														? item.theoryScore
+														: "-"}
 												</TableCell>
 												<TableCell className="text-center font-mono text-slate-700">
-													{item.practicalScore || "-"}
+													{item.practicalScore !== null &&
+													item.practicalScore !== undefined
+														? item.practicalScore
+														: "-"}
 												</TableCell>
 												<TableCell className="text-center font-mono text-slate-700">
-													{item.utsScore || "-"}
+													{item.utsScore !== null && item.utsScore !== undefined
+														? item.utsScore
+														: "-"}
 												</TableCell>
 												<TableCell className="text-center font-mono text-slate-700">
-													{item.uasScore || "-"}
+													{item.uasScore !== null && item.uasScore !== undefined
+														? item.uasScore
+														: "-"}
 												</TableCell>
 												<TableCell className="text-center font-mono font-bold text-sm bg-blue-50/30 text-blue-950">
-													{item.finalScore}
+													{item.grade &&
+													item.grade !== "-" &&
+													item.status !== "BELUM_DINILAI"
+														? item.finalScore
+														: "-"}
 												</TableCell>
 												<TableCell className="text-center bg-blue-50/30">
-													<Badge
-														className={`font-black text-xs px-2 py-0.5 ${
-															isA
-																? "bg-emerald-100 text-emerald-800 border-emerald-300"
-																: isB
-																	? "bg-blue-100 text-blue-800 border-blue-300"
-																	: isC
-																		? "bg-amber-100 text-amber-800 border-amber-300"
-																		: "bg-rose-100 text-rose-800 border-rose-300"
-														}`}
-													>
-														{item.grade}
-													</Badge>
+													{item.grade &&
+													item.grade !== "-" &&
+													item.status !== "BELUM_DINILAI" ? (
+														<Badge
+															className={`font-black text-xs px-2 py-0.5 ${
+																isA
+																	? "bg-emerald-100 text-emerald-800 border-emerald-300"
+																	: isB
+																		? "bg-blue-100 text-blue-800 border-blue-300"
+																		: isC
+																			? "bg-amber-100 text-amber-800 border-amber-300"
+																			: "bg-rose-100 text-rose-800 border-rose-300"
+															}`}
+														>
+															{item.grade}
+														</Badge>
+													) : (
+														<span className="text-slate-400 font-mono text-xs">
+															-
+														</span>
+													)}
 												</TableCell>
 												<TableCell className="text-center font-mono text-slate-700 font-semibold">
-													{((item.gradePoint || 0) / 100).toFixed(2)}
+													{item.grade &&
+													item.grade !== "-" &&
+													item.status !== "BELUM_DINILAI"
+														? ((item.gradePoint || 0) / 100).toFixed(2)
+														: "-"}
 												</TableCell>
 												<TableCell className="text-center font-mono font-bold text-slate-900">
-													{item.qualityScore?.toFixed(2) || "0.00"}
+													{item.grade &&
+													item.grade !== "-" &&
+													item.status !== "BELUM_DINILAI"
+														? item.qualityScore?.toFixed(2) || "0.00"
+														: "-"}
 												</TableCell>
 												<TableCell className="text-center">
-													{item.isPassed ? (
+													{!item.grade ||
+													item.grade === "-" ||
+													item.status === "BELUM_DINILAI" ? (
+														<Badge className="bg-slate-100 text-slate-600 border-slate-200 text-[10px]">
+															Belum Dinilai
+														</Badge>
+													) : item.isPassed ? (
 														<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">
 															Lulus
 														</Badge>
@@ -616,50 +715,6 @@ export function TabNilaiKhs({
 					)}
 				</CardContent>
 			</Card>
-
-			{/* DIALOG 3: Input Nomor Registrasi PDDIKTI */}
-			<Dialog open={isPddiktiModalOpen} onOpenChange={setIsPddiktiModalOpen}>
-				<DialogContent className="max-w-md bg-white p-6">
-					<DialogHeader>
-						<DialogTitle className="text-base font-bold flex items-center gap-2">
-							<FileCheck className="w-5 h-5 text-indigo-600" />
-							Pelaporan Feeder PDDIKTI Mahasiswa
-						</DialogTitle>
-					</DialogHeader>
-
-					<div className="space-y-4 py-3 text-xs">
-						<div className="space-y-1.5">
-							<label className="font-semibold text-slate-700">
-								Nomor Registrasi / NIM PDDIKTI:
-							</label>
-							<Input
-								placeholder="Contoh: DIKTI-2026-00492"
-								value={pddiktiRegNo}
-								onChange={(e) => setPddiktiRegNo(e.target.value)}
-								className="text-xs h-9 bg-slate-50 font-mono"
-							/>
-						</div>
-					</div>
-
-					<DialogFooter className="flex justify-end gap-2">
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => setIsPddiktiModalOpen(false)}
-						>
-							Batal
-						</Button>
-						<Button
-							size="sm"
-							onClick={handleSavePddiktiReport}
-							disabled={isUpdatingPddikti}
-							className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold"
-						>
-							{isUpdatingPddikti ? "Menyimpan..." : "Tandai Terlapor"}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
 		</div>
 	);
 }

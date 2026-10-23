@@ -15,6 +15,7 @@ import {
 } from "../db/schema";
 import { cacheInvalidatePattern } from "../lib/cache";
 import { getValidUserId, hasRole } from "../lib/permissions";
+import { GradeCalculationService } from "../modules/academic/grade-calculation.service";
 
 function addDays(baseDateStr: string, days: number): string {
 	const d = new Date(baseDateStr + "T00:00:00Z");
@@ -968,6 +969,40 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 		});
 		const enrolledIds = new Set(existingCustom.map((e) => e.studentId));
 
+		// Helper untuk memeriksa apakah mahasiswa sudah menjadi peserta reguler rombel & peminatan kelas ini
+		const isRegularParticipant = (s: {
+			cohort: number;
+			rombel?: string | null;
+			subProgram?: string | null;
+		}) => {
+			if (s.cohort !== course.cohort) return false;
+			if (
+				course.rombel &&
+				course.rombel.trim().toLowerCase() !== "gabungan" &&
+				course.rombel.trim().toLowerCase() !== "semua"
+			) {
+				if (
+					!s.rombel ||
+					s.rombel.trim().toLowerCase() !== course.rombel.trim().toLowerCase()
+				) {
+					return false;
+				}
+			}
+			if (
+				course.peminatan &&
+				course.peminatan.trim().toLowerCase() !== "umum" &&
+				course.peminatan.trim().toLowerCase() !== "semua" &&
+				course.peminatan.trim().toLowerCase() !== "gabungan"
+			) {
+				const cPem = course.peminatan.trim().toLowerCase();
+				const sSub = (s.subProgram || "").trim().toLowerCase();
+				if (!sSub || sSub !== cPem) {
+					return false;
+				}
+			}
+			return true;
+		};
+
 		// Fetch active students
 		const allStudents = await db.query.students.findMany({
 			where: eq(students.isArchived, false),
@@ -976,6 +1011,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				nim: true,
 				name: true,
 				cohort: true,
+				rombel: true,
 				program: true,
 				subProgram: true,
 				studentStatus: true,
@@ -986,14 +1022,15 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 
 		const filtered = allStudents
 			.filter((s) => {
-				// Exclude if already manually enrolled OR if already in the course's regular cohort
-				if (enrolledIds.has(s.id) || s.cohort === course.cohort) return false;
+				// Exclude jika sudah terdaftar di enrollments ATAU sudah menjadi peserta reguler rombel kelas
+				if (enrolledIds.has(s.id) || isRegularParticipant(s)) return false;
 				if (!q) return true;
 				return (
 					s.name.toLowerCase().includes(q) ||
 					(s.nim && s.nim.toLowerCase().includes(q)) ||
 					s.cohort.toString().includes(q) ||
-					(s.subProgram && s.subProgram.toLowerCase().includes(q))
+					(s.subProgram && s.subProgram.toLowerCase().includes(q)) ||
+					(s.rombel && s.rombel.toLowerCase().includes(q))
 				);
 			})
 			.slice(0, 50);
@@ -1041,14 +1078,51 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			// Fetch candidate student details
 			const studentRecords = await db.query.students.findMany({
 				where: inArray(students.id, targetIds),
-				columns: { id: true, cohort: true, name: true },
+				columns: {
+					id: true,
+					cohort: true,
+					name: true,
+					rombel: true,
+					subProgram: true,
+				},
 			});
 
-			// 1. Check if any student is already in the course's regular cohort
-			const regularCohortIds = new Set(
-				studentRecords
-					.filter((s) => s.cohort === course.cohort)
-					.map((s) => s.id),
+			const isRegularParticipant = (s: {
+				cohort: number;
+				rombel?: string | null;
+				subProgram?: string | null;
+			}) => {
+				if (s.cohort !== course.cohort) return false;
+				if (
+					course.rombel &&
+					course.rombel.trim().toLowerCase() !== "gabungan" &&
+					course.rombel.trim().toLowerCase() !== "semua"
+				) {
+					if (
+						!s.rombel ||
+						s.rombel.trim().toLowerCase() !== course.rombel.trim().toLowerCase()
+					) {
+						return false;
+					}
+				}
+				if (
+					course.peminatan &&
+					course.peminatan.trim().toLowerCase() !== "umum" &&
+					course.peminatan.trim().toLowerCase() !== "semua" &&
+					course.peminatan.trim().toLowerCase() !== "gabungan"
+				) {
+					const cPem = course.peminatan.trim().toLowerCase();
+					const sSub = (s.subProgram || "").trim().toLowerCase();
+					if (!sSub || sSub !== cPem) {
+						return false;
+					}
+				}
+				return true;
+			};
+
+			// 1. Check if any student is already in the course's regular rombel
+			const regularParticipantIds = new Set(
+				studentRecords.filter((s) => isRegularParticipant(s)).map((s) => s.id),
 			);
 
 			// 2. Check if already registered in custom course enrollments
@@ -1060,9 +1134,9 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			});
 			const existingIds = new Set(existing.map((e) => e.studentId));
 
-			// Only insert students who are neither in regular cohort nor already in courseEnrollments
+			// Only insert students who are neither in regular rombel nor already in courseEnrollments
 			const toInsert = targetIds.filter(
-				(id) => !regularCohortIds.has(id) && !existingIds.has(id),
+				(id) => !regularParticipantIds.has(id) && !existingIds.has(id),
 			);
 
 			if (toInsert.length === 0) {
@@ -1087,6 +1161,18 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				.insert(courseEnrollments)
 				.values(recordsToInsert)
 				.returning();
+
+			// Auto-synchronize full AKD-06 academic calculation for each newly enrolled student
+			for (const sId of toInsert) {
+				try {
+					await GradeCalculationService.calculateStudentGrades(sId, 1);
+				} catch (syncErr) {
+					console.error(
+						`Gagal sinkron nilai setelah enrollment untuk student ${sId}:`,
+						syncErr,
+					);
+				}
+			}
 
 			return {
 				success: true,
@@ -1121,22 +1207,23 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			.delete(courseEnrollments)
 			.where(eq(courseEnrollments.id, enrollId));
 
-		// Hapus juga record courseGrades terkait jika mahasiswa bukan bagian dari cohort reguler mata kuliah ini
-		const course = await db.query.courses.findFirst({
-			where: eq(courses.id, existing.courseId),
-		});
-		const student = await db.query.students.findFirst({
-			where: eq(students.id, existing.studentId),
-		});
-		if (course && student && student.cohort !== course.cohort) {
-			await db
-				.delete(courseGrades)
-				.where(
-					and(
-						eq(courseGrades.courseId, existing.courseId),
-						eq(courseGrades.studentId, existing.studentId),
-					),
-				);
+		// Hapus juga record courseGrades terkait
+		await db
+			.delete(courseGrades)
+			.where(
+				and(
+					eq(courseGrades.courseId, existing.courseId),
+					eq(courseGrades.studentId, existing.studentId),
+				),
+			);
+
+		try {
+			await GradeCalculationService.calculateStudentGrades(
+				existing.studentId,
+				1,
+			);
+		} catch (syncErr) {
+			console.error(`Gagal sinkron nilai setelah delete enrollment:`, syncErr);
 		}
 
 		return {
@@ -1524,133 +1611,19 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 
 				await db.insert(courseMeetingAttendances).values(toInsert);
 
-				// Auto-synchronize aggregate scores and attendance rate for each affected student
+				// Auto-synchronize aggregate scores, attendance rate, and full AKD-06 academic calculation for each affected student
 				const studentIds = Array.from(
 					new Set(input.attendances.map((a: any) => a.studentId)),
 				) as number[];
 
-				// Get all meetings for this course
-				const allCourseMeetings = await db.query.courseMeetings.findMany({
-					where: eq(courseMeetings.courseId, courseId),
-					columns: { id: true },
-				});
-				const allMeetingIds = allCourseMeetings.map((m) => m.id);
-
-				if (allMeetingIds.length > 0) {
-					for (const studentId of studentIds) {
-						// Fetch all attendances for this student across this course's meetings
-						const studentAttendances =
-							await db.query.courseMeetingAttendances.findMany({
-								where: and(
-									eq(courseMeetingAttendances.studentId, studentId),
-									inArray(courseMeetingAttendances.meetingId, allMeetingIds),
-								),
-							});
-
-						const presentCount = studentAttendances.filter(
-							(a) => a.status === "hadir",
-						).length;
-						const totalMeetings = 16;
-						const attendanceRate = Math.min(
-							100,
-							Math.round((presentCount / totalMeetings) * 100),
+				for (const studentId of studentIds) {
+					try {
+						await GradeCalculationService.calculateStudentGrades(studentId, 1);
+					} catch (calcErr) {
+						console.error(
+							`Gagal menghitung nilai student ${studentId}:`,
+							calcErr,
 						);
-
-						// Average theory score
-						const validTheoryScores = studentAttendances
-							.filter(
-								(a) => a.theoryScore !== null && a.theoryScore !== undefined,
-							)
-							.map((a) => a.theoryScore as number);
-						const avgTheory =
-							validTheoryScores.length > 0
-								? Math.round(
-										validTheoryScores.reduce((acc, curr) => acc + curr, 0) /
-											validTheoryScores.length,
-									)
-								: null;
-
-						// Average practical score
-						const validPracticalScores = studentAttendances
-							.filter(
-								(a) =>
-									a.practicalScore !== null && a.practicalScore !== undefined,
-							)
-							.map((a) => a.practicalScore as number);
-						const avgPractical =
-							validPracticalScores.length > 0
-								? Math.round(
-										validPracticalScores.reduce((acc, curr) => acc + curr, 0) /
-											validPracticalScores.length,
-									)
-								: null;
-
-						// Calculate final score
-						const isPracticalCourse = course.type === "praktik";
-						let displayGrade: string | null = null;
-						if (avgTheory !== null || avgPractical !== null) {
-							const p = avgPractical ?? avgTheory ?? 0;
-							const t = avgTheory ?? avgPractical ?? 0;
-							const finalScore = isPracticalCourse
-								? Math.round(p * 0.8 + t * 0.2)
-								: t;
-
-							displayGrade = "E";
-							if (finalScore >= 85) displayGrade = "A";
-							else if (finalScore >= 75) displayGrade = "B";
-							else if (finalScore >= 65) displayGrade = "C";
-							else if (finalScore >= 50) displayGrade = "D";
-						}
-
-						// Overall status based on attendance
-						const status =
-							attendanceRate >= 90
-								? "AMAN"
-								: attendanceRate >= 75
-									? "PERLU_PERHATIAN"
-									: "TIDAK_AMAN";
-
-						// Upsert into courseGrades table
-						const existingGrade = await db.query.courseGrades.findFirst({
-							where: and(
-								eq(courseGrades.studentId, studentId),
-								eq(courseGrades.courseId, courseId),
-							),
-						});
-
-						if (existingGrade) {
-							await db
-								.update(courseGrades)
-								.set({
-									courseCode: course.code,
-									courseName: course.name,
-									dosenId: course.dosenId,
-									attendancePresent: presentCount,
-									totalMeetings: totalMeetings,
-									attendanceRate: attendanceRate,
-									theoryScore: avgTheory,
-									practicalScore: avgPractical,
-									grade: displayGrade,
-									status: status,
-									updatedAt: new Date(),
-								})
-								.where(eq(courseGrades.id, existingGrade.id));
-						} else {
-							await db.insert(courseGrades).values({
-								studentId: studentId,
-								courseId: courseId,
-								courseCode: course.code,
-								courseName: course.name,
-								dosenId: course.dosenId,
-								attendancePresent: presentCount,
-								totalMeetings: totalMeetings,
-								attendanceRate: attendanceRate,
-								theoryScore: avgTheory,
-								practicalScore: avgPractical,
-								grade: displayGrade,
-								status: status,
-							});
-						}
 					}
 				}
 			}
