@@ -15,6 +15,10 @@ import {
 } from "../db/schema";
 import { cacheInvalidatePattern } from "../lib/cache";
 import { getValidUserId, hasRole } from "../lib/permissions";
+import {
+	checkStudentScheduleConflict,
+	getActiveAcademicTerm,
+} from "../modules/academic/curriculum.service";
 import { GradeCalculationService } from "../modules/academic/grade-calculation.service";
 
 function addDays(baseDateStr: string, days: number): string {
@@ -1046,10 +1050,11 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 			}
 
 			const courseId = parseInt(params.id, 10);
-			const { studentId, studentIds, notes } = body as {
+			const { studentId, studentIds, notes, allowOverride } = body as {
 				studentId?: number;
 				studentIds?: number[];
 				notes?: string;
+				allowOverride?: boolean;
 			};
 
 			const targetIds: number[] =
@@ -1148,6 +1153,29 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				};
 			}
 
+			// 3. Pengecekan Bentrok Jadwal Mahasiswa
+			const activeTerm = await getActiveAcademicTerm();
+			const termId = course.termId || activeTerm?.id;
+			if (termId && !allowOverride) {
+				for (const s of studentRecords) {
+					if (!toInsert.includes(s.id)) continue;
+					const conflictCheck = await checkStudentScheduleConflict(
+						s.id,
+						courseId,
+						termId,
+					);
+					if (conflictCheck.hasConflict) {
+						set.status = 409;
+						const firstConflict = conflictCheck.conflicts[0];
+						return {
+							success: false,
+							message: `Konflik Jadwal: Mahasiswa '${s.name}' sudah memiliki jadwal perkuliahan '${firstConflict?.existingCourse}' pada hari ${firstConflict?.day} (${firstConflict?.existingTime}) yang bertabrakan dengan kelas ini.`,
+							conflicts: conflictCheck.conflicts,
+						};
+					}
+				}
+			}
+
 			const validUserId = (await getValidUserId(user)) || user?.id || null;
 
 			const recordsToInsert = toInsert.map((sId) => ({
@@ -1185,6 +1213,7 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				studentId: t.Optional(t.Number()),
 				studentIds: t.Optional(t.Array(t.Number())),
 				notes: t.Optional(t.Union([t.String(), t.Null()])),
+				allowOverride: t.Optional(t.Boolean()),
 			}),
 		},
 	)

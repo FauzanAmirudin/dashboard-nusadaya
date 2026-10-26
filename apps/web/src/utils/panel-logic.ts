@@ -63,17 +63,15 @@ export const PMB_REQUIRED_DOC_KEYS = [
 	"docIjazah",
 	"docTranskrip",
 	"docPassportDepan",
-	"docPassportVisa",
 	"docSkbm",
 	"docPreMcu",
-	"docMcu",
 	"docSla",
-	"docSertifikasiBahasa",
 ] as const;
 
 export function calculatePmbChecklist(pmbData: any): {
 	mainCompletedCount: number;
 	requiredDocsCompletedCount: number;
+	totalRequiredCompleted14: number;
 	totalRequiredCompleted16: number;
 	totalRequiredCompleted17: number;
 	totalRequiredCompleted: number;
@@ -83,6 +81,7 @@ export function calculatePmbChecklist(pmbData: any): {
 		return {
 			mainCompletedCount: 0,
 			requiredDocsCompletedCount: 0,
+			totalRequiredCompleted14: 0,
 			totalRequiredCompleted16: 0,
 			totalRequiredCompleted17: 0,
 			totalRequiredCompleted: 0,
@@ -111,10 +110,11 @@ export function calculatePmbChecklist(pmbData: any): {
 	return {
 		mainCompletedCount,
 		requiredDocsCompletedCount,
+		totalRequiredCompleted14: totalRequiredCompleted,
 		totalRequiredCompleted16: totalRequiredCompleted,
 		totalRequiredCompleted17: totalRequiredCompleted,
 		totalRequiredCompleted,
-		isAllChecklistDone: totalRequiredCompleted === 17,
+		isAllChecklistDone: totalRequiredCompleted === 14,
 	};
 }
 

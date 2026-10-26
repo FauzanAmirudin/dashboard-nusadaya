@@ -16,6 +16,25 @@ export function getToken(): string | null {
 	}
 }
 
+/**
+ * Helper to resolve uploaded file path into fully qualified URL with JWT query param
+ * Works for relative paths (e.g. /files/:id/download) and absolute URLs
+ */
+export function getFileUrl(url: string | null | undefined): string {
+	if (!url) return "";
+	const token = getToken();
+	let fullUrl = url;
+	if (!url.startsWith("http://") && !url.startsWith("https://")) {
+		const cleanPath = url.startsWith("/") ? url : `/${url}`;
+		fullUrl = `${API_URL}${cleanPath}`;
+	}
+	if (token && !fullUrl.includes("token=")) {
+		const separator = fullUrl.includes("?") ? "&" : "?";
+		fullUrl += `${separator}token=${encodeURIComponent(token)}`;
+	}
+	return fullUrl;
+}
+
 function cleanUrl(rawUrl: string | URL): string {
 	try {
 		const urlObj =

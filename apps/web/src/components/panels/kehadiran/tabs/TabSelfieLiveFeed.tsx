@@ -29,7 +29,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { API_URL, getToken } from "@/lib/eden";
+import { API_URL, getFileUrl, getToken } from "@/lib/eden";
 import { cn } from "@/lib/utils";
 import {
 	SelfieDetailModal,
@@ -283,7 +283,7 @@ export function TabSelfieLiveFeed() {
 								>
 									{item.selfieUrl ? (
 										<img
-											src={item.selfieUrl}
+											src={getFileUrl(item.selfieUrl)}
 											alt={`Selfie ${item.student?.name}`}
 											className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
 										/>

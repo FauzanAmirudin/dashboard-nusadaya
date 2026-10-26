@@ -92,8 +92,8 @@ export default function LeafletMap({
 	className = "w-full rounded-xl overflow-hidden border border-slate-200 shadow-sm",
 	height = "320px",
 }: LeafletMapProps) {
-	const centerLat = studentCoords.latitude || -8.6705;
-	const centerLon = studentCoords.longitude || 115.2126;
+	const centerLat = studentCoords.latitude || -5.40145;
+	const centerLon = studentCoords.longitude || 105.2114;
 
 	return (
 		<div className={className} style={{ height, width: "100%" }}>

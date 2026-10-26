@@ -21,6 +21,15 @@ import {
 	courses,
 } from "./courses";
 import { crmData, crmDocuments, crmLogs } from "./crm";
+import {
+	academicAuditLogs,
+	academicTerms,
+	curricula,
+	curriculumPackages,
+	masterCourses,
+	semesterRolloverLogs,
+	studentSemesterRegistrations,
+} from "./curriculum";
 import { finalDecision } from "./final-decision";
 import {
 	financeData,
@@ -748,6 +757,14 @@ export const coursesRelations = relations(courses, ({ one, many }) => ({
 	}),
 	meetings: many(courseMeetings),
 	enrollments: many(courseEnrollments),
+	masterCourse: one(masterCourses, {
+		fields: [courses.masterCourseId],
+		references: [masterCourses.id],
+	}),
+	term: one(academicTerms, {
+		fields: [courses.termId],
+		references: [academicTerms.id],
+	}),
 }));
 
 export const courseEnrollmentsRelations = relations(
@@ -764,6 +781,10 @@ export const courseEnrollmentsRelations = relations(
 		addedBy: one(users, {
 			fields: [courseEnrollments.addedBy],
 			references: [users.id],
+		}),
+		term: one(academicTerms, {
+			fields: [courseEnrollments.termId],
+			references: [academicTerms.id],
 		}),
 	}),
 );
@@ -870,6 +891,61 @@ export const selfieFraudFlagsRelations = relations(
 		}),
 		reviewer: one(users, {
 			fields: [selfieFraudFlags.reviewedBy],
+			references: [users.id],
+		}),
+	}),
+);
+
+export const masterCoursesRelations = relations(masterCourses, ({ many }) => ({
+	packages: many(curriculumPackages),
+	courses: many(courses),
+}));
+
+export const academicTermsRelations = relations(
+	academicTerms,
+	({ one, many }) => ({
+		calendar: one(academicCalendars, {
+			fields: [academicTerms.calendarId],
+			references: [academicCalendars.id],
+		}),
+		courses: many(courses),
+		registrations: many(studentSemesterRegistrations),
+		enrollments: many(courseEnrollments),
+		grades: many(courseGrades),
+	}),
+);
+
+export const curriculaRelations = relations(curricula, ({ many }) => ({
+	packages: many(curriculumPackages),
+}));
+
+export const curriculumPackagesRelations = relations(
+	curriculumPackages,
+	({ one }) => ({
+		curriculum: one(curricula, {
+			fields: [curriculumPackages.curriculumId],
+			references: [curricula.id],
+		}),
+		masterCourse: one(masterCourses, {
+			fields: [curriculumPackages.masterCourseId],
+			references: [masterCourses.id],
+		}),
+	}),
+);
+
+export const studentSemesterRegistrationsRelations = relations(
+	studentSemesterRegistrations,
+	({ one }) => ({
+		student: one(students, {
+			fields: [studentSemesterRegistrations.studentId],
+			references: [students.id],
+		}),
+		term: one(academicTerms, {
+			fields: [studentSemesterRegistrations.termId],
+			references: [academicTerms.id],
+		}),
+		approvedBy: one(users, {
+			fields: [studentSemesterRegistrations.approvedBy],
 			references: [users.id],
 		}),
 	}),

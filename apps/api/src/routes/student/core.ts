@@ -144,7 +144,7 @@ export async function createStudentPipeline(body: any, userId: number) {
 			addressStreet: body.addressStreet,
 			addressRt: body.addressRt,
 			addressRw: body.addressRw,
-			addressNo: body.addressNo,
+			addressNo: body.addressNo || null,
 			addressVillage: body.addressVillage,
 			addressDistrict: body.addressDistrict,
 			addressCity: body.addressCity,
@@ -152,7 +152,7 @@ export async function createStudentPipeline(body: any, userId: number) {
 			livingWith: body.livingWith,
 			schoolOrigin: body.schoolOrigin,
 			schoolAddress: body.schoolAddress,
-			schoolMajor: body.schoolMajor,
+			schoolMajor: body.schoolMajor || null,
 			graduationYear: body.graduationYear,
 			classType: body.classType,
 			academicYear: body.academicYear,
@@ -182,6 +182,27 @@ export async function createStudentPipeline(body: any, userId: number) {
 		height: body.height,
 		weight: body.weight,
 		clothingSize: body.clothingSize,
+		hasBoneFracture:
+			body.hasBoneFracture === true || body.hasBoneFracture === "true",
+		boneFractureLocation:
+			body.hasBoneFracture === true || body.hasBoneFracture === "true"
+				? body.boneFractureLocation || null
+				: null,
+		boneFractureYear:
+			(body.hasBoneFracture === true || body.hasBoneFracture === "true") &&
+			body.boneFractureYear
+				? parseInt(body.boneFractureYear, 10)
+				: null,
+		hasSurgery: body.hasSurgery === true || body.hasSurgery === "true",
+		surgeryType:
+			body.hasSurgery === true || body.hasSurgery === "true"
+				? body.surgeryType || null
+				: null,
+		surgeryYear:
+			(body.hasSurgery === true || body.hasSurgery === "true") &&
+			body.surgeryYear
+				? parseInt(body.surgeryYear, 10)
+				: null,
 	});
 
 	// 5. Insert Student Parents (Ayah, Ibu, Wali) — Support array & fallback flat fields
@@ -878,6 +899,12 @@ export const coreRoutes = new Elysia()
 				height: t.Optional(t.Number()),
 				weight: t.Optional(t.Number()),
 				clothingSize: t.Optional(t.String()),
+				hasBoneFracture: t.Optional(t.Boolean()),
+				boneFractureLocation: t.Optional(t.String()),
+				boneFractureYear: t.Optional(t.Number()),
+				hasSurgery: t.Optional(t.Boolean()),
+				surgeryType: t.Optional(t.String()),
+				surgeryYear: t.Optional(t.Number()),
 
 				// Tab 4, 5, 6
 				parents: t.Optional(
@@ -1002,18 +1029,46 @@ export const coreRoutes = new Elysia()
 				.where(eq(students.id, id));
 
 			// 3. Update Student Health
+			const healthData = {
+				bloodType: body.bloodType,
+				diseaseHistory: body.diseaseHistory,
+				congenitalDisease: body.congenitalDisease,
+				height: body.height,
+				weight: body.weight,
+				clothingSize: body.clothingSize,
+				hasBoneFracture:
+					body.hasBoneFracture === true || body.hasBoneFracture === "true",
+				boneFractureLocation:
+					body.hasBoneFracture === true || body.hasBoneFracture === "true"
+						? body.boneFractureLocation || null
+						: null,
+				boneFractureYear:
+					(body.hasBoneFracture === true || body.hasBoneFracture === "true") &&
+					body.boneFractureYear
+						? parseInt(body.boneFractureYear, 10)
+						: null,
+				hasSurgery: body.hasSurgery === true || body.hasSurgery === "true",
+				surgeryType:
+					body.hasSurgery === true || body.hasSurgery === "true"
+						? body.surgeryType || null
+						: null,
+				surgeryYear:
+					(body.hasSurgery === true || body.hasSurgery === "true") &&
+					body.surgeryYear
+						? parseInt(body.surgeryYear, 10)
+						: null,
+				updatedAt: new Date(),
+			};
 			await db
-				.update(studentHealth)
-				.set({
-					bloodType: body.bloodType,
-					diseaseHistory: body.diseaseHistory,
-					congenitalDisease: body.congenitalDisease,
-					height: body.height,
-					weight: body.weight,
-					clothingSize: body.clothingSize,
-					updatedAt: new Date(),
+				.insert(studentHealth)
+				.values({
+					studentId: id,
+					...healthData,
 				})
-				.where(eq(studentHealth.studentId, id));
+				.onConflictDoUpdate({
+					target: studentHealth.studentId,
+					set: healthData,
+				});
 
 			// 4. Update Student Parents (Ayah, Ibu, Wali)
 			await db.delete(studentParents).where(eq(studentParents.studentId, id));
@@ -1125,6 +1180,12 @@ export const coreRoutes = new Elysia()
 				height: t.Optional(t.Number()),
 				weight: t.Optional(t.Number()),
 				clothingSize: t.Optional(t.String()),
+				hasBoneFracture: t.Optional(t.Boolean()),
+				boneFractureLocation: t.Optional(t.String()),
+				boneFractureYear: t.Optional(t.Number()),
+				hasSurgery: t.Optional(t.Boolean()),
+				surgeryType: t.Optional(t.String()),
+				surgeryYear: t.Optional(t.Number()),
 
 				// Tab 4, 5, 6
 				parents: t.Optional(
@@ -1605,6 +1666,7 @@ export const coreRoutes = new Elysia()
 					grades,
 					parents,
 					friendContacts,
+					health,
 				] = await Promise.all([
 					db.query.pmbData.findFirst({
 						where: eq(pmbData.studentId, id),
@@ -1646,6 +1708,9 @@ export const coreRoutes = new Elysia()
 					db.query.studentFriendContacts.findMany({
 						where: eq(studentFriendContacts.studentId, id),
 					}),
+					db.query.studentHealth.findFirst({
+						where: eq(studentHealth.studentId, id),
+					}),
 				]);
 
 				return {
@@ -1660,6 +1725,7 @@ export const coreRoutes = new Elysia()
 					courseGrades: grades,
 					parents,
 					friendContacts,
+					health,
 				};
 			},
 			CACHE_TTL_DETAIL,

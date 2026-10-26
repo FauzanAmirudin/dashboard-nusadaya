@@ -62,7 +62,7 @@ export function TabDokumen({
 	handleSaveNotes,
 	isSaving,
 }: TabDokumenProps) {
-	// Hitung kelengkapan 12 dokumen
+	// Hitung kelengkapan dokumen kesiapan keberangkatan
 	const checklistKeys = [
 		"passportReady",
 		"interviewReady",
@@ -76,11 +76,11 @@ export function TabDokumen({
 		"pdtReady",
 		"dokumentasiReady",
 		"agenReady",
+		"languageCertReady",
 	];
 
 	const completedCount = checklistKeys.filter((k) => !!data?.[k]).length;
 	const isAllCompleted = completedCount === checklistKeys.length;
-
 	return (
 		<div className="space-y-6">
 			{/* Main Card */}
@@ -89,7 +89,7 @@ export function TabDokumen({
 					<div>
 						<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
 							<Plane className="w-4 h-4 text-[#0517B0]" />
-							Status Dokumen & Kesiapan Keberangkatan (12)
+							Status Dokumen & Kesiapan Keberangkatan ({checklistKeys.length})
 						</CardTitle>
 						<p className="text-[11px] text-slate-500 mt-0.5">
 							Monitoring legalitas dokumen paspor, visa, kontrak kerja, tiket,
@@ -104,7 +104,7 @@ export function TabDokumen({
 									: "bg-blue-50 text-[#0517B0] border-blue-200"
 							}`}
 						>
-							{completedCount}/12 Selesai
+							{completedCount}/{checklistKeys.length} Selesai
 						</Badge>
 					</div>
 				</CardHeader>
@@ -1332,6 +1332,130 @@ export function TabDokumen({
 									studentId={studentId}
 									panel="magang"
 									documentKey="mitra_agen"
+									canEdit={canEdit}
+									onUploadSuccess={fetchInternshipData}
+								/>
+							</div>
+						</div>
+
+						{/* 13. Sertifikasi Bahasa Asing (Poin 12) */}
+						<div
+							className={`p-4 rounded-xl border transition-colors space-y-3 ${
+								data?.languageCertReady
+									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
+									: "border-slate-200 bg-white shadow-xs"
+							}`}
+						>
+							<div className="flex items-start justify-between gap-3">
+								<div className="flex items-start gap-3">
+									<Checkbox
+										id="chk-languageCertReady"
+										checked={!!data?.languageCertReady}
+										disabled={!canEdit || loadingItem === "languageCertReady"}
+										onCheckedChange={(checked) =>
+											handleToggleField("languageCertReady", !!checked)
+										}
+										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+									/>
+									<div>
+										<label
+											htmlFor="chk-languageCertReady"
+											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
+										>
+											13. Sertifikasi Bahasa Asing
+										</label>
+										<p className="text-[11px] text-slate-500 mt-0.5">
+											Kesiapan sertifikasi bahasa kerja (TOEIC / JLPT / Topik)
+											menjelang keberangkatan
+										</p>
+									</div>
+								</div>
+								<div className="flex items-center gap-2 shrink-0">
+									{loadingItem === "languageCertReady" ? (
+										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+									) : data?.languageCertReady ? (
+										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+											✓ Selesai
+										</Badge>
+									) : (
+										<Badge
+											variant="outline"
+											className="text-slate-400 border-slate-200 text-[10px]"
+										>
+											Belum
+										</Badge>
+									)}
+								</div>
+							</div>
+
+							<div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+								<div className="space-y-1">
+									<Label className="text-[11px] font-semibold text-slate-600">
+										Jenis Sertifikasi
+									</Label>
+									<Select
+										value={data?.languageCertName || "TOEIC"}
+										disabled={!canEdit}
+										onValueChange={(val) => {
+											handleLocalChange("languageCertName", val);
+											handleToggleField("languageCertName", val);
+										}}
+									>
+										<SelectTrigger className="h-8 text-xs bg-white">
+											<SelectValue placeholder="Pilih Jenis" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="TOEIC">TOEIC (English)</SelectItem>
+											<SelectItem value="JLPT">JLPT (Jepang)</SelectItem>
+											<SelectItem value="Topik">TOPIK (Korea)</SelectItem>
+											<SelectItem value="TOCFL">TOCFL (Mandarin)</SelectItem>
+											<SelectItem value="Lainnya">Lainnya</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+								<div className="space-y-1">
+									<Label className="text-[11px] font-semibold text-slate-600">
+										Tanggal Tes / Kelulusan
+									</Label>
+									<Input
+										type="date"
+										className="h-8 text-xs bg-white"
+										value={
+											data?.languageCertDate
+												? new Date(data.languageCertDate)
+														.toISOString()
+														.split("T")[0]
+												: ""
+										}
+										disabled={!canEdit}
+										onChange={(e) =>
+											handleLocalChange("languageCertDate", e.target.value)
+										}
+										onBlur={() => handleBlurField("languageCertDate")}
+									/>
+								</div>
+								<div className="space-y-1">
+									<Label className="text-[11px] font-semibold text-slate-600">
+										Skor / Hasil Kelulusan
+									</Label>
+									<Input
+										placeholder="Contoh: 650 / N3 / Level 2"
+										className="h-8 text-xs bg-white"
+										value={data?.languageCertScore || ""}
+										disabled={!canEdit}
+										onChange={(e) =>
+											handleLocalChange("languageCertScore", e.target.value)
+										}
+										onBlur={() => handleBlurField("languageCertScore")}
+									/>
+								</div>
+							</div>
+
+							<div className="pt-2 border-t border-slate-100">
+								<DocumentUpload
+									studentId={studentId}
+									panel="magang"
+									documentKey="sertifikasi_bahasa"
 									canEdit={canEdit}
 									onUploadSuccess={fetchInternshipData}
 								/>

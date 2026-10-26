@@ -6,6 +6,7 @@ import {
 	Camera,
 	CheckCircle2,
 	Clock,
+	ExternalLink,
 	FileText,
 	Info,
 	Loader2,
@@ -18,12 +19,20 @@ import {
 	type SelfieRecordDetail,
 } from "@/components/panels/kehadiran/SelfieDetailModal";
 import { Badge } from "@/components/ui/badge";
-import { api } from "@/lib/eden";
+import { Button } from "@/components/ui/button";
+import { API_URL, api, getFileUrl, getToken } from "@/lib/eden";
 import { cn } from "@/lib/utils";
 
 export function TabODS({ studentId }: { studentId: number }) {
 	const [records, setRecords] = useState<any[]>([]);
 	const [crmData, setCrmData] = useState<any | null>(null);
+	const [crmDocs, setCrmDocs] = useState<any[]>([]);
+	const [studentInfo, setStudentInfo] = useState<{
+		name: string;
+		nim: string;
+		cohort?: number;
+		rombel?: string;
+	} | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [selectedSelfieRecord, setSelectedSelfieRecord] =
 		useState<SelfieRecordDetail | null>(null);
@@ -31,9 +40,16 @@ export function TabODS({ studentId }: { studentId: number }) {
 	const fetchData = async (isSilent = false) => {
 		if (!isSilent) setIsLoading(true);
 		try {
-			const [odsRes, crmRes] = await Promise.all([
+			const token = getToken();
+			const [odsRes, crmRes, studentRes, docsRes] = await Promise.all([
 				(api as any).attendance.mahasiswa[studentId].ods.get(),
 				api.students[studentId.toString()].crm.get(),
+				api.students[studentId.toString()].get().catch(() => null),
+				fetch(`${API_URL}/students/${studentId}/crm/documents`, {
+					headers: token ? { Authorization: `Bearer ${token}` } : {},
+				})
+					.then((r) => (r.ok ? r.json() : null))
+					.catch(() => null),
 			]);
 
 			if (odsRes.data?.success) {
@@ -41,6 +57,24 @@ export function TabODS({ studentId }: { studentId: number }) {
 			}
 			if (crmRes.data?.success && (crmRes.data.data as any)?.crm) {
 				setCrmData((crmRes.data.data as any).crm);
+			}
+			if (studentRes?.data?.success && studentRes.data.data) {
+				const s = studentRes.data.data as any;
+				setStudentInfo({
+					name: s.name,
+					nim: s.nim,
+					cohort: s.cohort,
+					rombel: s.rombel,
+				});
+			}
+			if (docsRes?.success && docsRes.data) {
+				let list: any[] = [];
+				if (Array.isArray(docsRes.data)) {
+					list = docsRes.data;
+				} else if (typeof docsRes.data === "object") {
+					list = Object.values(docsRes.data).flat();
+				}
+				setCrmDocs(list);
 			}
 		} catch (error) {
 			if (!isSilent) {
@@ -176,48 +210,88 @@ export function TabODS({ studentId }: { studentId: number }) {
 					{[1, 2, 3, 4, 5].map((num, idx) => {
 						const item = odsList[idx] || {};
 						const isDone = !!item.isDone;
+						const matchingDoc = crmDocs.find((d: any) => {
+							if (
+								d.documentKey === `ods_${num}_report` ||
+								d.documentKey === `ods_${num}`
+							)
+								return true;
+							if (num === 1 && d.documentKey === "ods_report") return true;
+							return false;
+						});
+
 						return (
 							<div
 								key={num}
 								className={cn(
-									"p-3.5 rounded-xl border text-xs space-y-2 transition-all shadow-2xs",
+									"p-3.5 rounded-xl border text-xs space-y-2.5 transition-all shadow-2xs flex flex-col justify-between",
 									isDone
 										? "bg-emerald-50/50 border-emerald-200/80"
 										: "bg-slate-50/70 border-slate-200/80",
 								)}
 							>
-								<div className="flex justify-between items-center">
-									<span className="font-bold text-slate-800 text-xs">
-										ODS #{num}
-									</span>
-									{isDone ? (
-										<Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0 h-4 font-semibold">
-											✓ Selesai
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="bg-white text-slate-400 text-[10px] px-1.5 py-0 h-4 border-slate-200"
-										>
-											Belum
-										</Badge>
-									)}
+								<div className="space-y-2">
+									<div className="flex justify-between items-center">
+										<span className="font-bold text-slate-800 text-xs">
+											ODS #{num}
+										</span>
+										{isDone ? (
+											<Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0 h-4 font-semibold">
+												✓ Selesai
+											</Badge>
+										) : (
+											<Badge
+												variant="outline"
+												className="bg-white text-slate-400 text-[10px] px-1.5 py-0 h-4 border-slate-200"
+											>
+												Belum
+											</Badge>
+										)}
+									</div>
+
+									<div className="space-y-1">
+										<div className="flex items-center gap-1.5 text-slate-700 min-w-0">
+											<Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+											<span
+												className="font-medium text-xs truncate"
+												title={item.industry || "Tempat belum diisi"}
+											>
+												{item.industry || "Belum ditentukan"}
+											</span>
+										</div>
+										<div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+											<Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+											<span>{item.date || "-"}</span>
+										</div>
+									</div>
 								</div>
 
-								<div className="space-y-1">
-									<div className="flex items-center gap-1.5 text-slate-700 min-w-0">
-										<Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-										<span
-											className="font-medium text-xs truncate"
-											title={item.industry || "Tempat belum diisi"}
+								{/* Bukti Dokumen Laporan ODS */}
+								<div className="pt-2 border-t border-slate-200/60 mt-auto">
+									{matchingDoc ? (
+										<a
+											href={`/dashboard/students/${studentId}/documents/${matchingDoc.id}?url=${encodeURIComponent(matchingDoc.fileUrl)}&name=${encodeURIComponent(matchingDoc.fileName)}&token=${getToken() || ""}`}
+											target="_blank"
+											rel="noreferrer"
+											className="inline-flex items-center justify-between gap-1.5 px-2 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-[#0517B0] hover:bg-blue-100 border border-blue-200/80 transition-colors w-full group shadow-2xs cursor-pointer"
+											title={`Review Dokumen Laporan ODS #${num}`}
 										>
-											{item.industry || "Belum ditentukan"}
-										</span>
-									</div>
-									<div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-										<Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-										<span>{item.date || "-"}</span>
-									</div>
+											<span className="flex items-center gap-1.5 truncate">
+												<FileText className="w-3.5 h-3.5 text-[#0517B0] shrink-0" />
+												<span className="truncate">Laporan ODS</span>
+											</span>
+											<ExternalLink className="w-3 h-3 text-blue-400 group-hover:text-[#0517B0] shrink-0" />
+										</a>
+									) : isDone ? (
+										<div className="text-[10px] text-slate-400 italic flex items-center gap-1 py-0.5">
+											<Info className="w-3 h-3 text-slate-300 shrink-0" />
+											<span>Laporan belum diunggah</span>
+										</div>
+									) : (
+										<div className="text-[10px] text-slate-300 italic flex items-center gap-1 py-0.5">
+											<span>Belum ada dokumen</span>
+										</div>
+									)}
 								</div>
 							</div>
 						);
@@ -267,7 +341,7 @@ export function TabODS({ studentId }: { studentId: number }) {
 									)}
 								</div>
 
-								<div className="flex items-center gap-2">
+								<div className="flex items-center gap-2 flex-wrap">
 									<Badge
 										variant={
 											r.status === "hadir"
@@ -290,9 +364,11 @@ export function TabODS({ studentId }: { studentId: number }) {
 									</Badge>
 
 									{/* Bukti Foto Selfie GPS Mahasiswa */}
-									{r.selfieUrl && (
-										<button
+									{r.selfieUrl ? (
+										<Button
 											type="button"
+											variant="outline"
+											size="sm"
 											onClick={() =>
 												setSelectedSelfieRecord({
 													id: r.id,
@@ -300,8 +376,10 @@ export function TabODS({ studentId }: { studentId: number }) {
 													title: `One Day Service - ${new Date(r.date).toLocaleDateString("id-ID")}`,
 													student: {
 														id: studentId,
-														name: "Mahasiswa",
-														nim: "",
+														name: studentInfo?.name || "Mahasiswa",
+														nim: studentInfo?.nim || "",
+														cohort: studentInfo?.cohort,
+														rombel: studentInfo?.rombel,
 													},
 													status: r.status || "hadir",
 													selfieUrl: r.selfieUrl,
@@ -316,21 +394,28 @@ export function TabODS({ studentId }: { studentId: number }) {
 														r.verificationStatus || "auto_approved",
 												})
 											}
-											className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-blue-50 border border-blue-200/80 bg-blue-50/40 text-blue-700 transition-colors cursor-pointer group text-left"
-											title="Klik untuk melihat foto selfie & peta GPS"
+											className="h-8 px-3 text-xs text-blue-700 border-blue-200 bg-blue-50/70 hover:bg-blue-100 font-semibold gap-2 rounded-lg shadow-2xs inline-flex items-center cursor-pointer"
+											title="Klik untuk melihat foto selfie & peta lokasi GPS ODS"
 										>
-											<div className="relative w-6 h-6 rounded overflow-hidden border border-blue-300 shrink-0">
+											<div className="relative w-5 h-5 rounded overflow-hidden border border-blue-300 shrink-0 bg-blue-100">
 												<img
-													src={r.selfieUrl}
-													alt="Bukti Selfie"
+													src={getFileUrl(r.selfieUrl)}
+													alt="Selfie"
 													className="w-full h-full object-cover"
 												/>
 											</div>
-											<span className="font-semibold text-[10px] flex items-center gap-1">
-												<Camera className="w-2.5 h-2.5" />
-												Selfie GPS
-											</span>
-										</button>
+											<Camera className="w-3.5 h-3.5 text-blue-600" />
+											<span>Lihat Bukti Absen</span>
+										</Button>
+									) : (
+										<Badge
+											variant="outline"
+											className="text-[10px] text-slate-400 border-slate-200 bg-slate-50 font-normal py-1"
+										>
+											{r.checkinMethod === "self"
+												? "Mandiri Web (Tanpa Foto)"
+												: "Presensi Manual CRM"}
+										</Badge>
 									)}
 								</div>
 							</div>

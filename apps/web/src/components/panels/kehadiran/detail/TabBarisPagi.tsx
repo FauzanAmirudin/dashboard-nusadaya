@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/eden";
+import { api, getFileUrl } from "@/lib/eden";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store";
 import {
@@ -67,6 +67,12 @@ interface BarisPagiData {
 
 export function TabBarisPagi({ studentId }: { studentId: number }) {
 	const [data, setData] = useState<BarisPagiData | null>(null);
+	const [studentInfo, setStudentInfo] = useState<{
+		name: string;
+		nim: string;
+		cohort?: number;
+		rombel?: string;
+	} | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [selectedRecord, setSelectedRecord] =
 		useState<SelfieRecordDetail | null>(null);
@@ -75,13 +81,23 @@ export function TabBarisPagi({ studentId }: { studentId: number }) {
 	const fetchData = async (isSilent = false) => {
 		if (!isSilent) setIsLoading(true);
 		try {
-			const res = await (api as any).attendance.mahasiswa[studentId][
-				"baris-pagi"
-			].get();
+			const [res, studentRes] = await Promise.all([
+				(api as any).attendance.mahasiswa[studentId]["baris-pagi"].get(),
+				api.students[studentId.toString()].get().catch(() => null),
+			]);
 			if (res.data?.success) {
 				setData(res.data.data);
 			} else if (!isSilent) {
 				toast.error("Gagal memuat rekap baris pagi mahasiswa");
+			}
+			if (studentRes?.data?.success && studentRes.data.data) {
+				const s = studentRes.data.data as any;
+				setStudentInfo({
+					name: s.name,
+					nim: s.nim,
+					cohort: s.cohort,
+					rombel: s.rombel,
+				});
 			}
 		} catch (error) {
 			if (!isSilent) toast.error("Terjadi kesalahan memuat data baris pagi");
@@ -320,8 +336,10 @@ export function TabBarisPagi({ studentId }: { studentId: number }) {
 																title: `Baris Pagi - ${rec.session?.sessionDate || ""}`,
 																student: {
 																	id: studentId,
-																	name: "Mahasiswa",
-																	nim: "",
+																	name: studentInfo?.name || "Mahasiswa",
+																	nim: studentInfo?.nim || "",
+																	cohort: studentInfo?.cohort,
+																	rombel: studentInfo?.rombel,
 																},
 																status: rec.status,
 																selfieUrl: rec.selfieUrl || undefined,
@@ -337,19 +355,26 @@ export function TabBarisPagi({ studentId }: { studentId: number }) {
 																	rec.verificationStatus || "auto_approved",
 															})
 														}
-														className="h-7 px-2.5 text-xs text-blue-700 border-blue-200 bg-blue-50/70 hover:bg-blue-100 font-semibold gap-1.5 rounded-lg shadow-2xs inline-flex items-center cursor-pointer"
+														className="h-8 px-2.5 text-xs text-blue-700 border-blue-200 bg-blue-50/70 hover:bg-blue-100 font-semibold gap-2 rounded-lg shadow-2xs inline-flex items-center cursor-pointer"
 														title="Lihat foto selfie & peta lokasi GPS baris pagi"
 													>
+														<div className="relative w-5 h-5 rounded overflow-hidden border border-blue-300 shrink-0 bg-blue-100">
+															<img
+																src={getFileUrl(rec.selfieUrl)}
+																alt="Thumbnail"
+																className="w-full h-full object-cover"
+															/>
+														</div>
 														<Camera className="w-3.5 h-3.5 text-blue-600" />
 														<span>Lihat Bukti Kehadiran</span>
 													</Button>
 												) : (
 													<Badge
 														variant="outline"
-														className="text-[10px] text-slate-400 border-slate-200 bg-slate-50 font-normal"
+														className="text-[10px] text-slate-400 border-slate-200 bg-slate-50 font-normal py-1"
 													>
 														{rec.checkinMethod === "self"
-															? "Mandiri Web"
+															? "Mandiri Web (Tanpa Foto)"
 															: "Petugas BAAK"}
 													</Badge>
 												)}

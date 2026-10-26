@@ -71,7 +71,7 @@ import {
 } from "@/components/ui/select";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { API_URL, getToken } from "@/lib/eden";
+import { API_URL, getFileUrl, getToken } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store";
@@ -122,7 +122,12 @@ function evaluateArrival(
 	const [ah, am] = arrivalTime.split(":").map((v) => parseInt(v, 10));
 	const [th, tm] = targetTime.split(":").map((v) => parseInt(v, 10));
 
-	if (isNaN(ah) || isNaN(am) || isNaN(th) || isNaN(tm)) {
+	if (
+		Number.isNaN(ah) ||
+		Number.isNaN(am) ||
+		Number.isNaN(th) ||
+		Number.isNaN(tm)
+	) {
 		return { isLate: false, minutesLate: 0 };
 	}
 
@@ -1463,7 +1468,7 @@ export function BarisPagiDashboard({
 																>
 																	<div className="relative w-7 h-7 rounded-md overflow-hidden border border-slate-300 group-hover:border-blue-500 shrink-0">
 																		<img
-																			src={m.selfieUrl}
+																			src={getFileUrl(m.selfieUrl)}
 																			alt="Selfie"
 																			className="w-full h-full object-cover"
 																		/>

@@ -129,6 +129,18 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 				icon: CalendarDays,
 			},
 			{
+				label: "Periode Akademik",
+				href: "/dashboard/akademik/periode",
+				roles: ["superadmin", "akademik"],
+				icon: CalendarDays,
+			},
+			{
+				label: "Kurikulum & Master MK",
+				href: "/dashboard/akademik/kurikulum",
+				roles: ["superadmin", "akademik"],
+				icon: BookOpen,
+			},
+			{
 				label: "Penjadwalan & Info",
 				href: "/dashboard/penjadwalan",
 				roles: ["superadmin", "akademik"],
@@ -467,16 +479,78 @@ function checkItemActive(
 		);
 	}
 
+	if (href === "/dashboard/mata-kuliah/rekap") {
+		return (
+			pathname === "/dashboard/mata-kuliah/rekap" ||
+			pathname.startsWith("/dashboard/mata-kuliah/rekap/")
+		);
+	}
+
+	if (href === "/dashboard/mata-kuliah/rekap-dosen") {
+		return (
+			pathname === "/dashboard/mata-kuliah/rekap-dosen" ||
+			pathname.startsWith("/dashboard/mata-kuliah/rekap-dosen/")
+		);
+	}
+
 	if (href === "/dashboard/akademik") {
 		return (
-			(pathname === "/dashboard/akademik" ||
-				pathname.startsWith("/dashboard/akademik/")) &&
-			!pathname.startsWith("/dashboard/akademik/pa")
+			pathname === "/dashboard/akademik" ||
+			(pathname.startsWith("/dashboard/akademik/") &&
+				!pathname.startsWith("/dashboard/akademik/periode") &&
+				!pathname.startsWith("/dashboard/akademik/kurikulum") &&
+				!pathname.startsWith("/dashboard/akademik/absensi-dosen") &&
+				!pathname.startsWith("/dashboard/akademik/pa"))
+		);
+	}
+
+	if (href === "/dashboard/akademik/periode") {
+		return (
+			pathname === "/dashboard/akademik/periode" ||
+			pathname.startsWith("/dashboard/akademik/periode/")
+		);
+	}
+
+	if (href === "/dashboard/akademik/kurikulum") {
+		return (
+			pathname === "/dashboard/akademik/kurikulum" ||
+			pathname.startsWith("/dashboard/akademik/kurikulum/")
+		);
+	}
+
+	if (href === "/dashboard/akademik/absensi-dosen") {
+		return (
+			pathname === "/dashboard/akademik/absensi-dosen" ||
+			pathname.startsWith("/dashboard/akademik/absensi-dosen/")
+		);
+	}
+
+	if (href === "/dashboard/akademik/pa") {
+		return (
+			pathname === "/dashboard/akademik/pa" ||
+			pathname.startsWith("/dashboard/akademik/pa/")
 		);
 	}
 
 	if (href === "/dashboard/kehadiran") {
-		return pathname === "/dashboard/kehadiran";
+		return (
+			pathname === "/dashboard/kehadiran" ||
+			pathname.startsWith("/dashboard/kehadiran/")
+		);
+	}
+
+	if (href === "/dashboard/penjadwalan") {
+		return (
+			pathname === "/dashboard/penjadwalan" ||
+			pathname.startsWith("/dashboard/penjadwalan/")
+		);
+	}
+
+	if (href === "/dashboard/kalender-akademik") {
+		return (
+			pathname === "/dashboard/kalender-akademik" ||
+			pathname.startsWith("/dashboard/kalender-akademik/")
+		);
 	}
 
 	return pathname === href || pathname.startsWith(`${href}/`);

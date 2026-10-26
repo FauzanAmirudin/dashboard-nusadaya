@@ -130,7 +130,7 @@ async function runMigration() {
 	for (const type of types) {
 		await db.execute(sql`
 			INSERT INTO attendance_checkpoint_config (type, label, latitude, longitude, radius_meters, is_active, notes)
-			SELECT ${type}, ${"Kampus Utama Nusadaya Academy Denpasar"}, -8.6705, 115.2126, 150, true, 'Default campus checkpoint'
+			SELECT ${type}, ${"Kampus Nusadaya Academy Bandar Lampung"}, -5.40145, 105.2114, 150, true, 'Jl. Raden Imba Kusuma Ratu, Langkapura, Kec. Langkapura, Kota Bandar Lampung, Lampung 35116'
 			WHERE NOT EXISTS (
 				SELECT 1 FROM attendance_checkpoint_config WHERE type = ${type} AND cohort IS NULL
 			);

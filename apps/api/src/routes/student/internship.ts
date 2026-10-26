@@ -180,6 +180,7 @@ export const internshipRoutes = new Elysia()
 				"interviewDate",
 				"contractDate",
 				"mcuDate",
+				"languageCertDate",
 				"ticketDate",
 				"pdtDate",
 				"pdtEndDate",

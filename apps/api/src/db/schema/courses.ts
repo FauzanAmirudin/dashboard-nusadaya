@@ -10,6 +10,7 @@ import {
 	timestamp,
 	unique,
 } from "drizzle-orm/pg-core";
+import { academicTerms, masterCourses } from "./curriculum";
 import { activityTypeEnum, courseTypeEnum, meetingTypeEnum } from "./enums";
 import { students, users } from "./shared";
 
@@ -34,6 +35,13 @@ export const courses = pgTable(
 		cohort: integer("cohort").notNull(),
 		rombel: text("rombel").default("Kelas A").notNull(),
 		type: courseTypeEnum("type").default("teori").notNull(),
+		masterCourseId: integer("master_course_id").references(
+			() => masterCourses.id,
+		),
+		termId: integer("term_id").references(() => academicTerms.id),
+		semester: integer("semester"), // 1 - 6
+		status: text("status").default("dibuka").notNull(), // "draft" | "dibuka" | "ditutup"
+		notes: text("notes"),
 		createdBy: integer("created_by").references(() => users.id),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -43,6 +51,8 @@ export const courses = pgTable(
 		index("idx_courses_cohort").on(t.cohort),
 		index("idx_courses_dosen_id").on(t.dosenId),
 		index("idx_courses_dosen_pendamping_id").on(t.dosenPendampingId),
+		index("idx_courses_term_id").on(t.termId),
+		index("idx_courses_master_id").on(t.masterCourseId),
 	],
 );
 
@@ -115,12 +125,18 @@ export const courseEnrollments = pgTable(
 			.references(() => students.id)
 			.notNull(),
 		addedBy: integer("added_by").references(() => users.id),
+		termId: integer("term_id").references(() => academicTerms.id),
+		source: text("source").default("paket").notNull(), // "paket" | "manual" | "mengulang" | "konversi"
+		status: text("status").default("aktif").notNull(), // "aktif" | "dibatalkan"
+		reason: text("reason"),
 		notes: text("notes"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
 	(t) => [
 		index("idx_course_enrollments_course_id").on(t.courseId),
 		index("idx_course_enrollments_student_id").on(t.studentId),
 		unique("uq_course_enrollment").on(t.courseId, t.studentId),
+		index("idx_course_enrollments_term_id").on(t.termId),
 	],
 );

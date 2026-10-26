@@ -64,6 +64,7 @@ export const students = pgTable(
 		rombel: text("rombel").default("Kelas A"), // Rombongan Belajar dinamis, e.g. "Kelas A", "Kelas B"
 		academicYear: text("academic_year"),
 		batch: integer("batch"),
+		currentSemester: integer("current_semester").default(1),
 
 		phone: text("phone"),
 		email: text("email"),
@@ -116,6 +117,12 @@ export const studentHealth = pgTable(
 		height: integer("height"),
 		weight: integer("weight"),
 		clothingSize: text("clothing_size"),
+		hasBoneFracture: boolean("has_bone_fracture").default(false),
+		boneFractureLocation: text("bone_fracture_location"),
+		boneFractureYear: integer("bone_fracture_year"),
+		hasSurgery: boolean("has_surgery").default(false),
+		surgeryType: text("surgery_type"),
+		surgeryYear: integer("surgery_year"),
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
 	(t) => [index("idx_student_health_student_id").on(t.studentId)],

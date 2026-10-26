@@ -139,7 +139,7 @@ describe("Tahap 3 — Panel Business Logic", () => {
 	// PANEL: PMB (Tasks 3.3 & 3.4)
 	// ============================================================
 	describe("Panel PMB (PmbPanel)", () => {
-		describe("Task 3.3 — PMB Checklist Completion Count (17 Item Wajib)", () => {
+		describe("Task 3.3 — PMB Checklist Completion Count (14 Item Wajib Pendaftaran)", () => {
 			it("should count mainCompletedCount = 5 when all 5 main items are true", () => {
 				const pmbData = {
 					formReceived: true,
@@ -155,7 +155,7 @@ describe("Tahap 3 — Panel Business Logic", () => {
 				expect(result.isAllChecklistDone).toBe(false);
 			});
 
-			it("should count requiredDocsCompletedCount = 12 when all 12 docs are true", () => {
+			it("should count requiredDocsCompletedCount = 9 when all 9 required registration docs are true", () => {
 				const pmbData = {
 					docKtp: true,
 					docKk: true,
@@ -163,21 +163,22 @@ describe("Tahap 3 — Panel Business Logic", () => {
 					docIjazah: true,
 					docTranskrip: true,
 					docPassportDepan: true,
-					docPassportVisa: true,
 					docSkbm: true,
 					docPreMcu: true,
-					docMcu: true,
 					docSla: true,
-					docSertifikasiBahasa: true,
+					// Berkas berikut opsional di PMB dan dikelola di Magang
+					docPassportVisa: false,
+					docMcu: false,
+					docSertifikasiBahasa: false,
 				};
 				const result = calculatePmbChecklist(pmbData);
-				expect(result.requiredDocsCompletedCount).toBe(12);
+				expect(result.requiredDocsCompletedCount).toBe(9);
 				expect(result.mainCompletedCount).toBe(0);
-				expect(result.totalRequiredCompleted).toBe(12);
+				expect(result.totalRequiredCompleted).toBe(9);
 				expect(result.isAllChecklistDone).toBe(false);
 			});
 
-			it("should return 17/17 and isAllChecklistDone = true when all items are complete", () => {
+			it("should return 14/14 and isAllChecklistDone = true when all 14 mandatory items are complete without passport visa, MCU full, or language cert", () => {
 				const completePmb = {
 					formReceived: true,
 					documentsComplete: true,
@@ -190,19 +191,21 @@ describe("Tahap 3 — Panel Business Logic", () => {
 					docIjazah: true,
 					docTranskrip: true,
 					docPassportDepan: true,
-					docPassportVisa: true,
 					docSkbm: true,
 					docPreMcu: true,
-					docMcu: true,
 					docSla: true,
-					docSertifikasiBahasa: true,
+					// Opsional (tidak memblokir kelulusan ACC PMB)
+					docPassportVisa: false,
+					docMcu: false,
+					docSertifikasiBahasa: false,
+					docBpjs: false,
 				};
 				const result = calculatePmbChecklist(completePmb);
-				expect(result.totalRequiredCompleted).toBe(17);
+				expect(result.totalRequiredCompleted).toBe(14);
 				expect(result.isAllChecklistDone).toBe(true);
 			});
 
-			it("should return isAllChecklistDone = false when only 16 of 17 are done", () => {
+			it("should return isAllChecklistDone = false when only 13 of 14 are done", () => {
 				const almostCompletePmb = {
 					formReceived: true,
 					documentsComplete: true,
@@ -215,34 +218,31 @@ describe("Tahap 3 — Panel Business Logic", () => {
 					docIjazah: true,
 					docTranskrip: true,
 					docPassportDepan: true,
-					docPassportVisa: true,
 					docSkbm: true,
 					docPreMcu: true,
-					docMcu: true,
-					docSla: true,
-					docSertifikasiBahasa: false, // 1 missing
+					docSla: false, // 1 wajib kurang
 				};
 				const result = calculatePmbChecklist(almostCompletePmb);
-				expect(result.totalRequiredCompleted).toBe(16);
+				expect(result.totalRequiredCompleted).toBe(13);
 				expect(result.isAllChecklistDone).toBe(false);
 			});
 
-			it("should return totalRequiredCompleted16 = 0 for empty data", () => {
-				expect(calculatePmbChecklist({}).totalRequiredCompleted16).toBe(0);
+			it("should return totalRequiredCompleted14 = 0 for empty data", () => {
+				expect(calculatePmbChecklist({}).totalRequiredCompleted14).toBe(0);
 			});
 
 			it("should handle null or undefined pmbData safely without crash", () => {
 				const resNull = calculatePmbChecklist(null);
-				expect(resNull.totalRequiredCompleted16).toBe(0);
+				expect(resNull.totalRequiredCompleted14).toBe(0);
 				expect(resNull.isAllChecklistDone).toBe(false);
 
 				const resUndef = calculatePmbChecklist(undefined);
-				expect(resUndef.totalRequiredCompleted16).toBe(0);
+				expect(resUndef.totalRequiredCompleted14).toBe(0);
 			});
 		});
 
-		describe("Task 3.4 — PMB isAllChecklistDone ACC Gate", () => {
-			it("should allow ACC when 17/17 items are completed", () => {
+		describe("Task 3.4 — PMB isAllChecklistDone ACC Gate (14 Indikator Baru)", () => {
+			it("should allow ACC when 14/14 mandatory items are completed even if visa, MCU full, and language cert are empty", () => {
 				const completePmb = {
 					formReceived: true,
 					documentsComplete: true,
@@ -255,17 +255,18 @@ describe("Tahap 3 — Panel Business Logic", () => {
 					docIjazah: true,
 					docTranskrip: true,
 					docPassportDepan: true,
-					docPassportVisa: true,
 					docSkbm: true,
 					docPreMcu: true,
-					docMcu: true,
 					docSla: true,
-					docSertifikasiBahasa: true,
+					// Opsional
+					docPassportVisa: false,
+					docMcu: false,
+					docSertifikasiBahasa: false,
 				};
 				expect(canGivePmbAcc(completePmb)).toBe(true);
 			});
 
-			it("should disable ACC when 16/17 items are completed", () => {
+			it("should disable ACC when 13/14 mandatory items are completed", () => {
 				const missingOne = {
 					formReceived: true,
 					documentsComplete: true,
@@ -278,17 +279,14 @@ describe("Tahap 3 — Panel Business Logic", () => {
 					docIjazah: true,
 					docTranskrip: true,
 					docPassportDepan: true,
-					docPassportVisa: true,
 					docSkbm: true,
 					docPreMcu: true,
-					docMcu: true,
-					docSla: true,
-					docSertifikasiBahasa: false,
+					docSla: false,
 				};
 				expect(canGivePmbAcc(missingOne)).toBe(false);
 			});
 
-			it("should disable ACC when 0/17 items are completed", () => {
+			it("should disable ACC when 0/14 items are completed", () => {
 				expect(canGivePmbAcc({})).toBe(false);
 			});
 		});

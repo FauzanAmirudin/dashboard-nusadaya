@@ -63,8 +63,8 @@ export function TabCheckpointConfig() {
 	const [editingId, setEditingId] = useState<number | null>(null);
 	const [formType, setFormType] = useState("baris_pagi");
 	const [formLabel, setFormLabel] = useState("");
-	const [formLat, setFormLat] = useState("-8.6705");
-	const [formLon, setFormLon] = useState("115.2126");
+	const [formLat, setFormLat] = useState("-5.40145");
+	const [formLon, setFormLon] = useState("105.2114");
 	const [formRadius, setFormRadius] = useState("150");
 	const [formCohort, setFormCohort] = useState<string>("all");
 	const [formNotes, setFormNotes] = useState("");
@@ -97,12 +97,14 @@ export function TabCheckpointConfig() {
 	const handleOpenCreate = () => {
 		setEditingId(null);
 		setFormType("baris_pagi");
-		setFormLabel("Kampus Nusadaya Academy Denpasar");
-		setFormLat("-8.6705");
-		setFormLon("115.2126");
+		setFormLabel("Kampus Nusadaya Academy Bandar Lampung");
+		setFormLat("-5.40145");
+		setFormLon("105.2114");
 		setFormRadius("150");
 		setFormCohort("all");
-		setFormNotes("");
+		setFormNotes(
+			"Jl. Raden Imba Kusuma Ratu, Langkapura, Kec. Langkapura, Kota Bandar Lampung, Lampung 35116",
+		);
 		setIsModalOpen(true);
 	};
 
@@ -124,7 +126,12 @@ export function TabCheckpointConfig() {
 		const lon = parseFloat(formLon);
 		const radius = parseInt(formRadius, 10);
 
-		if (isNaN(lat) || isNaN(lon) || isNaN(radius) || radius <= 0) {
+		if (
+			Number.isNaN(lat) ||
+			Number.isNaN(lon) ||
+			Number.isNaN(radius) ||
+			radius <= 0
+		) {
 			toast.error("Koordinat atau radius tidak valid");
 			return;
 		}
@@ -375,7 +382,7 @@ export function TabCheckpointConfig() {
 								required
 								value={formLabel}
 								onChange={(e) => setFormLabel(e.target.value)}
-								placeholder="contoh: Kampus Utama Nusadaya Denpasar"
+								placeholder="contoh: Kampus Nusadaya Academy Bandar Lampung"
 								className="h-9 text-xs"
 							/>
 						</div>
@@ -389,7 +396,7 @@ export function TabCheckpointConfig() {
 									required
 									value={formLat}
 									onChange={(e) => setFormLat(e.target.value)}
-									placeholder="-8.6705"
+									placeholder="-5.40145"
 									className="h-9 text-xs font-mono"
 								/>
 							</div>
@@ -401,7 +408,7 @@ export function TabCheckpointConfig() {
 									required
 									value={formLon}
 									onChange={(e) => setFormLon(e.target.value)}
-									placeholder="115.2126"
+									placeholder="105.2114"
 									className="h-9 text-xs font-mono"
 								/>
 							</div>

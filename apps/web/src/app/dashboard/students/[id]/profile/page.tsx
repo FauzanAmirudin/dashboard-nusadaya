@@ -128,7 +128,12 @@ export default function StudentProfilePage() {
 		weight: "",
 		clothingSize: "",
 		clothingSizeOther: "",
-
+		hasBoneFracture: "Tidak",
+		boneFractureLocation: "",
+		boneFractureYear: "",
+		hasSurgery: "Tidak",
+		surgeryType: "",
+		surgeryYear: "",
 		// Data Ayah
 		ayahName: "",
 		ayahStatus: "Hidup",
@@ -313,7 +318,12 @@ export default function StudentProfilePage() {
 					weight: healthDataObj?.weight?.toString() || "",
 					clothingSize: healthDataObj?.clothingSize || "",
 					clothingSizeOther: "",
-
+					hasBoneFracture: healthDataObj?.hasBoneFracture ? "Ya" : "Tidak",
+					boneFractureLocation: healthDataObj?.boneFractureLocation || "",
+					boneFractureYear: healthDataObj?.boneFractureYear?.toString() || "",
+					hasSurgery: healthDataObj?.hasSurgery ? "Ya" : "Tidak",
+					surgeryType: healthDataObj?.surgeryType || "",
+					surgeryYear: healthDataObj?.surgeryYear?.toString() || "",
 					// Ayah
 					ayahName: ayah.name || "",
 					ayahStatus: ayah.status || "Hidup",
@@ -595,6 +605,24 @@ export default function StudentProfilePage() {
 					formData.clothingSize === "Lainnya"
 						? formData.clothingSizeOther || undefined
 						: formData.clothingSize || undefined,
+				hasBoneFracture: formData.hasBoneFracture === "Ya",
+				boneFractureLocation:
+					formData.hasBoneFracture === "Ya"
+						? formData.boneFractureLocation || undefined
+						: undefined,
+				boneFractureYear:
+					formData.hasBoneFracture === "Ya" && formData.boneFractureYear
+						? parseInt(formData.boneFractureYear, 10)
+						: undefined,
+				hasSurgery: formData.hasSurgery === "Ya",
+				surgeryType:
+					formData.hasSurgery === "Ya"
+						? formData.surgeryType || undefined
+						: undefined,
+				surgeryYear:
+					formData.hasSurgery === "Ya" && formData.surgeryYear
+						? parseInt(formData.surgeryYear, 10)
+						: undefined,
 
 				// Tab 4, 5, 6: Parents
 				parents: parentsListPayload.length > 0 ? parentsListPayload : undefined,
@@ -1039,6 +1067,10 @@ export default function StudentProfilePage() {
 								label="Angkatan (Cohort) / Batch"
 								value={`Angkatan ${student.cohort || "-"} ${student.batch ? `(Batch ${student.batch})` : ""}`}
 							/>
+							<DataRow
+								label="Posisi Semester"
+								value={`Semester ${student.currentSemester || 1}`}
+							/>
 						</CardContent>
 					</Card>
 
@@ -1080,6 +1112,22 @@ export default function StudentProfilePage() {
 							<DataRow
 								label="Penyakit Bawaan"
 								value={health?.congenitalDisease}
+							/>
+							<DataRow
+								label="Riwayat Patah Tulang"
+								value={
+									health?.hasBoneFracture
+										? `Pernah (${health?.boneFractureLocation || "-"}, Tahun ${health?.boneFractureYear || "-"})`
+										: "Tidak Pernah"
+								}
+							/>
+							<DataRow
+								label="Riwayat Operasi"
+								value={
+									health?.hasSurgery
+										? `Pernah (${health?.surgeryType || "-"}, Tahun ${health?.surgeryYear || "-"})`
+										: "Tidak Pernah"
+								}
 							/>
 						</CardContent>
 					</Card>
@@ -1153,6 +1201,93 @@ export default function StudentProfilePage() {
 						</CardHeader>
 						<CardContent className="p-5">
 							<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+								{/* Wali */}
+								<div className="border border-slate-200/80 rounded-xl p-4 bg-slate-50/50 space-y-2">
+									<div className="flex items-center justify-between pb-2 border-b border-slate-200">
+										<h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
+											<User className="w-3.5 h-3.5 text-amber-600" /> Wali (Jika
+											Ada)
+										</h4>
+										{wali?.guardianRelation && (
+											<Badge
+												variant="outline"
+												className="text-[10px] font-bold bg-white text-slate-700"
+											>
+												{wali.guardianRelation}
+											</Badge>
+										)}
+									</div>
+									{wali?.name ? (
+										<div className="space-y-1.5 text-xs pt-1">
+											<div>
+												<span className="text-slate-400 block text-[10px]">
+													Nama Wali
+												</span>
+												<span className="font-semibold text-slate-800">
+													{wali.name}
+												</span>
+											</div>
+											<div>
+												<span className="text-slate-400 block text-[10px]">
+													Hubungan
+												</span>
+												<span className="font-medium text-slate-700">
+													{wali.guardianRelation || "-"}
+												</span>
+											</div>
+											<div>
+												<span className="text-slate-400 block text-[10px]">
+													Tempat, Tgl Lahir
+												</span>
+												<span className="font-medium text-slate-700">
+													{wali.birthPlace || "-"},{" "}
+													{wali.birthDate
+														? new Date(wali.birthDate).toLocaleDateString(
+																"id-ID",
+															)
+														: "-"}
+												</span>
+											</div>
+											<div>
+												<span className="text-slate-400 block text-[10px]">
+													Agama / Kewarganegaraan
+												</span>
+												<span className="font-medium text-slate-700">
+													{wali.religion || "-"} / {wali.nationality || "-"}
+												</span>
+											</div>
+											<div>
+												<span className="text-slate-400 block text-[10px]">
+													Pendidikan / Pekerjaan
+												</span>
+												<span className="font-medium text-slate-700">
+													{wali.education || "-"} / {wali.job || "-"}
+												</span>
+											</div>
+											<div>
+												<span className="text-slate-400 block text-[10px]">
+													No. HP / Email
+												</span>
+												<span className="font-mono text-slate-700">
+													{wali.phone || "-"} / {wali.email || "-"}
+												</span>
+											</div>
+											<div>
+												<span className="text-slate-400 block text-[10px]">
+													Alamat
+												</span>
+												<span className="font-medium text-slate-700">
+													{wali.address || "-"}
+												</span>
+											</div>
+										</div>
+									) : (
+										<p className="text-xs text-slate-400 italic py-4 text-center">
+											Data Wali tidak diisi
+										</p>
+									)}
+								</div>
+
 								{/* Ayah */}
 								<div className="border border-slate-200/80 rounded-xl p-4 bg-slate-50/50 space-y-2">
 									<div className="flex items-center justify-between pb-2 border-b border-slate-200">
@@ -1302,93 +1437,6 @@ export default function StudentProfilePage() {
 									) : (
 										<p className="text-xs text-slate-400 italic py-4 text-center">
 											Data Ibu belum diisi
-										</p>
-									)}
-								</div>
-
-								{/* Wali */}
-								<div className="border border-slate-200/80 rounded-xl p-4 bg-slate-50/50 space-y-2">
-									<div className="flex items-center justify-between pb-2 border-b border-slate-200">
-										<h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
-											<User className="w-3.5 h-3.5 text-amber-600" /> Wali (Jika
-											Ada)
-										</h4>
-										{wali?.guardianRelation && (
-											<Badge
-												variant="outline"
-												className="text-[10px] font-bold bg-white text-slate-700"
-											>
-												{wali.guardianRelation}
-											</Badge>
-										)}
-									</div>
-									{wali?.name ? (
-										<div className="space-y-1.5 text-xs pt-1">
-											<div>
-												<span className="text-slate-400 block text-[10px]">
-													Nama Wali
-												</span>
-												<span className="font-semibold text-slate-800">
-													{wali.name}
-												</span>
-											</div>
-											<div>
-												<span className="text-slate-400 block text-[10px]">
-													Hubungan
-												</span>
-												<span className="font-medium text-slate-700">
-													{wali.guardianRelation || "-"}
-												</span>
-											</div>
-											<div>
-												<span className="text-slate-400 block text-[10px]">
-													Tempat, Tgl Lahir
-												</span>
-												<span className="font-medium text-slate-700">
-													{wali.birthPlace || "-"},{" "}
-													{wali.birthDate
-														? new Date(wali.birthDate).toLocaleDateString(
-																"id-ID",
-															)
-														: "-"}
-												</span>
-											</div>
-											<div>
-												<span className="text-slate-400 block text-[10px]">
-													Agama / Kewarganegaraan
-												</span>
-												<span className="font-medium text-slate-700">
-													{wali.religion || "-"} / {wali.nationality || "-"}
-												</span>
-											</div>
-											<div>
-												<span className="text-slate-400 block text-[10px]">
-													Pendidikan / Pekerjaan
-												</span>
-												<span className="font-medium text-slate-700">
-													{wali.education || "-"} / {wali.job || "-"}
-												</span>
-											</div>
-											<div>
-												<span className="text-slate-400 block text-[10px]">
-													No. HP / Email
-												</span>
-												<span className="font-mono text-slate-700">
-													{wali.phone || "-"} / {wali.email || "-"}
-												</span>
-											</div>
-											<div>
-												<span className="text-slate-400 block text-[10px]">
-													Alamat
-												</span>
-												<span className="font-medium text-slate-700">
-													{wali.address || "-"}
-												</span>
-											</div>
-										</div>
-									) : (
-										<p className="text-xs text-slate-400 italic py-4 text-center">
-											Data Wali tidak diisi
 										</p>
 									)}
 								</div>
@@ -1955,6 +2003,9 @@ export default function StudentProfilePage() {
 											<SelectValue placeholder="Pilih Gol. Darah" />
 										</SelectTrigger>
 										<SelectContent>
+											<SelectItem value="Belum Diketahui">
+												Belum Diketahui
+											</SelectItem>
 											<SelectItem value="A">A</SelectItem>
 											<SelectItem value="B">B</SelectItem>
 											<SelectItem value="AB">AB</SelectItem>

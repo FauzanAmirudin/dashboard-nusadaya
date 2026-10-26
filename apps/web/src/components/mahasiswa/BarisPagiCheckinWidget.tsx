@@ -19,6 +19,10 @@ import {
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+	SelfieDetailModal,
+	type SelfieRecordDetail,
+} from "@/components/panels/kehadiran/SelfieDetailModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,7 +40,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { API_URL, getToken } from "@/lib/eden";
+import { API_URL, getFileUrl, getToken } from "@/lib/eden";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store";
 import { SelfieCheckinModal } from "./SelfieCheckinModal";
@@ -132,6 +136,8 @@ export function BarisPagiCheckinWidget() {
 	const [historyData, setHistoryData] = useState<MyRecordsData | null>(null);
 	const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 	const [isSelfieModalOpen, setIsSelfieModalOpen] = useState(false);
+	const [selectedProofRecord, setSelectedProofRecord] =
+		useState<SelfieRecordDetail | null>(null);
 
 	// Fetch today's session
 	const fetchTodaySession = async () => {
@@ -394,11 +400,38 @@ export function BarisPagiCheckinWidget() {
 					<div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
 						<div className="flex items-start sm:items-center gap-3 min-w-0">
 							{studentCheckin.selfieUrl ? (
-								<div className="relative w-12 h-12 rounded-xl overflow-hidden border-2 border-emerald-500 shrink-0 shadow-xs">
+								<div
+									onClick={() => {
+										setSelectedProofRecord({
+											id: studentCheckin.recordId || 0,
+											attendanceType: "baris_pagi",
+											title: `Bukti Presensi Baris Pagi - ${session?.sessionDate || ""}`,
+											student: {
+												id: (user as any)?.id || 0,
+												name: user?.fullName || "Mahasiswa",
+												nim: user?.username || "",
+											},
+											status: studentCheckin.status || "hadir",
+											selfieUrl: studentCheckin.selfieUrl,
+											latitude: studentCheckin.latitude || undefined,
+											longitude: studentCheckin.longitude || undefined,
+											gpsAccuracy: studentCheckin.gpsAccuracy || undefined,
+											locationName: studentCheckin.locationName || undefined,
+											distanceFromCheckpoint:
+												studentCheckin.distanceFromCheckpoint || undefined,
+											isWithinRadius: studentCheckin.isWithinRadius ?? true,
+											selfieTakenAt: studentCheckin.recordedAt || undefined,
+											verificationStatus:
+												studentCheckin.verificationStatus || "auto_approved",
+										});
+									}}
+									className="relative w-12 h-12 rounded-xl overflow-hidden border-2 border-emerald-500 shrink-0 shadow-xs cursor-pointer group"
+									title="Klik untuk melihat bukti foto selfie & peta lokasi GPS"
+								>
 									<img
-										src={studentCheckin.selfieUrl}
+										src={getFileUrl(studentCheckin.selfieUrl)}
 										alt="Selfie Presensi"
-										className="w-full h-full object-cover"
+										className="w-full h-full object-cover group-hover:scale-105 transition-transform"
 									/>
 									<span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white" />
 								</div>
@@ -448,7 +481,43 @@ export function BarisPagiCheckinWidget() {
 							</div>
 						</div>
 
-						<div className="flex items-center gap-2 shrink-0">
+						<div className="flex items-center gap-2 shrink-0 flex-wrap">
+							{studentCheckin.selfieUrl && (
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() =>
+										setSelectedProofRecord({
+											id: studentCheckin.recordId || 0,
+											attendanceType: "baris_pagi",
+											title: `Bukti Presensi Baris Pagi - ${session?.sessionDate || ""}`,
+											student: {
+												id: (user as any)?.id || 0,
+												name: user?.fullName || "Mahasiswa",
+												nim: user?.username || "",
+											},
+											status: studentCheckin.status || "hadir",
+											selfieUrl: studentCheckin.selfieUrl,
+											latitude: studentCheckin.latitude || undefined,
+											longitude: studentCheckin.longitude || undefined,
+											gpsAccuracy: studentCheckin.gpsAccuracy || undefined,
+											locationName: studentCheckin.locationName || undefined,
+											distanceFromCheckpoint:
+												studentCheckin.distanceFromCheckpoint || undefined,
+											isWithinRadius: studentCheckin.isWithinRadius ?? true,
+											selfieTakenAt: studentCheckin.recordedAt || undefined,
+											verificationStatus:
+												studentCheckin.verificationStatus || "auto_approved",
+										})
+									}
+									className="h-8 text-xs font-semibold text-emerald-800 border-emerald-300 bg-white/90 hover:bg-emerald-100 gap-1.5 rounded-lg shadow-2xs"
+									title="Lihat foto selfie & peta lokasi GPS"
+								>
+									<Camera className="w-3.5 h-3.5 text-emerald-700" />
+									<span>Lihat Bukti Foto</span>
+								</Button>
+							)}
+
 							<Badge
 								variant="outline"
 								className="bg-white/80 border-emerald-300 text-emerald-800 text-xs font-semibold px-3 py-1"
@@ -542,6 +611,15 @@ export function BarisPagiCheckinWidget() {
 					fetchTodaySession();
 				}}
 			/>
+
+			{/* DETAIL BUKTI SELFIE GPS MODAL */}
+			{selectedProofRecord && (
+				<SelfieDetailModal
+					record={selectedProofRecord}
+					isOpen={!!selectedProofRecord}
+					onClose={() => setSelectedProofRecord(null)}
+				/>
+			)}
 		</Card>
 	);
 

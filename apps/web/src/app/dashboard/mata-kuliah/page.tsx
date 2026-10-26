@@ -2,6 +2,7 @@
 
 import {
 	BookOpen,
+	Calendar,
 	CheckSquare,
 	Edit,
 	GraduationCap,
@@ -604,24 +605,46 @@ export default function MataKuliahPage() {
 
 				<div className="flex items-center gap-2.5 flex-wrap">
 					{(user?.role === "superadmin" || user?.role === "akademik") && (
-						<Button
-							size="sm"
-							onClick={() => {
-								setEditingId(null);
-								setFormData({
-									...initialForm,
-									cohort: availableCohorts[0]
-										? availableCohorts[0].toString()
-										: "16",
-								});
-								setIsCustomRombel(false);
-								setIsAddOpen(true);
-							}}
-							className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold text-xs gap-1.5 h-9 shadow-xs"
-						>
-							<Plus className="w-3.5 h-3.5" />
-							Tambah Mata Kuliah
-						</Button>
+						<>
+							<Link href="/dashboard/akademik/kurikulum">
+								<Button
+									variant="outline"
+									size="sm"
+									className="border-slate-300 text-slate-700 text-xs font-semibold h-9 gap-1.5"
+								>
+									<BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+									Kurikulum & Master MK
+								</Button>
+							</Link>
+							<Link href="/dashboard/akademik/periode">
+								<Button
+									variant="outline"
+									size="sm"
+									className="border-slate-300 text-slate-700 text-xs font-semibold h-9 gap-1.5"
+								>
+									<Calendar className="w-3.5 h-3.5 text-indigo-600" />
+									Periode Akademik
+								</Button>
+							</Link>
+							<Button
+								size="sm"
+								onClick={() => {
+									setEditingId(null);
+									setFormData({
+										...initialForm,
+										cohort: availableCohorts[0]
+											? availableCohorts[0].toString()
+											: "16",
+									});
+									setIsCustomRombel(false);
+									setIsAddOpen(true);
+								}}
+								className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold text-xs gap-1.5 h-9 shadow-xs"
+							>
+								<Plus className="w-3.5 h-3.5" />
+								Tambah Mata Kuliah
+							</Button>
+						</>
 					)}
 				</div>
 			</div>

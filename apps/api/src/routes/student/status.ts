@@ -121,7 +121,7 @@ export const statusRoutes = new Elysia().get(
 		let totalCompleted = 0;
 		let totalIndicators = 0;
 
-		// 1. PMB (17 Items Total: 5 Berkas Utama + 12 Dokumen Wajib)
+		// 1. PMB (14 Items Total: 5 Berkas Utama + 9 Dokumen Wajib Pendaftaran)
 		const pmbItems = [
 			{ prop: pmb?.formReceived, name: "Formulir Pendaftaran" },
 			{ prop: pmb?.documentsComplete, name: "Dokumen Lengkap" },
@@ -134,12 +134,9 @@ export const statusRoutes = new Elysia().get(
 			{ prop: pmb?.docIjazah, name: "Dokumen Ijazah" },
 			{ prop: pmb?.docTranskrip, name: "Dokumen Transkrip" },
 			{ prop: pmb?.docPassportDepan, name: "Dokumen Paspor Depan" },
-			{ prop: pmb?.docPassportVisa, name: "Dokumen Paspor Visa" },
 			{ prop: pmb?.docSkbm, name: "Dokumen SKBM" },
 			{ prop: pmb?.docPreMcu, name: "Dokumen Pre-MCU" },
-			{ prop: pmb?.docMcu, name: "Dokumen MCU Full" },
 			{ prop: pmb?.docSla, name: "Dokumen SLA" },
-			{ prop: pmb?.docSertifikasiBahasa, name: "Dokumen Sertifikasi Bahasa" },
 		];
 		const pmbCompleted = pmbItems.filter((i) => i.prop).length;
 		pmbItems

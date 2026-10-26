@@ -41,7 +41,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { api } from "@/lib/eden";
+import { api, getFileUrl } from "@/lib/eden";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store";
 
@@ -550,9 +550,16 @@ export function TabPiket({ studentId }: { studentId: number }) {
 																	r.verificationStatus || "auto_approved",
 															})
 														}
-														className="h-7 px-2.5 text-xs text-blue-700 border-blue-200 bg-blue-50/70 hover:bg-blue-100 font-semibold gap-1.5 rounded-lg shadow-2xs inline-flex items-center cursor-pointer"
+														className="h-8 px-2.5 text-xs text-blue-700 border-blue-200 bg-blue-50/70 hover:bg-blue-100 font-semibold gap-2 rounded-lg shadow-2xs inline-flex items-center cursor-pointer"
 														title="Lihat foto selfie & peta GPS piket mahasiswa"
 													>
+														<div className="relative w-5 h-5 rounded overflow-hidden border border-blue-300 shrink-0 bg-blue-100">
+															<img
+																src={getFileUrl(r.selfieUrl)}
+																alt="Thumbnail"
+																className="w-full h-full object-cover"
+															/>
+														</div>
 														<Camera className="w-3.5 h-3.5 text-blue-600" />
 														<span>Lihat Bukti Kehadiran</span>
 													</Button>

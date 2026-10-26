@@ -124,6 +124,11 @@ export const internshipData = pgTable(
 		videoDokumentasiReady: boolean("video_dokumentasi_ready").default(false),
 		videoDokumentasiLink: text("video_dokumentasi_link"),
 
+		// Kesiapan Bahasa & Sertifikasi Magang
+		languageCertReady: boolean("language_cert_ready").default(false),
+		languageCertName: text("language_cert_name"),
+		languageCertScore: text("language_cert_score"),
+		languageCertDate: timestamp("language_cert_date"),
 		notes: text("notes"),
 
 		isAcc: boolean("is_acc").default(false),

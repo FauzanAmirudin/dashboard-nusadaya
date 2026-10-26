@@ -223,9 +223,24 @@ export const selfieAttendanceRoutes = new Elysia({ prefix: "/attendance" })
 			);
 			const isWithin = distance <= checkpoint.radiusMeters;
 
+			// Validasi Geofencing: Mahasiswa wajib berada di dalam radius kampus
+			if (!isWithin) {
+				if (isRedisReady()) {
+					await redis.del(lockKey);
+				}
+				set.status = 400;
+				return {
+					success: false,
+					message: `Presensi gagal: Posisi perangkat Anda berada di luar radius kampus (${distance} meter dari kampus, batas maksimal ${checkpoint.radiusMeters} meter). Presensi wajib dilakukan di lingkungan Kampus Nusadaya Academy Bandar Lampung (${checkpoint.label}).`,
+					distance,
+					radiusMeters: checkpoint.radiusMeters,
+					checkpointLabel: checkpoint.label,
+				};
+			}
+
 			// 10. Deteksi Fraud / GPS Spoofing
 			const spoofRisk = detectGpsSpoofingRisk(accuracy, latitude, longitude);
-			const isFlagged = !isWithin || spoofRisk.isSuspicious;
+			const isFlagged = spoofRisk.isSuspicious;
 			const verificationStatus = isFlagged ? "pending_review" : "auto_approved";
 
 			// 11. Reverse Geocoding
@@ -287,9 +302,7 @@ export const selfieAttendanceRoutes = new Elysia({ prefix: "/attendance" })
 
 			// 15. Jika Flagged: Catat ke selfie_fraud_flags
 			if (isFlagged) {
-				const flagReason = !isWithin
-					? "outside_radius"
-					: spoofRisk.reason || "gps_spoofing_suspected";
+				const flagReason = spoofRisk.reason || "gps_spoofing_suspected";
 
 				await db.insert(selfieFraudFlags).values({
 					attendanceType: "baris_pagi",
@@ -332,7 +345,7 @@ export const selfieAttendanceRoutes = new Elysia({ prefix: "/attendance" })
 			]);
 
 			const message = isFlagged
-				? `Presensi diterima pukul ${timeStr} WIB (${distance}m dari titik lokasi). Status menunggu verifikasi staf karena ${!isWithin ? "di luar radius checkpoint" : "akurasi GPS mencurigakan"}.`
+				? `Presensi diterima pukul ${timeStr} WIB (${distance}m dari titik lokasi). Status menunggu verifikasi staf karena akurasi GPS mencurigakan.`
 				: evalResult.status === "hadir"
 					? `Presensi Berhasil! Anda hadir tepat waktu pukul ${timeStr} WIB di lokasi ${locationName}.`
 					: `Presensi Berhasil! Anda tercatat terlambat ${evalResult.minutesLate} menit (pukul ${timeStr} WIB, standar ${targetTime} WIB).`;
@@ -497,8 +510,21 @@ export const selfieAttendanceRoutes = new Elysia({ prefix: "/attendance" })
 				checkpoint.longitude,
 			);
 			const isWithin = distance <= checkpoint.radiusMeters;
+
+			// Validasi Geofencing: Mahasiswa wajib berada di dalam radius kampus
+			if (!isWithin) {
+				set.status = 400;
+				return {
+					success: false,
+					message: `Presensi gagal: Posisi perangkat Anda berada di luar radius kampus (${distance} meter dari kampus, batas maksimal ${checkpoint.radiusMeters} meter). Presensi wajib dilakukan di lingkungan Kampus Nusadaya Academy Bandar Lampung (${checkpoint.label}).`,
+					distance,
+					radiusMeters: checkpoint.radiusMeters,
+					checkpointLabel: checkpoint.label,
+				};
+			}
+
 			const spoofRisk = detectGpsSpoofingRisk(accuracy, latitude, longitude);
-			const isFlagged = !isWithin || spoofRisk.isSuspicious;
+			const isFlagged = spoofRisk.isSuspicious;
 			const verificationStatus = isFlagged ? "pending_review" : "auto_approved";
 
 			const locationName = await reverseGeocode(latitude, longitude);
@@ -553,9 +579,7 @@ export const selfieAttendanceRoutes = new Elysia({ prefix: "/attendance" })
 					attendanceType: "kuliah",
 					attendanceRecordId: record.id,
 					studentId: student.id,
-					flagReason: !isWithin
-						? "outside_radius"
-						: spoofRisk.reason || "gps_spoofing_suspected",
+					flagReason: spoofRisk.reason || "gps_spoofing_suspected",
 					flagDetail: {
 						distanceFromCheckpoint: distance,
 						radiusMeters: checkpoint.radiusMeters,
@@ -585,7 +609,7 @@ export const selfieAttendanceRoutes = new Elysia({ prefix: "/attendance" })
 			return {
 				success: true,
 				message: isFlagged
-					? `Presensi kuliah diterima (${distance}m dari lokasi kelas). Menunggu verifikasi staf.`
+					? `Presensi kuliah diterima (${distance}m dari lokasi kelas). Menunggu verifikasi staf karena akurasi GPS mencurigakan.`
 					: `Presensi kuliah "${classSchedule.subject}" berhasil tercatat hadir pada pukul ${timeStr} WIB.`,
 				data: { record, distance, isWithinRadius: isWithin, locationName },
 			};
@@ -705,8 +729,21 @@ export const selfieAttendanceRoutes = new Elysia({ prefix: "/attendance" })
 				checkpoint.longitude,
 			);
 			const isWithin = distance <= checkpoint.radiusMeters;
+
+			// Validasi Geofencing: Mahasiswa wajib berada di dalam radius kampus
+			if (!isWithin) {
+				set.status = 400;
+				return {
+					success: false,
+					message: `Presensi gagal: Posisi perangkat Anda berada di luar radius kampus (${distance} meter dari kampus, batas maksimal ${checkpoint.radiusMeters} meter). Presensi wajib dilakukan di lingkungan Kampus Nusadaya Academy Bandar Lampung (${checkpoint.label}).`,
+					distance,
+					radiusMeters: checkpoint.radiusMeters,
+					checkpointLabel: checkpoint.label,
+				};
+			}
+
 			const spoofRisk = detectGpsSpoofingRisk(accuracy, latitude, longitude);
-			const isFlagged = !isWithin || spoofRisk.isSuspicious;
+			const isFlagged = spoofRisk.isSuspicious;
 			const verificationStatus = isFlagged ? "pending_review" : "auto_approved";
 
 			const locationName = await reverseGeocode(latitude, longitude);
@@ -759,9 +796,7 @@ export const selfieAttendanceRoutes = new Elysia({ prefix: "/attendance" })
 					attendanceType: "piket",
 					attendanceRecordId: record.id,
 					studentId: student.id,
-					flagReason: !isWithin
-						? "outside_radius"
-						: spoofRisk.reason || "gps_spoofing_suspected",
+					flagReason: spoofRisk.reason || "gps_spoofing_suspected",
 					flagDetail: {
 						distanceFromCheckpoint: distance,
 						radiusMeters: checkpoint.radiusMeters,
@@ -776,7 +811,7 @@ export const selfieAttendanceRoutes = new Elysia({ prefix: "/attendance" })
 			return {
 				success: true,
 				message: isFlagged
-					? `Presensi piket diterima (${distance}m dari lokasi piket). Menunggu verifikasi staf.`
+					? `Presensi piket diterima (${distance}m dari lokasi piket). Menunggu verifikasi staf karena akurasi GPS mencurigakan.`
 					: `Presensi piket berhasil dicatat hadir pukul ${timeStr} WIB.`,
 				data: { record, distance, isWithinRadius: isWithin, locationName },
 			};
@@ -855,8 +890,21 @@ export const selfieAttendanceRoutes = new Elysia({ prefix: "/attendance" })
 				checkpoint.longitude,
 			);
 			const isWithin = distance <= checkpoint.radiusMeters;
+
+			// Validasi Geofencing: Mahasiswa wajib berada di dalam radius kampus
+			if (!isWithin) {
+				set.status = 400;
+				return {
+					success: false,
+					message: `Presensi gagal: Posisi perangkat Anda berada di luar radius kampus (${distance} meter dari kampus, batas maksimal ${checkpoint.radiusMeters} meter). Presensi wajib dilakukan di lingkungan Kampus Nusadaya Academy Bandar Lampung (${checkpoint.label}).`,
+					distance,
+					radiusMeters: checkpoint.radiusMeters,
+					checkpointLabel: checkpoint.label,
+				};
+			}
+
 			const spoofRisk = detectGpsSpoofingRisk(accuracy, latitude, longitude);
-			const isFlagged = !isWithin || spoofRisk.isSuspicious;
+			const isFlagged = spoofRisk.isSuspicious;
 			const verificationStatus = isFlagged ? "pending_review" : "auto_approved";
 
 			const locationName = await reverseGeocode(latitude, longitude);
@@ -909,9 +957,7 @@ export const selfieAttendanceRoutes = new Elysia({ prefix: "/attendance" })
 					attendanceType: "ods",
 					attendanceRecordId: record.id,
 					studentId: student.id,
-					flagReason: !isWithin
-						? "outside_radius"
-						: spoofRisk.reason || "gps_spoofing_suspected",
+					flagReason: spoofRisk.reason || "gps_spoofing_suspected",
 					flagDetail: {
 						distanceFromCheckpoint: distance,
 						radiusMeters: checkpoint.radiusMeters,
@@ -927,7 +973,7 @@ export const selfieAttendanceRoutes = new Elysia({ prefix: "/attendance" })
 			return {
 				success: true,
 				message: isFlagged
-					? `Presensi ODS diterima (${distance}m dari checkpoint). Menunggu verifikasi staf.`
+					? `Presensi ODS diterima (${distance}m dari checkpoint). Menunggu verifikasi staf karena akurasi GPS mencurigakan.`
 					: `Presensi ODS berhasil dicatat hadir pukul ${timeStr} WIB.`,
 				data: { record, distance, isWithinRadius: isWithin, locationName },
 			};

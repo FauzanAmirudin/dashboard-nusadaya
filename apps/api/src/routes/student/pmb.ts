@@ -196,7 +196,7 @@ export const pmbRoutes = new Elysia()
 			where: eq(pmbData.studentId, id),
 		});
 
-		// 17 Required checks (BPJS is optional, so it is omitted from mandatory checks)
+		// 14 Required checks (BPJS, Paspor Visa, MCU Full, dan Sertifikasi Bahasa adalah opsional di PMB dan dikelola di Magang)
 		const requiredChecks = [
 			currentPmb?.formReceived,
 			currentPmb?.documentsComplete,
@@ -209,12 +209,9 @@ export const pmbRoutes = new Elysia()
 			currentPmb?.docIjazah,
 			currentPmb?.docTranskrip,
 			currentPmb?.docPassportDepan,
-			currentPmb?.docPassportVisa,
 			currentPmb?.docSkbm,
 			currentPmb?.docPreMcu,
-			currentPmb?.docMcu,
 			currentPmb?.docSla,
-			currentPmb?.docSertifikasiBahasa,
 		];
 
 		if (!requiredChecks.every(Boolean)) {
@@ -222,7 +219,7 @@ export const pmbRoutes = new Elysia()
 			return {
 				success: false,
 				message:
-					"Semua checklist kelengkapan berkas utama (5) dan dokumen wajib PMB (12) harus selesai divalidasi sebelum melakukan ACC PMB.",
+					"Semua checklist kelengkapan berkas utama (5) dan dokumen wajib PMB (9) harus selesai divalidasi sebelum melakukan ACC PMB.",
 			};
 		}
 
@@ -523,7 +520,7 @@ export const pmbRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!hasRole(user, "pmb")) {
+			if (!hasRole(user, "pmb", "superadmin")) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
@@ -570,6 +567,20 @@ export const pmbRoutes = new Elysia()
 				});
 			}
 
+			if (body.pendaftaranDp !== undefined && body.pendaftaranDp !== null) {
+				if (
+					!Number.isInteger(body.pendaftaranDp) ||
+					body.pendaftaranDp < 0 ||
+					body.pendaftaranDp > 999_999_999
+				) {
+					set.status = 400;
+					return {
+						success: false,
+						message:
+							"Nominal DP Pendaftaran harus berupa bilangan bulat (integer) dan maksimal 9 digit (Rp 999.999.999)",
+					};
+				}
+			}
 			if (body.totalBiaya !== undefined) {
 				if (
 					!Number.isInteger(body.totalBiaya) ||

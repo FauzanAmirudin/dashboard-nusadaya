@@ -8,7 +8,8 @@ import {
 	text,
 	timestamp,
 } from "drizzle-orm/pg-core";
-import { courses } from "./courses";
+import { courseEnrollments, courses } from "./courses";
+import { academicTerms } from "./curriculum";
 import { statusEnum } from "./enums";
 import { students, users } from "./shared";
 
@@ -142,6 +143,14 @@ export const courseGrades = pgTable(
 		finalScore: integer("final_score"),
 		gradePoint: integer("grade_point"), // scaled by 100: 400 for 4.00, 350 for 3.50, etc.
 		semester: integer("semester").default(1),
+		termId: integer("term_id").references(() => academicTerms.id),
+		enrollmentId: integer("enrollment_id").references(
+			() => courseEnrollments.id,
+		),
+		attempt: integer("attempt").default(1).notNull(),
+		isLocked: boolean("is_locked").default(false).notNull(),
+		lockedAt: timestamp("locked_at"),
+		lockedBy: integer("locked_by").references(() => users.id),
 		isPublished: boolean("is_published").default(false),
 		publishedAt: timestamp("published_at"),
 		syncedToMagang: boolean("synced_to_magang").default(false),
@@ -167,6 +176,8 @@ export const courseGrades = pgTable(
 	(t) => [
 		index("idx_course_grades_student_id").on(t.studentId),
 		index("idx_course_grades_course_id").on(t.courseId),
+		index("idx_course_grades_term_id").on(t.termId),
+		index("idx_course_grades_enrollment_id").on(t.enrollmentId),
 	],
 );
 
@@ -181,6 +192,8 @@ export const academicKhsTranscripts = pgTable(
 		type: text("type").notNull().default("khs"), // "khs" | "krs" | "transkrip"
 		semester: integer("semester").notNull().default(1),
 		academicYear: text("academic_year").default("2025/2026"),
+		termId: integer("term_id").references(() => academicTerms.id),
+		isOfficial: boolean("is_official").default(false).notNull(),
 		documentNumber: text("document_number"),
 		totalSks: integer("total_sks").notNull().default(0),
 		gpa: integer("gpa").notNull().default(0), // scaled by 100
@@ -198,6 +211,7 @@ export const academicKhsTranscripts = pgTable(
 	(t) => [
 		index("idx_khs_transcripts_student_id").on(t.studentId),
 		index("idx_khs_transcripts_type_sem").on(t.type, t.semester),
+		index("idx_khs_transcripts_term_id").on(t.termId),
 	],
 );
 

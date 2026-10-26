@@ -137,6 +137,166 @@ export async function ensureDatabaseSchema() {
 			  ADD COLUMN IF NOT EXISTS emergency_contact_phone TEXT,
 			  ADD COLUMN IF NOT EXISTS emergency_contact_relation TEXT;
 
+			ALTER TABLE student_health
+			  ADD COLUMN IF NOT EXISTS has_bone_fracture BOOLEAN DEFAULT false,
+			  ADD COLUMN IF NOT EXISTS bone_fracture_location TEXT,
+			  ADD COLUMN IF NOT EXISTS bone_fracture_year INTEGER,
+			  ADD COLUMN IF NOT EXISTS has_surgery BOOLEAN DEFAULT false,
+			  ADD COLUMN IF NOT EXISTS surgery_type TEXT,
+			  ADD COLUMN IF NOT EXISTS surgery_year INTEGER;
+
+			ALTER TABLE internship_data
+			  ADD COLUMN IF NOT EXISTS language_cert_ready BOOLEAN DEFAULT false,
+			  ADD COLUMN IF NOT EXISTS language_cert_name TEXT,
+			  ADD COLUMN IF NOT EXISTS language_cert_score TEXT,
+			  ADD COLUMN IF NOT EXISTS language_cert_date TIMESTAMP;
+
+
+			-- FASE 1: Master Mata Kuliah, Periode Akademik & Kurikulum
+			CREATE TABLE IF NOT EXISTS master_courses (
+			  id SERIAL PRIMARY KEY,
+			  code TEXT NOT NULL UNIQUE,
+			  name TEXT NOT NULL,
+			  sks INTEGER NOT NULL DEFAULT 2,
+			  type course_type NOT NULL DEFAULT 'teori',
+			  description TEXT,
+			  is_active BOOLEAN DEFAULT true NOT NULL,
+			  created_by INTEGER REFERENCES users(id),
+			  created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+			  updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+			);
+			CREATE INDEX IF NOT EXISTS idx_master_courses_code ON master_courses(code);
+			CREATE INDEX IF NOT EXISTS idx_master_courses_name ON master_courses(name);
+
+			CREATE TABLE IF NOT EXISTS academic_terms (
+			  id SERIAL PRIMARY KEY,
+			  academic_year TEXT NOT NULL,
+			  semester_type TEXT NOT NULL,
+			  name TEXT NOT NULL,
+			  start_date DATE NOT NULL,
+			  end_date DATE NOT NULL,
+			  krs_start_date DATE,
+			  krs_end_date DATE,
+			  grade_lock_date DATE,
+			  status TEXT DEFAULT 'draft' NOT NULL,
+			  is_active BOOLEAN DEFAULT false NOT NULL,
+			  calendar_id INTEGER REFERENCES academic_calendars(id),
+			  created_by INTEGER REFERENCES users(id),
+			  created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+			  updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
+			  CONSTRAINT uq_academic_terms_year_sem UNIQUE (academic_year, semester_type)
+			);
+			CREATE INDEX IF NOT EXISTS idx_academic_terms_is_active ON academic_terms(is_active);
+			CREATE INDEX IF NOT EXISTS idx_academic_terms_status ON academic_terms(status);
+
+			CREATE TABLE IF NOT EXISTS curricula (
+			  id SERIAL PRIMARY KEY,
+			  name TEXT NOT NULL,
+			  program TEXT DEFAULT 'D3 Perhotelan' NOT NULL,
+			  sub_program TEXT,
+			  start_cohort INTEGER NOT NULL,
+			  end_cohort INTEGER,
+			  max_sks_per_semester INTEGER DEFAULT 24 NOT NULL,
+			  is_active BOOLEAN DEFAULT true NOT NULL,
+			  created_by INTEGER REFERENCES users(id),
+			  created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+			  updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+			);
+			CREATE INDEX IF NOT EXISTS idx_curricula_program_sub ON curricula(program, sub_program);
+
+			CREATE TABLE IF NOT EXISTS curriculum_packages (
+			  id SERIAL PRIMARY KEY,
+			  curriculum_id INTEGER NOT NULL REFERENCES curricula(id) ON DELETE CASCADE,
+			  master_course_id INTEGER NOT NULL REFERENCES master_courses(id) ON DELETE CASCADE,
+			  semester INTEGER NOT NULL,
+			  is_required BOOLEAN DEFAULT true NOT NULL,
+			  order_index INTEGER DEFAULT 0 NOT NULL,
+			  created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+			  CONSTRAINT uq_curriculum_course UNIQUE (curriculum_id, master_course_id)
+			);
+			CREATE INDEX IF NOT EXISTS idx_curriculum_packages_sem ON curriculum_packages(curriculum_id, semester);
+
+			CREATE TABLE IF NOT EXISTS student_semester_registrations (
+			  id SERIAL PRIMARY KEY,
+			  student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+			  term_id INTEGER NOT NULL REFERENCES academic_terms(id),
+			  semester INTEGER NOT NULL,
+			  status TEXT DEFAULT 'aktif' NOT NULL,
+			  krs_status TEXT DEFAULT 'draft' NOT NULL,
+			  ips INTEGER DEFAULT 0,
+			  ipk INTEGER DEFAULT 0,
+			  sks_taken INTEGER DEFAULT 0 NOT NULL,
+			  sks_passed INTEGER DEFAULT 0 NOT NULL,
+			  approved_by INTEGER REFERENCES users(id),
+			  approved_at TIMESTAMP,
+			  created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+			  updated_at TIMESTAMP DEFAULT NOW() NOT NULL,
+			  CONSTRAINT uq_student_term_registration UNIQUE (student_id, term_id)
+			);
+			CREATE INDEX IF NOT EXISTS idx_student_sem_reg_student ON student_semester_registrations(student_id);
+			CREATE INDEX IF NOT EXISTS idx_student_sem_reg_term ON student_semester_registrations(term_id);
+
+			CREATE TABLE IF NOT EXISTS semester_rollover_logs (
+			  id SERIAL PRIMARY KEY,
+			  source_term_id INTEGER REFERENCES academic_terms(id),
+			  target_term_id INTEGER REFERENCES academic_terms(id),
+			  action TEXT NOT NULL,
+			  step TEXT,
+			  status TEXT NOT NULL,
+			  summary JSONB DEFAULT '{}'::jsonb,
+			  error_details TEXT,
+			  executed_by INTEGER REFERENCES users(id),
+			  created_at TIMESTAMP DEFAULT NOW() NOT NULL
+			);
+
+			CREATE TABLE IF NOT EXISTS academic_audit_logs (
+			  id SERIAL PRIMARY KEY,
+			  term_id INTEGER REFERENCES academic_terms(id),
+			  student_id INTEGER REFERENCES students(id),
+			  action TEXT NOT NULL,
+			  details JSONB DEFAULT '{}'::jsonb,
+			  reason TEXT NOT NULL,
+			  performed_by INTEGER NOT NULL REFERENCES users(id),
+			  created_at TIMESTAMP DEFAULT NOW() NOT NULL
+			);
+
+			-- Perluasan Kolom pada Tabel yang Ada
+			ALTER TABLE courses
+			  ADD COLUMN IF NOT EXISTS master_course_id INTEGER REFERENCES master_courses(id),
+			  ADD COLUMN IF NOT EXISTS term_id INTEGER REFERENCES academic_terms(id),
+			  ADD COLUMN IF NOT EXISTS semester INTEGER,
+			  ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'dibuka',
+			  ADD COLUMN IF NOT EXISTS notes TEXT;
+
+			ALTER TABLE course_enrollments
+			  ADD COLUMN IF NOT EXISTS term_id INTEGER REFERENCES academic_terms(id),
+			  ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'paket',
+			  ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'aktif',
+			  ADD COLUMN IF NOT EXISTS reason TEXT,
+			  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
+
+			ALTER TABLE course_grades
+			  ADD COLUMN IF NOT EXISTS term_id INTEGER REFERENCES academic_terms(id),
+			  ADD COLUMN IF NOT EXISTS enrollment_id INTEGER REFERENCES course_enrollments(id),
+			  ADD COLUMN IF NOT EXISTS attempt INTEGER DEFAULT 1,
+			  ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT false,
+			  ADD COLUMN IF NOT EXISTS locked_at TIMESTAMP,
+			  ADD COLUMN IF NOT EXISTS locked_by INTEGER REFERENCES users(id);
+
+			ALTER TABLE academic_khs_transcripts
+			  ADD COLUMN IF NOT EXISTS term_id INTEGER REFERENCES academic_terms(id),
+			  ADD COLUMN IF NOT EXISTS is_official BOOLEAN DEFAULT false;
+
+			ALTER TABLE students
+			  ADD COLUMN IF NOT EXISTS current_semester INTEGER DEFAULT 1;
+
+			ALTER TABLE class_schedules
+			  ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id),
+			  ADD COLUMN IF NOT EXISTS term_id INTEGER REFERENCES academic_terms(id);
+
+			ALTER TABLE practicum_schedules
+			  ADD COLUMN IF NOT EXISTS course_id INTEGER REFERENCES courses(id),
+			  ADD COLUMN IF NOT EXISTS term_id INTEGER REFERENCES academic_terms(id);
 			ALTER TABLE fee_share_recipients
 			  ADD COLUMN IF NOT EXISTS nama_institusi TEXT;
 
@@ -564,19 +724,19 @@ export async function ensureDatabaseSchema() {
 
 			-- Default seedings (Idempotent)
 			INSERT INTO attendance_checkpoint_config (type, label, latitude, longitude, radius_meters, is_active, notes)
-			SELECT 'baris_pagi', 'Kampus Utama Nusadaya Academy Denpasar', -8.6705, 115.2126, 150, true, 'Default campus checkpoint'
+			SELECT 'baris_pagi', 'Kampus Nusadaya Academy Bandar Lampung', -5.40145, 105.2114, 150, true, 'Jl. Raden Imba Kusuma Ratu, Langkapura, Kec. Langkapura, Kota Bandar Lampung, Lampung 35116'
 			WHERE NOT EXISTS (SELECT 1 FROM attendance_checkpoint_config WHERE type = 'baris_pagi' AND cohort IS NULL);
 
 			INSERT INTO attendance_checkpoint_config (type, label, latitude, longitude, radius_meters, is_active, notes)
-			SELECT 'kuliah', 'Kampus Utama Nusadaya Academy Denpasar', -8.6705, 115.2126, 150, true, 'Default campus checkpoint'
+			SELECT 'kuliah', 'Kampus Nusadaya Academy Bandar Lampung', -5.40145, 105.2114, 150, true, 'Jl. Raden Imba Kusuma Ratu, Langkapura, Kec. Langkapura, Kota Bandar Lampung, Lampung 35116'
 			WHERE NOT EXISTS (SELECT 1 FROM attendance_checkpoint_config WHERE type = 'kuliah' AND cohort IS NULL);
 
 			INSERT INTO attendance_checkpoint_config (type, label, latitude, longitude, radius_meters, is_active, notes)
-			SELECT 'piket', 'Kampus Utama Nusadaya Academy Denpasar', -8.6705, 115.2126, 150, true, 'Default campus checkpoint'
+			SELECT 'piket', 'Kampus Nusadaya Academy Bandar Lampung', -5.40145, 105.2114, 150, true, 'Jl. Raden Imba Kusuma Ratu, Langkapura, Kec. Langkapura, Kota Bandar Lampung, Lampung 35116'
 			WHERE NOT EXISTS (SELECT 1 FROM attendance_checkpoint_config WHERE type = 'piket' AND cohort IS NULL);
 
 			INSERT INTO attendance_checkpoint_config (type, label, latitude, longitude, radius_meters, is_active, notes)
-			SELECT 'ods', 'Kampus Utama Nusadaya Academy Denpasar', -8.6705, 115.2126, 150, true, 'Default campus checkpoint'
+			SELECT 'ods', 'Kampus Nusadaya Academy Bandar Lampung', -5.40145, 105.2114, 150, true, 'Jl. Raden Imba Kusuma Ratu, Langkapura, Kec. Langkapura, Kota Bandar Lampung, Lampung 35116'
 			WHERE NOT EXISTS (SELECT 1 FROM attendance_checkpoint_config WHERE type = 'ods' AND cohort IS NULL);
 
 			INSERT INTO morning_assembly_schedule_config (cohort, day_of_week, target_time, check_in_window_start, check_in_window_end, location, rombel, is_active)

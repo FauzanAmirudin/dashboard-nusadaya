@@ -2,6 +2,7 @@
 export * from "./academic-calendar";
 export * from "./courses";
 export * from "./crm";
+export * from "./curriculum";
 export * from "./enums";
 export * from "./final-decision";
 export * from "./finance";

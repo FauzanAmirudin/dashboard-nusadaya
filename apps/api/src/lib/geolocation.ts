@@ -17,12 +17,13 @@ export interface CheckpointInfo {
 	cohort?: number | null;
 }
 
-// Default fallback checkpoint: Nusadaya Academy Campus (Denpasar, Bali)
+// Default fallback checkpoint: Kampus Nusadaya Academy (Bandar Lampung)
+// Alamat: Jl. Raden Imba Kusuma Ratu, Langkapura, Kec. Langkapura, Kota Bandar Lampung, Lampung 35116
 export const DEFAULT_CAMPUS_CHECKPOINT: CheckpointInfo = {
 	type: "default",
-	label: "Kampus Nusadaya Academy Denpasar",
-	latitude: -8.6705,
-	longitude: 115.2126,
+	label: "Kampus Nusadaya Academy Bandar Lampung",
+	latitude: -5.40145,
+	longitude: 105.2114,
 	radiusMeters: 150,
 };
 

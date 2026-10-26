@@ -76,9 +76,9 @@ const ADDITIONAL_DOCS = [
 	{
 		key: "passport_visa",
 		propKey: "docPassportVisa",
-		label: "Paspor Halaman Visa / Tambahan",
-		desc: "Halaman catatan visa atau lembar pengesahan paspor",
-		isOptional: false,
+		label: "Paspor Halaman Visa / Tambahan (Opsional)",
+		desc: "Halaman catatan visa atau lembar pengesahan paspor (Opsional di awal, tidak mengunci ACC PMB)",
+		isOptional: true,
 	},
 	{
 		key: "skbm",
@@ -97,9 +97,9 @@ const ADDITIONAL_DOCS = [
 	{
 		key: "mcu",
 		propKey: "docMcu",
-		label: "Medical Check Up Full (MCU Lengkap Keberangkatan)",
-		desc: "Pemeriksaan kesehatan klinis & laboratorium menyeluruh sesuai standar magang kerja",
-		isOptional: false,
+		label: "Medical Check Up Full (MCU Lengkap Keberangkatan - Opsional PMB)",
+		desc: "Pemeriksaan klinis & laboratorium menyeluruh untuk magang (Dikelola di Panel Magang, tidak mengunci ACC PMB)",
+		isOptional: true,
 	},
 	{
 		key: "sla",
@@ -111,9 +111,9 @@ const ADDITIONAL_DOCS = [
 	{
 		key: "sertifikasi_bahasa",
 		propKey: "docSertifikasiBahasa",
-		label: "Sertifikasi Bahasa (TOEIC / JLPT / Topik)",
-		desc: "Sertifikat kompetensi bahasa sesuai program negara tujuan",
-		isOptional: false,
+		label: "Sertifikasi Bahasa (TOEIC / JLPT / Topik - Opsional PMB)",
+		desc: "Sertifikat kompetensi bahasa sesuai negara tujuan (Dikelola di Panel Magang, tidak mengunci ACC PMB)",
+		isOptional: true,
 	},
 	{
 		key: "bpjs",
@@ -297,7 +297,7 @@ export function TabChecklist({
 					detail: {
 						studentId,
 						completed: updatedTotal,
-						total: 17,
+						total: 14,
 					},
 				}),
 			);

@@ -153,46 +153,51 @@ describe("Sistem Absensi Selfie + GPS (Kuliah, Piket, Baris Pagi, ODS)", () => {
 	describe("1. Geolocation & Spoofing Risk Utilities", () => {
 		it("menghitung jarak 0 meter jika koordinat identik", () => {
 			const dist = calculateDistanceMeters(
-				-8.6705,
-				115.2126,
-				-8.6705,
-				115.2126,
+				-5.40145,
+				105.2114,
+				-5.40145,
+				105.2114,
 			);
 			expect(dist).toBe(0);
 		});
 
-		it("menghitung jarak Haversine antar 2 titik di Bali dengan presisi wajar", () => {
-			// Titik Kampus (-8.6705, 115.2126) ke Lapangan Renon (-8.6725, 115.2340) ~ 2.3km
-			const dist = calculateDistanceMeters(-8.6705, 115.2126, -8.6725, 115.234);
-			expect(dist).toBeGreaterThan(2000);
-			expect(dist).toBeLessThan(2600);
+		it("menghitung jarak Haversine antar 2 titik di Bandar Lampung dengan presisi wajar", () => {
+			// Titik Kampus (-5.40145, 105.2114) ke Tugu Adipura Bandar Lampung (-5.4211, 105.2585) ~ 5.6km
+			const dist = calculateDistanceMeters(
+				-5.40145,
+				105.2114,
+				-5.4211,
+				105.2585,
+			);
+			expect(dist).toBeGreaterThan(5000);
+			expect(dist).toBeLessThan(6500);
 		});
 
 		it("mengecek radius secara tepat (isWithinRadius)", () => {
-			const center = { latitude: -8.6705, longitude: 115.2126 };
-			const near = { latitude: -8.6706, longitude: 115.2127 }; // ~15 meter
-			const far = { latitude: -8.7, longitude: 115.2126 }; // ~3.2 km
+			const center = { latitude: -5.40145, longitude: 105.2114 };
+			const near = { latitude: -5.4015, longitude: 105.21145 }; // ~8 meter
+			const far = { latitude: -5.45, longitude: 105.26 }; // ~7.5 km
 
 			expect(isWithinRadius(near, center, 150)).toBe(true);
 			expect(isWithinRadius(far, center, 150)).toBe(false);
 		});
 
 		it("mendeteksi koordinat normal di Indonesia dengan akurasi wajar", () => {
-			const result = detectGpsSpoofingRisk(12, -8.6705, 115.2126);
+			const result = detectGpsSpoofingRisk(12, -5.40145, 105.2114);
 			expect(result.isSuspicious).toBe(false);
 		});
 
 		it("menandai anomali bila akurasi GPS terlalu rendah (> 500m)", () => {
-			const result = detectGpsSpoofingRisk(650, -8.6705, 115.2126);
+			const result = detectGpsSpoofingRisk(650, -5.40145, 105.2114);
 			expect(result.isSuspicious).toBe(true);
 			expect(result.reason).toBe("gps_accuracy_too_low");
 		});
 
 		it("menandai anomali bila akurasi GPS tidak valid (<= 0 atau NaN)", () => {
-			const res1 = detectGpsSpoofingRisk(0, -8.6705, 115.2126);
+			const res1 = detectGpsSpoofingRisk(0, -5.40145, 105.2114);
 			expect(res1.isSuspicious).toBe(true);
 
-			const res2 = detectGpsSpoofingRisk(-5, -8.6705, 115.2126);
+			const res2 = detectGpsSpoofingRisk(-5, -5.40145, 105.2114);
 			expect(res2.isSuspicious).toBe(true);
 		});
 
@@ -302,8 +307,8 @@ describe("Sistem Absensi Selfie + GPS (Kuliah, Piket, Baris Pagi, ODS)", () => {
 
 		it("menolak presensi jika foto selfie tidak dilampirkan", async () => {
 			const form = new FormData();
-			form.append("latitude", "-8.6705");
-			form.append("longitude", "115.2126");
+			form.append("latitude", "-5.40145");
+			form.append("longitude", "105.2114");
 			form.append("accuracy", "15");
 			form.append("sessionId", testSessionId.toString());
 			form.append("clientTimestamp", Date.now().toString());
@@ -325,8 +330,8 @@ describe("Sistem Absensi Selfie + GPS (Kuliah, Piket, Baris Pagi, ODS)", () => {
 		it("menolak presensi jika clientTimestamp terpaut lebih dari 5 menit (anti-replay)", async () => {
 			const form = new FormData();
 			form.append("photo", createMockPhotoBlob());
-			form.append("latitude", "-8.6705");
-			form.append("longitude", "115.2126");
+			form.append("latitude", "-5.40145");
+			form.append("longitude", "105.2114");
 			form.append("accuracy", "15");
 			form.append("sessionId", testSessionId.toString());
 			// Timestamp 10 menit yang lalu
@@ -346,12 +351,45 @@ describe("Sistem Absensi Selfie + GPS (Kuliah, Piket, Baris Pagi, ODS)", () => {
 			expect(json.message).toContain("Timestamp perangkat tidak sinkron");
 		});
 
+		it("menolak presensi jika posisi GPS perangkat berada di luar radius kampus", async () => {
+			if (isRedisReady()) {
+				await redis.del(`rl:selfie:selfie:baris_pagi:${testStudent.id}`);
+			}
+			const form = new FormData();
+			form.append("photo", createMockPhotoBlob("selfie_outside.jpg"));
+			// Titik di luar radius kampus (~7.5 km di Teluk Betung)
+			form.append("latitude", "-5.4500");
+			form.append("longitude", "105.2600");
+			form.append("accuracy", "12");
+			form.append("sessionId", testSessionId.toString());
+			form.append("clientTimestamp", Date.now().toString());
+
+			const res = await fetch(
+				`${API_BASE}/attendance/baris-pagi/selfie-checkin`,
+				{
+					method: "POST",
+					headers: { Authorization: `Bearer ${studentToken}` },
+					body: form,
+				},
+			);
+			const json = await res.json();
+			expect(res.status).toBe(400);
+			expect(json.success).toBe(false);
+			expect(json.message).toContain("di luar radius kampus");
+		});
+
 		it("berhasil melakukan selfie check-in dalam radius kampus (Happy Path)", async () => {
+			if (isRedisReady()) {
+				await redis.del(
+					`lock:attendance:baris_pagi:${testSessionId}:${testStudent.id}`,
+				);
+				await redis.del(`rl:selfie:selfie:baris_pagi:${testStudent.id}`);
+			}
 			const form = new FormData();
 			form.append("photo", createMockPhotoBlob("selfie_test_valid.jpg"));
-			// Koordinat tepat di Kampus Nusadaya Denpasar
-			form.append("latitude", "-8.6705");
-			form.append("longitude", "115.2126");
+			// Koordinat tepat di Kampus Nusadaya Bandar Lampung
+			form.append("latitude", "-5.40145");
+			form.append("longitude", "105.2114");
 			form.append("accuracy", "12");
 			form.append("sessionId", testSessionId.toString());
 			form.append("clientTimestamp", Date.now().toString());
@@ -380,8 +418,8 @@ describe("Sistem Absensi Selfie + GPS (Kuliah, Piket, Baris Pagi, ODS)", () => {
 			}
 			const form = new FormData();
 			form.append("photo", createMockPhotoBlob("selfie_duplicate.jpg"));
-			form.append("latitude", "-8.6705");
-			form.append("longitude", "115.2126");
+			form.append("latitude", "-5.40145");
+			form.append("longitude", "105.2114");
 			form.append("accuracy", "12");
 			form.append("sessionId", testSessionId.toString());
 			form.append("clientTimestamp", Date.now().toString());

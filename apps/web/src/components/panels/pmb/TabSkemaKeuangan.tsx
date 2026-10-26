@@ -58,7 +58,15 @@ export function TabSkemaKeuangan({
 					pmbData?.finance?.totalBiayaPendidikan ??
 					0);
 
+	const initialPendaftaranDp =
+		pmbData?.paymentPlan?.pendaftaranDp && pmbData.paymentPlan.pendaftaranDp > 0
+			? pmbData.paymentPlan.pendaftaranDp
+			: (pmbData?.paymentPlan?.totalDp ?? 0);
+
 	const [totalBiaya, setTotalBiaya] = useState<number>(initialTotalBiaya);
+	const [pendaftaranDp, setPendaftaranDp] =
+		useState<number>(initialPendaftaranDp);
+	const [dpWarning, setDpWarning] = useState<string | null>(null);
 	const [financeDetail, setFinanceDetail] = useState<any>(null);
 	const [programDefaults, setProgramDefaults] = useState<any[]>([]);
 
@@ -90,6 +98,9 @@ export function TabSkemaKeuangan({
 						setTotalBiaya((prev) =>
 							prev === 0 ? json.data.finance.totalBiayaPendidikan : prev,
 						);
+					}
+					if (json.data.paymentPlan?.pendaftaranDp !== undefined) {
+						setPendaftaranDp(json.data.paymentPlan.pendaftaranDp || 0);
 					}
 				}
 			}
@@ -139,6 +150,31 @@ export function TabSkemaKeuangan({
 			setTotalBiaya(parseInt(digitsOnly, 10) || 0);
 		}
 	};
+	const handleDpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const rawValue = e.target.value;
+		const digitsOnly = rawValue.replace(/[^0-9]/g, "");
+
+		if (digitsOnly.length > 9) {
+			toast.warning("Maksimal 9 digit angka (maks. Rp 999.999.999)");
+			setDpWarning("Input dibatasi maksimal 9 digit (maks. Rp 999.999.999)");
+			const trimmed = digitsOnly.slice(0, 9);
+			setPendaftaranDp(Number(trimmed) || 0);
+			return;
+		}
+
+		if (rawValue !== digitsOnly && /[^0-9]/.test(rawValue)) {
+			toast.warning("Hanya angka (bilangan bulat) yang diperbolehkan");
+			setDpWarning("Hanya menerima input angka bilangan bulat (integer)");
+		} else {
+			setDpWarning(null);
+		}
+
+		if (digitsOnly === "") {
+			setPendaftaranDp(0);
+		} else {
+			setPendaftaranDp(parseInt(digitsOnly, 10) || 0);
+		}
+	};
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
 		if (
@@ -171,6 +207,16 @@ export function TabSkemaKeuangan({
 			toast.error("Total Biaya Pendidikan maksimal 9 digit (Rp 999.999.999)");
 			return;
 		}
+		if (!Number.isInteger(Number(pendaftaranDp)) || pendaftaranDp < 0) {
+			toast.error(
+				"Nominal DP Pendaftaran harus berupa bilangan bulat (integer)",
+			);
+			return;
+		}
+		if (pendaftaranDp > 999_999_999) {
+			toast.error("Nominal DP Pendaftaran maksimal 9 digit (Rp 999.999.999)");
+			return;
+		}
 		setIsSaving(true);
 		try {
 			const res = await fetch(
@@ -183,6 +229,7 @@ export function TabSkemaKeuangan({
 					},
 					body: JSON.stringify({
 						totalBiaya: Math.max(0, Math.floor(Number(totalBiaya)) || 0),
+						pendaftaranDp: Math.max(0, Math.floor(Number(pendaftaranDp)) || 0),
 					}),
 				},
 			);
@@ -207,7 +254,9 @@ export function TabSkemaKeuangan({
 
 	const handleCancelEdit = () => {
 		setTotalBiaya(initialTotalBiaya);
+		setPendaftaranDp(initialPendaftaranDp);
 		setInputWarning(null);
+		setDpWarning(null);
 		setIsEditing(false);
 	};
 
@@ -442,6 +491,68 @@ export function TabSkemaKeuangan({
 									? formatRupiah(totalBiaya)
 									: "Belum ada biaya terinput"}
 							</span>
+							{/* Input Nominal DP Pendaftaran (Poin 10) */}
+							<div className="pt-3 border-t border-indigo-100">
+								<div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
+									<Label className="text-xs font-bold text-indigo-950 flex items-center gap-2">
+										<span>Nominal Uang Muka / DP Pendaftaran (Rp)</span>
+										<span className="text-muted-foreground text-[10px] font-normal">
+											(Disepakati PMB)
+										</span>
+									</Label>
+									{financeState?.registrasiStatus ||
+									pmbData?.paymentPlan?.statusDp ? (
+										<Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-100 text-[10px] font-bold gap-1">
+											<CheckCircle2 className="w-3 h-3 text-emerald-600" />
+											Lunas DP
+										</Badge>
+									) : (
+										<Badge
+											variant="outline"
+											className="text-amber-800 border-amber-300 bg-amber-50 text-[10px] font-bold gap-1"
+										>
+											<AlertCircle className="w-3 h-3 text-amber-600" />
+											Belum Lunas
+										</Badge>
+									)}
+								</div>
+
+								<div className="relative">
+									<span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
+										Rp
+									</span>
+									<Input
+										type="text"
+										inputMode="numeric"
+										pattern="[0-9]*"
+										maxLength={9}
+										disabled={!isEditing || !canEdit}
+										value={
+											pendaftaranDp === 0 || !pendaftaranDp ? "" : pendaftaranDp
+										}
+										onKeyDown={handleKeyDown}
+										onChange={handleDpChange}
+										className={`pl-9 font-bold text-base bg-white h-10 border-indigo-200 focus:border-indigo-500 disabled:bg-slate-100 disabled:text-slate-700 ${
+											dpWarning ? "border-amber-400 ring-1 ring-amber-300" : ""
+										}`}
+										placeholder="Nominal DP (Contoh: 3000000)"
+									/>
+								</div>
+
+								{dpWarning && (
+									<div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200 mt-1.5 animate-in fade-in">
+										<AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+										<span>{dpWarning}</span>
+									</div>
+								)}
+
+								<span className="text-xs font-semibold text-indigo-700 mt-1.5 block">
+									Terbilang:{" "}
+									{pendaftaranDp > 0
+										? formatRupiah(pendaftaranDp)
+										: "Belum ada DP ditentukan"}
+								</span>
+							</div>
 						</div>
 
 						<div className="flex items-start gap-2 pt-1 text-xs text-indigo-900/80">

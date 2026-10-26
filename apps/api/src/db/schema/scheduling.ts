@@ -12,6 +12,8 @@ import {
 	timestamp,
 } from "drizzle-orm/pg-core";
 import { academicCalendars } from "./academic-calendar";
+import { courses } from "./courses";
+import { academicTerms } from "./curriculum";
 import { students, users } from "./shared";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,6 +37,8 @@ export const classSchedules = pgTable(
 		startTime: text("start_time").notNull(), // HH:MM format
 		endTime: text("end_time").notNull(), // HH:MM format
 		calendarId: integer("calendar_id").references(() => academicCalendars.id),
+		courseId: integer("course_id").references(() => courses.id),
+		termId: integer("term_id").references(() => academicTerms.id),
 		notes: text("notes"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -44,6 +48,8 @@ export const classSchedules = pgTable(
 		index("idx_class_schedules_dosen_id").on(t.dosenId),
 		index("idx_class_schedules_dosen_pendamping_id").on(t.dosenPendampingId),
 		index("idx_class_schedules_calendar_id").on(t.calendarId),
+		index("idx_class_schedules_course_id").on(t.courseId),
+		index("idx_class_schedules_term_id").on(t.termId),
 	],
 );
 
@@ -64,6 +70,8 @@ export const practicumSchedules = pgTable(
 		startTime: text("start_time").notNull(),
 		endTime: text("end_time").notNull(),
 		calendarId: integer("calendar_id").references(() => academicCalendars.id),
+		courseId: integer("course_id").references(() => courses.id),
+		termId: integer("term_id").references(() => academicTerms.id),
 		notes: text("notes"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -75,6 +83,8 @@ export const practicumSchedules = pgTable(
 			t.dosenPendampingId,
 		),
 		index("idx_practicum_schedules_calendar_id").on(t.calendarId),
+		index("idx_practicum_schedules_course_id").on(t.courseId),
+		index("idx_practicum_schedules_term_id").on(t.termId),
 	],
 );
 
