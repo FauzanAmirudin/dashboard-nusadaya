@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import {
 	CheckCircle,
 	CheckCircle2,
@@ -45,6 +46,7 @@ interface FinancePanelProps {
 }
 
 export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
+	const queryClient = useQueryClient();
 	const { user } = useAuthStore();
 	const isFinanceAdmin = hasRole(user, "finance", "superadmin");
 	const canEdit = isFinanceAdmin;
@@ -52,9 +54,9 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 	const [finState, setFinState] = useState<any>(null);
 	const [pmbState, setPmbState] = useState<any>(null);
 	const [customFields, setCustomFields] = useState<any[]>([]);
+	const [student, setStudent] = useState<any>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [isAccSaving, setIsAccSaving] = useState(false);
-
 	const fetchData = async (silent = false) => {
 		try {
 			if (!silent && !finState) {
@@ -64,7 +66,18 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 				await api.finance.student[studentId.toString()].get();
 			if (!error && data?.success) {
 				setFinState(data?.data?.finance);
-				setPmbState({ rumahJuang: data?.data?.rumahJuangAktif });
+				setStudent(data?.data?.student);
+				setPmbState({
+					rumahJuang: data?.data?.rumahJuangAktif,
+					pmbDp: (data?.data as any)?.pmbDp,
+					totalDp:
+						(data?.data as any)?.pmbDp ??
+						(data?.data as any)?.paymentPlan?.totalDp,
+					pendaftaranDp:
+						(data?.data as any)?.pmbDp ??
+						(data?.data as any)?.paymentPlan?.pendaftaranDp,
+					paymentPlan: (data?.data as any)?.paymentPlan,
+				});
 				setCustomFields(data?.data?.customFields || []);
 			}
 		} catch (err) {
@@ -97,6 +110,9 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 				toast.success("Panel Keuangan berhasil disetujui (ACC)!");
 				fetchData();
 				onUpdate();
+				queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
+				queryClient.invalidateQueries({ queryKey: ["students-list"] });
+				queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
 			} else {
 				toast.error(
 					(res.data as any)?.message || "Gagal memberikan ACC Keuangan",
@@ -117,6 +133,9 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 				toast.success("Status ACC Keuangan berhasil dibatalkan");
 				fetchData();
 				onUpdate();
+				queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
+				queryClient.invalidateQueries({ queryKey: ["students-list"] });
+				queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
 			} else {
 				toast.error(
 					(res.data as any)?.message || "Gagal membatalkan ACC Keuangan",
@@ -182,6 +201,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 							pmbState={pmbState}
 							customFields={customFields}
 							canEdit={canEdit}
+							destinationCountry={student?.destinationCountry}
 							onUpdate={refreshData}
 						/>
 					</TabsContent>

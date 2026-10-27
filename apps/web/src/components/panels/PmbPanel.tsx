@@ -142,6 +142,7 @@ export function PmbPanel({
 			if (res.data?.success) {
 				toast.success("Panel PMB berhasil disetujui (ACC)!");
 				queryClient.invalidateQueries({ queryKey: ["students-list"] });
+				queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
 				queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
 				queryClient.invalidateQueries({
 					queryKey: ["student", studentId.toString()],
@@ -182,6 +183,7 @@ export function PmbPanel({
 			if (res.data?.success) {
 				toast.success("Status ACC PMB berhasil dibatalkan");
 				queryClient.invalidateQueries({ queryKey: ["students-list"] });
+				queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
 				queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
 				queryClient.invalidateQueries({
 					queryKey: ["student", studentId.toString()],

@@ -1,4 +1,5 @@
 import {
+	bigint,
 	boolean,
 	date,
 	decimal,
@@ -9,6 +10,7 @@ import {
 	serial,
 	text,
 	timestamp,
+	uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { courses } from "./courses";
 import { statusEnum } from "./enums";
@@ -63,9 +65,11 @@ export const financeData = pgTable(
 		mandiriSemesterNominal: integer("mandiri_semester_nominal").default(0),
 		mandiriSemesterStatus: boolean("mandiri_semester_status").default(false),
 		mandiriSemesterBuktiBayarUrl: text("mandiri_semester_bukti_bayar_url"),
+		mandiriSemesterPaidDate: timestamp("mandiri_semester_paid_date"),
 		mandiriInterviewNominal: integer("mandiri_interview_nominal").default(0),
 		mandiriInterviewStatus: boolean("mandiri_interview_status").default(false),
 		mandiriInterviewBuktiBayarUrl: text("mandiri_interview_bukti_bayar_url"),
+		mandiriInterviewPaidDate: timestamp("mandiri_interview_paid_date"),
 		mandiriKeberangkatanNominal: integer(
 			"mandiri_keberangkatan_nominal",
 		).default(0),
@@ -75,6 +79,15 @@ export const financeData = pgTable(
 		mandiriKeberangkatanBuktiBayarUrl: text(
 			"mandiri_keberangkatan_bukti_bayar_url",
 		),
+		mandiriKeberangkatanPaidDate: timestamp("mandiri_keberangkatan_paid_date"),
+
+		// FIN-02 Pemisahan Dokumen Resmi Termin 3 (Kontrak Magang & Surat Suhan)
+		kontrakMagangStatus: boolean("kontrak_magang_status").default(false),
+		kontrakMagangBuktiBayarUrl: text("kontrak_magang_bukti_bayar_url"),
+		kontrakMagangPaidDate: timestamp("kontrak_magang_paid_date"),
+		suhanStatus: boolean("suhan_status").default(false),
+		suhanBuktiBayarUrl: text("suhan_bukti_bayar_url"),
+		suhanPaidDate: timestamp("suhan_paid_date"),
 
 		// Dana Talangan Tahap 1 — Semester
 		t1SemesterNominalTotal: integer("t1_semester_nominal_total").default(0),
@@ -85,16 +98,19 @@ export const financeData = pgTable(
 		t1SemesterJumlahCicilan: integer("t1_semester_jumlah_cicilan").default(0),
 		t1SemesterCicilanKe: integer("t1_semester_cicilan_ke").default(0),
 		t1SemesterStatus: boolean("t1_semester_status").default(false),
+		t1SemesterPaidDate: timestamp("t1_semester_paid_date"),
 
-		// Dana Talangan Tahap 1 — Interview Magang
+		// Dana Talangan Tahap 1 — Interview Magang / Kontrak Magang & Suhan
 		t1InterviewNominal: integer("t1_interview_nominal").default(0),
 		t1InterviewStatus: boolean("t1_interview_status").default(false),
 		t1InterviewBuktiBayarUrl: text("t1_interview_bukti_bayar_url"),
+		t1InterviewPaidDate: timestamp("t1_interview_paid_date"),
 
-		// Dana Talangan Tahap 2 — Keberangkatan
+		// Dana Talangan Tahap 2 — Keberangkatan / Penempatan
 		t2KeberangkatanNominal: integer("t2_keberangkatan_nominal").default(0),
 		t2KeberangkatanStatus: boolean("t2_keberangkatan_status").default(false),
 		t2KeberangkatanBuktiBayarUrl: text("t2_keberangkatan_bukti_bayar_url"),
+		t2KeberangkatanPaidDate: timestamp("t2_keberangkatan_paid_date"),
 
 		// Biaya Administrasi Talangan
 		adminTalaganNominal: integer("admin_talagan_nominal").default(0),
@@ -176,6 +192,8 @@ export const financeSemesterInstallments = pgTable(
 		buktiBayarUrl: text("bukti_bayar_url"),
 		notes: text("notes"),
 		isTalangan: boolean("is_talangan").default(false),
+		installmentMonth: text("installment_month"),
+		periodNotes: text("period_notes"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},
 	(t) => [index("idx_finance_semester_installments_sem_id").on(t.semesterId)],
@@ -337,3 +355,32 @@ export const vocationalLeftovers = pgTable("vocational_leftovers", {
 	reportedBy: integer("reported_by").references(() => users.id),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// 15. Executive Projection Targets (FIN-01)
+export const financeProjectionTargets = pgTable(
+	"finance_projection_targets",
+	{
+		id: serial("id").primaryKey(),
+		cohort: integer("cohort").notNull(), // 0 for global/all, 15, 16, dst.
+		category: text("category").notNull(), // "pmb" | "spp_taiwan" | "spp_malaysia"
+		year: integer("year").notNull(),
+		month: integer("month").default(0).notNull(), // 0 = full year / all, 1-12 = specific month
+		periodType: text("period_type").default("monthly"), // "monthly" | "yearly" | "academic_cycle"
+		targetNominal: bigint("target_nominal", { mode: "number" })
+			.notNull()
+			.default(0),
+		notes: text("notes"),
+		updatedBy: integer("updated_by").references(() => users.id),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(t) => [
+		index("idx_projection_targets_cohort_cat").on(t.cohort, t.category, t.year),
+		uniqueIndex("idx_projection_targets_unique").on(
+			t.cohort,
+			t.category,
+			t.year,
+			t.month,
+		),
+	],
+);

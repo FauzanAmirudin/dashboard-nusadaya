@@ -34,6 +34,7 @@ import { finalDecision } from "./final-decision";
 import {
 	financeData,
 	financeDocuments,
+	financeProjectionTargets,
 	financeSemesterInstallments,
 	financeSemesters,
 	financeTalanganInstallments,
@@ -229,6 +230,10 @@ export const crmDocumentsRelations = relations(crmDocuments, ({ one }) => ({
 }));
 
 export const financeDataRelations = relations(financeData, ({ one }) => ({
+	student: one(students, {
+		fields: [financeData.studentId],
+		references: [students.id],
+	}),
 	accBy: one(users, {
 		fields: [financeData.accBy],
 		references: [users.id],
@@ -238,12 +243,26 @@ export const financeDataRelations = relations(financeData, ({ one }) => ({
 export const financeDocumentsRelations = relations(
 	financeDocuments,
 	({ one }) => ({
+		student: one(students, {
+			fields: [financeDocuments.studentId],
+			references: [students.id],
+		}),
 		uploadedBy: one(users, {
 			fields: [financeDocuments.uploadedBy],
 			references: [users.id],
 		}),
 		verifiedBy: one(users, {
 			fields: [financeDocuments.verifiedBy],
+			references: [users.id],
+		}),
+	}),
+);
+
+export const financeProjectionTargetsRelations = relations(
+	financeProjectionTargets,
+	({ one }) => ({
+		updatedByUser: one(users, {
+			fields: [financeProjectionTargets.updatedBy],
 			references: [users.id],
 		}),
 	}),
@@ -418,6 +437,13 @@ export const studentsRelations = relations(students, ({ one, many }) => ({
 		fields: [students.id],
 		references: [departureAssessments.studentId],
 	}),
+	finance: one(financeData, {
+		fields: [students.id],
+		references: [financeData.studentId],
+	}),
+	financeDocuments: many(financeDocuments),
+	financeSemesters: many(financeSemesters),
+	financeTalanganInstallments: many(financeTalanganInstallments),
 }));
 
 export const departureAssessmentsRelations = relations(

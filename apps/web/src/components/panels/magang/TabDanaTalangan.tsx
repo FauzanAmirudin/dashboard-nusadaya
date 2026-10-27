@@ -68,6 +68,11 @@ export function TabDanaTalangan({
 	const financeState = financeDetail?.finance || {};
 	const isDanaTalangan = financeState?.metodePembayaran === "dana_talangan";
 	const isDanaMandiri = financeState?.metodePembayaran === "mandiri";
+	const destCountry = financeDetail?.student?.destinationCountry || "";
+	const isMalaysia = destCountry.toLowerCase().includes("malaysia");
+	const penempatanLabel = isMalaysia
+		? "Penempatan Magang D3 Malaysia / Keberangkatan"
+		: "Penempatan Magang Taiwan / Keberangkatan";
 
 	const renderStage = (
 		title: string,
@@ -129,7 +134,9 @@ export function TabDanaTalangan({
 								</span>
 								<span>
 									Total DP: Rp{" "}
-									{pmbPaymentData.totalDp?.toLocaleString("id-ID") || 0}
+									{(
+										pmbPaymentData.totalDp || pmbPaymentData.pendaftaranDp
+									)?.toLocaleString("id-ID") || 0}
 								</span>
 							</div>
 						</div>
@@ -211,38 +218,44 @@ export function TabDanaTalangan({
 								) : isDanaMandiri ? (
 									<>
 										{renderStage(
-											"Tahap 1 - Semester Lunas",
+											"2. SPP Semester 1",
 											financeState.mandiriSemesterNominal || 0,
-											!!financeState.mandiriSemesterStatus,
-											"Biaya perkuliahan berjalan",
+											Boolean(financeState.mandiriSemesterStatus),
+											"Biaya perkuliahan berjalan Semester 1",
 										)}
 										{renderStage(
-											"Tahap 2 - Interview Magang",
+											"3. Kontrak Magang / Suhan",
 											financeState.mandiriInterviewNominal || 0,
-											!!financeState.mandiriInterviewStatus,
-											"Persiapan magang industri",
+											Boolean(
+												financeState.kontrakMagangStatus ||
+													financeState.suhanStatus ||
+													financeState.mandiriInterviewStatus,
+											),
+											"Biaya proses turun kontrak kerja & izin Suhan",
 										)}
 										{renderStage(
-											"Tahap 3 - Keberangkatan",
+											`4. ${penempatanLabel}`,
 											financeState.mandiriKeberangkatanNominal || 0,
-											!!financeState.mandiriKeberangkatanStatus,
-											"Tahap akhir keberangkatan",
+											Boolean(financeState.mandiriKeberangkatanStatus),
+											"Tahap akhir penempatan magang & visa",
 										)}
 									</>
 								) : isDanaTalangan ? (
 									<>
 										{renderStage(
-											"Tahap 1 - Semester & Interview",
+											"Tahap 1 — SPP Semester 1 & Kontrak Magang/Suhan",
 											financeState.t1SemesterNominalTotal || 0,
-											!!financeState.t1SemesterStatus &&
-												!!financeState.t1InterviewStatus,
-											"Talangan semester & interview",
+											Boolean(
+												financeState.t1SemesterStatus &&
+													financeState.t1InterviewStatus,
+											),
+											"Plafon talangan SPP Semester 1 & Kontrak/Suhan",
 										)}
 										{renderStage(
-											"Tahap 2 - Keberangkatan",
+											`Tahap 2 — ${penempatanLabel}`,
 											financeState.t2KeberangkatanNominal || 0,
-											!!financeState.t2KeberangkatanStatus,
-											"Talangan keberangkatan magang",
+											Boolean(financeState.t2KeberangkatanStatus),
+											"Plafon talangan penempatan keberangkatan magang",
 										)}
 									</>
 								) : null}

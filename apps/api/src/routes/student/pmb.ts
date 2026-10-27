@@ -14,6 +14,7 @@ import {
 import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
 import { hasRole } from "../../lib/permissions";
 import { fileService } from "../../modules/file/service/file.service";
+import { invalidateFinanceCaches } from "./finance";
 
 export const invalidatePmbCache = async (studentId: number) => {
 	await Promise.all([
@@ -513,7 +514,16 @@ export const pmbRoutes = new Elysia()
 			where: eq(pmbPaymentPlan.studentId, id),
 		});
 		if (!plan) return { success: false, message: "Not found" };
-		return { success: true, data: plan };
+		const effectiveDp =
+			plan.totalDp || plan.pendaftaranDp || plan.pembayaranAwalDp || 0;
+		return {
+			success: true,
+			data: {
+				...plan,
+				totalDp: effectiveDp,
+				pendaftaranDp: effectiveDp,
+			},
+		};
 	})
 	.put(
 		"/:id/pmb/payment-plan",
@@ -526,62 +536,8 @@ export const pmbRoutes = new Elysia()
 			}
 			const id = parseInt(params.id, 10);
 
-			const existingPlan = await db.query.pmbPaymentPlan.findFirst({
-				where: eq(pmbPaymentPlan.studentId, id),
-			});
-
-			if (existingPlan) {
-				await db
-					.update(pmbPaymentPlan)
-					.set({
-						totalBiaya: body.totalBiaya,
-						pendaftaranDp: body.pendaftaranDp,
-						totalDp: body.totalDp,
-						pembayaranAwalDp: body.pembayaranAwalDp,
-						statusDp: body.statusDp,
-						janjiTahap2: body.janjiTahap2 ? new Date(body.janjiTahap2) : null,
-						janjiTahap2Nominal: body.janjiTahap2Nominal,
-						janjiTahap2Notes: body.janjiTahap2Notes,
-						janjiTahap3: body.janjiTahap3 ? new Date(body.janjiTahap3) : null,
-						janjiTahap3Nominal: body.janjiTahap3Nominal,
-						janjiTahap3Notes: body.janjiTahap3Notes,
-						pengajuanDanaTalangan: body.pengajuanDanaTalangan,
-						updatedAt: new Date(),
-					})
-					.where(eq(pmbPaymentPlan.studentId, id));
-			} else {
-				await db.insert(pmbPaymentPlan).values({
-					studentId: id,
-					totalBiaya: body.totalBiaya || 0,
-					pendaftaranDp: body.pendaftaranDp || 0,
-					totalDp: body.totalDp || 0,
-					pembayaranAwalDp: body.pembayaranAwalDp || 0,
-					statusDp: body.statusDp || false,
-					janjiTahap2: body.janjiTahap2 ? new Date(body.janjiTahap2) : null,
-					janjiTahap2Nominal: body.janjiTahap2Nominal || 0,
-					janjiTahap2Notes: body.janjiTahap2Notes || null,
-					janjiTahap3: body.janjiTahap3 ? new Date(body.janjiTahap3) : null,
-					janjiTahap3Nominal: body.janjiTahap3Nominal || 0,
-					janjiTahap3Notes: body.janjiTahap3Notes || null,
-					pengajuanDanaTalangan: body.pengajuanDanaTalangan || null,
-				});
-			}
-
-			if (body.pendaftaranDp !== undefined && body.pendaftaranDp !== null) {
-				if (
-					!Number.isInteger(body.pendaftaranDp) ||
-					body.pendaftaranDp < 0 ||
-					body.pendaftaranDp > 999_999_999
-				) {
-					set.status = 400;
-					return {
-						success: false,
-						message:
-							"Nominal DP Pendaftaran harus berupa bilangan bulat (integer) dan maksimal 9 digit (Rp 999.999.999)",
-					};
-				}
-			}
-			if (body.totalBiaya !== undefined) {
+			// Validasi Total Biaya
+			if (body.totalBiaya !== undefined && body.totalBiaya !== null) {
 				if (
 					!Number.isInteger(body.totalBiaya) ||
 					body.totalBiaya < 0 ||
@@ -594,27 +550,144 @@ export const pmbRoutes = new Elysia()
 							"Total Biaya Pendidikan harus berupa bilangan bulat (integer) dan maksimal 9 digit (Rp 999.999.999)",
 					};
 				}
+			}
 
-				const existingFin = await db.query.financeData.findFirst({
-					where: eq(financeData.studentId, id),
-				});
-				if (existingFin) {
-					await db
-						.update(financeData)
-						.set({
-							totalBiayaPendidikan: body.totalBiaya,
-							updatedAt: new Date(),
-						})
-						.where(eq(financeData.studentId, id));
-				} else {
-					await db.insert(financeData).values({
-						studentId: id,
-						totalBiayaPendidikan: body.totalBiaya,
-					});
+			// Normalisasi & Validasi DP Pendaftaran / Total DP
+			const rawDp =
+				body.totalDp !== undefined && body.totalDp !== null
+					? body.totalDp
+					: body.pendaftaranDp !== undefined && body.pendaftaranDp !== null
+						? body.pendaftaranDp
+						: body.pembayaranAwalDp;
+
+			if (rawDp !== undefined && rawDp !== null) {
+				if (!Number.isInteger(rawDp) || rawDp < 0 || rawDp > 999_999_999) {
+					set.status = 400;
+					return {
+						success: false,
+						message:
+							"Nominal DP Pendaftaran / Total DP harus berupa bilangan bulat (integer) dan maksimal 9 digit (Rp 999.999.999)",
+					};
 				}
 			}
 
+			const effectiveDp =
+				rawDp !== undefined && rawDp !== null
+					? Math.max(0, Math.floor(rawDp))
+					: undefined;
+
+			// Update / Insert pmbPaymentPlan
+			const existingPlan = await db.query.pmbPaymentPlan.findFirst({
+				where: eq(pmbPaymentPlan.studentId, id),
+			});
+
+			if (existingPlan) {
+				await db
+					.update(pmbPaymentPlan)
+					.set({
+						totalBiaya:
+							body.totalBiaya !== undefined
+								? body.totalBiaya
+								: existingPlan.totalBiaya,
+						pendaftaranDp:
+							effectiveDp !== undefined
+								? effectiveDp
+								: existingPlan.pendaftaranDp,
+						totalDp:
+							effectiveDp !== undefined ? effectiveDp : existingPlan.totalDp,
+						pembayaranAwalDp:
+							effectiveDp !== undefined
+								? effectiveDp
+								: existingPlan.pembayaranAwalDp,
+						statusDp:
+							body.statusDp !== undefined
+								? body.statusDp
+								: existingPlan.statusDp,
+						janjiTahap2: body.janjiTahap2
+							? new Date(body.janjiTahap2)
+							: existingPlan.janjiTahap2,
+						janjiTahap2Nominal:
+							body.janjiTahap2Nominal !== undefined
+								? body.janjiTahap2Nominal
+								: existingPlan.janjiTahap2Nominal,
+						janjiTahap2Notes:
+							body.janjiTahap2Notes !== undefined
+								? body.janjiTahap2Notes
+								: existingPlan.janjiTahap2Notes,
+						janjiTahap3: body.janjiTahap3
+							? new Date(body.janjiTahap3)
+							: existingPlan.janjiTahap3,
+						janjiTahap3Nominal:
+							body.janjiTahap3Nominal !== undefined
+								? body.janjiTahap3Nominal
+								: existingPlan.janjiTahap3Nominal,
+						janjiTahap3Notes:
+							body.janjiTahap3Notes !== undefined
+								? body.janjiTahap3Notes
+								: existingPlan.janjiTahap3Notes,
+						pengajuanDanaTalangan:
+							body.pengajuanDanaTalangan !== undefined
+								? body.pengajuanDanaTalangan
+								: existingPlan.pengajuanDanaTalangan,
+						updatedAt: new Date(),
+					})
+					.where(eq(pmbPaymentPlan.studentId, id));
+			} else {
+				await db.insert(pmbPaymentPlan).values({
+					studentId: id,
+					totalBiaya: body.totalBiaya || 0,
+					pendaftaranDp: effectiveDp || 0,
+					totalDp: effectiveDp || 0,
+					pembayaranAwalDp: effectiveDp || 0,
+					statusDp: body.statusDp || false,
+					janjiTahap2: body.janjiTahap2 ? new Date(body.janjiTahap2) : null,
+					janjiTahap2Nominal: body.janjiTahap2Nominal || 0,
+					janjiTahap2Notes: body.janjiTahap2Notes || null,
+					janjiTahap3: body.janjiTahap3 ? new Date(body.janjiTahap3) : null,
+					janjiTahap3Nominal: body.janjiTahap3Nominal || 0,
+					janjiTahap3Notes: body.janjiTahap3Notes || null,
+					pengajuanDanaTalangan: body.pengajuanDanaTalangan || null,
+				});
+			}
+
+			// Sinkronisasi Langsung ke financeData (Panel Finance Registrasi & Total Biaya)
+			const existingFin = await db.query.financeData.findFirst({
+				where: eq(financeData.studentId, id),
+			});
+
+			if (existingFin) {
+				const finUpdates: Record<string, any> = {
+					updatedAt: new Date(),
+				};
+				if (body.totalBiaya !== undefined && body.totalBiaya !== null) {
+					finUpdates.totalBiayaPendidikan = body.totalBiaya;
+				}
+				if (effectiveDp !== undefined && effectiveDp !== null) {
+					finUpdates.registrasiNominal = effectiveDp;
+				}
+				if (body.statusDp !== undefined && body.statusDp !== null) {
+					finUpdates.registrasiStatus = body.statusDp;
+					if (body.statusDp && !existingFin.registrasiPaidDate) {
+						finUpdates.registrasiPaidDate = new Date();
+					}
+				}
+				await db
+					.update(financeData)
+					.set(finUpdates)
+					.where(eq(financeData.studentId, id));
+			} else {
+				await db.insert(financeData).values({
+					studentId: id,
+					totalBiayaPendidikan: body.totalBiaya || 0,
+					registrasiNominal: effectiveDp || 0,
+					registrasiStatus: Boolean(body.statusDp),
+					registrasiPaidDate: body.statusDp ? new Date() : null,
+				});
+			}
+
+			// Invalidate Cache PMB dan Finance secara bersamaan
 			await invalidatePmbCache(id);
+			await invalidateFinanceCaches(id);
 
 			return { success: true };
 		},

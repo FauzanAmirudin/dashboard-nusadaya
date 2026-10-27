@@ -742,6 +742,22 @@ export async function ensureDatabaseSchema() {
 			INSERT INTO morning_assembly_schedule_config (cohort, day_of_week, target_time, check_in_window_start, check_in_window_end, location, rombel, is_active)
 			SELECT 16, 1, '06:22', '05:30', '07:00', 'Lapangan Utama Kampus', 'Semua', true
 			WHERE NOT EXISTS (SELECT 1 FROM morning_assembly_schedule_config WHERE cohort = 16);
+
+			-- FIN-02: 4 Termin Baku Biaya & Pemisahan Kontrak vs Suhan
+			ALTER TABLE finance_data ADD COLUMN IF NOT EXISTS mandiri_semester_paid_date TIMESTAMP;
+			ALTER TABLE finance_data ADD COLUMN IF NOT EXISTS mandiri_interview_paid_date TIMESTAMP;
+			ALTER TABLE finance_data ADD COLUMN IF NOT EXISTS mandiri_keberangkatan_paid_date TIMESTAMP;
+			ALTER TABLE finance_data ADD COLUMN IF NOT EXISTS kontrak_magang_status BOOLEAN DEFAULT false;
+			ALTER TABLE finance_data ADD COLUMN IF NOT EXISTS kontrak_magang_bukti_bayar_url TEXT;
+			ALTER TABLE finance_data ADD COLUMN IF NOT EXISTS kontrak_magang_paid_date TIMESTAMP;
+			ALTER TABLE finance_data ADD COLUMN IF NOT EXISTS suhan_status BOOLEAN DEFAULT false;
+			ALTER TABLE finance_data ADD COLUMN IF NOT EXISTS suhan_bukti_bayar_url TEXT;
+			ALTER TABLE finance_data ADD COLUMN IF NOT EXISTS suhan_paid_date TIMESTAMP;
+			ALTER TABLE finance_data ADD COLUMN IF NOT EXISTS t1_semester_paid_date TIMESTAMP;
+			ALTER TABLE finance_data ADD COLUMN IF NOT EXISTS t1_interview_paid_date TIMESTAMP;
+			ALTER TABLE finance_data ADD COLUMN IF NOT EXISTS t2_keberangkatan_paid_date TIMESTAMP;
+			ALTER TABLE finance_semester_installments ADD COLUMN IF NOT EXISTS installment_month TEXT;
+			ALTER TABLE finance_semester_installments ADD COLUMN IF NOT EXISTS period_notes TEXT;
 		`);
 	} catch (err) {
 		console.warn("[Database] Schema check warning:", err);

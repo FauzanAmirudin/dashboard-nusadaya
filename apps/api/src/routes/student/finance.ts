@@ -59,7 +59,43 @@ export const financeRoutes = new Elysia()
 				accBy: { columns: { fullName: true } },
 			},
 		});
-		return { success: true, data: finance };
+		const paymentPlan = await db.query.pmbPaymentPlan.findFirst({
+			where: eq(pmbPaymentPlan.studentId, id),
+		});
+		const pmbDp =
+			paymentPlan?.totalDp ||
+			paymentPlan?.pendaftaranDp ||
+			paymentPlan?.pembayaranAwalDp ||
+			0;
+
+		if (finance) {
+			if (
+				(!finance.registrasiNominal || finance.registrasiNominal === 0) &&
+				pmbDp > 0
+			) {
+				finance.registrasiNominal = pmbDp;
+			}
+			// Backward compatibility: fallback Termin 3 to legacy interview fields if null
+			if (
+				finance.kontrakMagangStatus === null ||
+				finance.kontrakMagangStatus === undefined
+			) {
+				finance.kontrakMagangStatus = finance.mandiriInterviewStatus ?? false;
+			}
+			if (!finance.kontrakMagangBuktiBayarUrl) {
+				finance.kontrakMagangBuktiBayarUrl =
+					finance.mandiriInterviewBuktiBayarUrl;
+			}
+			if (!finance.kontrakMagangPaidDate) {
+				finance.kontrakMagangPaidDate = finance.mandiriInterviewPaidDate;
+			}
+		}
+		return {
+			success: true,
+			data: finance,
+			paymentPlan: paymentPlan || null,
+			pmbDp,
+		};
 	})
 	.patch(
 		"/:id/finance",
@@ -75,16 +111,17 @@ export const financeRoutes = new Elysia()
 
 			const isFinance = hasRole(user, "finance");
 			const isMagang = hasRole(user, "magang");
+			const isPmb = hasRole(user, "pmb");
+			const isSuper = user.role === "superadmin";
 
-			if (!isFinance && !isMagang) {
+			if (!isFinance && !isMagang && !isPmb && !isSuper) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
-
 			const id = Number(params.id);
 			const updates = body as Record<string, any>;
 
-			if (isMagang) {
+			if (isMagang && !isFinance && !isSuper) {
 				const allowedKeys = [
 					"t1SemesterNominalTotal",
 					"t1SemesterPaidDate",
@@ -96,6 +133,12 @@ export const financeRoutes = new Elysia()
 					"t2KeberangkatanStatus",
 					"adminTalaganBankTujuan",
 					"adminTalaganMetode",
+					"kontrakMagangStatus",
+					"kontrakMagangPaidDate",
+					"kontrakMagangBuktiBayarUrl",
+					"suhanStatus",
+					"suhanPaidDate",
+					"suhanBuktiBayarUrl",
 				];
 				const hasForbiddenKey = Object.keys(updates).some(
 					(k) => !allowedKeys.includes(k),
@@ -104,7 +147,8 @@ export const financeRoutes = new Elysia()
 					set.status = 403;
 					return {
 						success: false,
-						message: "Tim Magang hanya dapat mengupdate data Dana Talangan",
+						message:
+							"Tim Magang hanya dapat mengupdate data Dana Talangan & Dokumen Magang",
 					};
 				}
 			}
@@ -176,17 +220,69 @@ export const financeRoutes = new Elysia()
 				cleanUpdates.mandiriSemesterPaidDate = new Date(
 					cleanUpdates.mandiriSemesterPaidDate,
 				);
+			if (cleanUpdates.mandiriInterviewPaidDate)
+				cleanUpdates.mandiriInterviewPaidDate = new Date(
+					cleanUpdates.mandiriInterviewPaidDate,
+				);
+			if (cleanUpdates.mandiriKeberangkatanPaidDate)
+				cleanUpdates.mandiriKeberangkatanPaidDate = new Date(
+					cleanUpdates.mandiriKeberangkatanPaidDate,
+				);
+			if (cleanUpdates.kontrakMagangPaidDate)
+				cleanUpdates.kontrakMagangPaidDate = new Date(
+					cleanUpdates.kontrakMagangPaidDate,
+				);
+			if (cleanUpdates.suhanPaidDate)
+				cleanUpdates.suhanPaidDate = new Date(cleanUpdates.suhanPaidDate);
 			if (cleanUpdates.toeicPaidDate)
 				cleanUpdates.toeicPaidDate = new Date(cleanUpdates.toeicPaidDate);
+			if (cleanUpdates.pasporPaidDate)
+				cleanUpdates.pasporPaidDate = new Date(cleanUpdates.pasporPaidDate);
 			if (cleanUpdates.t1SemesterPaidDate)
 				cleanUpdates.t1SemesterPaidDate = new Date(
 					cleanUpdates.t1SemesterPaidDate,
+				);
+			if (cleanUpdates.t1InterviewPaidDate)
+				cleanUpdates.t1InterviewPaidDate = new Date(
+					cleanUpdates.t1InterviewPaidDate,
 				);
 			if (cleanUpdates.t2KeberangkatanPaidDate)
 				cleanUpdates.t2KeberangkatanPaidDate = new Date(
 					cleanUpdates.t2KeberangkatanPaidDate,
 				);
 
+			// Backward compatibility sync for Termin 3
+			if (
+				cleanUpdates.kontrakMagangStatus !== undefined ||
+				cleanUpdates.suhanStatus !== undefined
+			) {
+				if (cleanUpdates.mandiriInterviewStatus === undefined) {
+					cleanUpdates.mandiriInterviewStatus = Boolean(
+						cleanUpdates.kontrakMagangStatus ??
+							current?.kontrakMagangStatus ??
+							cleanUpdates.suhanStatus ??
+							current?.suhanStatus,
+					);
+				}
+			} else if (cleanUpdates.mandiriInterviewStatus !== undefined) {
+				if (cleanUpdates.kontrakMagangStatus === undefined) {
+					cleanUpdates.kontrakMagangStatus =
+						cleanUpdates.mandiriInterviewStatus;
+				}
+			}
+			if (
+				cleanUpdates.kontrakMagangBuktiBayarUrl &&
+				!cleanUpdates.mandiriInterviewBuktiBayarUrl
+			) {
+				cleanUpdates.mandiriInterviewBuktiBayarUrl =
+					cleanUpdates.kontrakMagangBuktiBayarUrl;
+			} else if (
+				cleanUpdates.mandiriInterviewBuktiBayarUrl &&
+				!cleanUpdates.kontrakMagangBuktiBayarUrl
+			) {
+				cleanUpdates.kontrakMagangBuktiBayarUrl =
+					cleanUpdates.mandiriInterviewBuktiBayarUrl;
+			}
 			const merged = { ...(current || {}), ...cleanUpdates };
 
 			// Hitung checklist keuangan dari 6 field aktual (mendukung kedua metode pembayaran)
@@ -200,8 +296,14 @@ export const financeRoutes = new Elysia()
 					: merged.mandiriSemesterStatus
 			)
 				checked++;
-			if (isTalangan ? merged.t1InterviewStatus : merged.mandiriInterviewStatus)
-				checked++;
+			const isT3Done = isTalangan
+				? merged.t1InterviewStatus
+				: Boolean(
+						merged.kontrakMagangStatus ||
+							merged.suhanStatus ||
+							merged.mandiriInterviewStatus,
+					);
+			if (isT3Done) checked++;
 			if (
 				isTalangan
 					? merged.t2KeberangkatanStatus
@@ -235,6 +337,30 @@ export const financeRoutes = new Elysia()
 					.update(financeData)
 					.set(cleanUpdates)
 					.where(eq(financeData.studentId, id));
+			}
+
+			// Sinkronisasi balik ke pmbPaymentPlan jika nominal registrasi / DP diubah oleh Finance
+			if (
+				cleanUpdates.registrasiNominal !== undefined &&
+				cleanUpdates.registrasiNominal !== null
+			) {
+				const plan = await db.query.pmbPaymentPlan.findFirst({
+					where: eq(pmbPaymentPlan.studentId, id),
+				});
+				if (plan) {
+					await db
+						.update(pmbPaymentPlan)
+						.set({
+							totalDp: cleanUpdates.registrasiNominal,
+							pendaftaranDp: cleanUpdates.registrasiNominal,
+							statusDp:
+								cleanUpdates.registrasiStatus !== undefined
+									? cleanUpdates.registrasiStatus
+									: plan.statusDp,
+							updatedAt: new Date(),
+						})
+						.where(eq(pmbPaymentPlan.studentId, id));
+				}
 			}
 
 			await invalidateFinanceCaches(id);
@@ -675,6 +801,8 @@ export const financeRoutes = new Elysia()
 				buktiBayarUrl: b.buktiBayarUrl,
 				notes: b.notes,
 				isTalangan: b.isTalangan ?? false,
+				installmentMonth: b.installmentMonth,
+				periodNotes: b.periodNotes,
 			});
 
 			// Recalculate status
@@ -707,6 +835,8 @@ export const financeRoutes = new Elysia()
 				buktiBayarUrl: t.Optional(t.String()),
 				notes: t.Optional(t.String()),
 				isTalangan: t.Optional(t.Boolean()),
+				installmentMonth: t.Optional(t.String()),
+				periodNotes: t.Optional(t.String()),
 			}),
 		},
 	)
@@ -765,6 +895,14 @@ export const financeRoutes = new Elysia()
 							: inst.buktiBayarUrl,
 					notes: updates.notes !== undefined ? updates.notes : inst.notes,
 					isTalangan: updates.isTalangan ?? inst.isTalangan,
+					installmentMonth:
+						updates.installmentMonth !== undefined
+							? updates.installmentMonth
+							: inst.installmentMonth,
+					periodNotes:
+						updates.periodNotes !== undefined
+							? updates.periodNotes
+							: inst.periodNotes,
 				})
 				.where(eq(financeSemesterInstallments.id, installmentId));
 
@@ -806,6 +944,8 @@ export const financeRoutes = new Elysia()
 				buktiBayarUrl: t.Optional(t.String()),
 				notes: t.Optional(t.String()),
 				isTalangan: t.Optional(t.Boolean()),
+				installmentMonth: t.Optional(t.String()),
+				periodNotes: t.Optional(t.String()),
 			}),
 		},
 	)

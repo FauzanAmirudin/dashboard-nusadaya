@@ -114,7 +114,7 @@ export default function FinancePanelMahasiswa() {
 				{
 					key: "tahap_1",
 					label: "3. Dana Talangan Tahap 1",
-					desc: "Plafon perkuliahan semester & interview magang ditalangi",
+					desc: "Plafon SPP Semester 1 & Kontrak Magang / Suhan ditalangi",
 					status: Boolean(data?.t1InterviewStatus || data?.t1SemesterStatus),
 					paidDate: data?.t1InterviewPaidDate || data?.t1SemesterPaidDate,
 					nominal:
@@ -125,7 +125,7 @@ export default function FinancePanelMahasiswa() {
 				{
 					key: "tahap_2",
 					label: "4. Dana Talangan Tahap 2",
-					desc: "Plafon biaya visa, tiket pesawat & keberangkatan magang",
+					desc: "Plafon penempatan magang Taiwan / keberangkatan ditalangi",
 					status: Boolean(data?.t2KeberangkatanStatus),
 					paidDate: data?.t2KeberangkatanPaidDate,
 					nominal: data?.t2KeberangkatanNominal || 0,
@@ -144,8 +144,8 @@ export default function FinancePanelMahasiswa() {
 				},
 				{
 					key: "semester",
-					label: "2. Perkuliahan 6 Semester",
-					desc: "Biaya perkuliahan semester 1 s.d semester 6",
+					label: "2. Pembayaran SPP Semester 1",
+					desc: "Biaya perkuliahan berjalan Semester 1 (cicilan bulanan persiapan)",
 					status: Boolean(data?.mandiriSemesterStatus),
 					paidDate: data?.mandiriSemesterPaidDate,
 					nominal: data?.mandiriSemesterNominal || 0,
@@ -153,17 +153,22 @@ export default function FinancePanelMahasiswa() {
 				},
 				{
 					key: "interview",
-					label: "3. Biaya Interview Magang",
-					desc: "Biaya pelaksanaan wawancara kerja magang luar negeri",
-					status: Boolean(data?.mandiriInterviewStatus),
-					paidDate: data?.mandiriInterviewPaidDate,
+					label: "3. Kontrak Magang / Suhan",
+					desc: "Biaya proses turun kontrak kerja & surat izin Suhan Taiwan",
+					status: Boolean(
+						data?.kontrakMagangStatus ||
+							data?.suhanStatus ||
+							data?.mandiriInterviewStatus,
+					),
+					paidDate:
+						data?.kontrakMagangPaidDate || data?.mandiriInterviewPaidDate,
 					nominal: data?.mandiriInterviewNominal || 0,
 					badge: "Partisi 3",
 				},
 				{
 					key: "keberangkatan",
-					label: "4. Biaya Keberangkatan",
-					desc: "Biaya visa kerja, asuransi & tiket penerbangan ke negara tujuan",
+					label: "4. Penempatan Magang Taiwan / Keberangkatan",
+					desc: "Biaya penempatan magang, visa, dan tiket penerbangan",
 					status: Boolean(data?.mandiriKeberangkatanStatus),
 					paidDate: data?.mandiriKeberangkatanPaidDate,
 					nominal: data?.mandiriKeberangkatanNominal || 0,
@@ -388,7 +393,7 @@ export default function FinancePanelMahasiswa() {
 											: "Biaya administrasi perjanjian lembaga keuangan",
 									)}
 									{renderChecklistItem(
-										"3. Dana Talangan Tahap 1",
+										"3. Dana Talangan Tahap 1 (SPP & Kontrak/Suhan)",
 										Boolean(
 											data?.t1InterviewStatus ||
 												data?.t1SemesterStatus ||
@@ -396,17 +401,17 @@ export default function FinancePanelMahasiswa() {
 										),
 										t1TotalBill > 0
 											? `Plafon: ${formatRupiah(t1TotalBill)}${t1Paid > 0 ? ` • Terbayar: ${formatRupiah(t1Paid)}` : ""}`
-											: "Plafon perkuliahan semester & interview magang",
+											: "Plafon SPP Semester 1 & kontrak magang/Suhan",
 									)}
 									{renderChecklistItem(
-										"4. Dana Talangan Tahap 2",
+										"4. Dana Talangan Tahap 2 (Penempatan/Keberangkatan)",
 										Boolean(
 											data?.t2KeberangkatanStatus ||
 												(t2TotalBill > 0 && t2Paid >= t2TotalBill),
 										),
 										t2TotalBill > 0
 											? `Plafon: ${formatRupiah(t2TotalBill)}${t2Paid > 0 ? ` • Terbayar: ${formatRupiah(t2Paid)}` : ""}`
-											: "Plafon tiket pesawat, visa & keberangkatan",
+											: "Plafon tiket pesawat, visa & penempatan keberangkatan",
 									)}
 								</>
 							) : (
@@ -419,21 +424,26 @@ export default function FinancePanelMahasiswa() {
 											: "Kewajiban awal pendaftaran langsung",
 									)}
 									{renderChecklistItem(
-										"2. Perkuliahan 6 Semester",
+										"2. Pembayaran SPP Semester 1",
 										progress.semesterStatus,
 										data?.mandiriSemesterPaidDate
 											? `Lunas pada ${formatDate(data.mandiriSemesterPaidDate)}`
-											: "Pelunasan perkuliahan semester 1 s.d 6",
+											: "Pelunasan perkuliahan SPP semester berjalan",
 									)}
 									{renderChecklistItem(
-										"3. Biaya Interview Magang",
-										progress.interviewStatus,
-										data?.mandiriInterviewPaidDate
-											? `Lunas pada ${formatDate(data.mandiriInterviewPaidDate)}`
-											: "Wawancara kerja user luar negeri",
+										"3. Kontrak Magang / Suhan",
+										Boolean(
+											data?.kontrakMagangStatus ||
+												data?.suhanStatus ||
+												progress.interviewStatus,
+										),
+										data?.kontrakMagangPaidDate ||
+											data?.mandiriInterviewPaidDate
+											? `Lunas pada ${formatDate(data.kontrakMagangPaidDate || data.mandiriInterviewPaidDate)}`
+											: "Kontrak kerja industri & surat izin Suhan Taiwan",
 									)}
 									{renderChecklistItem(
-										"4. Biaya Keberangkatan",
+										"4. Penempatan Magang Taiwan / Keberangkatan",
 										progress.keberangkatanStatus,
 										data?.mandiriKeberangkatanPaidDate
 											? `Lunas pada ${formatDate(data.mandiriKeberangkatanPaidDate)}`
@@ -527,7 +537,7 @@ export default function FinancePanelMahasiswa() {
 
 							<div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm border border-white/10">
 								<span className="text-[11px] text-blue-200 block">
-									6 Semester Kuliah
+									SPP Semester 1
 								</span>
 								<p className="text-sm font-bold font-mono mt-0.5">
 									{formatRupiah(semNominal)}
@@ -551,7 +561,7 @@ export default function FinancePanelMahasiswa() {
 
 							<div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm border border-white/10">
 								<span className="text-[11px] text-blue-200 block">
-									Interview Magang
+									Kontrak / Suhan
 								</span>
 								<p className="text-sm font-bold font-mono mt-0.5">
 									{formatRupiah(intNominal)}
@@ -575,7 +585,7 @@ export default function FinancePanelMahasiswa() {
 
 							<div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm border border-white/10">
 								<span className="text-[11px] text-blue-200 block">
-									Keberangkatan
+									Penempatan Magang
 								</span>
 								<p className="text-sm font-bold font-mono mt-0.5">
 									{formatRupiah(kebNominal)}
@@ -604,7 +614,7 @@ export default function FinancePanelMahasiswa() {
 						<div className="flex items-center justify-between">
 							<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
 								<GraduationCap className="w-4 h-4 text-[#0517B0]" />
-								Rincian Biaya Perkuliahan (6 Semester)
+								Rincian Biaya Perkuliahan & SPP Semester 1
 							</h3>
 						</div>
 
@@ -701,6 +711,11 @@ export default function FinancePanelMahasiswa() {
 																			Cicilan #
 																			{ins.installmentNumber || idx + 1}
 																		</span>
+																		{ins.installmentMonth && (
+																			<Badge className="bg-blue-100 text-[#0517B0] border-0 text-[10px] py-0 h-4 font-semibold">
+																				{ins.installmentMonth}
+																			</Badge>
+																		)}
 																		<span className="text-slate-400">•</span>
 																		<span className="text-slate-500 font-mono">
 																			{formatRupiah(ins.nominalPaid)}

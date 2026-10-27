@@ -47,7 +47,15 @@ describe("Verifikasi State Active Sidebar Modul Akademik (No Double Active)", ()
 			return (
 				pathname === "/dashboard/finance" ||
 				(pathname.startsWith("/dashboard/finance/") &&
-					!pathname.startsWith("/dashboard/finance/anggaran-praktik"))
+					!pathname.startsWith("/dashboard/finance/anggaran-praktik") &&
+					!pathname.startsWith("/dashboard/finance/proyeksi"))
+			);
+		}
+
+		if (href === "/dashboard/finance/proyeksi") {
+			return (
+				pathname === "/dashboard/finance/proyeksi" ||
+				pathname.startsWith("/dashboard/finance/proyeksi/")
 			);
 		}
 

@@ -269,17 +269,25 @@ const getAcademicChecklist = (s: any) => {
 	};
 };
 
-const getFinanceChecklist = (fin: any) => {
+const getFinanceChecklist = (fin: any, destCountry?: string | null) => {
 	const isTalangan = fin?.metodePembayaran === "dana_talangan";
 	const isSemesterDone = isTalangan
 		? Boolean(fin?.t1SemesterStatus || fin?.mandiriSemesterStatus)
 		: Boolean(fin?.mandiriSemesterStatus);
 	const isInterviewDone = isTalangan
 		? Boolean(fin?.t1InterviewStatus)
-		: Boolean(fin?.mandiriInterviewStatus);
+		: Boolean(
+				fin?.kontrakMagangStatus ||
+					fin?.suhanStatus ||
+					fin?.mandiriInterviewStatus,
+			);
 	const isKeberangkatanDone = isTalangan
 		? Boolean(fin?.t2KeberangkatanStatus)
 		: Boolean(fin?.mandiriKeberangkatanStatus);
+
+	const penempatanLabel = (destCountry || "").toLowerCase().includes("malaysia")
+		? "Penempatan Magang D3 Malaysia / Keberangkatan"
+		: "Penempatan Magang Taiwan / Keberangkatan";
 
 	const items = [
 		{
@@ -288,16 +296,16 @@ const getFinanceChecklist = (fin: any) => {
 		},
 		{
 			name: isTalangan
-				? "Perkuliahan Semester (Talangan)"
-				: "Perkuliahan 6 Semester",
+				? "Pembayaran SPP Semester 1 (Talangan)"
+				: "Pembayaran SPP Semester 1",
 			done: isSemesterDone,
 		},
 		{
-			name: isTalangan ? "Interview Magang (Tahap 1)" : "Interview Magang",
+			name: "Kontrak Magang / Suhan",
 			done: isInterviewDone,
 		},
 		{
-			name: isTalangan ? "Keberangkatan (Tahap 2)" : "Keberangkatan",
+			name: penempatanLabel,
 			done: isKeberangkatanDone,
 		},
 		{
@@ -377,7 +385,7 @@ function getAcademicYear(student: any) {
 const getStudentAccDetails = (s: any) => {
 	const pmbCl = getPmbChecklist(s.pmb);
 	const crmCl = getCrmChecklist(s.crm);
-	const finCl = getFinanceChecklist(s.finance);
+	const finCl = getFinanceChecklist(s.finance, s.student?.destinationCountry);
 	const acadCl = getAcademicChecklist(s);
 	const paCl = getPaChecklist(s.pa);
 	const internCl = getInternshipChecklist(s.internship);

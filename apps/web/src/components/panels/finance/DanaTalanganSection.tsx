@@ -143,18 +143,15 @@ export function DanaTalanganSection({
 								<Building className="w-5 h-5 text-amber-600" />
 							</div>
 							<div>
-								<label
-									htmlFor="chk-t1Status"
-									className="font-bold text-slate-800 text-base flex items-center gap-2 cursor-pointer hover:text-[#0517B0] transition-colors"
-								>
-									Tahap 1: Interview Magang & Semester Ditalangi
+								<label htmlFor="chk-t1Status">
+									Tahap 1: SPP Semester 1 & Kontrak Magang/Suhan Ditalangi
 								</label>
 								<div className="flex items-center gap-2 mt-0.5">
 									<Badge
 										variant="outline"
 										className="text-[10px] font-semibold bg-amber-50 border-amber-200 text-amber-700"
 									>
-										Partisi 3 ({intPct}% Total) + {talanganSemCount} Semester
+										Partisi 3 ({intPct}% Total) + SPP Semester 1
 									</Badge>
 								</div>
 							</div>
@@ -196,8 +193,8 @@ export function DanaTalanganSection({
 									Plafon Pinjaman Tahap 1
 								</span>
 								<p className="text-xs text-slate-500 mt-0.5">
-									Akumulasi biaya perkuliahan semester yang ditalangi dan biaya
-									interview magang
+									Akumulasi biaya SPP Semester 1 yang ditalangi dan biaya
+									kontrak magang / Surat Suhan
 								</p>
 							</div>
 							<div className="text-left sm:text-right">
@@ -280,7 +277,7 @@ export function DanaTalanganSection({
 						<div className="p-3.5 bg-slate-50/80 rounded-lg border border-slate-200/80 flex flex-col justify-between">
 							<div className="flex items-center justify-between mb-1">
 								<span className="text-xs font-semibold text-slate-600">
-									2. Biaya Interview Magang
+									2. Biaya Kontrak Magang / Suhan
 								</span>
 								<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-bold">
 									Partisi 3 ({intPct}%)
@@ -442,11 +439,8 @@ export function DanaTalanganSection({
 								<Plane className="w-5 h-5 text-emerald-600" />
 							</div>
 							<div>
-								<label
-									htmlFor="chk-t2Status"
-									className="font-bold text-slate-800 text-base flex items-center gap-2 cursor-pointer hover:text-[#0517B0] transition-colors"
-								>
-									Tahap 2: Tiket, Visa & Keberangkatan
+								<label htmlFor="chk-t2Status">
+									Tahap 2: Penempatan Magang Taiwan / Keberangkatan
 								</label>
 								<div className="flex items-center gap-2 mt-0.5">
 									<Badge
@@ -495,8 +489,8 @@ export function DanaTalanganSection({
 									Plafon Pinjaman Tahap 2
 								</span>
 								<p className="text-xs text-slate-500 mt-0.5">
-									Disesuaikan otomatis dari Partisi Biaya Pendidikan
-									(Keberangkatan)
+									Disesuaikan otomatis dari Partisi Biaya Pendidikan (Penempatan
+									Magang / Keberangkatan)
 								</p>
 							</div>
 							<div className="text-left sm:text-right">

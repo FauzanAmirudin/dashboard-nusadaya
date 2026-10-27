@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import {
 	ArrowLeft,
 	CheckCircle,
@@ -329,6 +330,7 @@ export default function StudentDetailPage() {
 }
 
 function StudentDetailContent() {
+	const queryClient = useQueryClient();
 	const params = useParams();
 	const router = useRouter();
 	const searchParams = useSearchParams();
@@ -368,7 +370,9 @@ function StudentDetailContent() {
 	const refetchStudent = useCallback(async () => {
 		setUpdateTrigger((prev) => prev + 1);
 		await refetchQuery();
-	}, [refetchQuery]);
+		queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
+		queryClient.invalidateQueries({ queryKey: ["students-list"] });
+	}, [refetchQuery, queryClient]);
 
 	const handleCrmProgressChange = useCallback(
 		(completed: number, total: number) => {

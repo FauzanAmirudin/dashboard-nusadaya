@@ -59,14 +59,6 @@ import {
 import { api } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 
-type DatePreset =
-	| "this_month"
-	| "last_month"
-	| "last_3_months"
-	| "this_year"
-	| "all"
-	| "custom";
-
 function formatRupiah(num: number): string {
 	return new Intl.NumberFormat("id-ID", {
 		style: "currency",
@@ -176,122 +168,6 @@ function calculateTotalPaidStudent(s: any): number {
 	return total;
 }
 
-/** Hitung transaksi masuk mahasiswa dalam rentang tanggal tertentu */
-function calculateTransactionsInDateRange(
-	s: any,
-	startDate: Date,
-	endDate: Date,
-): number {
-	let total = 0;
-	const fin = s.finance;
-	if (!fin) return 0;
-
-	const isWithin = (d?: string | Date | null) => {
-		if (!d) return false;
-		const dateObj = new Date(d);
-		if (Number.isNaN(dateObj.getTime())) return false;
-		return dateObj >= startDate && dateObj <= endDate;
-	};
-
-	// 1. Installments semester (Mandiri)
-	let hasInstallments = false;
-	if (s.financeInstallments && s.financeInstallments.length > 0) {
-		for (const inst of s.financeInstallments) {
-			const d = inst.paymentDate || inst.createdAt;
-			if (isWithin(d)) {
-				total += Number(inst.nominalPaid) || 0;
-				hasInstallments = true;
-			}
-		}
-	}
-
-	if (!hasInstallments) {
-		if (
-			fin.mandiriSemesterStatus &&
-			isWithin(fin.mandiriSemesterPaidDate || fin.updatedAt)
-		) {
-			total += Number(fin.mandiriSemesterNominal) || 0;
-		}
-	}
-
-	// 2. Installments Dana Talangan (Tahap 1 & Tahap 2)
-	let hasTalanganInst = false;
-	if (
-		s.financeTalanganInstallments &&
-		s.financeTalanganInstallments.length > 0
-	) {
-		for (const inst of s.financeTalanganInstallments) {
-			const d = inst.paymentDate || inst.createdAt;
-			if (isWithin(d)) {
-				total += Number(inst.nominalPaid) || 0;
-				hasTalanganInst = true;
-			}
-		}
-	}
-
-	if (!hasTalanganInst) {
-		if (
-			fin.t1SemesterNominalDibayar &&
-			isWithin(fin.t1SemesterPaidDate || fin.updatedAt)
-		) {
-			total += Number(fin.t1SemesterNominalDibayar) || 0;
-		}
-		// Interview Magang
-		if (fin.mandiriInterviewStatus && isWithin(fin.updatedAt)) {
-			total += Number(fin.mandiriInterviewNominal) || 0;
-		} else if (fin.t1InterviewStatus && isWithin(fin.updatedAt)) {
-			total += Number(fin.t1InterviewNominal) || 0;
-		}
-		// Keberangkatan
-		if (
-			fin.mandiriKeberangkatanStatus &&
-			isWithin(fin.t2KeberangkatanPaidDate || fin.updatedAt)
-		) {
-			total += Number(fin.mandiriKeberangkatanNominal) || 0;
-		} else if (
-			fin.t2KeberangkatanStatus &&
-			isWithin(fin.t2KeberangkatanPaidDate || fin.updatedAt)
-		) {
-			total += Number(fin.t2KeberangkatanNominal) || 0;
-		}
-	}
-
-	// 3. Registrasi Awal
-	if (fin.registrasiStatus || fin.registrationPaid) {
-		const d = fin.registrasiPaidDate || fin.updatedAt;
-		if (isWithin(d)) {
-			total += Number(fin.registrasiNominal) || 0;
-		}
-	}
-
-	// 5. Admin Talangan
-	if (fin.adminTalaganStatus && isWithin(fin.updatedAt)) {
-		total += Number(fin.adminTalaganNominal) || 0;
-	}
-
-	// 6. Biaya Tambahan
-	if (fin.toeicStatus && isWithin(fin.toeicPaidDate || fin.updatedAt)) {
-		total += Number(fin.toeicNominal) || 0;
-	}
-	if (fin.pasporStatus && isWithin(fin.updatedAt)) {
-		total += Number(fin.pasporNominal) || 0;
-	}
-	if (fin.rumahJuangStatus && isWithin(fin.updatedAt)) {
-		total += Number(fin.rumahJuangNominal) || 0;
-	}
-
-	// 7. Custom Fields
-	if (s.financeCustomFields && s.financeCustomFields.length > 0) {
-		for (const cf of s.financeCustomFields) {
-			if (cf.status && isWithin(cf.createdAt || cf.updatedAt)) {
-				total += Number(cf.nominal) || 0;
-			}
-		}
-	}
-
-	return total;
-}
-
 /** Hitung timestamp aktivitas terbaru dari seorang mahasiswa */
 function getStudentLatestTimestamp(s: any): number {
 	let latest = 0;
@@ -385,50 +261,6 @@ export function FinanceDashboard({ user, data = [] }: any) {
 	const [currentPage, setCurrentPage] = useState(1);
 	const pageSize = 20;
 
-	// State Fitur Proyeksi Pendapatan per Bulan (Komponen 2)
-	const [datePreset, setDatePreset] = useState<DatePreset>("this_month");
-	const [customStartDate, setCustomStartDate] = useState<string>(() => {
-		const now = new Date();
-		return new Date(now.getFullYear(), now.getMonth(), 1)
-			.toISOString()
-			.split("T")[0];
-	});
-	const [customEndDate, setCustomEndDate] = useState<string>(() => {
-		const now = new Date();
-		return new Date(now.getFullYear(), now.getMonth() + 1, 0)
-			.toISOString()
-			.split("T")[0];
-	});
-
-	// Target Proyeksi Pendapatan (Manual Input with Local Storage persistence)
-	const targetStorageKey = `nusadaya_finance_projection_target_${selectedCohort}`;
-	const [targetNominal, setTargetNominal] = useState<number>(50_000_000);
-	const [isEditingTarget, setIsEditingTarget] = useState(false);
-	const [tempTargetInput, setTempTargetInput] = useState<string>("50000000");
-
-	// Load target from localStorage on mount or cohort change
-	useEffect(() => {
-		if (typeof window !== "undefined") {
-			const saved = localStorage.getItem(targetStorageKey);
-			if (saved && !Number.isNaN(Number(saved)) && Number(saved) > 0) {
-				setTargetNominal(Number(saved));
-				setTempTargetInput(saved);
-			} else {
-				setTargetNominal(50_000_000);
-				setTempTargetInput("50000000");
-			}
-		}
-	}, [selectedCohort, targetStorageKey]);
-
-	const handleSaveTarget = () => {
-		const val = Math.max(0, Number(tempTargetInput) || 0);
-		setTargetNominal(val);
-		if (typeof window !== "undefined") {
-			localStorage.setItem(targetStorageKey, val.toString());
-		}
-		setIsEditingTarget(false);
-	};
-
 	// Available cohorts dynamically derived strictly from student data
 	const availableCohorts = useMemo(() => {
 		const cohorts = new Set<string>();
@@ -456,122 +288,6 @@ export function FinanceDashboard({ user, data = [] }: any) {
 					s.student?.cohort === Number(selectedCohort) - 2010),
 		);
 	}, [data, selectedCohort]);
-
-	// Menghitung Rentang Tanggal Aktif
-	const activeDateRange = useMemo(() => {
-		const now = new Date();
-		if (datePreset === "this_month") {
-			const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-			const end = new Date(
-				now.getFullYear(),
-				now.getMonth() + 1,
-				0,
-				23,
-				59,
-				59,
-				999,
-			);
-			const label = start.toLocaleDateString("id-ID", {
-				month: "long",
-				year: "numeric",
-			});
-			return { start, end, label: `Bulan Ini (${label})` };
-		}
-		if (datePreset === "last_month") {
-			const start = new Date(
-				now.getFullYear(),
-				now.getMonth() - 1,
-				1,
-				0,
-				0,
-				0,
-				0,
-			);
-			const end = new Date(
-				now.getFullYear(),
-				now.getMonth(),
-				0,
-				23,
-				59,
-				59,
-				999,
-			);
-			const label = start.toLocaleDateString("id-ID", {
-				month: "long",
-				year: "numeric",
-			});
-			return { start, end, label: `Bulan Lalu (${label})` };
-		}
-		if (datePreset === "last_3_months") {
-			const start = new Date(
-				now.getFullYear(),
-				now.getMonth() - 2,
-				1,
-				0,
-				0,
-				0,
-				0,
-			);
-			const end = new Date(
-				now.getFullYear(),
-				now.getMonth() + 1,
-				0,
-				23,
-				59,
-				59,
-				999,
-			);
-			return { start, end, label: "3 Bulan Terakhir" };
-		}
-		if (datePreset === "this_year") {
-			const start = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
-			const end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
-			return { start, end, label: `Tahun Ini (${now.getFullYear()})` };
-		}
-		if (datePreset === "custom" && customStartDate && customEndDate) {
-			const start = new Date(`${customStartDate}T00:00:00`);
-			const end = new Date(`${customEndDate}T23:59:59`);
-			const startStr = start.toLocaleDateString("id-ID", {
-				day: "numeric",
-				month: "short",
-				year: "numeric",
-			});
-			const endStr = end.toLocaleDateString("id-ID", {
-				day: "numeric",
-				month: "short",
-				year: "numeric",
-			});
-			return { start, end, label: `${startStr} - ${endStr}` };
-		}
-		// All time
-		const start = new Date(2020, 0, 1);
-		const end = new Date(2035, 11, 31);
-		return { start, end, label: "Semua Waktu" };
-	}, [datePreset, customStartDate, customEndDate]);
-
-	// Kalkulasi Realisasi Riil Otomatis Berdasarkan Periode
-	const realisasiRiilPeriod = useMemo(() => {
-		if (!cohortData || cohortData.length === 0) return 0;
-		return cohortData.reduce((acc: number, s: any) => {
-			return (
-				acc +
-				calculateTransactionsInDateRange(
-					s,
-					activeDateRange.start,
-					activeDateRange.end,
-				)
-			);
-		}, 0);
-	}, [cohortData, activeDateRange]);
-
-	// Persentase Ketercapaian Target
-	const achievementPercentage = useMemo(() => {
-		if (!targetNominal || targetNominal <= 0) return 0;
-		const pct = (realisasiRiilPeriod / targetNominal) * 100;
-		return Number(pct.toFixed(1));
-	}, [realisasiRiilPeriod, targetNominal]);
-
-	const sisaTarget = Math.max(0, targetNominal - realisasiRiilPeriod);
 
 	// KPI Metrics based on cohortData
 	const totalStudents = cohortData.length;
@@ -698,17 +414,27 @@ export function FinanceDashboard({ user, data = [] }: any) {
 		);
 	};
 
-	const getFinanceChecklist = (fin: any) => {
+	const getFinanceChecklist = (fin: any, destCountry?: string | null) => {
 		const isTalangan = fin?.metodePembayaran === "dana_talangan";
 		const isSemesterDone = isTalangan
 			? Boolean(fin?.t1SemesterStatus || fin?.mandiriSemesterStatus)
 			: Boolean(fin?.mandiriSemesterStatus);
 		const isInterviewDone = isTalangan
 			? Boolean(fin?.t1InterviewStatus)
-			: Boolean(fin?.mandiriInterviewStatus);
+			: Boolean(
+					fin?.kontrakMagangStatus ||
+						fin?.suhanStatus ||
+						fin?.mandiriInterviewStatus,
+				);
 		const isKeberangkatanDone = isTalangan
 			? Boolean(fin?.t2KeberangkatanStatus)
 			: Boolean(fin?.mandiriKeberangkatanStatus);
+
+		const penempatanLabel = (destCountry || "")
+			.toLowerCase()
+			.includes("malaysia")
+			? "Penempatan Magang D3 Malaysia / Keberangkatan"
+			: "Penempatan Magang Taiwan / Keberangkatan";
 
 		const items = [
 			{
@@ -716,15 +442,17 @@ export function FinanceDashboard({ user, data = [] }: any) {
 				done: Boolean(fin?.registrasiStatus || fin?.registrationPaid),
 			},
 			{
-				name: isTalangan ? "Perkuliahan 6 Semester" : "Perkuliahan 6 Semester",
+				name: isTalangan
+					? "Pembayaran SPP Semester 1 (Talangan)"
+					: "Pembayaran SPP Semester 1",
 				done: isSemesterDone,
 			},
 			{
-				name: isTalangan ? "Interview Magang (Tahap 1)" : "Interview Magang",
+				name: "Kontrak Magang / Suhan",
 				done: isInterviewDone,
 			},
 			{
-				name: isTalangan ? "Keberangkatan (Tahap 2)" : "Keberangkatan",
+				name: penempatanLabel,
 				done: isKeberangkatanDone,
 			},
 			{ name: "Biaya Sertifikasi Bahasa", done: Boolean(fin?.toeicStatus) },
@@ -779,15 +507,6 @@ export function FinanceDashboard({ user, data = [] }: any) {
 		},
 	];
 
-	// Date preset buttons config
-	const datePresetButtons: { key: DatePreset; label: string }[] = [
-		{ key: "this_month", label: "Bulan Ini" },
-		{ key: "last_month", label: "Bulan Lalu" },
-		{ key: "last_3_months", label: "3 Bulan" },
-		{ key: "this_year", label: "Tahun Ini" },
-		{ key: "custom", label: "Kustom" },
-	];
-
 	return (
 		<div className="space-y-5 pb-12">
 			{/* ─── 1. TOP COMPACT HEADER BAR ─── */}
@@ -830,6 +549,17 @@ export function FinanceDashboard({ user, data = [] }: any) {
 							</SelectContent>
 						</Select>
 
+						<Link href="/dashboard/finance/proyeksi">
+							<Button
+								variant="outline"
+								size="sm"
+								className="border-slate-200 text-slate-700 hover:bg-blue-50 hover:text-[#0517B0] hover:border-blue-200 text-xs gap-1.5 h-8.5 font-semibold shadow-2xs rounded-lg transition-all"
+							>
+								<TrendingUp className="w-3.5 h-3.5 text-blue-600" />
+								Proyeksi & Realisasi
+							</Button>
+						</Link>
+
 						<Link href="/dashboard/finance/anggaran-praktik">
 							<Button
 								variant="outline"
@@ -867,304 +597,7 @@ export function FinanceDashboard({ user, data = [] }: any) {
 				))}
 			</div>
 
-			{/* ─── 3. KOMPONEN 2: PROYEKSI & REALISASI PENDAPATAN (CLEAN & SIMPLE WIDGET) ─── */}
-			<Card className="bg-white border-slate-200/90 shadow-2xs overflow-hidden rounded-xl">
-				<CardHeader className="p-4 sm:p-5 pb-3 border-b border-slate-100 bg-linear-to-r from-blue-50/50 via-indigo-50/20 to-white">
-					<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
-						<div className="flex items-center gap-2.5">
-							<div className="p-2 bg-blue-50 text-[#0517B0] rounded-lg border border-blue-200/60 shadow-2xs">
-								<TrendingUp className="w-4 h-4" />
-							</div>
-							<div>
-								<div className="flex items-center gap-2">
-									<CardTitle className="text-base font-bold text-slate-900 tracking-tight">
-										Proyeksi & Realisasi Pendapatan
-									</CardTitle>
-									<Badge className="bg-blue-50 text-[#0517B0] border-blue-200 text-[10px] font-bold px-2 py-0.5">
-										<div className="w-1.5 h-1.5 rounded-full bg-[#0517B0] animate-pulse mr-1" />
-										Live Tracking
-									</Badge>
-								</div>
-								<p className="text-xs text-slate-500 mt-0.5">
-									Ringkasan uang masuk riil dan ketercapaian target periode
-									terpilih.
-								</p>
-							</div>
-						</div>
-
-						{/* Quick Date Presets & Date Range Selector (Aligned Right with Slide-down Animation) */}
-						<div className="flex flex-col items-end gap-1.5 w-full lg:w-auto">
-							<div className="flex items-center bg-slate-100/90 rounded-lg p-0.5 border border-slate-200 shadow-2xs self-end">
-								{datePresetButtons.map((btn) => (
-									<button
-										key={btn.key}
-										type="button"
-										onClick={() => setDatePreset(btn.key)}
-										className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-											datePreset === btn.key
-												? "bg-[#0517B0] text-white shadow-xs font-bold"
-												: "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
-										}`}
-									>
-										{btn.label}
-									</button>
-								))}
-							</div>
-
-							{datePreset === "custom" && (
-								<div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200/90 shadow-2xs self-end animate-slide-down">
-									<Calendar className="w-3.5 h-3.5 text-[#0517B0] shrink-0" />
-									<div className="flex items-center gap-1.5 text-xs">
-										<input
-											type="date"
-											value={customStartDate}
-											onChange={(e) => setCustomStartDate(e.target.value)}
-											className="bg-transparent text-xs text-slate-800 font-semibold outline-hidden cursor-pointer"
-										/>
-										<span className="text-slate-400 font-medium">s/d</span>
-										<input
-											type="date"
-											value={customEndDate}
-											onChange={(e) => setCustomEndDate(e.target.value)}
-											className="bg-transparent text-xs text-slate-800 font-semibold outline-hidden cursor-pointer"
-										/>
-									</div>
-								</div>
-							)}
-						</div>
-					</div>
-				</CardHeader>
-
-				<CardContent className="p-4 sm:p-5 space-y-4">
-					{/* 4 Cards Grid Metrics (Simple & Concise) */}
-					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-						{/* 1. Realisasi Riil */}
-						<div className="bg-linear-to-br from-blue-50/70 via-blue-50/20 to-white border border-blue-200/70 rounded-xl p-3.5 flex flex-col justify-between shadow-2xs">
-							<div className="flex items-center justify-between">
-								<span className="text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
-									<Wallet className="w-3.5 h-3.5 text-[#0517B0]" />
-									Realisasi Masuk
-								</span>
-								<Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[10px] px-1.5 py-0 font-bold">
-									Terkumpul
-								</Badge>
-							</div>
-							<div className="mt-2.5">
-								<p className="text-2xl font-black text-[#0517B0] tracking-tight leading-none">
-									{formatRupiah(realisasiRiilPeriod)}
-								</p>
-								<p className="text-[11px] text-slate-500 mt-1.5 font-medium truncate">
-									Periode: {activeDateRange.label}
-								</p>
-							</div>
-						</div>
-
-						{/* 2. Target Proyeksi (Manual Input Editable) */}
-						<div className="bg-linear-to-br from-indigo-50/60 via-indigo-50/20 to-white border border-indigo-200/70 rounded-xl p-3.5 flex flex-col justify-between shadow-2xs">
-							<div className="flex items-center justify-between">
-								<span className="text-xs font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
-									<Target className="w-3.5 h-3.5 text-[#0517B0]" />
-									Target Proyeksi
-								</span>
-								{!isEditingTarget && (
-									<button
-										type="button"
-										onClick={() => {
-											setTempTargetInput(targetNominal.toString());
-											setIsEditingTarget(true);
-										}}
-										className="text-xs text-[#0517B0] hover:text-blue-800 font-bold underline underline-offset-2 transition-colors"
-									>
-										Ubah
-									</button>
-								)}
-							</div>
-
-							<div className="mt-2.5">
-								{isEditingTarget ? (
-									<div className="space-y-1.5">
-										<div className="flex items-center gap-1.5">
-											<span className="text-xs text-slate-500 font-bold">
-												Rp
-											</span>
-											<Input
-												type="number"
-												min={0}
-												placeholder="0"
-												value={tempTargetInput === "0" ? "" : tempTargetInput}
-												onChange={(e) => setTempTargetInput(e.target.value)}
-												className="h-7 text-xs font-bold bg-white border-blue-400 text-slate-900 shadow-2xs"
-												autoFocus
-											/>
-										</div>
-										<div className="flex items-center gap-1">
-											<Button
-												size="sm"
-												onClick={handleSaveTarget}
-												className="h-6 text-[11px] bg-[#0517B0] hover:bg-blue-800 text-white font-semibold px-2 shadow-2xs"
-											>
-												Simpan
-											</Button>
-											<Button
-												size="sm"
-												variant="ghost"
-												onClick={() => setIsEditingTarget(false)}
-												className="h-6 text-[11px] text-slate-500 hover:text-slate-800 px-1.5"
-											>
-												Batal
-											</Button>
-										</div>
-									</div>
-								) : (
-									<>
-										<p className="text-2xl font-black text-slate-900 tracking-tight leading-none">
-											{formatRupiah(targetNominal)}
-										</p>
-										<div className="flex items-center gap-1 mt-1.5 flex-wrap">
-											{[50_000_000, 100_000_000, 250_000_000, 500_000_000].map(
-												(preset) => (
-													<button
-														key={preset}
-														type="button"
-														onClick={() => {
-															setTargetNominal(preset);
-															localStorage.setItem(
-																targetStorageKey,
-																preset.toString(),
-															);
-														}}
-														className={`text-[10px] px-1.5 py-0.5 rounded-md border font-semibold transition-all ${
-															targetNominal === preset
-																? "bg-[#0517B0] border-[#0517B0] text-white shadow-2xs font-bold"
-																: "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
-														}`}
-													>
-														{formatShortRupiah(preset)}
-													</button>
-												),
-											)}
-										</div>
-									</>
-								)}
-							</div>
-						</div>
-
-						{/* 3. Persentase Ketercapaian */}
-						<div className="bg-linear-to-br from-sky-50/60 via-blue-50/20 to-white border border-sky-200/70 rounded-xl p-3.5 flex flex-col justify-between shadow-2xs">
-							<div className="flex items-center justify-between">
-								<span className="text-xs font-bold text-sky-950 uppercase tracking-wider flex items-center gap-1.5">
-									<Sparkles className="w-3.5 h-3.5 text-blue-600" />
-									Ketercapaian
-								</span>
-								<Badge
-									className={`text-[10px] px-1.5 py-0 font-bold ${
-										achievementPercentage >= 100
-											? "bg-blue-100 text-[#0517B0] border-blue-200"
-											: achievementPercentage >= 50
-												? "bg-sky-100 text-sky-800 border-sky-200"
-												: "bg-amber-100 text-amber-800 border-amber-200"
-									}`}
-								>
-									{achievementPercentage >= 100
-										? "✓ Tercapai"
-										: achievementPercentage >= 50
-											? "Berjalan Baik"
-											: "Perlu Dikejar"}
-								</Badge>
-							</div>
-							<div className="mt-2.5">
-								<div className="flex items-baseline gap-1.5">
-									<p
-										className={`text-2xl font-black tracking-tight leading-none ${
-											achievementPercentage >= 100
-												? "text-[#0517B0]"
-												: achievementPercentage >= 50
-													? "text-blue-600"
-													: "text-amber-600"
-										}`}
-									>
-										{achievementPercentage}%
-									</p>
-									<span className="text-xs text-slate-500 font-medium">
-										dari target
-									</span>
-								</div>
-								<p className="text-[11px] text-slate-400 mt-1.5">
-									Persentase realisasi uang masuk
-								</p>
-							</div>
-						</div>
-
-						{/* 4. Sisa / Selisih Target */}
-						<div className="bg-linear-to-br from-slate-50/80 via-slate-50/30 to-white border border-slate-200/80 rounded-xl p-3.5 flex flex-col justify-between shadow-2xs">
-							<div className="flex items-center justify-between">
-								<span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-									<Clock className="w-3.5 h-3.5 text-slate-500" />
-									{realisasiRiilPeriod >= targetNominal
-										? "Surplus Target"
-										: "Sisa Target"}
-								</span>
-								<span className="text-[10px] text-slate-500 font-mono bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
-									{selectedCohort === "all"
-										? "Semua"
-										: `Angkatan ${selectedCohort}`}
-								</span>
-							</div>
-							<div className="mt-2.5">
-								<p
-									className={`text-2xl font-black tracking-tight leading-none ${
-										realisasiRiilPeriod >= targetNominal
-											? "text-[#0517B0]"
-											: "text-rose-600"
-									}`}
-								>
-									{realisasiRiilPeriod >= targetNominal
-										? `+${formatRupiah(realisasiRiilPeriod - targetNominal)}`
-										: formatRupiah(sisaTarget)}
-								</p>
-								<p className="text-[11px] text-slate-400 mt-1.5">
-									{realisasiRiilPeriod >= targetNominal
-										? "Target telah tercapai penuh"
-										: "Nominal yang masih harus dikejar"}
-								</p>
-							</div>
-						</div>
-					</div>
-
-					{/* Simple Integrated Progress Bar */}
-					<div className="space-y-1.5 bg-slate-50/90 p-3 rounded-xl border border-slate-200/70">
-						<div className="flex items-center justify-between text-xs font-bold">
-							<span className="text-slate-600 flex items-center gap-1.5">
-								<div className="w-2 h-2 rounded-full bg-[#0517B0] animate-pulse" />
-								Progres Ketercapaian Target ({activeDateRange.label}):
-							</span>
-							<span className="text-[#0517B0] font-mono text-xs font-extrabold">
-								{formatRupiah(realisasiRiilPeriod)} /{" "}
-								{formatRupiah(targetNominal)}{" "}
-								<span className="text-slate-500 font-bold">
-									({achievementPercentage}%)
-								</span>
-							</span>
-						</div>
-						<div className="w-full h-2.5 bg-slate-200/80 rounded-full overflow-hidden border border-slate-300/50 p-0.5">
-							<div
-								className={`h-full rounded-full transition-all duration-500 ${
-									achievementPercentage >= 100
-										? "bg-linear-to-r from-blue-600 to-[#0517B0] shadow-sm"
-										: achievementPercentage >= 50
-											? "bg-linear-to-r from-sky-500 to-blue-600 shadow-sm"
-											: "bg-linear-to-r from-amber-500 to-blue-600"
-								}`}
-								style={{
-									width: `${Math.min(100, achievementPercentage)}%`,
-								}}
-							/>
-						</div>
-					</div>
-				</CardContent>
-			</Card>
-
-			{/* ─── 4. KOMPONEN 1: TABEL KELENGKAPAN FINANCE (MONITORING UTAMA) ─── */}
+			{/* ─── 3. KOMPONEN 1: TABEL KELENGKAPAN FINANCE (MONITORING UTAMA) ─── */}
 			<Card className="bg-white border-slate-200/90 shadow-2xs overflow-hidden rounded-xl">
 				<CardHeader className="p-4 sm:p-5 border-b border-slate-100 bg-white space-y-3">
 					{/* Row 1: Title + Count + Search + Sort */}
@@ -1318,7 +751,10 @@ export function FinanceDashboard({ user, data = [] }: any) {
 							<TableBody>
 								{paginatedData.map((s: any, idx: number) => {
 									const { items, completed, total, isDone } =
-										getFinanceChecklist(s.finance);
+										getFinanceChecklist(
+											s.finance,
+											s.student?.destinationCountry,
+										);
 									const totalPaid = calculateTotalPaidStudent(s);
 									const waUrl = formatWhatsAppUrl(s.student?.phone);
 

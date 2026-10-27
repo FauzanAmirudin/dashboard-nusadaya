@@ -36,6 +36,7 @@ interface PartitionModalProps {
 	onOpenChange: (open: boolean) => void;
 	saving: boolean;
 	totalBiaya: number;
+	pmbDp?: number;
 	registrasi: number;
 	setRegistrasi: (val: number) => void;
 	semesterPerSem: number;
@@ -55,6 +56,7 @@ export function PartitionModal({
 	onOpenChange,
 	saving,
 	totalBiaya,
+	pmbDp = 0,
 	registrasi,
 	setRegistrasi,
 	semesterPerSem,
@@ -85,8 +87,9 @@ export function PartitionModal({
 						Atur Pembagian & Partisi Biaya Pendidikan
 					</DialogTitle>
 					<DialogDescription className="text-xs sm:text-sm text-slate-500 mt-1">
-						Atur proporsi pembagian total biaya pendidikan ke 4 pos pembayaran
-						utama secara akurat.
+						Atur proporsi pembagian total biaya pendidikan ke 4 termin biaya
+						baku (Registrasi, SPP Semester 1, Kontrak Magang/Suhan,
+						Penempatan/Keberangkatan).
 					</DialogDescription>
 				</DialogHeader>
 
@@ -155,6 +158,19 @@ export function PartitionModal({
 										placeholder="Nominal registrasi"
 									/>
 								</div>
+								{pmbDp > 0 && registrasi !== pmbDp && (
+									<button
+										type="button"
+										onClick={() => setRegistrasi(pmbDp)}
+										className="mt-2 text-[10px] text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2 py-1 rounded-md font-medium text-left flex items-center justify-between w-full transition-colors cursor-pointer"
+										title="Klik untuk menyelaraskan dengan DP PMB"
+									>
+										<span>Sesuai DP PMB:</span>
+										<span className="font-bold font-mono">
+											{formatRupiah(pmbDp)}
+										</span>
+									</button>
+								)}
 							</div>
 							<div className="pt-2.5 border-t border-slate-100 text-xs text-slate-600 font-semibold font-mono flex items-center justify-between">
 								<span className="text-[11px] text-slate-400 font-normal">
@@ -164,13 +180,15 @@ export function PartitionModal({
 							</div>
 						</div>
 
-						{/* 2. Perkuliahan 6 Semester */}
+						{/* 2. Pembayaran SPP Semester 1 */}
 						<div className="p-4 sm:p-4.5 bg-white border border-slate-200/90 rounded-2xl space-y-3.5 hover:border-indigo-300 hover:shadow-sm transition-all flex flex-col justify-between shadow-2xs">
 							<div>
 								<div className="flex items-center justify-between gap-1 mb-1">
 									<label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 truncate">
 										<GraduationCap className="w-4 h-4 text-indigo-600 shrink-0" />
-										<span className="truncate">2. 6 Semester</span>
+										<span className="truncate">
+											2. Pembayaran SPP Semester 1
+										</span>
 									</label>
 									<span className="text-xs font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-full shrink-0 font-mono">
 										{totalBiaya > 0
@@ -180,7 +198,8 @@ export function PartitionModal({
 									</span>
 								</div>
 								<p className="text-[11px] text-slate-400 mb-2.5">
-									Per semester (@6 semester)
+									Biaya perkuliahan berjalan Semester 1 (cicilan bulanan
+									persiapan)
 								</p>
 								<div className="relative">
 									<span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
@@ -192,20 +211,20 @@ export function PartitionModal({
 										max={999999999}
 										maxLength={9}
 										onKeyDown={preventFinanceIntegerKey}
-										value={semesterPerSem || ""}
+										value={semesterTotal || ""}
 										onChange={(e) => {
 											const val = filterFinanceInteger(e.target.value);
+											setSemesterTotal(val);
 											setSemesterPerSem(val);
-											setSemesterTotal(filterFinanceInteger(val * 6));
 										}}
 										className="pl-9 h-10 text-sm font-semibold font-mono rounded-xl"
-										placeholder="Nominal per semester"
+										placeholder="Pagu SPP Semester 1"
 									/>
 								</div>
 							</div>
 							<div className="pt-2.5 border-t border-slate-100 text-xs text-slate-600 font-semibold font-mono flex items-center justify-between">
 								<span className="text-[11px] text-slate-400 font-normal">
-									Total 6 Smt:
+									Total SPP Smt 1:
 								</span>
 								<span className="text-indigo-900 font-bold">
 									{formatRupiah(semesterTotal)}
@@ -213,13 +232,13 @@ export function PartitionModal({
 							</div>
 						</div>
 
-						{/* 3. Interview Magang */}
+						{/* 3. Kontrak Magang / Suhan */}
 						<div className="p-4 sm:p-4.5 bg-white border border-slate-200/90 rounded-2xl space-y-3.5 hover:border-amber-300 hover:shadow-sm transition-all flex flex-col justify-between shadow-2xs">
 							<div>
 								<div className="flex items-center justify-between gap-1 mb-1">
 									<label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 truncate">
 										<Building className="w-4 h-4 text-amber-600 shrink-0" />
-										<span className="truncate">3. Interview Magang</span>
+										<span className="truncate">3. Kontrak Magang / Suhan</span>
 									</label>
 									<span className="text-xs font-extrabold text-amber-700 bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-full shrink-0 font-mono">
 										{totalBiaya > 0
@@ -229,7 +248,7 @@ export function PartitionModal({
 									</span>
 								</div>
 								<p className="text-[11px] text-slate-400 mb-2.5">
-									Seleksi mitra luar negeri
+									Biaya proses turun kontrak kerja & surat izin Suhan Taiwan
 								</p>
 								<div className="relative">
 									<span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
@@ -246,7 +265,7 @@ export function PartitionModal({
 											setInterview(filterFinanceInteger(e.target.value))
 										}
 										className="pl-9 h-10 text-sm font-semibold font-mono rounded-xl"
-										placeholder="Nominal interview"
+										placeholder="Nominal kontrak / suhan"
 									/>
 								</div>
 							</div>
@@ -258,13 +277,15 @@ export function PartitionModal({
 							</div>
 						</div>
 
-						{/* 4. Keberangkatan */}
+						{/* 4. Penempatan Magang Taiwan / Keberangkatan */}
 						<div className="p-4 sm:p-4.5 bg-white border border-slate-200/90 rounded-2xl space-y-3.5 hover:border-emerald-300 hover:shadow-sm transition-all flex flex-col justify-between shadow-2xs">
 							<div>
 								<div className="flex items-center justify-between gap-1 mb-1">
 									<label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 truncate">
 										<Plane className="w-4 h-4 text-emerald-600 shrink-0" />
-										<span className="truncate">4. Keberangkatan</span>
+										<span className="truncate">
+											4. Penempatan Magang Taiwan / Keberangkatan
+										</span>
 									</label>
 									<span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-full shrink-0 font-mono">
 										{totalBiaya > 0
@@ -274,7 +295,7 @@ export function PartitionModal({
 									</span>
 								</div>
 								<p className="text-[11px] text-slate-400 mb-2.5">
-									Visa, tiket & keberangkatan
+									Biaya penempatan magang, visa, dan tiket penerbangan
 								</p>
 								<div className="relative">
 									<span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
@@ -291,7 +312,7 @@ export function PartitionModal({
 											setKeberangkatan(filterFinanceInteger(e.target.value))
 										}
 										className="pl-9 h-10 text-sm font-semibold font-mono rounded-xl"
-										placeholder="Nominal keberangkatan"
+										placeholder="Nominal penempatan / keberangkatan"
 									/>
 								</div>
 							</div>
@@ -325,7 +346,7 @@ export function PartitionModal({
 								}}
 								className="h-8 text-xs bg-white hover:bg-slate-100 text-slate-700 border-slate-300 rounded-lg shadow-2xs font-medium"
 							>
-								Sisa ke Keberangkatan
+								Sisa ke Penempatan
 							</Button>
 							<Button
 								type="button"
@@ -338,11 +359,11 @@ export function PartitionModal({
 										Number(keberangkatan || 0);
 									const rem = Math.max(0, Number(totalBiaya || 0) - other);
 									setSemesterTotal(rem);
-									setSemesterPerSem(Math.round(rem / 6));
+									setSemesterPerSem(rem);
 								}}
 								className="h-8 text-xs bg-white hover:bg-slate-100 text-slate-700 border-slate-300 rounded-lg shadow-2xs font-medium"
 							>
-								Sisa ke Semester (Bagi 6)
+								Sisa ke SPP Semester 1
 							</Button>
 							<Button
 								type="button"
@@ -357,7 +378,7 @@ export function PartitionModal({
 										const keb = total - (reg + semTot + intv);
 										setRegistrasi(reg);
 										setSemesterTotal(semTot);
-										setSemesterPerSem(Math.round(semTot / 6));
+										setSemesterPerSem(semTot);
 										setInterview(intv);
 										setKeberangkatan(keb > 0 ? keb : 0);
 									}

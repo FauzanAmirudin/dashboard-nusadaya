@@ -977,29 +977,45 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				registrasiPaidDate: finance?.registrasiPaidDate,
 				registrasiBuktiBayarUrl: finance?.registrasiBuktiBayarUrl,
 
-				// 2. Perkuliahan (Dana Mandiri / 6 Semester)
+				// 2. Perkuliahan (Dana Mandiri / SPP Semester 1)
 				mandiriSemesterNominal: finance?.mandiriSemesterNominal ?? 0,
 				mandiriSemesterStatus: finance?.mandiriSemesterStatus ?? false,
 				mandiriSemesterBuktiBayarUrl: finance?.mandiriSemesterBuktiBayarUrl,
+				mandiriSemesterPaidDate: finance?.mandiriSemesterPaidDate,
 
-				// 3. Interview Magang
+				// 3. Termin 3: Kontrak Magang / Suhan
+				kontrakMagangStatus:
+					finance?.kontrakMagangStatus ??
+					finance?.mandiriInterviewStatus ??
+					false,
+				kontrakMagangBuktiBayarUrl:
+					finance?.kontrakMagangBuktiBayarUrl ??
+					finance?.mandiriInterviewBuktiBayarUrl,
+				kontrakMagangPaidDate:
+					finance?.kontrakMagangPaidDate ?? finance?.mandiriInterviewPaidDate,
+				suhanStatus: finance?.suhanStatus ?? false,
+				suhanBuktiBayarUrl: finance?.suhanBuktiBayarUrl,
+				suhanPaidDate: finance?.suhanPaidDate,
 				mandiriInterviewNominal: finance?.mandiriInterviewNominal ?? 0,
 				mandiriInterviewStatus: finance?.mandiriInterviewStatus ?? false,
 				mandiriInterviewBuktiBayarUrl: finance?.mandiriInterviewBuktiBayarUrl,
+				mandiriInterviewPaidDate: finance?.mandiriInterviewPaidDate,
 				t1InterviewNominal: finance?.t1InterviewNominal ?? 0,
 				t1InterviewStatus: finance?.t1InterviewStatus ?? false,
 				t1InterviewBuktiBayarUrl: finance?.t1InterviewBuktiBayarUrl,
+				t1InterviewPaidDate: finance?.t1InterviewPaidDate,
 
-				// 4. Keberangkatan
+				// 4. Termin 4: Penempatan Magang / Keberangkatan
 				mandiriKeberangkatanNominal: finance?.mandiriKeberangkatanNominal ?? 0,
 				mandiriKeberangkatanStatus:
 					finance?.mandiriKeberangkatanStatus ?? false,
 				mandiriKeberangkatanBuktiBayarUrl:
 					finance?.mandiriKeberangkatanBuktiBayarUrl,
+				mandiriKeberangkatanPaidDate: finance?.mandiriKeberangkatanPaidDate,
 				t2KeberangkatanNominal: finance?.t2KeberangkatanNominal ?? 0,
 				t2KeberangkatanStatus: finance?.t2KeberangkatanStatus ?? false,
 				t2KeberangkatanBuktiBayarUrl: finance?.t2KeberangkatanBuktiBayarUrl,
-
+				t2KeberangkatanPaidDate: finance?.t2KeberangkatanPaidDate,
 				// Dana Talangan Tahap 1 (Akumulasi Semester + Interview)
 				t1SemesterNominalTotal: finance?.t1SemesterNominalTotal ?? 0,
 				t1SemesterNominalDibayar: finance?.t1SemesterNominalDibayar ?? 0,
@@ -1042,6 +1058,8 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 						paymentDate: ins.paymentDate,
 						buktiBayarUrl: ins.buktiBayarUrl,
 						notes: ins.notes,
+						installmentMonth: ins.installmentMonth,
+						periodNotes: ins.periodNotes,
 					})),
 				})),
 

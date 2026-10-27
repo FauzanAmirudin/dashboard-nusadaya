@@ -138,7 +138,11 @@ export function getFinancePaymentStatus(finState: any): {
 		: Boolean(finState?.mandiriSemesterStatus);
 	const isInterviewDone = isTalangan
 		? Boolean(finState?.t1InterviewStatus)
-		: Boolean(finState?.mandiriInterviewStatus);
+		: Boolean(
+				finState?.kontrakMagangStatus ||
+					finState?.suhanStatus ||
+					finState?.mandiriInterviewStatus,
+			);
 	const isKeberangkatanDone = isTalangan
 		? Boolean(finState?.t2KeberangkatanStatus)
 		: Boolean(finState?.mandiriKeberangkatanStatus);
@@ -151,7 +155,18 @@ export function getFinancePaymentStatus(finState: any): {
 	};
 }
 
-export function calculateFinanceChecklist(finState: any): {
+export function getPenempatanLabel(destinationCountry?: string | null): string {
+	const dest = (destinationCountry || "").toLowerCase();
+	if (dest.includes("malaysia")) {
+		return "Penempatan Magang D3 Malaysia / Keberangkatan";
+	}
+	return "Penempatan Magang Taiwan / Keberangkatan";
+}
+
+export function calculateFinanceChecklist(
+	finState: any,
+	destinationCountry?: string | null,
+): {
 	completedCount: number;
 	totalChecks: number;
 	isFinanceReady: boolean;
@@ -169,6 +184,10 @@ export function calculateFinanceChecklist(finState: any): {
 	const { isTalangan, isSemesterDone, isInterviewDone, isKeberangkatanDone } =
 		getFinancePaymentStatus(finState);
 
+	const penempatanName = getPenempatanLabel(
+		destinationCountry || finState.destinationCountry,
+	);
+
 	const items = [
 		{
 			name: "Registrasi / Pendaftaran",
@@ -176,16 +195,16 @@ export function calculateFinanceChecklist(finState: any): {
 		},
 		{
 			name: isTalangan
-				? "Perkuliahan Semester (Talangan)"
-				: "Perkuliahan 6 Semester",
+				? "Pembayaran SPP Semester 1 (Talangan)"
+				: "Pembayaran SPP Semester 1",
 			done: isSemesterDone,
 		},
 		{
-			name: isTalangan ? "Interview Magang (Tahap 1)" : "Interview Magang",
+			name: "Kontrak Magang / Suhan",
 			done: isInterviewDone,
 		},
 		{
-			name: isTalangan ? "Keberangkatan (Tahap 2)" : "Keberangkatan",
+			name: penempatanName,
 			done: isKeberangkatanDone,
 		},
 		{

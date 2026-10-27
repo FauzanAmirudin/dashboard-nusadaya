@@ -356,7 +356,11 @@ export default function PmbPanelMahasiswa() {
 											Total DP yang Disepakati
 										</span>
 										<span className="text-base font-bold text-amber-950 font-mono">
-											{formatRupiah(data.paymentPlan.totalDp || 0)}
+											{formatRupiah(
+												data.paymentPlan.totalDp ||
+													data.paymentPlan.pendaftaranDp ||
+													0,
+											)}
 										</span>
 									</div>
 									<div>

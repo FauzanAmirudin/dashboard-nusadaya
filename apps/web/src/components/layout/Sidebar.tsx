@@ -18,6 +18,7 @@ import {
 	Settings,
 	ShieldCheck,
 	Sparkles,
+	TrendingUp,
 	UserCheck,
 	UserCog,
 	Users,
@@ -102,6 +103,12 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 				href: "/dashboard/finance",
 				roles: ["superadmin", "finance"],
 				icon: Wallet,
+			},
+			{
+				label: "Proyeksi Target & Realisasi",
+				href: "/dashboard/finance/proyeksi",
+				roles: ["superadmin", "finance"],
+				icon: TrendingUp,
 			},
 			{
 				label: "Anggaran Praktik",
@@ -460,7 +467,15 @@ function checkItemActive(
 		return (
 			pathname === "/dashboard/finance" ||
 			(pathname.startsWith("/dashboard/finance/") &&
-				!pathname.startsWith("/dashboard/finance/anggaran-praktik"))
+				!pathname.startsWith("/dashboard/finance/anggaran-praktik") &&
+				!pathname.startsWith("/dashboard/finance/proyeksi"))
+		);
+	}
+
+	if (href === "/dashboard/finance/proyeksi") {
+		return (
+			pathname === "/dashboard/finance/proyeksi" ||
+			pathname.startsWith("/dashboard/finance/proyeksi/")
 		);
 	}
 

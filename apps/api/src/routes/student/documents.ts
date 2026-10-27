@@ -223,12 +223,30 @@ export const documentsRoutes = new Elysia()
 							updatedAt: new Date(),
 						})
 						.where(eq(financeData.studentId, studentId));
-				} else if (documentKey === "mandiri_interview") {
+				} else if (
+					documentKey === "mandiri_interview" ||
+					documentKey === "kontrak_magang"
+				) {
 					await db
 						.update(financeData)
 						.set({
 							mandiriInterviewStatus: true,
 							mandiriInterviewBuktiBayarUrl: fileUrl,
+							mandiriInterviewPaidDate: new Date(),
+							kontrakMagangStatus: true,
+							kontrakMagangBuktiBayarUrl: fileUrl,
+							kontrakMagangPaidDate: new Date(),
+							updatedAt: new Date(),
+						})
+						.where(eq(financeData.studentId, studentId));
+				} else if (documentKey === "suhan") {
+					await db
+						.update(financeData)
+						.set({
+							suhanStatus: true,
+							suhanBuktiBayarUrl: fileUrl,
+							suhanPaidDate: new Date(),
+							mandiriInterviewStatus: true,
 							updatedAt: new Date(),
 						})
 						.where(eq(financeData.studentId, studentId));
@@ -238,15 +256,20 @@ export const documentsRoutes = new Elysia()
 						.set({
 							t1InterviewStatus: true,
 							t1InterviewBuktiBayarUrl: fileUrl,
+							t1InterviewPaidDate: new Date(),
 							updatedAt: new Date(),
 						})
 						.where(eq(financeData.studentId, studentId));
-				} else if (documentKey === "mandiri_keberangkatan") {
+				} else if (
+					documentKey === "mandiri_keberangkatan" ||
+					documentKey === "penempatan_keberangkatan"
+				) {
 					await db
 						.update(financeData)
 						.set({
 							mandiriKeberangkatanStatus: true,
 							mandiriKeberangkatanBuktiBayarUrl: fileUrl,
+							mandiriKeberangkatanPaidDate: new Date(),
 							updatedAt: new Date(),
 						})
 						.where(eq(financeData.studentId, studentId));
@@ -256,6 +279,7 @@ export const documentsRoutes = new Elysia()
 						.set({
 							t2KeberangkatanStatus: true,
 							t2KeberangkatanBuktiBayarUrl: fileUrl,
+							t2KeberangkatanPaidDate: new Date(),
 							updatedAt: new Date(),
 						})
 						.where(eq(financeData.studentId, studentId));

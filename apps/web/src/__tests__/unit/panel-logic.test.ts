@@ -14,6 +14,7 @@ import {
 	getFinancePaymentStatus,
 	getGpaGrade,
 	getKeputusanConfig,
+	getPenempatanLabel,
 	updateCrmField,
 } from "../../utils/panel-logic";
 import { calculateOverallStatus } from "../../utils/status";
@@ -425,6 +426,54 @@ describe("Tahap 3 — Panel Business Logic", () => {
 				const res = calculateFinanceChecklist(null);
 				expect(res.completedCount).toBe(0);
 				expect(res.isFinanceReady).toBe(false);
+			});
+
+			it("FIN-02: should format official names for 4 termin baku in calculateFinanceChecklist", () => {
+				const fin = {
+					registrasiStatus: true,
+					metodePembayaran: "mandiri",
+					mandiriSemesterStatus: true,
+					kontrakMagangStatus: true,
+					suhanStatus: true,
+					mandiriKeberangkatanStatus: true,
+					toeicStatus: true,
+					pasporStatus: true,
+				};
+				const resTaiwan = calculateFinanceChecklist(fin, "Taiwan");
+				expect(resTaiwan.items[1].name).toBe("Pembayaran SPP Semester 1");
+				expect(resTaiwan.items[2].name).toBe("Kontrak Magang / Suhan");
+				expect(resTaiwan.items[3].name).toBe(
+					"Penempatan Magang Taiwan / Keberangkatan",
+				);
+				expect(resTaiwan.completedCount).toBe(6);
+
+				const resMalaysia = calculateFinanceChecklist(fin, "Malaysia");
+				expect(resMalaysia.items[3].name).toBe(
+					"Penempatan Magang D3 Malaysia / Keberangkatan",
+				);
+			});
+
+			it("FIN-02: getPenempatanLabel returns dynamic labels based on country", () => {
+				expect(getPenempatanLabel("Taiwan-Hospitality")).toBe(
+					"Penempatan Magang Taiwan / Keberangkatan",
+				);
+				expect(getPenempatanLabel("Malaysia-Hospitality")).toBe(
+					"Penempatan Magang D3 Malaysia / Keberangkatan",
+				);
+			});
+
+			it("FIN-02: getFinancePaymentStatus recognizes kontrakMagangStatus and suhanStatus", () => {
+				const finKontrak = {
+					metodePembayaran: "mandiri",
+					kontrakMagangStatus: true,
+				};
+				expect(getFinancePaymentStatus(finKontrak).isInterviewDone).toBe(true);
+
+				const finSuhan = {
+					metodePembayaran: "mandiri",
+					suhanStatus: true,
+				};
+				expect(getFinancePaymentStatus(finSuhan).isInterviewDone).toBe(true);
 			});
 		});
 	});

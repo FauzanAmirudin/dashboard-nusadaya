@@ -59,9 +59,12 @@ export function TabSkemaKeuangan({
 					0);
 
 	const initialPendaftaranDp =
-		pmbData?.paymentPlan?.pendaftaranDp && pmbData.paymentPlan.pendaftaranDp > 0
-			? pmbData.paymentPlan.pendaftaranDp
-			: (pmbData?.paymentPlan?.totalDp ?? 0);
+		pmbData?.paymentPlan?.totalDp && pmbData.paymentPlan.totalDp > 0
+			? pmbData.paymentPlan.totalDp
+			: pmbData?.paymentPlan?.pendaftaranDp &&
+					pmbData.paymentPlan.pendaftaranDp > 0
+				? pmbData.paymentPlan.pendaftaranDp
+				: (pmbData?.finance?.registrasiNominal ?? 0);
 
 	const [totalBiaya, setTotalBiaya] = useState<number>(initialTotalBiaya);
 	const [pendaftaranDp, setPendaftaranDp] =
@@ -99,8 +102,15 @@ export function TabSkemaKeuangan({
 							prev === 0 ? json.data.finance.totalBiayaPendidikan : prev,
 						);
 					}
-					if (json.data.paymentPlan?.pendaftaranDp !== undefined) {
-						setPendaftaranDp(json.data.paymentPlan.pendaftaranDp || 0);
+					const incomingDp =
+						json.data.paymentPlan?.totalDp ??
+						json.data.paymentPlan?.pendaftaranDp ??
+						json.data.finance?.registrasiNominal ??
+						json.data.pmbDp;
+					if (incomingDp !== undefined && incomingDp !== null) {
+						setPendaftaranDp((prev) =>
+							prev === 0 ? Number(incomingDp) || 0 : prev,
+						);
 					}
 				}
 			}
@@ -230,12 +240,13 @@ export function TabSkemaKeuangan({
 					body: JSON.stringify({
 						totalBiaya: Math.max(0, Math.floor(Number(totalBiaya)) || 0),
 						pendaftaranDp: Math.max(0, Math.floor(Number(pendaftaranDp)) || 0),
+						totalDp: Math.max(0, Math.floor(Number(pendaftaranDp)) || 0),
 					}),
 				},
 			);
 			if (res.ok) {
 				toast.success(
-					"Total Biaya Pendidikan berhasil disimpan & terhubung ke Finance",
+					"Total Biaya & DP Pendaftaran berhasil disimpan & tersinkronisasi ke Panel Finance",
 				);
 				setIsEditing(false);
 				setInputWarning(null);

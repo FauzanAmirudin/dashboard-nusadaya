@@ -62,6 +62,7 @@ interface PembayaranUtamaSectionProps {
 	isKeberangkatanLunas: boolean;
 	intPct: number;
 	kebPct: number;
+	destinationCountry?: string | null;
 	onUpdate: () => void;
 }
 
@@ -95,15 +96,21 @@ export function PembayaranUtamaSection({
 	isKeberangkatanLunas,
 	intPct,
 	kebPct,
+	destinationCountry,
 	onUpdate,
 }: PembayaranUtamaSectionProps) {
 	const isMetodeTalangan = formData?.metodePembayaran === "dana_talangan";
+	const destCountry = formData?.destinationCountry || destinationCountry;
+	const isMalaysia = (destCountry || "").toLowerCase().includes("malaysia");
+	const penempatanLabel = isMalaysia
+		? "Penempatan Magang D3 Malaysia / Keberangkatan"
+		: "Penempatan Magang Taiwan / Keberangkatan";
 
 	const renderSemesterCards = () => (
 		<div className="space-y-4 bg-white p-5 border border-slate-200 rounded-lg shadow-sm">
 			<div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 pb-3 gap-4">
 				<h5 className="font-bold text-slate-800 flex items-center">
-					Pembayaran 6 Semester
+					Pembayaran SPP Semester 1 (Cicilan Bulanan)
 				</h5>
 			</div>
 			{loadingSemesters ? (
@@ -305,6 +312,11 @@ export function PembayaranUtamaSection({
 																		<div className="font-semibold text-slate-800 text-sm">
 																			{formatRupiah(inst.nominalPaid)}
 																		</div>
+																		{inst.installmentMonth && (
+																			<Badge className="bg-blue-50 text-[#0517B0] border border-blue-200 text-[10px] py-0 h-4 font-semibold">
+																				{inst.installmentMonth}
+																			</Badge>
+																		)}
 																		{inst.isTalangan && isMetodeTalangan && (
 																			<Badge className="bg-violet-100 text-violet-700 border-0 text-[10px] py-0 h-4">
 																				Dana Talangan
@@ -639,7 +651,7 @@ export function PembayaranUtamaSection({
 					<div className="flex items-center justify-between mb-4">
 						<div className="flex items-center gap-2">
 							<h4 className="font-semibold text-slate-800 flex items-center">
-								Biaya Perkuliahan (6 Semester)
+								Pembayaran SPP Semester 1 (Cicilan Bulanan)
 								{isSemesterAllLunas ? (
 									<Badge className="ml-3 bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0">
 										<CheckCircle className="w-3 h-3 mr-1" /> Lunas
@@ -665,7 +677,7 @@ export function PembayaranUtamaSection({
 					<div className="p-4 bg-slate-50 rounded-lg border border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-6">
 						<div>
 							<label className="text-xs font-semibold text-slate-500 mb-1 block uppercase tracking-wider">
-								Total Tagihan Perkuliahan (6 Semester)
+								Total Tagihan SPP Semester 1
 							</label>
 							<div className="text-lg font-bold text-slate-800">
 								{formatRupiah(curSemestersTotal)}
@@ -752,125 +764,286 @@ export function PembayaranUtamaSection({
 				{formData?.metodePembayaran === "mandiri" && (
 					<div className="space-y-4 p-5 border border-blue-100 bg-blue-50/40 rounded-xl">
 						<h4 className="font-bold text-blue-900 flex items-center">
-							Rincian Skema Dana Mandiri (Interview & Keberangkatan)
+							Rincian Skema Dana Mandiri (Kontrak Magang / Suhan & Penempatan
+							Magang)
 						</h4>
 
 						<div className="grid gap-4">
-							{[
-								{
-									label: "Interview Magang",
-									docKey: "mandiri_interview",
-									nomField: "mandiriInterviewNominal",
-									statusField: "mandiriInterviewStatus",
-									pct: intPct,
-									partisiNum: 3,
-									badgeColor: "bg-amber-50 border-amber-200 text-amber-700",
-									chkId: "chk-mandiriInterview",
-								},
-								{
-									label: "Keberangkatan",
-									docKey: "mandiri_keberangkatan",
-									nomField: "mandiriKeberangkatanNominal",
-									statusField: "mandiriKeberangkatanStatus",
-									pct: kebPct,
-									partisiNum: 4,
-									badgeColor:
-										"bg-emerald-50 border-emerald-200 text-emerald-700",
-									chkId: "chk-mandiriKeberangkatan",
-								},
-							].map((item, idx) => {
-								const isLunas = Boolean(formData?.[item.statusField]);
-								return (
-									<div
-										key={idx}
-										className={`p-4 rounded-xl border transition-colors space-y-3.5 ${
-											isLunas
-												? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-												: "border-slate-200 bg-white shadow-xs"
-										}`}
-									>
-										<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 border-slate-100">
-											<div className="flex items-center gap-3">
-												<Checkbox
-													id={item.chkId}
-													checked={isLunas}
-													disabled={!canEdit}
-													onCheckedChange={(checked) => {
-														if (isEditingUtama) {
-															handleFieldChange(
-																item.statusField,
-																Boolean(checked),
-															);
-															if (
-																checked &&
-																!formData?.[`${item.statusField}PaidDate`]
-															) {
-																handleFieldChange(
-																	`${item.statusField}PaidDate`,
-																	new Date().toISOString().split("T")[0],
-																);
-															}
-														} else if (handleToggleStatus) {
-															handleToggleStatus(
-																item.statusField,
-																Boolean(checked),
-															);
-														}
-													}}
-													className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-												/>
-												<div>
-													<label
-														htmlFor={item.chkId}
-														className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer flex items-center gap-2 hover:text-[#0517B0] transition-colors"
-													>
-														<span>{item.label}</span>
-														<Badge
-															variant="outline"
-															className={`text-[10px] font-semibold ${item.badgeColor}`}
-														>
-															Partisi {item.partisiNum} ({item.pct}% Total)
-														</Badge>
-													</label>
-												</div>
-											</div>
-											<div className="flex items-center gap-4">
-												<div className="font-bold text-slate-800 text-right font-mono">
-													{formatRupiah(formData?.[item.nomField] || 0)}
-												</div>
-												<div>
-													{isLunas ? (
-														<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-															<CheckCircle className="w-3 h-3 mr-1" /> Lunas
-														</Badge>
-													) : (
-														<Badge
-															variant="outline"
-															className="text-slate-400 border-slate-200 text-[10px]"
-														>
-															Belum Lunas
-														</Badge>
-													)}
-												</div>
-											</div>
-										</div>
+							{/* 3. Termin 3: Kontrak Magang / Suhan */}
+							<div
+								className={`p-4 rounded-xl border transition-colors space-y-4 ${
+									isInterviewLunas ||
+									(formData?.kontrakMagangStatus && formData?.suhanStatus) ||
+									formData?.mandiriInterviewStatus
+										? "border-emerald-200 bg-emerald-50/20 shadow-xs"
+										: "border-slate-200 bg-white shadow-xs"
+								}`}
+							>
+								<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 border-slate-100">
+									<div className="flex items-center gap-3">
+										<Checkbox
+											id="chk-mandiriInterview"
+											checked={Boolean(
+												isInterviewLunas ||
+													(formData?.kontrakMagangStatus &&
+														formData?.suhanStatus) ||
+													formData?.mandiriInterviewStatus,
+											)}
+											disabled={!canEdit}
+											onCheckedChange={(checked) => {
+												if (isEditingUtama) {
+													handleFieldChange(
+														"kontrakMagangStatus",
+														Boolean(checked),
+													);
+													handleFieldChange("suhanStatus", Boolean(checked));
+													handleFieldChange(
+														"mandiriInterviewStatus",
+														Boolean(checked),
+													);
+													if (checked && !formData?.mandiriInterviewPaidDate) {
+														handleFieldChange(
+															"mandiriInterviewPaidDate",
+															new Date().toISOString().split("T")[0],
+														);
+													}
+												} else if (handleToggleStatus) {
+													handleToggleStatus(
+														"kontrakMagangStatus",
+														Boolean(checked),
+													);
+													handleToggleStatus("suhanStatus", Boolean(checked));
+													handleToggleStatus(
+														"mandiriInterviewStatus",
+														Boolean(checked),
+													);
+												}
+											}}
+											className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+										/>
 										<div>
-											<label className="text-[11px] font-semibold text-slate-500 block mb-1 uppercase tracking-wider">
-												Bukti Bayar {item.label} (PDF)
+											<label
+												htmlFor="chk-mandiriInterview"
+												className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer flex items-center gap-2 hover:text-[#0517B0] transition-colors"
+											>
+												<span>3. Kontrak Magang / Suhan</span>
+												<Badge
+													variant="outline"
+													className="text-[10px] font-semibold bg-amber-50 border-amber-200 text-amber-700"
+												>
+													Partisi 3 ({intPct}% Total)
+												</Badge>
 											</label>
-											<DocumentUpload
-												studentId={studentId}
-												panel="finance"
-												documentKey={item.docKey}
-												canEdit={canEdit}
-												onUploadSuccess={onUpdate}
-												onDeleteSuccess={onUpdate}
-												onUpdate={onUpdate}
-											/>
+											<p className="text-[11px] text-slate-500 mt-0.5">
+												Biaya proses turun kontrak kerja & surat izin Suhan
+												Taiwan
+											</p>
 										</div>
 									</div>
-								);
-							})}
+									<div className="flex items-center gap-4">
+										<div className="font-bold text-slate-800 text-right font-mono">
+											{formatRupiah(formData?.mandiriInterviewNominal || 0)}
+										</div>
+										<div>
+											{isInterviewLunas ||
+											(formData?.kontrakMagangStatus &&
+												formData?.suhanStatus) ||
+											formData?.mandiriInterviewStatus ? (
+												<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+													<CheckCircle className="w-3 h-3 mr-1" /> Lunas
+												</Badge>
+											) : formData?.kontrakMagangStatus ? (
+												<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-bold">
+													Kontrak Siap
+												</Badge>
+											) : (
+												<Badge
+													variant="outline"
+													className="text-slate-400 border-slate-200 text-[10px]"
+												>
+													Belum Lunas
+												</Badge>
+											)}
+										</div>
+									</div>
+								</div>
+
+								{/* Banner Alur Dokumen Segmen 11 & 20 */}
+								<div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-lg flex items-start gap-2 text-xs text-amber-900">
+									<span className="font-bold shrink-0">Alur Resmi:</span>
+									<span>
+										Dokumen Kontrak Magang kerja industri diterbitkan lebih
+										dahulu, disusul oleh Surat Suhan (persetujuan izin magang
+										resmi Taiwan).
+									</span>
+								</div>
+
+								{/* Slot Pemisahan Dokumen Kontrak Magang vs Suhan */}
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+									{/* Slot A: Dokumen Kontrak Magang */}
+									<div className="p-3.5 bg-slate-50/90 rounded-xl border border-slate-200 space-y-2">
+										<div className="flex items-center justify-between">
+											<span className="text-xs font-bold text-slate-800">
+												Slot A: Dokumen Kontrak Magang
+											</span>
+											{formData?.kontrakMagangStatus ||
+											formData?.mandiriInterviewStatus ? (
+												<Badge className="bg-emerald-100 text-emerald-800 text-[9px] px-1.5 py-0 font-semibold border-0">
+													Terunggah
+												</Badge>
+											) : (
+												<Badge
+													variant="outline"
+													className="text-slate-400 text-[9px] px-1.5 py-0"
+												>
+													Belum Ada
+												</Badge>
+											)}
+										</div>
+										<p className="text-[11px] text-slate-500">
+											Perjanjian kerja magang hotel / industri
+										</p>
+										<DocumentUpload
+											studentId={studentId}
+											panel="finance"
+											documentKey="kontrak_magang"
+											canEdit={canEdit}
+											onUploadSuccess={onUpdate}
+											onDeleteSuccess={onUpdate}
+											onUpdate={onUpdate}
+										/>
+									</div>
+
+									{/* Slot B: Dokumen Surat Suhan */}
+									<div className="p-3.5 bg-slate-50/90 rounded-xl border border-slate-200 space-y-2">
+										<div className="flex items-center justify-between">
+											<span className="text-xs font-bold text-slate-800">
+												Slot B: Dokumen Surat Suhan
+											</span>
+											{formData?.suhanStatus ? (
+												<Badge className="bg-emerald-100 text-emerald-800 text-[9px] px-1.5 py-0 font-semibold border-0">
+													Terunggah
+												</Badge>
+											) : (
+												<Badge
+													variant="outline"
+													className="text-slate-400 text-[9px] px-1.5 py-0"
+												>
+													Menunggu
+												</Badge>
+											)}
+										</div>
+										<p className="text-[11px] text-slate-500">
+											Surat Persetujuan Magang Resmi Taiwan
+										</p>
+										<DocumentUpload
+											studentId={studentId}
+											panel="finance"
+											documentKey="suhan"
+											canEdit={canEdit}
+											onUploadSuccess={onUpdate}
+											onDeleteSuccess={onUpdate}
+											onUpdate={onUpdate}
+										/>
+									</div>
+								</div>
+							</div>
+
+							{/* 4. Termin 4: Penempatan Magang / Keberangkatan */}
+							<div
+								className={`p-4 rounded-xl border transition-colors space-y-3.5 ${
+									isKeberangkatanLunas || formData?.mandiriKeberangkatanStatus
+										? "border-emerald-200 bg-emerald-50/20 shadow-xs"
+										: "border-slate-200 bg-white shadow-xs"
+								}`}
+							>
+								<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3 border-slate-100">
+									<div className="flex items-center gap-3">
+										<Checkbox
+											id="chk-mandiriKeberangkatan"
+											checked={Boolean(
+												isKeberangkatanLunas ||
+													formData?.mandiriKeberangkatanStatus,
+											)}
+											disabled={!canEdit}
+											onCheckedChange={(checked) => {
+												if (isEditingUtama) {
+													handleFieldChange(
+														"mandiriKeberangkatanStatus",
+														Boolean(checked),
+													);
+													if (
+														checked &&
+														!formData?.mandiriKeberangkatanPaidDate
+													) {
+														handleFieldChange(
+															"mandiriKeberangkatanPaidDate",
+															new Date().toISOString().split("T")[0],
+														);
+													}
+												} else if (handleToggleStatus) {
+													handleToggleStatus(
+														"mandiriKeberangkatanStatus",
+														Boolean(checked),
+													);
+												}
+											}}
+											className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+										/>
+										<div>
+											<label
+												htmlFor="chk-mandiriKeberangkatan"
+												className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer flex items-center gap-2 hover:text-[#0517B0] transition-colors"
+											>
+												<span>{penempatanLabel}</span>
+												<Badge
+													variant="outline"
+													className="text-[10px] font-semibold bg-emerald-50 border-emerald-200 text-emerald-700"
+												>
+													Partisi 4 ({kebPct}% Total)
+												</Badge>
+											</label>
+											<p className="text-[11px] text-slate-500 mt-0.5">
+												Biaya penempatan magang, visa, dan tiket penerbangan
+											</p>
+										</div>
+									</div>
+									<div className="flex items-center gap-4">
+										<div className="font-bold text-slate-800 text-right font-mono">
+											{formatRupiah(formData?.mandiriKeberangkatanNominal || 0)}
+										</div>
+										<div>
+											{isKeberangkatanLunas ||
+											formData?.mandiriKeberangkatanStatus ? (
+												<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+													<CheckCircle className="w-3 h-3 mr-1" /> Lunas
+												</Badge>
+											) : (
+												<Badge
+													variant="outline"
+													className="text-slate-400 border-slate-200 text-[10px]"
+												>
+													Belum Lunas
+												</Badge>
+											)}
+										</div>
+									</div>
+								</div>
+								<div>
+									<label className="text-[11px] font-semibold text-slate-500 block mb-1 uppercase tracking-wider">
+										Bukti Bayar Penempatan / Keberangkatan & Visa (PDF)
+									</label>
+									<DocumentUpload
+										studentId={studentId}
+										panel="finance"
+										documentKey="penempatan_keberangkatan"
+										canEdit={canEdit}
+										onUploadSuccess={onUpdate}
+										onDeleteSuccess={onUpdate}
+										onUpdate={onUpdate}
+									/>
+								</div>
+							</div>
 						</div>
 					</div>
 				)}

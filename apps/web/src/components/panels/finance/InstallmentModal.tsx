@@ -32,6 +32,8 @@ interface InstallmentModalProps {
 		isTalangan: boolean;
 		file: File | null;
 		buktiBayarUrl: string;
+		installmentMonth?: string;
+		periodNotes?: string;
 	};
 	setInstallmentForm: React.Dispatch<
 		React.SetStateAction<{
@@ -41,6 +43,8 @@ interface InstallmentModalProps {
 			isTalangan: boolean;
 			file: File | null;
 			buktiBayarUrl: string;
+			installmentMonth?: string;
+			periodNotes?: string;
 		}>
 	>;
 	isMetodeTalangan: boolean;
@@ -111,6 +115,41 @@ export function InstallmentModal({
 						)}
 					</div>
 
+					<div>
+						<Label className="text-xs font-semibold text-slate-600">
+							Bulan / Periode Cicilan
+						</Label>
+						<Input
+							type="text"
+							list="installment-months-list"
+							value={installmentForm.installmentMonth || ""}
+							onChange={(e) =>
+								setInstallmentForm((prev) => ({
+									...prev,
+									installmentMonth: e.target.value,
+								}))
+							}
+							placeholder="Contoh: Cicilan Bulan Agustus"
+							className="mt-1 text-xs"
+						/>
+						<datalist id="installment-months-list">
+							<option value="Cicilan Bulan Januari" />
+							<option value="Cicilan Bulan Februari" />
+							<option value="Cicilan Bulan Maret" />
+							<option value="Cicilan Bulan April" />
+							<option value="Cicilan Bulan Mei" />
+							<option value="Cicilan Bulan Juni" />
+							<option value="Cicilan Bulan Juli" />
+							<option value="Cicilan Bulan Agustus" />
+							<option value="Cicilan Bulan September" />
+							<option value="Cicilan Bulan Oktober" />
+							<option value="Cicilan Bulan November" />
+							<option value="Cicilan Bulan Desember" />
+						</datalist>
+						<p className="text-[11px] text-slate-400 mt-1">
+							Pencatatan fleksibel cicilan bulanan persiapan SPP Semester 1
+						</p>
+					</div>
 					<div>
 						<Label className="text-xs font-semibold text-slate-600">
 							Tanggal Pembayaran

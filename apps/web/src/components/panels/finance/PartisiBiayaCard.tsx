@@ -33,6 +33,8 @@ interface PartisiBiayaCardProps {
 	semestersLunasCount: number;
 	isInterviewLunas: boolean;
 	isKeberangkatanLunas: boolean;
+	destinationCountry?: string | null;
+	pmbDp?: number;
 	// Dana Talangan specific props
 	hasAdminTalanganDoc?: boolean;
 	adminTalaganNominal?: number;
@@ -43,7 +45,6 @@ interface PartisiBiayaCardProps {
 	isTahap1Lunas?: boolean;
 	isTahap2Lunas?: boolean;
 }
-
 export function PartisiBiayaCard({
 	totalBiaya,
 	formData,
@@ -63,6 +64,8 @@ export function PartisiBiayaCard({
 	semestersLunasCount,
 	isInterviewLunas,
 	isKeberangkatanLunas,
+	destinationCountry,
+	pmbDp = 0,
 	hasAdminTalanganDoc = false,
 	adminTalaganNominal = 0,
 	totalTahap1Nominal = 0,
@@ -72,6 +75,14 @@ export function PartisiBiayaCard({
 	isTahap1Lunas = false,
 	isTahap2Lunas = false,
 }: PartisiBiayaCardProps) {
+	const destination = formData?.destinationCountry || destinationCountry;
+	const isMalaysia = (destination || "").toLowerCase().includes("malaysia");
+	const penempatanLabel = isMalaysia
+		? "Penempatan Magang D3 Malaysia / Keberangkatan"
+		: "Penempatan Magang Taiwan / Keberangkatan";
+	const penempatanShortLabel = isMalaysia
+		? `4. Penempatan Malaysia (${kebPct}%)`
+		: `4. Penempatan Taiwan (${kebPct}%)`;
 	const isTalangan = formData?.metodePembayaran === "dana_talangan";
 
 	const t1Pct =
@@ -218,21 +229,21 @@ export function PartisiBiayaCard({
 									<div
 										style={{ width: `${semPct}%` }}
 										className="h-full bg-indigo-500 rounded-xs transition-all duration-500"
-										title={`Perkuliahan 6 Semester: ${semPct}% (${formatRupiah(curSemestersTotal)})`}
+										title={`SPP Semester 1: ${semPct}% (${formatRupiah(curSemestersTotal)})`}
 									/>
 								)}
 								{intPct > 0 && (
 									<div
 										style={{ width: `${intPct}%` }}
 										className="h-full bg-amber-500 rounded-xs transition-all duration-500"
-										title={`Interview Magang: ${intPct}% (${formatRupiah(curInterview)})`}
+										title={`Kontrak Magang / Suhan: ${intPct}% (${formatRupiah(curInterview)})`}
 									/>
 								)}
 								{kebPct > 0 && (
 									<div
 										style={{ width: `${kebPct}%` }}
 										className="h-full bg-emerald-500 rounded-xs transition-all duration-500"
-										title={`Keberangkatan: ${kebPct}% (${formatRupiah(curKeberangkatan)})`}
+										title={`${penempatanLabel}: ${kebPct}% (${formatRupiah(curKeberangkatan)})`}
 									/>
 								)}
 							</>
@@ -253,6 +264,11 @@ export function PartisiBiayaCard({
 										<p className="text-xs font-bold text-slate-800 font-mono">
 											{formatRupiah(curRegistrasi)}
 										</p>
+										{curRegistrasi === 0 && pmbDp > 0 && (
+											<span className="text-[9px] text-sky-700 bg-sky-100/70 px-1 rounded font-semibold block mt-0.5">
+												PMB DP: {formatRupiah(pmbDp)}
+											</span>
+										)}
 									</div>
 								</div>
 								{isRegistrasiLunas ? (
@@ -375,6 +391,11 @@ export function PartisiBiayaCard({
 										<p className="text-xs font-bold text-slate-800 font-mono">
 											{formatRupiah(curRegistrasi)}
 										</p>
+										{curRegistrasi === 0 && pmbDp > 0 && (
+											<span className="text-[9px] text-sky-700 bg-sky-100/70 px-1 rounded font-semibold block mt-0.5">
+												PMB DP: {formatRupiah(pmbDp)}
+											</span>
+										)}
 									</div>
 								</div>
 								{isRegistrasiLunas ? (
@@ -391,13 +412,13 @@ export function PartisiBiayaCard({
 								)}
 							</div>
 
-							{/* 2. 6 Semester */}
+							{/* 2. SPP Semester 1 */}
 							<div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between">
 								<div className="flex items-center gap-2">
 									<span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0" />
 									<div>
 										<p className="text-[10px] font-bold text-slate-500 uppercase">
-											2. 6 Semester ({semPct}%)
+											2. SPP Semester 1 ({semPct}%)
 										</p>
 										<p className="text-xs font-bold text-slate-800 font-mono">
 											{formatRupiah(curSemestersTotal)}
@@ -406,22 +427,22 @@ export function PartisiBiayaCard({
 								</div>
 								<Badge
 									className={
-										semestersLunasCount === 6
+										semestersLunasCount >= 1
 											? "bg-emerald-100 text-emerald-700 border-0 text-[9px] px-1.5 py-0 font-bold"
 											: "bg-indigo-50 text-indigo-700 border-0 text-[9px] px-1.5 py-0 font-bold"
 									}
 								>
-									{semestersLunasCount}/6 Smt
+									{semestersLunasCount >= 1 ? "Lunas" : "Belum"}
 								</Badge>
 							</div>
 
-							{/* 3. Interview */}
+							{/* 3. Kontrak Magang / Suhan */}
 							<div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between">
 								<div className="flex items-center gap-2">
 									<span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
 									<div>
 										<p className="text-[10px] font-bold text-slate-500 uppercase">
-											3. Interview ({intPct}%)
+											3. Kontrak / Suhan ({intPct}%)
 										</p>
 										<p className="text-xs font-bold text-slate-800 font-mono">
 											{formatRupiah(curInterview)}
@@ -442,13 +463,13 @@ export function PartisiBiayaCard({
 								)}
 							</div>
 
-							{/* 4. Berangkat */}
+							{/* 4. Penempatan Magang / Keberangkatan */}
 							<div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between">
 								<div className="flex items-center gap-2">
 									<span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
 									<div>
 										<p className="text-[10px] font-bold text-slate-500 uppercase">
-											4. Berangkat ({kebPct}%)
+											{penempatanShortLabel}
 										</p>
 										<p className="text-xs font-bold text-slate-800 font-mono">
 											{formatRupiah(curKeberangkatan)}

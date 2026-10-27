@@ -271,6 +271,7 @@ export function TabChecklist({
 
 			// 1. Invalidate TanStack query cache untuk instant synchronization
 			queryClient.invalidateQueries({ queryKey: ["students-list"] });
+			queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
 			queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
 			queryClient.invalidateQueries({
 				queryKey: ["student", studentId.toString()],

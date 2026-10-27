@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -29,6 +30,7 @@ interface TabKeuanganProps {
 	pmbState: any;
 	customFields: any[];
 	canEdit: boolean;
+	destinationCountry?: string | null;
 	onUpdate: () => void;
 }
 
@@ -38,8 +40,10 @@ export function TabKeuangan({
 	pmbState,
 	customFields,
 	canEdit,
+	destinationCountry,
 	onUpdate,
 }: TabKeuanganProps) {
+	const queryClient = useQueryClient();
 	const [loadingUtama, setLoadingUtama] = useState(false);
 	const [loadingTambahan, setLoadingTambahan] = useState(false);
 	const [isEditingUtama, setIsEditingUtama] = useState(false);
@@ -64,6 +68,8 @@ export function TabKeuangan({
 		isTalangan: boolean;
 		file: File | null;
 		buktiBayarUrl: string;
+		installmentMonth?: string;
+		periodNotes?: string;
 	}>({
 		nominalPaid: "",
 		paymentDate: new Date().toISOString().split("T")[0],
@@ -71,6 +77,8 @@ export function TabKeuangan({
 		isTalangan: false,
 		file: null,
 		buktiBayarUrl: "",
+		installmentMonth: "",
+		periodNotes: "",
 	});
 
 	const [deletedInstallments, setDeletedInstallments] = useState<
@@ -164,15 +172,33 @@ export function TabKeuangan({
 		}
 	};
 
+	// PMB DP extraction for seamless integration
+	const pmbDp =
+		Number(pmbState?.pmbDp) ||
+		Number(pmbState?.totalDp) ||
+		Number(pmbState?.pendaftaranDp) ||
+		Number(pmbState?.paymentPlan?.totalDp) ||
+		Number(pmbState?.paymentPlan?.pendaftaranDp) ||
+		Number(finState?.pmbDp) ||
+		0;
+
 	// Initialize form data when state changes
 	useEffect(() => {
 		if (finState) {
-			setFormData(finState);
+			const initialForm = { ...finState };
+			if (
+				(!initialForm.registrasiNominal ||
+					Number(initialForm.registrasiNominal) === 0) &&
+				pmbDp > 0
+			) {
+				initialForm.registrasiNominal = pmbDp;
+			}
+			setFormData(initialForm);
 		}
 		if (customFields) {
 			setCustomData(customFields);
 		}
-	}, [finState, customFields]);
+	}, [finState, customFields, pmbDp]);
 
 	// Fetch semesters
 	const fetchSemesters = async () => {
@@ -390,6 +416,8 @@ export function TabKeuangan({
 				isTalangan: installment.isTalangan ?? false,
 				file: installment.file || null,
 				buktiBayarUrl: installment.buktiBayarUrl || "",
+				installmentMonth: installment.installmentMonth || "",
+				periodNotes: installment.periodNotes || "",
 			});
 		} else {
 			setInstallmentForm({
@@ -399,6 +427,8 @@ export function TabKeuangan({
 				isTalangan: false,
 				file: null,
 				buktiBayarUrl: "",
+				installmentMonth: "",
+				periodNotes: "",
 			});
 		}
 		setInstallmentModalOpen(true);
@@ -426,6 +456,8 @@ export function TabKeuangan({
 									paymentDate: installmentForm.paymentDate,
 									notes: installmentForm.notes,
 									isTalangan: installmentForm.isTalangan,
+									installmentMonth: installmentForm.installmentMonth,
+									periodNotes: installmentForm.periodNotes,
 									file: installmentForm.file || inst.file,
 									buktiBayarUrl:
 										installmentForm.buktiBayarUrl || inst.buktiBayarUrl,
@@ -465,6 +497,8 @@ export function TabKeuangan({
 				paymentDate: installmentForm.paymentDate,
 				notes: installmentForm.notes,
 				isTalangan: installmentForm.isTalangan,
+				installmentMonth: installmentForm.installmentMonth,
+				periodNotes: installmentForm.periodNotes,
 				file: installmentForm.file,
 				buktiBayarUrl: installmentForm.buktiBayarUrl || "",
 				isDraftNew: true,
@@ -641,7 +675,10 @@ export function TabKeuangan({
 		const tb = finState?.totalBiayaPendidikan || 0;
 		setPartitionTotalBiaya(tb);
 
-		const reg = Number(formData?.registrasiNominal) || 0;
+		let reg = Number(formData?.registrasiNominal) || 0;
+		if (reg === 0 && pmbDp > 0) {
+			reg = pmbDp;
+		}
 		setPartitionRegistrasi(reg);
 
 		const semTotal =
@@ -712,6 +749,9 @@ export function TabKeuangan({
 			setPartitionModalOpen(false);
 			fetchSemesters();
 			onUpdate();
+			queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
+			queryClient.invalidateQueries({ queryKey: ["students-list"] });
+			queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
 		} catch (e: any) {
 			toast.error(e.message || "Terjadi kesalahan saat menyimpan partisi");
 		} finally {
@@ -755,6 +795,9 @@ export function TabKeuangan({
 				toast.success(
 					`Status ${nextStatus ? "Lunas" : "Belum Lunas"} berhasil diperbarui`,
 				);
+				queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
+				queryClient.invalidateQueries({ queryKey: ["students-list"] });
+				queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
 			} else {
 				// Revert on error
 				setFormData((prev: any) => ({
@@ -866,6 +909,8 @@ export function TabKeuangan({
 									paymentDate: inst.paymentDate,
 									notes: inst.notes,
 									isTalangan: inst.isTalangan,
+									installmentMonth: inst.installmentMonth,
+									periodNotes: inst.periodNotes,
 									buktiBayarUrl,
 								}),
 							},
@@ -880,6 +925,8 @@ export function TabKeuangan({
 									paymentDate: inst.paymentDate,
 									notes: inst.notes,
 									isTalangan: inst.isTalangan,
+									installmentMonth: inst.installmentMonth,
+									periodNotes: inst.periodNotes,
 									buktiBayarUrl,
 								}),
 							},
@@ -977,6 +1024,9 @@ export function TabKeuangan({
 				fetchFinanceDocs();
 				fetchTalanganInstallments();
 				onUpdate();
+				queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
+				queryClient.invalidateQueries({ queryKey: ["students-list"] });
+				queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
 			} else {
 				const err = await res.json();
 				toast.error(err.message || "Gagal menyimpan pembayaran utama");
@@ -1028,6 +1078,8 @@ export function TabKeuangan({
 				setDeletedDocKeysTambahan([]);
 				fetchFinanceDocs();
 				onUpdate();
+				queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
+				queryClient.invalidateQueries({ queryKey: ["students-list"] });
 			} else {
 				toast.error("Gagal menyimpan biaya tambahan");
 			}
@@ -1316,6 +1368,8 @@ export function TabKeuangan({
 				t2Paid={t2Paid}
 				isTahap1Lunas={isTahap1Lunas}
 				isTahap2Lunas={isTahap2Lunas}
+				destinationCountry={destinationCountry}
+				pmbDp={pmbDp}
 			/>
 
 			{/* 2. Pembayaran Utama Section */}
@@ -1348,6 +1402,7 @@ export function TabKeuangan({
 				isKeberangkatanLunas={isKeberangkatanLunas}
 				intPct={intPct}
 				kebPct={kebPct}
+				destinationCountry={destinationCountry}
 				handleToggleStatus={handleToggleStatus}
 				onUpdate={() => {
 					fetchFinanceDocs();
@@ -1421,6 +1476,7 @@ export function TabKeuangan({
 				onOpenChange={setPartitionModalOpen}
 				saving={partitionSaving}
 				totalBiaya={partitionTotalBiaya}
+				pmbDp={pmbDp}
 				registrasi={partitionRegistrasi}
 				setRegistrasi={setPartitionRegistrasi}
 				semesterPerSem={partitionSemesterPerSem}
