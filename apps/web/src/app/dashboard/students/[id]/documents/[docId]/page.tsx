@@ -4,15 +4,21 @@ import { ArrowLeft, Download, FileText } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
+import { getToken } from "@/lib/eden";
 
 function DocumentReviewContent() {
 	const searchParams = useSearchParams();
 	const fileUrl = searchParams.get("url");
 	const fileName = searchParams.get("name") || "Dokumen Tanpa Nama";
-	const token = searchParams.get("token");
+	const token = searchParams.get("token") || getToken();
 	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 	const cleanFileUrl = fileUrl?.startsWith("./") ? fileUrl.slice(1) : fileUrl;
+	const isImage = Boolean(
+		(fileName && /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(fileName)) ||
+			(cleanFileUrl &&
+				/\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(cleanFileUrl)),
+	);
 	let fullUrl = "";
 	if (cleanFileUrl) {
 		if (
@@ -84,12 +90,22 @@ function DocumentReviewContent() {
 			{/* Viewer Area */}
 			<div className="flex-1 bg-slate-200 relative">
 				{fullUrl ? (
-					<iframe
-						src={fullUrl}
-						className="w-full h-full border-0"
-						title="Document Viewer"
-						style={{ backgroundColor: "#e2e8f0" }}
-					/>
+					isImage ? (
+						<div className="w-full h-full p-4 flex items-center justify-center overflow-auto bg-slate-100">
+							<img
+								src={fullUrl}
+								alt={fileName}
+								className="max-h-[80vh] max-w-full object-contain rounded-lg shadow-md bg-white border border-slate-300"
+							/>
+						</div>
+					) : (
+						<iframe
+							src={fullUrl}
+							className="w-full h-full border-0"
+							title="Document Viewer"
+							style={{ backgroundColor: "#e2e8f0" }}
+						/>
+					)
 				) : (
 					<div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 bg-white">
 						<div className="w-16 h-16 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mb-4">

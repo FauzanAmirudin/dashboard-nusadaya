@@ -45,6 +45,16 @@ import {
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -76,8 +86,9 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { api } from "@/lib/eden";
+import { api, getFileUrl, getToken } from "@/lib/eden";
 import { hasRole, useAuthStore } from "@/store";
+import { openDocumentReview } from "@/utils/document-review";
 import { formatDate, formatRupiah } from "@/utils/format";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -172,6 +183,7 @@ interface MaterialReport {
 
 export function AnggaranPraktikDashboard() {
 	const { user, token } = useAuthStore();
+	const authToken = token || getToken();
 	const isFinance = hasRole(user, "finance");
 	const canManage = isFinance;
 
@@ -207,6 +219,8 @@ export function AnggaranPraktikDashboard() {
 	const [proofFile, setProofFile] = useState<File | null>(null);
 	const [uploadingProof, setUploadingProof] = useState(false);
 	const [isChangeProofMode, setIsChangeProofMode] = useState(false);
+	const [proofToDelete, setProofToDelete] = useState<number | null>(null);
+	const [resetRequestId, setResetRequestId] = useState<number | null>(null);
 
 	const fetchData = async () => {
 		try {
@@ -322,15 +336,6 @@ export function AnggaranPraktikDashboard() {
 		return filteredReports.slice(start, start + pageSize);
 	}, [filteredReports, page, pageSize]);
 
-	// Helpers
-	const getFileUrl = (urlPath?: string | null) => {
-		if (!urlPath) return "";
-		if (urlPath.startsWith("http://") || urlPath.startsWith("https://")) {
-			return urlPath;
-		}
-		return `${API_URL}${urlPath}`;
-	};
-
 	// Actions
 	const handleApprove = async (id: number) => {
 		if (!canManage) return;
@@ -348,7 +353,7 @@ export function AnggaranPraktikDashboard() {
 					`${API_URL}/finance/anggaran-praktik/${id}/upload-bukti`,
 					{
 						method: "POST",
-						headers: { Authorization: `Bearer ${token}` },
+						headers: { Authorization: `Bearer ${authToken}` },
 						body: formData,
 					},
 				);
@@ -427,7 +432,7 @@ export function AnggaranPraktikDashboard() {
 				{
 					method: "POST",
 					headers: {
-						Authorization: `Bearer ${token}`,
+						Authorization: `Bearer ${authToken}`,
 					},
 					body: formData,
 				},
@@ -474,7 +479,7 @@ export function AnggaranPraktikDashboard() {
 				{
 					method: "DELETE",
 					headers: {
-						Authorization: `Bearer ${token}`,
+						Authorization: `Bearer ${authToken}`,
 					},
 				},
 			);
@@ -509,7 +514,8 @@ export function AnggaranPraktikDashboard() {
 
 	const handleReject = async (id: number) => {
 		if (!canManage) return;
-		if (!rejectReason.trim()) {
+		const reason = rejectReason.trim();
+		if (!reason) {
 			toast.error("Mohon berikan catatan alasan penolakan");
 			return;
 		}
@@ -517,7 +523,7 @@ export function AnggaranPraktikDashboard() {
 			setActionLoading(true);
 			const { data, error } = await api.finance["anggaran-praktik"][
 				id.toString()
-			].reject.patch({ catatanFinance: rejectReason });
+			].reject.patch({ catatanFinance: reason });
 			if (!error && (data as any)?.success !== false) {
 				toast.success("Pengajuan anggaran ditolak");
 				setIsReviewOpen(false);
@@ -528,10 +534,16 @@ export function AnggaranPraktikDashboard() {
 				setIsChangeProofMode(false);
 				fetchData();
 			} else {
-				toast.error("Gagal menolak pengajuan anggaran");
+				const errMsg =
+					(error as any)?.value?.message ||
+					(data as any)?.message ||
+					"Gagal menolak pengajuan anggaran";
+				toast.error(errMsg);
 			}
-		} catch (e) {
-			toast.error("Terjadi kesalahan sistem saat menolak anggaran");
+		} catch (e: any) {
+			toast.error(
+				e?.message || "Terjadi kesalahan sistem saat menolak anggaran",
+			);
 		} finally {
 			setActionLoading(false);
 		}
@@ -1199,12 +1211,19 @@ export function AnggaranPraktikDashboard() {
 																size="sm"
 																variant="ghost"
 																onClick={() =>
-																	window.open(rep.fileUrl, "_blank")
+																	openDocumentReview(
+																		"laporan-sisa-bahan",
+																		rep.fileUrl,
+																		rep.fileName ||
+																			`Lampiran_Laporan_${rep.id}.pdf`,
+																		rep.id,
+																	)
 																}
 																className="text-xs h-7 gap-1 text-[#0517B0] hover:bg-blue-50 font-semibold"
+																title="Review Berkas Laporan"
 															>
-																<ExternalLink className="w-3 h-3" />
-																Berkas
+																<Eye className="w-3.5 h-3.5" />
+																Review Berkas
 															</Button>
 														) : (
 															<span className="text-xs text-slate-400">-</span>
@@ -1518,15 +1537,19 @@ export function AnggaranPraktikDashboard() {
 														size="sm"
 														variant="outline"
 														onClick={() =>
-															window.open(
-																getFileUrl(selectedRequest.buktiPencairanUrl),
-																"_blank",
+															openDocumentReview(
+																"anggaran-praktik",
+																selectedRequest.buktiPencairanUrl,
+																selectedRequest.buktiPencairanFileName ||
+																	`Bukti_Pencairan_Anggaran_${selectedRequest.id}.pdf`,
+																selectedRequest.id,
 															)
 														}
-														className="text-xs h-8.5 gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-semibold"
+														className="text-xs h-8.5 gap-1.5 border-emerald-300 text-emerald-800 hover:bg-emerald-50 font-semibold shadow-2xs"
+														title="Review Dokumen Bukti Pencairan"
 													>
-														<ExternalLink className="w-3.5 h-3.5" />
-														Lihat Bukti
+														<Eye className="w-3.5 h-3.5 text-emerald-700" />
+														Review Bukti
 													</Button>
 													{canManage && (
 														<>
@@ -1545,9 +1568,10 @@ export function AnggaranPraktikDashboard() {
 																variant="ghost"
 																disabled={uploadingProof}
 																onClick={() =>
-																	handleDeleteProof(selectedRequest.id)
+																	setProofToDelete(selectedRequest.id)
 																}
 																className="text-xs h-8.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+																title="Hapus Bukti Transfer"
 															>
 																<Trash2 className="w-3.5 h-3.5" />
 															</Button>
@@ -1762,7 +1786,7 @@ export function AnggaranPraktikDashboard() {
 										<Button
 											variant="outline"
 											size="sm"
-											onClick={() => handleReset(selectedRequest.id)}
+											onClick={() => setResetRequestId(selectedRequest.id)}
 											disabled={actionLoading}
 											className="text-xs h-9 gap-1.5 border-slate-300 text-slate-700 hover:bg-slate-100"
 										>
@@ -1943,12 +1967,19 @@ export function AnggaranPraktikDashboard() {
 										size="sm"
 										variant="outline"
 										onClick={() =>
-											window.open(selectedReport.fileUrl, "_blank")
+											openDocumentReview(
+												"laporan-sisa-bahan",
+												selectedReport.fileUrl,
+												selectedReport.fileName ||
+													`Lampiran_Laporan_${selectedReport.id}.pdf`,
+												selectedReport.id,
+											)
 										}
 										className="text-xs h-8 gap-1.5 border-blue-200 text-[#0517B0] hover:bg-blue-100 shrink-0 font-semibold"
+										title="Review Dokumen Laporan"
 									>
-										<ExternalLink className="w-3.5 h-3.5" />
-										Buka Berkas
+										<Eye className="w-3.5 h-3.5" />
+										Review Berkas
 									</Button>
 								</div>
 							)}
@@ -1967,6 +1998,90 @@ export function AnggaranPraktikDashboard() {
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+
+			{/* Alert Dialog Konfirmasi Hapus Bukti Pencairan */}
+			<AlertDialog
+				open={proofToDelete !== null}
+				onOpenChange={(open) => !open && setProofToDelete(null)}
+			>
+				<AlertDialogContent className="bg-white rounded-2xl max-w-md border-slate-200 shadow-xl">
+					<AlertDialogHeader>
+						<div className="w-10 h-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mb-1 border border-rose-100">
+							<AlertTriangle className="w-5 h-5" />
+						</div>
+						<AlertDialogTitle className="text-base font-bold text-slate-900">
+							Hapus Bukti Pencairan?
+						</AlertDialogTitle>
+						<AlertDialogDescription className="text-xs text-slate-500 leading-relaxed">
+							Apakah Anda yakin ingin menghapus berkas bukti transfer pencairan
+							anggaran ini? Berkas yang telah dihapus tidak dapat dipulihkan.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter className="flex gap-2 sm:justify-end mt-3">
+						<AlertDialogCancel
+							disabled={uploadingProof}
+							className="text-xs h-9 rounded-lg"
+						>
+							Batal
+						</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={async () => {
+								if (proofToDelete) {
+									await handleDeleteProof(proofToDelete);
+									setProofToDelete(null);
+								}
+							}}
+							disabled={uploadingProof}
+							className="bg-rose-600 hover:bg-rose-700 text-white text-xs h-9 rounded-lg font-bold shadow-xs"
+						>
+							{uploadingProof ? "Menghapus..." : "Ya, Hapus Bukti"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			{/* Alert Dialog Konfirmasi Kembalikan ke Menunggu */}
+			<AlertDialog
+				open={resetRequestId !== null}
+				onOpenChange={(open) => !open && setResetRequestId(null)}
+			>
+				<AlertDialogContent className="bg-white rounded-2xl max-w-md border-slate-200 shadow-xl">
+					<AlertDialogHeader>
+						<div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mb-1 border border-amber-100">
+							<RotateCcw className="w-5 h-5" />
+						</div>
+						<AlertDialogTitle className="text-base font-bold text-slate-900">
+							Kembalikan Status ke Menunggu?
+						</AlertDialogTitle>
+						<AlertDialogDescription className="text-xs text-slate-500 leading-relaxed">
+							Apakah Anda yakin ingin mengembalikan status pengajuan anggaran
+							ini ke status &quot;Menunggu&quot;? Finance dapat kembali
+							meninjau, menyetujui, atau menolak pengajuan tersebut.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter className="flex gap-2 sm:justify-end mt-3">
+						<AlertDialogCancel
+							disabled={actionLoading}
+							className="text-xs h-9 rounded-lg"
+						>
+							Batal
+						</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={async () => {
+								if (resetRequestId) {
+									const idToReset = resetRequestId;
+									setResetRequestId(null);
+									await handleReset(idToReset);
+								}
+							}}
+							disabled={actionLoading}
+							className="bg-amber-600 hover:bg-amber-700 text-white text-xs h-9 rounded-lg font-bold shadow-xs"
+						>
+							{actionLoading ? "Memproses..." : "Ya, Kembalikan ke Menunggu"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	);
 }

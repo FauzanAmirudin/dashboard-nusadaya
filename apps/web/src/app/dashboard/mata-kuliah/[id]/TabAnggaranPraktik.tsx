@@ -10,6 +10,7 @@ import {
 	Edit,
 	Edit2,
 	ExternalLink,
+	Eye,
 	FileText,
 	Loader2,
 	PackageCheck,
@@ -45,6 +46,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { getToken } from "@/lib/eden";
 import { useAuthStore } from "@/store";
+import { openDocumentReview } from "@/utils/document-review";
 import { formatRupiah } from "@/utils/format";
 
 interface ItemKebutuhan {
@@ -185,12 +187,19 @@ export function TabAnggaranPraktik({
 					let filtered = allCourses;
 					if (user?.role === "dosen") {
 						filtered = allCourses.filter(
-							(c) => c.dosenId === user.id || c.dosen?.id === user.id,
+							(c) =>
+								(c.dosenId === user.id ||
+									c.dosen?.id === user.id ||
+									c.dosenPendampingId === user.id) &&
+								c.type === "praktik",
 						);
+					} else {
+						filtered = allCourses.filter((c) => c.type === "praktik");
 					}
-					// Ensure current course is included
+					// Ensure current course is included if it's praktik
 					if (
 						currentCourse &&
+						currentCourse.type === "praktik" &&
 						!filtered.some((c) => c.id === currentCourse.id)
 					) {
 						filtered = [currentCourse, ...filtered];
@@ -199,7 +208,8 @@ export function TabAnggaranPraktik({
 						!filtered.some((c) => c.id.toString() === courseId.toString())
 					) {
 						const cur = allCourses.find(
-							(c) => c.id.toString() === courseId.toString(),
+							(c) =>
+								c.id.toString() === courseId.toString() && c.type === "praktik",
 						);
 						if (cur) filtered = [cur, ...filtered];
 					}
@@ -313,8 +323,21 @@ export function TabAnggaranPraktik({
 	};
 
 	const handleSaveBudgetRequest = async () => {
-		if (items.some((i) => !i.namaItem.trim() || i.satuanHarga <= 0)) {
-			toast.error("Lengkapi rincian nama barang dan harga nominal per-item");
+		const sanitizedItems = items.map((i) => ({
+			namaItem: (i.namaItem || "").trim(),
+			jumlah: Math.max(1, Number(i.jumlah) || 1),
+			satuan: (i.satuan || "").trim() || "pcs",
+			satuanHarga: Math.max(0, Number(i.satuanHarga) || 0),
+		}));
+
+		if (
+			sanitizedItems.some(
+				(i) => !i.namaItem || i.jumlah <= 0 || i.satuanHarga <= 0,
+			)
+		) {
+			toast.error(
+				"Lengkapi rincian nama barang, kuantitas, dan harga satuan per-item",
+			);
 			return;
 		}
 
@@ -326,10 +349,14 @@ export function TabAnggaranPraktik({
 
 		setIsSaving(true);
 		try {
+			const calculatedTotal = sanitizedItems.reduce(
+				(sum, item) => sum + item.jumlah * item.satuanHarga,
+				0,
+			);
 			const payload = {
 				courseId: Number(targetCourseId),
-				daftarKebutuhan: items,
-				totalNominal: totalNominalCalculated,
+				daftarKebutuhan: sanitizedItems,
+				totalNominal: calculatedTotal,
 			};
 
 			const endpoint = editingRequestId
@@ -756,17 +783,19 @@ export function TabAnggaranPraktik({
 													size="sm"
 													variant="outline"
 													onClick={() => {
-														const url = req.buktiPencairanUrl?.startsWith(
-															"http",
-														)
-															? req.buktiPencairanUrl
-															: `${API_URL}${req.buktiPencairanUrl}`;
-														window.open(url, "_blank");
+														openDocumentReview(
+															"anggaran-praktik",
+															req.buktiPencairanUrl,
+															req.buktiPencairanFileName ||
+																`Bukti_Pencairan_Anggaran_${req.id}.pdf`,
+															req.id,
+														);
 													}}
-													className="text-xs h-7.5 gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-100 font-semibold shrink-0"
+													className="text-xs h-7.5 gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-100 font-semibold shrink-0 shadow-2xs"
+													title="Review Dokumen Bukti Pencairan"
 												>
-													<ExternalLink className="w-3.5 h-3.5" />
-													Lihat Bukti Pencairan
+													<Eye className="w-3.5 h-3.5 text-emerald-600" />
+													Review Bukti
 												</Button>
 											)}
 										</div>
@@ -947,21 +976,25 @@ export function TabAnggaranPraktik({
 													</div>
 												)}
 												{rep.fileName && (
-													<a
-														href={
-															rep.fileUrl?.startsWith("http")
-																? rep.fileUrl
-																: rep.fileUrl?.startsWith("/")
-																	? `${API_URL}${rep.fileUrl}`
-																	: `${API_URL}/${rep.fileUrl?.replace(/\\/g, "/")}`
-														}
-														target="_blank"
-														rel="noreferrer"
-														className="inline-flex items-center gap-1.5 text-xs text-[#0517B0] font-bold hover:underline"
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														onClick={() => {
+															openDocumentReview(
+																"laporan-sisa-bahan",
+																rep.fileUrl,
+																rep.fileName ||
+																	`Lampiran_Laporan_${rep.id}.pdf`,
+																rep.id,
+															);
+														}}
+														className="inline-flex items-center gap-1.5 text-xs text-[#0517B0] font-bold hover:bg-blue-50 h-7 px-2 cursor-pointer"
+														title="Review Berkas Laporan"
 													>
-														<Download className="w-3.5 h-3.5" />
-														Unduh File Laporan
-													</a>
+														<Eye className="w-3.5 h-3.5" />
+														Review Berkas
+													</Button>
 												)}
 											</div>
 										</div>

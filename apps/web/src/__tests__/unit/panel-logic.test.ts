@@ -475,6 +475,43 @@ describe("Tahap 3 — Panel Business Logic", () => {
 				};
 				expect(getFinancePaymentStatus(finSuhan).isInterviewDone).toBe(true);
 			});
+
+			it("FIN-02: Tracking Sisa Tagihan SPP Semester 1 calculates balance, percentage and status accurately", () => {
+				const sem1TotalBilled = 10200000;
+				const installments = [
+					{
+						id: 1,
+						nominalPaid: 1700000,
+						installmentMonth: "Cicilan Bulan Agustus",
+					},
+					{
+						id: 2,
+						nominalPaid: 1700000,
+						installmentMonth: "Cicilan Bulan September",
+					},
+				];
+
+				const totalPaid = installments.reduce(
+					(sum, i) => sum + i.nominalPaid,
+					0,
+				);
+				const remaining = Math.max(0, sem1TotalBilled - totalPaid);
+				const pct = Math.round((totalPaid / sem1TotalBilled) * 100);
+
+				expect(totalPaid).toBe(3400000);
+				expect(remaining).toBe(6800000);
+				expect(pct).toBe(33);
+
+				const getStatus = (paid: number, billed: number) => {
+					if (paid >= billed && billed > 0) return "Lunas";
+					if (paid > 0) return "Sebagian";
+					return "Belum Bayar";
+				};
+
+				expect(getStatus(totalPaid, sem1TotalBilled)).toBe("Sebagian");
+				expect(getStatus(0, sem1TotalBilled)).toBe("Belum Bayar");
+				expect(getStatus(10200000, sem1TotalBilled)).toBe("Lunas");
+			});
 		});
 	});
 

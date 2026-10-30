@@ -93,8 +93,9 @@ export function useFinanceProjections(
 			return json.data as FinanceProjectionsData;
 		},
 		enabled,
-		staleTime: 15 * 1000,
-		refetchInterval: 30 * 1000,
+		staleTime: 0,
+		refetchInterval: 10 * 1000,
+		refetchOnWindowFocus: true,
 	});
 }
 

@@ -32,6 +32,8 @@ import {
 } from "./curriculum";
 import { finalDecision } from "./final-decision";
 import {
+	feeDisbursementLogs,
+	feeShareRecipients,
 	financeData,
 	financeDocuments,
 	financeProjectionTargets,
@@ -132,6 +134,39 @@ export const financeTalanganInstallmentsRelations = relations(
 		student: one(students, {
 			fields: [financeTalanganInstallments.studentId],
 			references: [students.id],
+		}),
+	}),
+);
+
+export const feeShareRecipientsRelations = relations(
+	feeShareRecipients,
+	({ one, many }) => ({
+		student: one(students, {
+			fields: [feeShareRecipients.studentId],
+			references: [students.id],
+		}),
+		createdByUser: one(users, {
+			fields: [feeShareRecipients.createdBy],
+			references: [users.id],
+		}),
+		disbursementLogs: many(feeDisbursementLogs),
+	}),
+);
+
+export const feeDisbursementLogsRelations = relations(
+	feeDisbursementLogs,
+	({ one }) => ({
+		recipient: one(feeShareRecipients, {
+			fields: [feeDisbursementLogs.recipientId],
+			references: [feeShareRecipients.id],
+		}),
+		student: one(students, {
+			fields: [feeDisbursementLogs.studentId],
+			references: [students.id],
+		}),
+		disbursedByUser: one(users, {
+			fields: [feeDisbursementLogs.disbursedBy],
+			references: [users.id],
 		}),
 	}),
 );

@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/tooltip";
 import { api, getToken } from "@/lib/eden";
 import { hasRole, useAuthStore } from "@/store";
+import { openDocumentReview } from "@/utils/document-review";
 import { formatDeviceDateTime } from "@/utils/format";
 import type { AssessmentRecord } from "./akademik/assessment/AssessmentFormCard";
 import { AssessmentFormCard } from "./akademik/assessment/AssessmentFormCard";
@@ -433,9 +434,11 @@ export function AkademikPanel({
 	};
 
 	const handleViewDocument = (docId: number) => {
-		window.open(
-			`${API_URL}/students/${studentId}/academic/documents/${docId}/download`,
-			"_blank",
+		openDocumentReview(
+			studentId,
+			`/students/${studentId}/academic/documents/${docId}/download`,
+			`Dokumen_Akademik_${docId}.pdf`,
+			docId,
 		);
 	};
 

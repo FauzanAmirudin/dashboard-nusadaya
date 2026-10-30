@@ -119,6 +119,12 @@ export const financeData = pgTable(
 		adminTalaganBuktiBayarUrl: text("admin_talagan_bukti_bayar_url"),
 		adminTalaganStatus: boolean("admin_talagan_status").default(false),
 
+		// Skema Fleksibel Dana Talangan (1 Tahap vs 2 Tahap - Segmen 12)
+		talanganTipe: text("talangan_tipe").default("2_tahap"), // "1_tahap" | "2_tahap"
+		talanganTotalPengajuan: integer("talangan_total_pengajuan").default(0),
+		talanganLembaga: text("talangan_lembaga"), // "Bank BTN", "Hong Ta", dll.
+		talanganNotes: text("talangan_notes"),
+
 		// Biaya Tambahan Standar
 		toeicNominal: integer("toeic_nominal").default(0),
 		toeicStatus: boolean("toeic_status").default(false),
@@ -187,7 +193,10 @@ export const financeSemesterInstallments = pgTable(
 			.references(() => financeSemesters.id)
 			.notNull(),
 		installmentNumber: integer("installment_number").notNull(),
-		nominalPaid: integer("nominal_paid").notNull(),
+		nominalScheduled: integer("nominal_scheduled").default(0),
+		dueDate: timestamp("due_date"),
+		status: text("status").default("BELUM_BAYAR"), // "BELUM_BAYAR" | "LUNAS"
+		nominalPaid: integer("nominal_paid").default(0).notNull(),
 		paymentDate: timestamp("payment_date"),
 		buktiBayarUrl: text("bukti_bayar_url"),
 		notes: text("notes"),
@@ -235,13 +244,40 @@ export const feeShareRecipients = pgTable(
 		noHp: text("no_hp"),
 		nominalFee: integer("nominal_fee").default(0),
 		invoiceFileUrl: text("invoice_file_url"),
-		statusPencairan: text("status_pencairan").default("belum_dibayarkan"), // "belum_dibayarkan" | "sudah_dibayarkan"
+		statusPencairan: text("status_pencairan").default("belum_dibayarkan"), // "belum_dibayarkan" | "cair_sebagian" | "sudah_dibayarkan"
 		tanggalCair: timestamp("tanggal_cair"),
 		createdBy: integer("created_by").references(() => users.id),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
 	(t) => [index("idx_fee_share_recipients_student_id").on(t.studentId)],
+);
+
+// 5a. Riwayat Pencairan Fee Sharing Bertahap (Multi-Termin)
+export const feeDisbursementLogs = pgTable(
+	"fee_disbursement_logs",
+	{
+		id: serial("id").primaryKey(),
+		recipientId: integer("recipient_id")
+			.references(() => feeShareRecipients.id, { onDelete: "cascade" })
+			.notNull(),
+		studentId: integer("student_id")
+			.references(() => students.id, { onDelete: "cascade" })
+			.notNull(),
+		terminNumber: integer("termin_number").notNull(),
+		amount: integer("amount").notNull().default(0),
+		transferProofUrl: text("transfer_proof_url"),
+		transferProofFileName: text("transfer_proof_file_name"),
+		disbursedAt: timestamp("disbursed_at").defaultNow().notNull(),
+		disbursedBy: integer("disbursed_by").references(() => users.id),
+		notes: text("notes"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(t) => [
+		index("idx_fee_disbursement_logs_recipient_id").on(t.recipientId),
+		index("idx_fee_disbursement_logs_student_id").on(t.studentId),
+	],
 );
 
 // 5b. Master Program Fee Defaults (Pagu Biaya Pendidikan per Program)

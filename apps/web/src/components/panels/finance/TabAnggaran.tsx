@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/eden";
+import { openDocumentReview } from "@/utils/document-review";
 import { formatRupiah } from "@/utils/format";
 
 interface TabAnggaranProps {
@@ -304,9 +305,16 @@ export function TabAnggaran({ canEdit }: TabAnggaranProps) {
 												<Button
 													variant="outline"
 													size="sm"
-													onClick={() => window.open(r.fileUrl, "_blank")}
+													onClick={() =>
+														openDocumentReview(
+															"anggaran",
+															r.fileUrl,
+															r.fileName || `Berkas_Anggaran_${r.id}.pdf`,
+															r.id,
+														)
+													}
 												>
-													Lihat File
+													Review File
 												</Button>
 											)}
 										</TableCell>

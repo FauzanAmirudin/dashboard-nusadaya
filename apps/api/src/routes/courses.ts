@@ -1716,6 +1716,15 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				return { success: false, message: "Course not found" };
 			}
 
+			if (course.type !== "praktik") {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Pengajuan anggaran praktik hanya berlaku untuk mata kuliah praktik",
+				};
+			}
+
 			if (
 				hasRole(user, "dosen") &&
 				!hasRole(user, "akademik", "superadmin") &&
@@ -1801,6 +1810,30 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				return { success: false, message: "Forbidden" };
 			}
 
+			const existingReq = await db.query.practicesBudgetRequests.findFirst({
+				where: eq(practicesBudgetRequests.id, reqId),
+				with: { course: true },
+			});
+
+			if (!existingReq) {
+				set.status = 404;
+				return {
+					success: false,
+					message: "Pengajuan anggaran tidak ditemukan",
+				};
+			}
+
+			if (
+				hasRole(user, "dosen") &&
+				!hasRole(user, "akademik", "superadmin") &&
+				existingReq.dosenId !== user.id &&
+				existingReq.course?.dosenId !== user.id &&
+				existingReq.course?.dosenPendampingId !== user.id
+			) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
 			const updateData: any = {
 				daftarKebutuhan: input.daftarKebutuhan,
 				totalNominal: input.totalNominal,
@@ -1831,6 +1864,30 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 		const reqId = parseInt(params.reqId, 10);
 
 		if (!hasRole(user, "dosen", "akademik")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		const existingReq = await db.query.practicesBudgetRequests.findFirst({
+			where: eq(practicesBudgetRequests.id, reqId),
+			with: { course: true },
+		});
+
+		if (!existingReq) {
+			set.status = 404;
+			return {
+				success: false,
+				message: "Pengajuan anggaran tidak ditemukan",
+			};
+		}
+
+		if (
+			hasRole(user, "dosen") &&
+			!hasRole(user, "akademik", "superadmin") &&
+			existingReq.dosenId !== user.id &&
+			existingReq.course?.dosenId !== user.id &&
+			existingReq.course?.dosenPendampingId !== user.id
+		) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}

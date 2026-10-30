@@ -120,6 +120,56 @@ export function PartitionModal({
 						</div>
 					</div>
 
+					{/* Warning Alert when Total Biaya is 0 / not determined yet by PMB */}
+					{totalBiaya <= 0 && (
+						<div className="p-4 bg-amber-50/90 border border-amber-200/90 rounded-2xl flex items-start gap-3 text-xs text-amber-950 shadow-xs">
+							<AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+							<div className="space-y-1">
+								<p className="font-bold text-sm text-amber-950">
+									Total Biaya Belum Ditentukan oleh PMB (Rp 0)
+								</p>
+								<p className="text-amber-800 leading-relaxed">
+									Tim PMB harus menginput Total Biaya Pendidikan dan uang muka
+									(DP) terlebih dahulu melalui{" "}
+									<strong>Panel PMB &gt; Tab Skema Keuangan</strong>. Setelah
+									total biaya terisi, Tim Keuangan dapat merincikan pembagian
+									termin di sini dan menyimpannya.
+								</p>
+							</div>
+						</div>
+					)}
+
+					{/* Warning Alert when Partition Total Exceeds PMB Total */}
+					{totalBiaya > 0 && modalDiff < 0 && (
+						<div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl flex items-start gap-3.5 text-xs text-rose-950 shadow-sm animate-pulse-once">
+							<div className="p-2 bg-rose-100 text-rose-700 rounded-xl shrink-0 mt-0.5">
+								<AlertTriangle className="w-5 h-5 text-rose-600" />
+							</div>
+							<div className="space-y-1.5 flex-1">
+								<div className="flex flex-wrap items-center justify-between gap-2">
+									<p className="font-extrabold text-sm text-rose-900">
+										Peringatan: Total Pembagian Melebihi Total Biaya Pendidikan!
+									</p>
+									<span className="font-mono font-black text-rose-700 bg-rose-100 border border-rose-300 px-2.5 py-0.5 rounded-full text-xs">
+										Kelebihan: +{formatRupiah(Math.abs(modalDiff))}
+									</span>
+								</div>
+								<p className="text-rose-800 leading-relaxed">
+									Jumlah alokasi 4 termin saat ini (
+									<strong className="font-mono font-bold text-rose-950">
+										{formatRupiah(modalTotalAllocated)}
+									</strong>
+									) melebihi batas Total Biaya Pendidikan yang telah ditetapkan
+									PMB (
+									<strong className="font-mono font-bold text-slate-900">
+										{formatRupiah(totalBiaya)}
+									</strong>
+									). Mohon kurangi nominal pada termin sebelum menyimpan.
+								</p>
+							</div>
+						</div>
+					)}
+
 					{/* 4 Partition Inputs Grid */}
 					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-4.5">
 						{/* 1. Registrasi Awal */}
@@ -149,16 +199,21 @@ export function PartitionModal({
 										min={0}
 										max={999999999}
 										maxLength={9}
+										disabled={totalBiaya <= 0}
 										onKeyDown={preventFinanceIntegerKey}
 										value={registrasi || ""}
 										onChange={(e) =>
 											setRegistrasi(filterFinanceInteger(e.target.value))
 										}
-										className="pl-9 h-10 text-sm font-semibold font-mono rounded-xl"
-										placeholder="Nominal registrasi"
+										className="pl-9 h-10 text-sm font-semibold font-mono rounded-xl disabled:bg-slate-100 disabled:text-slate-400"
+										placeholder={
+											totalBiaya <= 0
+												? "Menunggu input PMB"
+												: "Nominal registrasi"
+										}
 									/>
 								</div>
-								{pmbDp > 0 && registrasi !== pmbDp && (
+								{totalBiaya > 0 && pmbDp > 0 && registrasi !== pmbDp && (
 									<button
 										type="button"
 										onClick={() => setRegistrasi(pmbDp)}
@@ -210,6 +265,7 @@ export function PartitionModal({
 										min={0}
 										max={999999999}
 										maxLength={9}
+										disabled={totalBiaya <= 0}
 										onKeyDown={preventFinanceIntegerKey}
 										value={semesterTotal || ""}
 										onChange={(e) => {
@@ -217,8 +273,12 @@ export function PartitionModal({
 											setSemesterTotal(val);
 											setSemesterPerSem(val);
 										}}
-										className="pl-9 h-10 text-sm font-semibold font-mono rounded-xl"
-										placeholder="Pagu SPP Semester 1"
+										className="pl-9 h-10 text-sm font-semibold font-mono rounded-xl disabled:bg-slate-100 disabled:text-slate-400"
+										placeholder={
+											totalBiaya <= 0
+												? "Menunggu input PMB"
+												: "Pagu SPP Semester 1"
+										}
 									/>
 								</div>
 							</div>
@@ -259,13 +319,18 @@ export function PartitionModal({
 										min={0}
 										max={999999999}
 										maxLength={9}
+										disabled={totalBiaya <= 0}
 										onKeyDown={preventFinanceIntegerKey}
 										value={interview || ""}
 										onChange={(e) =>
 											setInterview(filterFinanceInteger(e.target.value))
 										}
-										className="pl-9 h-10 text-sm font-semibold font-mono rounded-xl"
-										placeholder="Nominal kontrak / suhan"
+										className="pl-9 h-10 text-sm font-semibold font-mono rounded-xl disabled:bg-slate-100 disabled:text-slate-400"
+										placeholder={
+											totalBiaya <= 0
+												? "Menunggu input PMB"
+												: "Nominal kontrak / suhan"
+										}
 									/>
 								</div>
 							</div>
@@ -306,13 +371,18 @@ export function PartitionModal({
 										min={0}
 										max={999999999}
 										maxLength={9}
+										disabled={totalBiaya <= 0}
 										onKeyDown={preventFinanceIntegerKey}
 										value={keberangkatan || ""}
 										onChange={(e) =>
 											setKeberangkatan(filterFinanceInteger(e.target.value))
 										}
-										className="pl-9 h-10 text-sm font-semibold font-mono rounded-xl"
-										placeholder="Nominal penempatan / keberangkatan"
+										className="pl-9 h-10 text-sm font-semibold font-mono rounded-xl disabled:bg-slate-100 disabled:text-slate-400"
+										placeholder={
+											totalBiaya <= 0
+												? "Menunggu input PMB"
+												: "Nominal penempatan / keberangkatan"
+										}
 									/>
 								</div>
 							</div>
@@ -336,6 +406,7 @@ export function PartitionModal({
 								type="button"
 								variant="outline"
 								size="sm"
+								disabled={totalBiaya <= 0}
 								onClick={() => {
 									const other =
 										Number(registrasi || 0) +
@@ -344,7 +415,7 @@ export function PartitionModal({
 									const rem = Math.max(0, Number(totalBiaya || 0) - other);
 									setKeberangkatan(rem);
 								}}
-								className="h-8 text-xs bg-white hover:bg-slate-100 text-slate-700 border-slate-300 rounded-lg shadow-2xs font-medium"
+								className="h-8 text-xs bg-white hover:bg-slate-100 text-slate-700 border-slate-300 rounded-lg shadow-2xs font-medium disabled:opacity-50"
 							>
 								Sisa ke Penempatan
 							</Button>
@@ -352,6 +423,7 @@ export function PartitionModal({
 								type="button"
 								variant="outline"
 								size="sm"
+								disabled={totalBiaya <= 0}
 								onClick={() => {
 									const other =
 										Number(registrasi || 0) +
@@ -361,7 +433,7 @@ export function PartitionModal({
 									setSemesterTotal(rem);
 									setSemesterPerSem(rem);
 								}}
-								className="h-8 text-xs bg-white hover:bg-slate-100 text-slate-700 border-slate-300 rounded-lg shadow-2xs font-medium"
+								className="h-8 text-xs bg-white hover:bg-slate-100 text-slate-700 border-slate-300 rounded-lg shadow-2xs font-medium disabled:opacity-50"
 							>
 								Sisa ke SPP Semester 1
 							</Button>
@@ -369,6 +441,7 @@ export function PartitionModal({
 								type="button"
 								variant="outline"
 								size="sm"
+								disabled={totalBiaya <= 0}
 								onClick={() => {
 									const total = Number(totalBiaya || 0);
 									if (total > 0) {
@@ -383,7 +456,7 @@ export function PartitionModal({
 										setKeberangkatan(keb > 0 ? keb : 0);
 									}
 								}}
-								className="h-8 text-xs bg-white hover:bg-slate-100 text-slate-700 border-slate-300 rounded-lg shadow-2xs font-medium"
+								className="h-8 text-xs bg-white hover:bg-slate-100 text-slate-700 border-slate-300 rounded-lg shadow-2xs font-medium disabled:opacity-50"
 							>
 								Bagi Proporsional (10:50:15:25)
 							</Button>
@@ -451,15 +524,21 @@ export function PartitionModal({
 					</Button>
 					<Button
 						onClick={onSave}
-						disabled={saving}
-						className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold gap-1.5 rounded-xl h-10 px-5 shadow-xs"
+						disabled={saving || totalBiaya <= 0 || !modalIsMatched}
+						className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold gap-1.5 rounded-xl h-10 px-5 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
 					>
 						{saving ? (
 							<Loader2 className="w-4 h-4 animate-spin" />
 						) : (
 							<Save className="w-4 h-4" />
 						)}
-						Terapkan & Simpan Pembagian
+						{totalBiaya <= 0
+							? "Menunggu Total Biaya dari PMB"
+							: modalDiff < 0
+								? "Pembagian Melebihi Total Biaya"
+								: modalDiff > 0
+									? "Pembagian Belum Pas 100%"
+									: "Terapkan & Simpan Pembagian"}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

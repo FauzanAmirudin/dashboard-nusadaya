@@ -223,30 +223,36 @@ export const documentsRoutes = new Elysia()
 							updatedAt: new Date(),
 						})
 						.where(eq(financeData.studentId, studentId));
-				} else if (
-					documentKey === "mandiri_interview" ||
-					documentKey === "kontrak_magang"
-				) {
+				} else if (documentKey === "mandiri_interview") {
 					await db
 						.update(financeData)
 						.set({
 							mandiriInterviewStatus: true,
 							mandiriInterviewBuktiBayarUrl: fileUrl,
 							mandiriInterviewPaidDate: new Date(),
+							updatedAt: new Date(),
+						})
+						.where(eq(financeData.studentId, studentId));
+				} else if (
+					documentKey === "mandiri_kontrak_magang" ||
+					documentKey === "kontrak_magang"
+				) {
+					await db
+						.update(financeData)
+						.set({
 							kontrakMagangStatus: true,
 							kontrakMagangBuktiBayarUrl: fileUrl,
 							kontrakMagangPaidDate: new Date(),
 							updatedAt: new Date(),
 						})
 						.where(eq(financeData.studentId, studentId));
-				} else if (documentKey === "suhan") {
+				} else if (documentKey === "mandiri_suhan" || documentKey === "suhan") {
 					await db
 						.update(financeData)
 						.set({
 							suhanStatus: true,
 							suhanBuktiBayarUrl: fileUrl,
 							suhanPaidDate: new Date(),
-							mandiriInterviewStatus: true,
 							updatedAt: new Date(),
 						})
 						.where(eq(financeData.studentId, studentId));

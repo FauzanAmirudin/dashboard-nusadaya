@@ -2,12 +2,15 @@ import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
 import {
+	feeDisbursementLogs,
 	feeShareRecipients,
 	financeCustomFields,
 	financeData,
+	financeDocuments,
 	financeProjectionTargets,
 	financeSemesterInstallments,
 	financeSemesters,
+	financeTalanganInstallments,
 	pmbData,
 	pmbPaymentPlan,
 	practicesBudgetRequests,
@@ -94,6 +97,9 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 		const monthParam = Number(query.month) || 0;
 		const startDate = query.startDate ? new Date(query.startDate) : null;
 		const endDate = query.endDate ? new Date(query.endDate) : null;
+		if (endDate && !query.endDate.includes("T")) {
+			endDate.setHours(23, 59, 59, 999);
+		}
 
 		const cohortNum = cohortParam === "all" ? 0 : Number(cohortParam) || 0;
 
@@ -196,6 +202,24 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 			installmentsByStudent.set(inst.studentId, arr);
 		}
 
+		// 3b. Fetch all talangan installments (Tahap 1 & Tahap 2)
+		const rawTalanganInstallments = await db
+			.select({
+				studentId: financeTalanganInstallments.studentId,
+				nominalPaid: financeTalanganInstallments.nominalPaid,
+				paymentDate: financeTalanganInstallments.paymentDate,
+				createdAt: financeTalanganInstallments.createdAt,
+				stage: financeTalanganInstallments.stage,
+			})
+			.from(financeTalanganInstallments);
+
+		const talanganByStudent = new Map<number, typeof rawTalanganInstallments>();
+		for (const inst of rawTalanganInstallments) {
+			const arr = talanganByStudent.get(inst.studentId) || [];
+			arr.push(inst);
+			talanganByStudent.set(inst.studentId, arr);
+		}
+
 		const isWithinDate = (d?: string | Date | null) => {
 			if (!startDate || !endDate) return true;
 			if (!d) return false;
@@ -236,50 +260,90 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 
 			const dest =
 				`${s.subProgram || ""} ${s.destinationCountry || ""} ${s.program || ""}`.toLowerCase();
-			const isTaiwan = dest.includes("taiwan");
 			const isMalaysia = dest.includes("malaysia");
 
-			// 1. SPP Taiwan vs Malaysia dari tabel cicilan resmi (finance_semester_installments)
+			const addSpp = (amount: number) => {
+				if (amount <= 0) return;
+				if (isMalaysia) sppMalaysiaPaid += amount;
+				else sppTaiwanPaid += amount;
+			};
+
+			// 1. SPP dari cicilan semester mandiri (finance_semester_installments)
 			const studentInsts = installmentsByStudent.get(s.id);
 			let hasInsts = false;
 			if (studentInsts && studentInsts.length > 0) {
 				for (const inst of studentInsts) {
-					const instDate = inst.paymentDate || inst.createdAt;
-					if (isWithinDate(instDate)) {
-						hasInsts = true;
-						const nom = Number(inst.nominalPaid) || 0;
-						if (isTaiwan) sppTaiwanPaid += nom;
-						else if (isMalaysia) sppMalaysiaPaid += nom;
+					const nom = Number(inst.nominalPaid) || 0;
+					if (nom > 0) {
+						const instDate = inst.paymentDate || inst.createdAt;
+						if (isWithinDate(instDate)) {
+							hasInsts = true;
+							addSpp(nom);
+						}
+					}
+				}
+			}
+
+			// 2. Pembayaran Cicilan Dana Talangan (finance_talangan_installments: Tahap 1 & Tahap 2)
+			const studentTalanganInsts = talanganByStudent.get(s.id);
+			let hasTalanganInsts = false;
+			if (studentTalanganInsts && studentTalanganInsts.length > 0) {
+				for (const inst of studentTalanganInsts) {
+					const nom = Number(inst.nominalPaid) || 0;
+					if (nom > 0) {
+						const instDate = inst.paymentDate || inst.createdAt;
+						if (isWithinDate(instDate)) {
+							hasTalanganInsts = true;
+							addSpp(nom);
+						}
 					}
 				}
 			}
 
 			if (fin) {
-				// 2. PMB / Registrasi Awal
+				// 3. PMB / Registrasi Awal (Partisi 1)
 				if (fin.registrasiStatus || (fin as any).registrationPaid) {
 					const regDate =
 						fin.registrasiPaidDate || fin.updatedAt || s.createdAt;
 					if (isWithinDate(regDate)) {
-						pmbPaid += Number(fin.registrasiNominal) || 0;
+						const nom = Number(fin.registrasiNominal) || 0;
+						if (nom > 0) pmbPaid += nom;
 					}
 				}
 
-				// 3. Fallback ke kolom single-payment legacy jika belum dipecah ke installments
-				if (!hasInsts) {
+				// 4. Fallback ke kolom single-payment legacy jika belum dipecah ke tabel installments
+				if (!hasInsts && !hasTalanganInsts) {
 					if (fin.mandiriSemesterStatus && fin.mandiriSemesterNominal) {
 						const semDate =
 							(fin as any).mandiriSemesterPaidDate || fin.updatedAt;
 						if (isWithinDate(semDate)) {
-							const nom = Number(fin.mandiriSemesterNominal) || 0;
-							if (isTaiwan) sppTaiwanPaid += nom;
-							else if (isMalaysia) sppMalaysiaPaid += nom;
+							addSpp(Number(fin.mandiriSemesterNominal) || 0);
 						}
 					} else if (fin.t1SemesterNominalDibayar) {
 						const semDate = (fin as any).t1SemesterPaidDate || fin.updatedAt;
 						if (isWithinDate(semDate)) {
-							const nom = Number(fin.t1SemesterNominalDibayar) || 0;
-							if (isTaiwan) sppTaiwanPaid += nom;
-							else if (isMalaysia) sppMalaysiaPaid += nom;
+							addSpp(Number(fin.t1SemesterNominalDibayar) || 0);
+						}
+					}
+				}
+
+				// 5. Pembayaran Mandiri Termin 3 (Kontrak Magang / Suhan) & Termin 4 (Keberangkatan)
+				if (fin.metodePembayaran === "mandiri") {
+					// Termin 3: Kontrak Magang / Suhan
+					if (fin.mandiriInterviewStatus || fin.kontrakMagangStatus) {
+						const intDate =
+							fin.mandiriInterviewPaidDate ||
+							fin.kontrakMagangPaidDate ||
+							fin.updatedAt;
+						if (isWithinDate(intDate)) {
+							addSpp(Number(fin.mandiriInterviewNominal) || 0);
+						}
+					}
+					// Termin 4: Penempatan Magang / Keberangkatan
+					if (fin.mandiriKeberangkatanStatus) {
+						const kebDate = fin.mandiriKeberangkatanPaidDate || fin.updatedAt;
+						if (isWithinDate(kebDate)) {
+							addSpp(Number(fin.mandiriKeberangkatanNominal) || 0);
 						}
 					}
 				}
@@ -469,21 +533,47 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 				return { success: false, message: "Student not found" };
 			}
 
-			const finance = await db.query.financeData.findFirst({
-				where: eq(financeData.studentId, sId),
-			});
-
-			const pmb = await db.query.pmbData.findFirst({
-				where: eq(pmbData.studentId, sId),
-			});
-
-			const paymentPlan = await db.query.pmbPaymentPlan.findFirst({
-				where: eq(pmbPaymentPlan.studentId, sId),
-			});
-
-			const customFields = await db.query.financeCustomFields.findMany({
-				where: eq(financeCustomFields.studentId, sId),
-			});
+			const [
+				finance,
+				pmb,
+				paymentPlan,
+				customFields,
+				semesters,
+				documents,
+				talanganInstallments,
+			] = await Promise.all([
+				db.query.financeData.findFirst({
+					where: eq(financeData.studentId, sId),
+				}),
+				db.query.pmbData.findFirst({
+					where: eq(pmbData.studentId, sId),
+				}),
+				db.query.pmbPaymentPlan.findFirst({
+					where: eq(pmbPaymentPlan.studentId, sId),
+				}),
+				db.query.financeCustomFields.findMany({
+					where: eq(financeCustomFields.studentId, sId),
+				}),
+				db.query.financeSemesters.findMany({
+					where: eq(financeSemesters.studentId, sId),
+					with: { installments: true },
+					orderBy: (financeSemesters, { asc }) => [
+						asc(financeSemesters.semesterNumber),
+					],
+				}),
+				db.query.financeDocuments.findMany({
+					where: eq(financeDocuments.studentId, sId),
+					orderBy: (financeDocuments, { desc }) => [
+						desc(financeDocuments.uploadedAt),
+					],
+				}),
+				db.query.financeTalanganInstallments.findMany({
+					where: eq(financeTalanganInstallments.studentId, sId),
+					orderBy: (financeTalanganInstallments, { asc }) => [
+						asc(financeTalanganInstallments.installmentNumber),
+					],
+				}),
+			]);
 
 			const isTalangan = finance?.metodePembayaran === "dana_talangan";
 			const rawFinance = (finance || {}) as Record<string, any>;
@@ -499,43 +589,156 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 					? rawFinance.registrasiNominal
 					: pmbDp;
 
+			// 1. Dokumen Registrasi Awal
+			const regDoc = documents.find(
+				(d) =>
+					d.documentKey === "registrasi" ||
+					d.documentKey === "bukti_registrasi",
+			);
+			const registrasiBuktiBayarUrl =
+				rawFinance.registrasiBuktiBayarUrl || regDoc?.fileUrl || null;
+
+			// 2. SPP Semester 1 (Cicilan Bulanan Mandiri / Talangan)
+			const sem1 = semesters.find((s) => s.semesterNumber === 1);
+			const sem1Installments = sem1?.installments || [];
+			const sem1TotalPaid = sem1Installments.reduce(
+				(sum, inst) => sum + (inst.nominalPaid || 0),
+				0,
+			);
+			const sem1TotalScheduled = sem1Installments.reduce(
+				(sum, inst) =>
+					sum +
+					(Number(
+						inst.nominalScheduled !== undefined &&
+							inst.nominalScheduled !== null
+							? inst.nominalScheduled
+							: inst.nominalPaid,
+					) || 0),
+				0,
+			);
+			const sem1NominalPagu =
+				(isTalangan
+					? rawFinance.t1SemesterNominalTotal
+					: rawFinance.mandiriSemesterNominal) ||
+				sem1?.totalBilled ||
+				0;
+
+			let sem1StatusString: "LUNAS" | "SEBAGIAN" | "BELUM_BAYAR" =
+				"BELUM_BAYAR";
+			if (
+				(sem1NominalPagu > 0 && sem1TotalPaid >= sem1NominalPagu) ||
+				(isTalangan
+					? Boolean(rawFinance.t1SemesterStatus)
+					: Boolean(rawFinance.mandiriSemesterStatus))
+			) {
+				sem1StatusString = "LUNAS";
+			} else if (sem1TotalPaid > 0) {
+				sem1StatusString = "SEBAGIAN";
+			}
+
+			const paidInstWithDoc = [...sem1Installments]
+				.reverse()
+				.find((inst) => (inst.nominalPaid || 0) > 0 && inst.buktiBayarUrl);
+			const anyInstWithDoc = [...sem1Installments]
+				.reverse()
+				.find((inst) => inst.buktiBayarUrl);
+			const sem1Doc = documents.find(
+				(d) =>
+					d.documentKey.startsWith("semester_1") ||
+					d.documentKey === "spp_semester_1" ||
+					d.documentKey === "semester_1_inst",
+			);
+			const sem1BuktiBayarUrl =
+				paidInstWithDoc?.buktiBayarUrl ||
+				anyInstWithDoc?.buktiBayarUrl ||
+				rawFinance.mandiriSemesterBuktiBayarUrl ||
+				sem1Doc?.fileUrl ||
+				null;
+
+			// 3. Kontrak Magang & Suhan
+			const kontrakDoc = documents.find(
+				(d) => d.documentKey === "kontrak_magang",
+			);
+			const suhanDoc = documents.find((d) => d.documentKey === "suhan");
+			const kontrakBuktiBayarUrl =
+				rawFinance.kontrakMagangBuktiBayarUrl ??
+				rawFinance.mandiriInterviewBuktiBayarUrl ??
+				kontrakDoc?.fileUrl ??
+				null;
+			const suhanBuktiBayarUrl =
+				rawFinance.suhanBuktiBayarUrl ?? suhanDoc?.fileUrl ?? null;
+			const termin3BuktiBayarUrl =
+				kontrakBuktiBayarUrl ?? suhanBuktiBayarUrl ?? null;
+
+			const isKontrakPaid = Boolean(
+				rawFinance.kontrakMagangStatus ?? rawFinance.mandiriInterviewStatus,
+			);
+			const isSuhanPaid = Boolean(rawFinance.suhanStatus);
+			const isTermin3Lunas = isTalangan
+				? Boolean(rawFinance.t1InterviewStatus)
+				: isKontrakPaid && isSuhanPaid;
+
+			// 4. Penempatan Magang / Keberangkatan
+			const kebDoc = documents.find(
+				(d) =>
+					d.documentKey === "keberangkatan" ||
+					d.documentKey === "visa_tiket" ||
+					d.documentKey === "mandiri_keberangkatan",
+			);
+			const termin4BuktiBayarUrl = isTalangan
+				? (rawFinance.t2KeberangkatanBuktiBayarUrl ?? kebDoc?.fileUrl ?? null)
+				: (rawFinance.mandiriKeberangkatanBuktiBayarUrl ??
+					kebDoc?.fileUrl ??
+					null);
+
 			const safeFinance = {
 				...rawFinance,
 				registrasiNominal: effectiveRegistrasiNominal,
-				kontrakMagangStatus:
-					rawFinance.kontrakMagangStatus ??
-					rawFinance.mandiriInterviewStatus ??
-					false,
-				kontrakMagangBuktiBayarUrl:
-					rawFinance.kontrakMagangBuktiBayarUrl ??
-					rawFinance.mandiriInterviewBuktiBayarUrl ??
-					null,
+				registrasiBuktiBayarUrl,
+				mandiriSemesterNominal: sem1NominalPagu,
+				mandiriSemesterStatus: sem1StatusString === "LUNAS",
+				mandiriSemesterStatusString: sem1StatusString,
+				mandiriSemesterPaidTotal: sem1TotalPaid,
+				kontrakMagangStatus: isKontrakPaid,
+				kontrakMagangBuktiBayarUrl: kontrakBuktiBayarUrl,
 				kontrakMagangPaidDate:
 					rawFinance.kontrakMagangPaidDate ??
 					rawFinance.mandiriInterviewPaidDate ??
 					null,
-				suhanStatus: rawFinance.suhanStatus ?? false,
-				suhanBuktiBayarUrl: rawFinance.suhanBuktiBayarUrl ?? null,
+				suhanStatus: isSuhanPaid,
+				suhanBuktiBayarUrl,
 				suhanPaidDate: rawFinance.suhanPaidDate ?? null,
+				mandiriKeberangkatanBuktiBayarUrl: termin4BuktiBayarUrl,
 				termin1: {
 					name: "Registrasi Awal",
 					nominal: effectiveRegistrasiNominal,
 					status: Boolean(rawFinance.registrasiStatus || paymentPlan?.statusDp),
 					paidDate: rawFinance.registrasiPaidDate ?? null,
-					buktiBayarUrl: rawFinance.registrasiBuktiBayarUrl ?? null,
+					buktiBayarUrl: registrasiBuktiBayarUrl,
 				},
 				termin2: {
 					name: "Pembayaran SPP Semester 1",
-					nominal: isTalangan
-						? (rawFinance.t1SemesterNominalTotal ?? 0)
-						: (rawFinance.mandiriSemesterNominal ?? 0),
-					status: isTalangan
-						? Boolean(rawFinance.t1SemesterStatus)
-						: Boolean(rawFinance.mandiriSemesterStatus),
+					nominal: sem1NominalPagu,
+					totalPaid: sem1TotalPaid,
+					totalScheduled: sem1TotalScheduled,
+					status: sem1StatusString === "LUNAS",
+					statusString: sem1StatusString,
 					paidDate: isTalangan
 						? (rawFinance.t1SemesterPaidDate ?? null)
 						: (rawFinance.mandiriSemesterPaidDate ?? null),
-					buktiBayarUrl: rawFinance.mandiriSemesterBuktiBayarUrl ?? null,
+					buktiBayarUrl: sem1BuktiBayarUrl,
+					installments: sem1Installments.map((inst) => ({
+						id: inst.id,
+						installmentNumber: inst.installmentNumber,
+						installmentMonth: inst.installmentMonth,
+						nominalScheduled: inst.nominalScheduled,
+						nominalPaid: inst.nominalPaid,
+						status: inst.status,
+						dueDate: inst.dueDate,
+						paymentDate: inst.paymentDate,
+						buktiBayarUrl: inst.buktiBayarUrl,
+						notes: inst.notes,
+					})),
 				},
 				termin3: {
 					name: "Kontrak Magang / Suhan",
@@ -549,20 +752,17 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 									rawFinance.suhanStatus ||
 									rawFinance.mandiriInterviewStatus,
 							),
+					isLunas: isTermin3Lunas,
 					paidDate: isTalangan
 						? (rawFinance.t1InterviewPaidDate ?? null)
 						: (rawFinance.kontrakMagangPaidDate ??
 							rawFinance.mandiriInterviewPaidDate ??
 							null),
-					kontrakStatus: Boolean(
-						rawFinance.kontrakMagangStatus ?? rawFinance.mandiriInterviewStatus,
-					),
-					suhanStatus: Boolean(rawFinance.suhanStatus),
-					buktiBayarUrl:
-						rawFinance.kontrakMagangBuktiBayarUrl ??
-						rawFinance.mandiriInterviewBuktiBayarUrl ??
-						null,
-					suhanBuktiBayarUrl: rawFinance.suhanBuktiBayarUrl ?? null,
+					kontrakStatus: isKontrakPaid,
+					suhanStatus: isSuhanPaid,
+					buktiBayarUrl: termin3BuktiBayarUrl,
+					kontrakBuktiBayarUrl,
+					suhanBuktiBayarUrl,
 				},
 				termin4: {
 					name: "Penempatan Magang Taiwan / Keberangkatan",
@@ -575,9 +775,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 					paidDate: isTalangan
 						? (rawFinance.t2KeberangkatanPaidDate ?? null)
 						: (rawFinance.mandiriKeberangkatanPaidDate ?? null),
-					buktiBayarUrl: isTalangan
-						? (rawFinance.t2KeberangkatanBuktiBayarUrl ?? null)
-						: (rawFinance.mandiriKeberangkatanBuktiBayarUrl ?? null),
+					buktiBayarUrl: termin4BuktiBayarUrl,
 				},
 			};
 
@@ -590,6 +788,9 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 					pmbDp,
 					rumahJuangAktif: pmb?.rumahJuang || false,
 					customFields,
+					semesters,
+					documents,
+					talanganInstallments,
 				},
 			};
 		},
@@ -851,6 +1052,16 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 			const sId = parseInt(studentId, 10);
 			const recipients = await db.query.feeShareRecipients.findMany({
 				where: eq(feeShareRecipients.studentId, sId),
+				with: {
+					disbursementLogs: {
+						orderBy: [desc(feeDisbursementLogs.terminNumber)],
+						with: {
+							disbursedByUser: {
+								columns: { id: true, fullName: true, username: true },
+							},
+						},
+					},
+				},
 				orderBy: [desc(feeShareRecipients.createdAt)],
 			});
 			const fin = await db.query.financeData.findFirst({
@@ -935,7 +1146,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 					updatePayload.tanggalCair = body.tanggalCair
 						? new Date(body.tanggalCair)
 						: new Date();
-				} else {
+				} else if (body.statusPencairan === "belum_dibayarkan") {
 					updatePayload.tanggalCair = null;
 				}
 			}
@@ -946,6 +1157,351 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 				.where(eq(feeShareRecipients.id, recipientIdInt));
 
 			return { success: true };
+		},
+	)
+	// Segmen 13: Upload Bukti Transfer Bank Pencairan Termin Fee Sharing
+	.post(
+		"/fee-sharing/recipients/:recipientId/upload-proof",
+		async ({ params: { recipientId }, body, set, user }: any) => {
+			if (!hasRole(user, "finance")) {
+				set.status = 403;
+				return {
+					success: false,
+					message:
+						"Hanya divisi Finance yang memiliki wewenang mengunggah bukti transfer fee sharing",
+				};
+			}
+			const recipientIdInt = parseInt(recipientId, 10);
+			const file = body.file as File;
+			if (!file || !file.name) {
+				set.status = 400;
+				return {
+					success: false,
+					message: "File bukti transfer tidak ditemukan dalam request",
+				};
+			}
+
+			const validUploaderId = await getValidUserId(user);
+
+			let uploadResult;
+			try {
+				uploadResult = await fileService.uploadFile({
+					file,
+					category: "finance",
+					panel: "finance",
+					documentKey: `fee_transfer_${recipientIdInt}_${Date.now()}`,
+					uploadedBy: validUploaderId ?? undefined,
+				});
+			} catch (err: any) {
+				set.status = 400;
+				return {
+					success: false,
+					message: err?.message || "Gagal mengunggah berkas",
+				};
+			}
+
+			const filePath = `/files/${uploadResult.id}/download`;
+
+			return {
+				success: true,
+				message: "Bukti transfer bank berhasil diunggah",
+				data: {
+					transferProofUrl: filePath,
+					transferProofFileName: uploadResult.originalName,
+				},
+			};
+		},
+		{
+			body: t.Object({
+				file: t.File(),
+			}),
+		},
+	)
+	// Segmen 13: Pencairan Fee Sharing Bertahap (Multi-Termin) oleh Finance
+	.post(
+		"/fee-sharing/recipients/:recipientId/disburse",
+		async ({ params: { recipientId }, body, set, user }: any) => {
+			if (!hasRole(user, "finance")) {
+				set.status = 403;
+				return {
+					success: false,
+					message:
+						"Hanya divisi Finance yang memiliki wewenang mencairkan fee sharing",
+				};
+			}
+			const recipientIdInt = parseInt(recipientId, 10);
+			const recipient = await db.query.feeShareRecipients.findFirst({
+				where: eq(feeShareRecipients.id, recipientIdInt),
+			});
+			if (!recipient) {
+				set.status = 404;
+				return {
+					success: false,
+					message: "Data penerima fee sharing tidak ditemukan",
+				};
+			}
+
+			const amount = Math.max(0, Number(body.amount) || 0);
+			if (amount <= 0) {
+				set.status = 400;
+				return {
+					success: false,
+					message: "Nominal pencairan fee sharing harus lebih dari Rp 0",
+				};
+			}
+
+			const existingLogs = await db.query.feeDisbursementLogs.findMany({
+				where: eq(feeDisbursementLogs.recipientId, recipientIdInt),
+			});
+
+			const nextTermin = body.terminNumber
+				? Number(body.terminNumber)
+				: existingLogs.length + 1;
+			const disbursedDate = body.disbursedAt
+				? new Date(body.disbursedAt)
+				: new Date();
+			const validUserId = await getValidUserId(user);
+
+			const [newLog] = await db
+				.insert(feeDisbursementLogs)
+				.values({
+					recipientId: recipientIdInt,
+					studentId: recipient.studentId,
+					terminNumber: nextTermin,
+					amount,
+					transferProofUrl: body.transferProofUrl || null,
+					transferProofFileName:
+						body.transferProofFileName ||
+						(body.transferProofUrl ? "Bukti_Transfer_Fee.pdf" : null),
+					disbursedAt: disbursedDate,
+					disbursedBy: validUserId,
+					notes: body.notes || null,
+				})
+				.returning();
+
+			// Recalculate total disbursed
+			const allLogs = [...existingLogs, newLog];
+			const totalDisbursed = allLogs.reduce(
+				(sum, l) => sum + (l.amount || 0),
+				0,
+			);
+
+			let newStatus = "belum_dibayarkan";
+			const targetNominal = recipient.nominalFee || 0;
+			if (totalDisbursed >= targetNominal && targetNominal > 0) {
+				newStatus = "sudah_dibayarkan";
+			} else if (totalDisbursed > 0) {
+				newStatus = "cair_sebagian";
+			}
+
+			await db
+				.update(feeShareRecipients)
+				.set({
+					statusPencairan: newStatus,
+					tanggalCair: disbursedDate,
+					updatedAt: new Date(),
+				})
+				.where(eq(feeShareRecipients.id, recipientIdInt));
+
+			await invalidateFinanceCache(recipient.studentId);
+
+			return {
+				success: true,
+				message: `Pencairan Termin ${nextTermin} sebesar Rp ${amount.toLocaleString("id-ID")} berhasil dicatat`,
+				data: {
+					log: newLog,
+					statusPencairan: newStatus,
+					totalDisbursed,
+				},
+			};
+		},
+		{
+			body: t.Object({
+				amount: t.Number(),
+				terminNumber: t.Optional(t.Number()),
+				disbursedAt: t.Optional(t.String()),
+				notes: t.Optional(t.String()),
+				transferProofUrl: t.Optional(t.String()),
+				transferProofFileName: t.Optional(t.String()),
+			}),
+		},
+	)
+	// Segmen 13: Hapus / Batalkan Pencairan Termin Tertentu
+	.delete(
+		"/fee-sharing/disbursements/:logId",
+		async ({ params: { logId }, set, user }: any) => {
+			if (!hasRole(user, "finance")) {
+				set.status = 403;
+				return {
+					success: false,
+					message:
+						"Hanya divisi Finance yang memiliki wewenang membatalkan pencairan fee",
+				};
+			}
+			const lId = parseInt(logId, 10);
+			const log = await db.query.feeDisbursementLogs.findFirst({
+				where: eq(feeDisbursementLogs.id, lId),
+			});
+			if (!log) {
+				set.status = 404;
+				return {
+					success: false,
+					message: "Riwayat pencairan tidak ditemukan",
+				};
+			}
+
+			const recipientId = log.recipientId;
+			const studentId = log.studentId;
+
+			await db
+				.delete(feeDisbursementLogs)
+				.where(eq(feeDisbursementLogs.id, lId));
+
+			// Recalculate recipient status
+			const remainingLogs = await db.query.feeDisbursementLogs.findMany({
+				where: eq(feeDisbursementLogs.recipientId, recipientId),
+				orderBy: [desc(feeDisbursementLogs.disbursedAt)],
+			});
+
+			const recipient = await db.query.feeShareRecipients.findFirst({
+				where: eq(feeShareRecipients.id, recipientId),
+			});
+
+			const totalDisbursed = remainingLogs.reduce(
+				(sum, l) => sum + (l.amount || 0),
+				0,
+			);
+
+			let newStatus = "belum_dibayarkan";
+			const targetNominal = recipient?.nominalFee || 0;
+			if (totalDisbursed >= targetNominal && targetNominal > 0) {
+				newStatus = "sudah_dibayarkan";
+			} else if (totalDisbursed > 0) {
+				newStatus = "cair_sebagian";
+			}
+
+			await db
+				.update(feeShareRecipients)
+				.set({
+					statusPencairan: newStatus,
+					tanggalCair: remainingLogs[0]?.disbursedAt || null,
+					updatedAt: new Date(),
+				})
+				.where(eq(feeShareRecipients.id, recipientId));
+
+			await invalidateFinanceCache(studentId);
+
+			return {
+				success: true,
+				message: "Riwayat pencairan termin berhasil dihapus",
+				data: { statusPencairan: newStatus, totalDisbursed },
+			};
+		},
+	)
+	// Segmen 13: Edit / Update Pencairan Termin Tertentu
+	.put(
+		"/fee-sharing/disbursements/:logId",
+		async ({ params: { logId }, body, set, user }: any) => {
+			if (!hasRole(user, "finance")) {
+				set.status = 403;
+				return {
+					success: false,
+					message:
+						"Hanya divisi Finance yang memiliki wewenang mengedit pencairan fee",
+				};
+			}
+			const lId = parseInt(logId, 10);
+			const log = await db.query.feeDisbursementLogs.findFirst({
+				where: eq(feeDisbursementLogs.id, lId),
+			});
+			if (!log) {
+				set.status = 404;
+				return {
+					success: false,
+					message: "Riwayat pencairan tidak ditemukan",
+				};
+			}
+
+			const amount =
+				body.amount !== undefined
+					? Math.max(0, Number(body.amount) || 0)
+					: log.amount;
+			if (amount <= 0) {
+				set.status = 400;
+				return {
+					success: false,
+					message: "Nominal pencairan fee sharing harus lebih dari Rp 0",
+				};
+			}
+
+			const updateValues: any = {
+				amount,
+				updatedAt: new Date(),
+			};
+			if (body.terminNumber !== undefined)
+				updateValues.terminNumber = Number(body.terminNumber);
+			if (body.disbursedAt !== undefined)
+				updateValues.disbursedAt = new Date(body.disbursedAt);
+			if (body.notes !== undefined) updateValues.notes = body.notes;
+			if (body.transferProofUrl !== undefined)
+				updateValues.transferProofUrl = body.transferProofUrl;
+			if (body.transferProofFileName !== undefined)
+				updateValues.transferProofFileName = body.transferProofFileName;
+
+			await db
+				.update(feeDisbursementLogs)
+				.set(updateValues)
+				.where(eq(feeDisbursementLogs.id, lId));
+
+			// Recalculate recipient status
+			const remainingLogs = await db.query.feeDisbursementLogs.findMany({
+				where: eq(feeDisbursementLogs.recipientId, log.recipientId),
+				orderBy: [desc(feeDisbursementLogs.disbursedAt)],
+			});
+
+			const recipient = await db.query.feeShareRecipients.findFirst({
+				where: eq(feeShareRecipients.id, log.recipientId),
+			});
+
+			const totalDisbursed = remainingLogs.reduce(
+				(sum, l) => sum + (l.amount || 0),
+				0,
+			);
+
+			let newStatus = "belum_dibayarkan";
+			const targetNominal = recipient?.nominalFee || 0;
+			if (totalDisbursed >= targetNominal && targetNominal > 0) {
+				newStatus = "sudah_dibayarkan";
+			} else if (totalDisbursed > 0) {
+				newStatus = "cair_sebagian";
+			}
+
+			await db
+				.update(feeShareRecipients)
+				.set({
+					statusPencairan: newStatus,
+					tanggalCair: remainingLogs[0]?.disbursedAt || null,
+					updatedAt: new Date(),
+				})
+				.where(eq(feeShareRecipients.id, log.recipientId));
+
+			await invalidateFinanceCache(log.studentId);
+
+			return {
+				success: true,
+				message: "Data pencairan termin berhasil diperbarui",
+				data: { statusPencairan: newStatus, totalDisbursed },
+			};
+		},
+		{
+			body: t.Object({
+				amount: t.Optional(t.Number()),
+				terminNumber: t.Optional(t.Number()),
+				disbursedAt: t.Optional(t.String()),
+				notes: t.Optional(t.String()),
+				transferProofUrl: t.Optional(t.String()),
+				transferProofFileName: t.Optional(t.String()),
+			}),
 		},
 	)
 
@@ -979,9 +1535,23 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	})
 	.patch(
 		"/anggaran-praktik/:requestId/approve",
-		async ({ params: { requestId }, body, user }: any) => {
-			if (!hasRole(user, "finance"))
+		async ({ params: { requestId }, body, set, user }: any) => {
+			if (!hasRole(user, "finance")) {
+				set.status = 403;
 				return { success: false, message: "Forbidden" };
+			}
+
+			const reqId = parseInt(requestId, 10);
+			const existing = await db.query.practicesBudgetRequests.findFirst({
+				where: eq(practicesBudgetRequests.id, reqId),
+			});
+			if (!existing) {
+				set.status = 404;
+				return {
+					success: false,
+					message: "Pengajuan anggaran tidak ditemukan",
+				};
+			}
 
 			const validApproverId = await getValidUserId(user);
 
@@ -1002,8 +1572,11 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 			await db
 				.update(practicesBudgetRequests)
 				.set(updateData)
-				.where(eq(practicesBudgetRequests.id, parseInt(requestId)));
-			return { success: true };
+				.where(eq(practicesBudgetRequests.id, reqId));
+			return {
+				success: true,
+				message: "Pengajuan anggaran berhasil disetujui",
+			};
 		},
 		{
 			body: t.Optional(
@@ -1131,18 +1704,42 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 	)
 	.patch(
 		"/anggaran-praktik/:requestId/reject",
-		async ({ params: { requestId }, body, user }: any) => {
-			if (!hasRole(user, "finance"))
+		async ({ params: { requestId }, body, set, user }: any) => {
+			if (!hasRole(user, "finance")) {
+				set.status = 403;
 				return { success: false, message: "Forbidden" };
+			}
+			const reason = (body?.catatanFinance || "").trim();
+			if (!reason) {
+				set.status = 400;
+				return {
+					success: false,
+					message: "Alasan penolakan tertulis wajib diisi",
+				};
+			}
+			const reqId = parseInt(requestId, 10);
+			const existing = await db.query.practicesBudgetRequests.findFirst({
+				where: eq(practicesBudgetRequests.id, reqId),
+			});
+			if (!existing) {
+				set.status = 404;
+				return {
+					success: false,
+					message: "Pengajuan anggaran tidak ditemukan",
+				};
+			}
 			await db
 				.update(practicesBudgetRequests)
 				.set({
 					status: "ditolak",
-					catatanFinance: body.catatanFinance,
+					catatanFinance: reason,
 					updatedAt: new Date(),
 				})
-				.where(eq(practicesBudgetRequests.id, parseInt(requestId)));
-			return { success: true };
+				.where(eq(practicesBudgetRequests.id, reqId));
+			return {
+				success: true,
+				message: "Pengajuan anggaran berhasil ditolak",
+			};
 		},
 		{ body: t.Object({ catatanFinance: t.String() }) },
 	)

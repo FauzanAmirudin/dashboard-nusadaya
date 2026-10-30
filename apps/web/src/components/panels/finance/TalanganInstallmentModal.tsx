@@ -1,6 +1,6 @@
 "use client";
 
-import { Banknote, Loader2, Paperclip, Save, Trash2 } from "lucide-react";
+import { Banknote, Eye, Loader2, Paperclip, Save, Trash2 } from "lucide-react";
 import type React from "react";
 import { useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { API_URL } from "@/lib/eden";
+import { openDocumentReview } from "@/utils/document-review";
 import { filterNumeric, preventNonNumericKey } from "@/utils/form-validators";
 import { formatRupiah } from "@/utils/format";
 
 interface TalanganInstallmentModalProps {
+	studentId?: number;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	activeStage: "tahap_1" | "tahap_2";
@@ -46,6 +48,7 @@ interface TalanganInstallmentModalProps {
 }
 
 export function TalanganInstallmentModal({
+	studentId,
 	open,
 	onOpenChange,
 	activeStage,
@@ -188,25 +191,42 @@ export function TalanganInstallmentModal({
 								</Button>
 							</div>
 						) : form.buktiBayarUrl ? (
-							<div className="flex items-center justify-between p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
-								<a
-									href={`${API_URL}${form.buktiBayarUrl.startsWith("/") ? "" : "/"}${form.buktiBayarUrl}`}
-									target="_blank"
-									rel="noreferrer"
-									className="flex items-center gap-2 text-xs text-blue-800 hover:text-blue-900 font-semibold truncate"
-								>
-									<Paperclip className="w-4 h-4 text-blue-600 shrink-0" />
-									<span className="truncate">Lihat Bukti Bayar Terlampir</span>
-								</a>
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									className="h-6 text-[11px] px-2 text-slate-700"
-									onClick={() => fileInputRef.current?.click()}
-								>
-									Ganti
-								</Button>
+							<div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+								<div className="flex items-center gap-2 text-xs text-slate-700 truncate pr-2">
+									<Paperclip className="w-4 h-4 text-slate-500 shrink-0" />
+									<span className="truncate font-semibold">
+										Bukti Bayar Terlampir
+									</span>
+								</div>
+								<div className="flex items-center gap-1.5 shrink-0">
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										className="h-7 text-xs font-semibold text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 bg-white rounded-lg cursor-pointer gap-1.5 shadow-2xs"
+										onClick={() =>
+											openDocumentReview(
+												studentId || "review",
+												form.buktiBayarUrl,
+												`Bukti Bayar Talangan — ${stageLabel}.pdf`,
+												activeInstallment?.id || "talangan",
+											)
+										}
+										title="Review Dokumen Bukti Bayar"
+									>
+										<Eye className="w-3.5 h-3.5 text-[#0517B0]" />
+										<span>Review Bukti</span>
+									</Button>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										className="h-7 text-xs border-slate-200 hover:bg-slate-100 cursor-pointer"
+										onClick={() => fileInputRef.current?.click()}
+									>
+										Ganti Berkas
+									</Button>
+								</div>
 							</div>
 						) : (
 							<Button
@@ -222,13 +242,13 @@ export function TalanganInstallmentModal({
 					</div>
 				</div>
 
-				<DialogFooter className="gap-2 sm:gap-0">
+				<DialogFooter className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
 					<Button
 						variant="outline"
 						size="sm"
 						onClick={() => onOpenChange(false)}
 						disabled={saving}
-						className="text-xs"
+						className="text-xs h-9 px-4"
 					>
 						Batal
 					</Button>
@@ -236,7 +256,7 @@ export function TalanganInstallmentModal({
 						size="sm"
 						onClick={onSave}
 						disabled={saving}
-						className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
+						className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold h-9 px-4 shadow-xs"
 					>
 						{saving ? (
 							<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />

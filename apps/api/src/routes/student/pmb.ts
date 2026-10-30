@@ -2,6 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../../db";
 import {
+	feeDisbursementLogs,
 	feeShareRecipients,
 	financeData,
 	pmbData,
@@ -581,6 +582,24 @@ export const pmbRoutes = new Elysia()
 				where: eq(pmbPaymentPlan.studentId, id),
 			});
 
+			const effectiveTotalBiaya = Number(
+				body.totalBiaya !== undefined
+					? body.totalBiaya
+					: (existingPlan?.totalBiaya ?? 0),
+			);
+
+			if (
+				effectiveTotalBiaya > 0 &&
+				effectiveDp !== undefined &&
+				effectiveDp > effectiveTotalBiaya
+			) {
+				set.status = 400;
+				return {
+					success: false,
+					message: `Nominal DP Pendaftaran (Rp ${effectiveDp.toLocaleString("id-ID")}) tidak boleh melebihi Total Biaya Pendidikan (Rp ${effectiveTotalBiaya.toLocaleString("id-ID")}).`,
+				};
+			}
+
 			if (existingPlan) {
 				await db
 					.update(pmbPaymentPlan)
@@ -713,6 +732,16 @@ export const pmbRoutes = new Elysia()
 		const id = parseInt(params.id, 10);
 		const recipients = await db.query.feeShareRecipients.findMany({
 			where: eq(feeShareRecipients.studentId, id),
+			with: {
+				disbursementLogs: {
+					orderBy: [desc(feeDisbursementLogs.terminNumber)],
+					with: {
+						disbursedByUser: {
+							columns: { id: true, fullName: true, username: true },
+						},
+					},
+				},
+			},
 			orderBy: [desc(feeShareRecipients.createdAt)],
 		});
 		return { success: true, data: recipients };

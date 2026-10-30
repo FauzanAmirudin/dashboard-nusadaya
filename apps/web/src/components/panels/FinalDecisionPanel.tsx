@@ -47,6 +47,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
+import { openDocumentReview } from "@/utils/document-review";
 
 interface FinalDecisionData {
 	decision: {
@@ -717,9 +718,16 @@ export function FinalDecisionPanel({
 													variant="outline"
 													size="sm"
 													className="w-full mt-1 border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-													onClick={() => window.open(doc.fileUrl, "_blank")}
+													onClick={() =>
+														openDocumentReview(
+															studentId,
+															doc.fileUrl,
+															doc.fileName || "Dokumen_Keputusan.pdf",
+															doc.documentKey || "decision",
+														)
+													}
 												>
-													Lihat Dokumen
+													Review Dokumen
 												</Button>
 											</div>
 										) : (

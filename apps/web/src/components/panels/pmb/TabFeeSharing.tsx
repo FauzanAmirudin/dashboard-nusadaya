@@ -9,6 +9,7 @@ import {
 	Loader2,
 	Megaphone,
 	Plus,
+	RefreshCw,
 	Trash2,
 	Users,
 } from "lucide-react";
@@ -53,12 +54,23 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { API_URL, getToken } from "@/lib/eden";
+import { openDocumentReview } from "@/utils/document-review";
 import {
 	filterNumeric,
 	filterPhone,
 	preventNonNumericKey,
 	preventNonPhoneKey,
 } from "@/utils/form-validators";
+
+interface FeeDisbursementLog {
+	id: number;
+	terminNumber: number;
+	amount: number;
+	transferProofUrl?: string | null;
+	transferProofFileName?: string | null;
+	notes?: string | null;
+	disbursedAt: string;
+}
 
 interface FeeShareRecipient {
 	id: number;
@@ -71,7 +83,8 @@ interface FeeShareRecipient {
 	namaBank?: string | null;
 	nominalFee: number;
 	invoiceFileUrl?: string | null;
-	statusPencairan: string; // "belum_dibayarkan" | "sudah_dibayarkan"
+	statusPencairan: string; // "belum_dibayarkan" | "cair_sebagian" | "sudah_dibayarkan"
+	disbursementLogs?: FeeDisbursementLog[];
 	createdAt: string;
 }
 
@@ -124,6 +137,22 @@ export function TabFeeSharing({
 
 	useEffect(() => {
 		fetchFeeShareRecipients();
+
+		const handleFeeUpdate = (e: any) => {
+			if (!e.detail?.studentId || e.detail.studentId === studentId) {
+				fetchFeeShareRecipients();
+			}
+		};
+
+		window.addEventListener("fee-sharing-updated", handleFeeUpdate);
+		window.addEventListener("focus", fetchFeeShareRecipients);
+		const interval = setInterval(fetchFeeShareRecipients, 10000);
+
+		return () => {
+			window.removeEventListener("fee-sharing-updated", handleFeeUpdate);
+			window.removeEventListener("focus", fetchFeeShareRecipients);
+			clearInterval(interval);
+		};
 	}, [studentId]);
 
 	const handleOpenAddModal = () => {
@@ -244,16 +273,27 @@ export function TabFeeSharing({
 		}).format(num);
 	};
 
+	const getRecipientDisbursed = (rec: FeeShareRecipient) => {
+		if (rec.disbursementLogs && rec.disbursementLogs.length > 0) {
+			return rec.disbursementLogs.reduce(
+				(sum, l) => sum + (Number(l.amount) || 0),
+				0,
+			);
+		}
+		return rec.statusPencairan === "sudah_dibayarkan"
+			? Number(rec.nominalFee) || 0
+			: 0;
+	};
+
 	const totalBiayaIklan = feeShareRecipients.reduce(
 		(sum, rec) => sum + (rec.nominalFee || 0),
 		0,
 	);
-	const totalSudahDibayar = feeShareRecipients
-		.filter((rec) => rec.statusPencairan === "sudah_dibayarkan")
-		.reduce((sum, rec) => sum + (rec.nominalFee || 0), 0);
-	const totalBelumDibayar = feeShareRecipients
-		.filter((rec) => rec.statusPencairan !== "sudah_dibayarkan")
-		.reduce((sum, rec) => sum + (rec.nominalFee || 0), 0);
+	const totalSudahDibayar = feeShareRecipients.reduce(
+		(sum, rec) => sum + getRecipientDisbursed(rec),
+		0,
+	);
+	const totalBelumDibayar = Math.max(0, totalBiayaIklan - totalSudahDibayar);
 
 	return (
 		<div className="space-y-6">
@@ -320,16 +360,28 @@ export function TabFeeSharing({
 							Finance
 						</p>
 					</div>
-					{canEdit && (
+					<div className="flex items-center gap-2">
 						<Button
-							onClick={handleOpenAddModal}
+							variant="outline"
 							size="sm"
-							className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1.5"
+							onClick={fetchFeeShareRecipients}
+							className="h-8 text-xs font-semibold text-slate-600 border-slate-200 hover:bg-slate-100 gap-1.5 cursor-pointer shadow-2xs"
+							title="Segarkan data dari Finance secara realtime"
 						>
-							<Plus className="w-4 h-4" />
-							Tambah Penerima Fee
+							<RefreshCw className="w-3.5 h-3.5" />
+							<span>Segarkan</span>
 						</Button>
-					)}
+						{canEdit && (
+							<Button
+								onClick={handleOpenAddModal}
+								size="sm"
+								className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1.5 shadow-2xs"
+							>
+								<Plus className="w-4 h-4" />
+								Tambah Penerima Fee
+							</Button>
+						)}
+					</div>
 				</CardHeader>
 				<CardContent className="p-0">
 					<Table>
@@ -400,27 +452,105 @@ export function TabFeeSharing({
 										<TableCell className="text-xs text-slate-600 font-medium">
 											{rec.noHp}
 										</TableCell>
-										<TableCell className="text-xs font-bold text-slate-800">
-											{formatRupiah(rec.nominalFee || 0)}
+										<TableCell className="text-xs">
+											<div className="font-black text-slate-900">
+												{formatRupiah(rec.nominalFee || 0)}
+											</div>
+											{rec.disbursementLogs &&
+												rec.disbursementLogs.length > 0 && (
+													<div className="mt-1 space-y-0.5">
+														<div className="text-[11px] font-bold text-emerald-700">
+															Cair: {formatRupiah(getRecipientDisbursed(rec))}
+														</div>
+														<div className="text-[10px] text-slate-500 font-medium">
+															{rec.disbursementLogs.length} Termin tercatat
+														</div>
+														{rec.nominalFee > getRecipientDisbursed(rec) ? (
+															<div className="text-[10px] font-semibold text-rose-600">
+																Sisa:{" "}
+																{formatRupiah(
+																	rec.nominalFee - getRecipientDisbursed(rec),
+																)}
+															</div>
+														) : (
+															<div className="text-[10px] font-bold text-emerald-600">
+																✓ Lunas Terpenuhi
+															</div>
+														)}
+													</div>
+												)}
 										</TableCell>
 										<TableCell>
-											{rec.invoiceFileUrl ? (
+											{rec.disbursementLogs &&
+											rec.disbursementLogs.length > 0 ? (
+												<div className="flex flex-col gap-1.5 items-start">
+													{rec.disbursementLogs.map((log) => (
+														<div
+															key={log.id}
+															className="p-1.5 rounded-lg bg-slate-50 border border-slate-200/90 w-full max-w-[220px] shadow-2xs"
+														>
+															<div className="flex items-center justify-between gap-1.5">
+																<span className="text-[11px] font-bold text-slate-800">
+																	T{log.terminNumber}:{" "}
+																	{formatRupiah(log.amount)}
+																</span>
+																{log.transferProofUrl ? (
+																	<Button
+																		type="button"
+																		variant="outline"
+																		size="sm"
+																		className="h-6 text-[10px] font-semibold text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 gap-1 cursor-pointer shadow-2xs px-2 shrink-0"
+																		title={`Review Bukti Termin ${log.terminNumber}`}
+																		onClick={() => {
+																			openDocumentReview(
+																				studentId,
+																				log.transferProofUrl,
+																				log.transferProofFileName ||
+																					`Bukti_Termin_${log.terminNumber}_${rec.namaReferral}.pdf`,
+																				`fee-termin-${log.id}`,
+																			);
+																		}}
+																	>
+																		<Eye className="w-3 h-3 text-[#0517B0]" />
+																		<span>Review Bukti</span>
+																	</Button>
+																) : (
+																	<span className="text-[10px] text-slate-400 italic">
+																		Tanpa berkas
+																	</span>
+																)}
+															</div>
+															{log.notes && (
+																<p
+																	className="text-[10px] text-slate-500 truncate"
+																	title={log.notes}
+																>
+																	{log.notes}
+																</p>
+															)}
+														</div>
+													))}
+												</div>
+											) : rec.invoiceFileUrl ? (
 												<Button
+													type="button"
 													variant="outline"
 													size="sm"
-													className="h-7 text-xs font-medium text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 gap-1.5 cursor-pointer shadow-2xs"
-													title="Lihat Bukti Transfer"
+													className="h-7 text-xs font-semibold text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 gap-1.5 cursor-pointer shadow-2xs"
+													title="Review Bukti Transfer"
 													onClick={() => {
 														const invoiceUrl = `/students/${studentId}/pmb/fee-share-recipients/${rec.id}/invoice`;
 														const invoiceName = `Bukti Transfer - ${rec.namaReferral} (${rec.kategori}).pdf`;
-														window.open(
-															`/dashboard/students/${studentId}/documents/${rec.id}?url=${encodeURIComponent(invoiceUrl)}&name=${encodeURIComponent(invoiceName)}&token=${getToken()}`,
-															"_blank",
+														openDocumentReview(
+															studentId,
+															invoiceUrl,
+															invoiceName,
+															rec.id,
 														);
 													}}
 												>
-													<Eye className="w-3.5 h-3.5" />
-													<span>Lihat Bukti</span>
+													<Eye className="w-3.5 h-3.5 text-[#0517B0]" />
+													<span>Review Bukti</span>
 												</Button>
 											) : (
 												<span className="text-[11px] text-slate-400 italic">
@@ -430,11 +560,15 @@ export function TabFeeSharing({
 										</TableCell>
 										<TableCell>
 											{rec.statusPencairan === "sudah_dibayarkan" ? (
-												<Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
-													Sudah Dibayarkan
+												<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+													✓ Lunas (100%)
+												</Badge>
+											) : rec.statusPencairan === "cair_sebagian" ? (
+												<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-bold">
+													⏳ Cair Sebagian
 												</Badge>
 											) : (
-												<Badge className="bg-rose-500/10 text-rose-500 border-rose-500/20 text-[10px]">
+												<Badge className="bg-rose-50 text-rose-600 border-rose-200 text-[10px] font-medium">
 													Belum Dibayarkan
 												</Badge>
 											)}

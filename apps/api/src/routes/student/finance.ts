@@ -139,6 +139,10 @@ export const financeRoutes = new Elysia()
 					"suhanStatus",
 					"suhanPaidDate",
 					"suhanBuktiBayarUrl",
+					"talanganTipe",
+					"talanganTotalPengajuan",
+					"talanganLembaga",
+					"talanganNotes",
 				];
 				const hasForbiddenKey = Object.keys(updates).some(
 					(k) => !allowedKeys.includes(k),
@@ -199,6 +203,7 @@ export const financeRoutes = new Elysia()
 				"t1InterviewNominal",
 				"t2KeberangkatanNominal",
 				"adminTalaganNominal",
+				"talanganTotalPengajuan",
 				"toeicNominal",
 				"pasporNominal",
 				"rumahJuangNominal",
@@ -209,6 +214,64 @@ export const financeRoutes = new Elysia()
 						999999999,
 						Math.max(0, Number(cleanUpdates[field]) || 0),
 					);
+				}
+			}
+
+			// Validasi batas atas: Pembagian termin & pengajuan talangan tidak boleh melebihi Total Biaya Pendidikan
+			const totalBiayaPendidikan =
+				cleanUpdates.totalBiayaPendidikan !== undefined
+					? Number(cleanUpdates.totalBiayaPendidikan)
+					: (current?.totalBiayaPendidikan ?? 0);
+
+			if (totalBiayaPendidikan > 0) {
+				const isPartitionUpdate =
+					cleanUpdates.registrasiNominal !== undefined ||
+					cleanUpdates.mandiriSemesterNominal !== undefined ||
+					cleanUpdates.mandiriSemesterNominalTotal !== undefined ||
+					cleanUpdates.mandiriInterviewNominal !== undefined ||
+					cleanUpdates.mandiriKeberangkatanNominal !== undefined;
+
+				if (isPartitionUpdate) {
+					const reg =
+						cleanUpdates.registrasiNominal !== undefined
+							? Number(cleanUpdates.registrasiNominal)
+							: (current?.registrasiNominal ?? 0);
+					const sem =
+						cleanUpdates.mandiriSemesterNominal !== undefined
+							? Number(cleanUpdates.mandiriSemesterNominal)
+							: cleanUpdates.mandiriSemesterNominalTotal !== undefined
+								? Number(cleanUpdates.mandiriSemesterNominalTotal)
+								: (current?.mandiriSemesterNominal ?? 0);
+					const intv =
+						cleanUpdates.mandiriInterviewNominal !== undefined
+							? Number(cleanUpdates.mandiriInterviewNominal)
+							: (current?.mandiriInterviewNominal ?? 0);
+					const keb =
+						cleanUpdates.mandiriKeberangkatanNominal !== undefined
+							? Number(cleanUpdates.mandiriKeberangkatanNominal)
+							: (current?.mandiriKeberangkatanNominal ?? 0);
+
+					const totalPartisi = reg + sem + intv + keb;
+					if (totalPartisi > totalBiayaPendidikan) {
+						set.status = 400;
+						return {
+							success: false,
+							message: `Total pembagian termin (Rp ${totalPartisi.toLocaleString("id-ID")}) melebihi Total Biaya Pendidikan yang ditetapkan PMB (Rp ${totalBiayaPendidikan.toLocaleString("id-ID")}). Kelebihan: Rp ${(totalPartisi - totalBiayaPendidikan).toLocaleString("id-ID")}.`,
+						};
+					}
+				}
+
+				if (
+					cleanUpdates.talanganTotalPengajuan !== undefined &&
+					cleanUpdates.talanganTotalPengajuan !== null &&
+					Number(cleanUpdates.talanganTotalPengajuan) > totalBiayaPendidikan
+				) {
+					const talanganNominal = Number(cleanUpdates.talanganTotalPengajuan);
+					set.status = 400;
+					return {
+						success: false,
+						message: `Total pengajuan dana talangan (Rp ${talanganNominal.toLocaleString("id-ID")}) tidak boleh melebihi Total Biaya Pendidikan (Rp ${totalBiayaPendidikan.toLocaleString("id-ID")}).`,
+					};
 				}
 			}
 
@@ -384,15 +447,27 @@ export const financeRoutes = new Elysia()
 			where: eq(financeData.studentId, id),
 		});
 
+		if (!currentFinance || (currentFinance.totalBiayaPendidikan || 0) <= 0) {
+			set.status = 400;
+			return {
+				success: false,
+				message:
+					"Total Biaya Pendidikan belum ditentukan oleh PMB (Rp 0). ACC Keuangan tidak dapat diberikan.",
+			};
+		}
+
 		const isTalangan = currentFinance?.metodePembayaran === "dana_talangan";
+		const isTalanganSatuTahap =
+			isTalangan && currentFinance?.talanganTipe === "1_tahap";
 		const isSemesterDone = isTalangan
-			? Boolean(
+			? isTalanganSatuTahap ||
+				Boolean(
 					currentFinance?.t1SemesterStatus ||
 						currentFinance?.mandiriSemesterStatus,
 				)
 			: Boolean(currentFinance?.mandiriSemesterStatus);
 		const isInterviewDone = isTalangan
-			? Boolean(currentFinance?.t1InterviewStatus)
+			? isTalanganSatuTahap || Boolean(currentFinance?.t1InterviewStatus)
 			: Boolean(currentFinance?.mandiriInterviewStatus);
 		const isKeberangkatanDone = isTalangan
 			? Boolean(currentFinance?.t2KeberangkatanStatus)
@@ -443,17 +518,20 @@ export const financeRoutes = new Elysia()
 		let checked = 0;
 		if (currentFinance) {
 			const isTalangan = currentFinance.metodePembayaran === "dana_talangan";
+			const isTalanganSatuTahap =
+				isTalangan && currentFinance.talanganTipe === "1_tahap";
 			if (currentFinance.registrasiStatus) checked++;
 			if (
 				isTalangan
-					? currentFinance.t1SemesterStatus ||
+					? isTalanganSatuTahap ||
+						currentFinance.t1SemesterStatus ||
 						currentFinance.mandiriSemesterStatus
 					: currentFinance.mandiriSemesterStatus
 			)
 				checked++;
 			if (
 				isTalangan
-					? currentFinance.t1InterviewStatus
+					? isTalanganSatuTahap || currentFinance.t1InterviewStatus
 					: currentFinance.mandiriInterviewStatus
 			)
 				checked++;
@@ -586,13 +664,15 @@ export const financeRoutes = new Elysia()
 			},
 		});
 
-		// Auto-seed if empty
+		// Auto-seed if empty (hanya Semester 1 untuk pengaturan awal)
 		if (semesters.length === 0) {
-			const seedData = Array.from({ length: 6 }).map((_, i) => ({
-				studentId: id,
-				semesterNumber: i + 1,
-				totalBilled: 0,
-			}));
+			const seedData = [
+				{
+					studentId: id,
+					semesterNumber: 1,
+					totalBilled: 0,
+				},
+			];
 			await db.insert(financeSemesters).values(seedData);
 
 			semesters = await db.query.financeSemesters.findMany({
@@ -667,6 +747,19 @@ export const financeRoutes = new Elysia()
 				.where(eq(financeSemesters.id, semesterId));
 
 			const studentId = Number(params.id);
+
+			if (current.semesterNumber === 1) {
+				const isLunas = newStatus === "LUNAS";
+				await db
+					.update(financeData)
+					.set({
+						mandiriSemesterStatus: isLunas,
+						mandiriSemesterPaidDate: isLunas ? new Date() : null,
+						updatedAt: new Date(),
+					})
+					.where(eq(financeData.studentId, studentId));
+			}
+
 			await invalidateFinanceCaches(studentId);
 
 			return { success: true };
@@ -757,9 +850,9 @@ export const financeRoutes = new Elysia()
 		{
 			body: t.Object({
 				nominalPaid: t.Number(),
-				paymentDate: t.Optional(t.String()),
-				buktiBayarUrl: t.Optional(t.String()),
-				notes: t.Optional(t.String()),
+				paymentDate: t.Optional(t.Nullable(t.String())),
+				buktiBayarUrl: t.Optional(t.Nullable(t.String())),
+				notes: t.Optional(t.Nullable(t.String())),
 				isTalangan: t.Optional(t.Boolean()),
 			}),
 		},
@@ -788,31 +881,62 @@ export const financeRoutes = new Elysia()
 			}
 
 			const installmentNumber = current.installments.length + 1;
-			const safeNominal = Math.min(
+			const safeNominalScheduled = Math.min(
+				999999999,
+				Math.max(
+					0,
+					Number(
+						b.nominalScheduled !== undefined
+							? b.nominalScheduled
+							: b.nominalPaid,
+					) || 0,
+				),
+			);
+			const safeNominalPaid = Math.min(
 				999999999,
 				Math.max(0, Number(b.nominalPaid) || 0),
 			);
+			const instStatus =
+				b.status || (safeNominalPaid > 0 ? "LUNAS" : "BELUM_BAYAR");
+			const dueDate = b.dueDate ? new Date(b.dueDate) : null;
+			const paymentDate = b.paymentDate
+				? new Date(b.paymentDate)
+				: instStatus === "LUNAS" && safeNominalPaid > 0
+					? new Date()
+					: null;
 
-			await db.insert(financeSemesterInstallments).values({
-				semesterId,
-				installmentNumber,
-				nominalPaid: safeNominal,
-				paymentDate: b.paymentDate ? new Date(b.paymentDate) : new Date(),
-				buktiBayarUrl: b.buktiBayarUrl,
-				notes: b.notes,
-				isTalangan: b.isTalangan ?? false,
-				installmentMonth: b.installmentMonth,
-				periodNotes: b.periodNotes,
-			});
+			const [inserted] = await db
+				.insert(financeSemesterInstallments)
+				.values({
+					semesterId,
+					installmentNumber,
+					nominalScheduled: safeNominalScheduled,
+					dueDate,
+					status: instStatus,
+					nominalPaid: safeNominalPaid,
+					paymentDate,
+					buktiBayarUrl: b.buktiBayarUrl || null,
+					notes: b.notes || null,
+					isTalangan: b.isTalangan ?? false,
+					installmentMonth: b.installmentMonth,
+					periodNotes: b.periodNotes,
+				})
+				.returning();
 
 			// Recalculate status
 			const newTotalPaid =
-				current.installments.reduce((sum, inst) => sum + inst.nominalPaid, 0) +
-				safeNominal;
+				current.installments.reduce(
+					(sum, inst) => sum + (inst.nominalPaid || 0),
+					0,
+				) + safeNominalPaid;
 			let newStatus = current.status;
 
 			if (newTotalPaid === 0) newStatus = "BELUM_BAYAR";
-			else if (newTotalPaid >= (current.totalBilled || 0)) newStatus = "LUNAS";
+			else if (
+				newTotalPaid >= (current.totalBilled || 0) &&
+				(current.totalBilled || 0) > 0
+			)
+				newStatus = "LUNAS";
 			else newStatus = "SEBAGIAN";
 
 			await db
@@ -824,19 +948,35 @@ export const financeRoutes = new Elysia()
 				.where(eq(financeSemesters.id, semesterId));
 
 			const studentId = Number(params.id);
+
+			if (current.semesterNumber === 1) {
+				const isLunas = newStatus === "LUNAS";
+				await db
+					.update(financeData)
+					.set({
+						mandiriSemesterStatus: isLunas,
+						mandiriSemesterPaidDate: isLunas ? new Date() : null,
+						updatedAt: new Date(),
+					})
+					.where(eq(financeData.studentId, studentId));
+			}
+
 			await invalidateFinanceCaches(studentId);
 
-			return { success: true };
+			return { success: true, data: inserted, installmentNumber };
 		},
 		{
 			body: t.Object({
-				nominalPaid: t.Number(),
-				paymentDate: t.Optional(t.String()),
-				buktiBayarUrl: t.Optional(t.String()),
-				notes: t.Optional(t.String()),
+				nominalScheduled: t.Optional(t.Number()),
+				dueDate: t.Optional(t.Nullable(t.String())),
+				status: t.Optional(t.String()),
+				nominalPaid: t.Optional(t.Number()),
+				paymentDate: t.Optional(t.Nullable(t.String())),
+				buktiBayarUrl: t.Optional(t.Nullable(t.String())),
+				notes: t.Optional(t.Nullable(t.String())),
 				isTalangan: t.Optional(t.Boolean()),
-				installmentMonth: t.Optional(t.String()),
-				periodNotes: t.Optional(t.String()),
+				installmentMonth: t.Optional(t.Nullable(t.String())),
+				periodNotes: t.Optional(t.Nullable(t.String())),
 			}),
 		},
 	)
@@ -852,6 +992,7 @@ export const financeRoutes = new Elysia()
 
 			const semesterId = Number(params.semesterId);
 			const installmentId = Number(params.installmentId);
+			const studentId = Number(params.id);
 			const updates = body as any;
 
 			const currentSemester = await db.query.financeSemesters.findFirst({
@@ -876,19 +1017,51 @@ export const financeRoutes = new Elysia()
 				return { success: false, message: "Installment not found" };
 			}
 
+			const newNominalPaid =
+				updates.nominalPaid !== undefined
+					? Math.min(999999999, Math.max(0, Number(updates.nominalPaid) || 0))
+					: inst.nominalPaid;
+			const newStatus =
+				updates.status !== undefined
+					? updates.status
+					: updates.nominalPaid !== undefined
+						? newNominalPaid > 0
+							? "LUNAS"
+							: "BELUM_BAYAR"
+						: inst.status;
+
+			const newNominalScheduled =
+				updates.nominalScheduled !== undefined
+					? Math.min(
+							999999999,
+							Math.max(0, Number(updates.nominalScheduled) || 0),
+						)
+					: inst.nominalScheduled;
+
 			await db
 				.update(financeSemesterInstallments)
 				.set({
-					nominalPaid:
-						updates.nominalPaid !== undefined
+					nominalScheduled:
+						updates.nominalScheduled !== undefined
 							? Math.min(
 									999999999,
-									Math.max(0, Number(updates.nominalPaid) || 0),
+									Math.max(0, Number(updates.nominalScheduled) || 0),
 								)
-							: inst.nominalPaid,
-					paymentDate: updates.paymentDate
-						? new Date(updates.paymentDate)
-						: inst.paymentDate,
+							: inst.nominalScheduled,
+					dueDate:
+						updates.dueDate !== undefined
+							? updates.dueDate
+								? new Date(updates.dueDate)
+								: null
+							: inst.dueDate,
+					status: newStatus,
+					nominalPaid: newNominalPaid,
+					paymentDate:
+						updates.paymentDate !== undefined
+							? updates.paymentDate
+								? new Date(updates.paymentDate)
+								: null
+							: inst.paymentDate,
 					buktiBayarUrl:
 						updates.buktiBayarUrl !== undefined
 							? updates.buktiBayarUrl
@@ -930,22 +1103,36 @@ export const financeRoutes = new Elysia()
 						updatedAt: new Date(),
 					})
 					.where(eq(financeSemesters.id, semesterId));
+
+				if (refreshedSemester.semesterNumber === 1) {
+					const isLunas = newStatus === "LUNAS";
+					await db
+						.update(financeData)
+						.set({
+							mandiriSemesterStatus: isLunas,
+							mandiriSemesterPaidDate: isLunas ? new Date() : null,
+							updatedAt: new Date(),
+						})
+						.where(eq(financeData.studentId, studentId));
+				}
 			}
 
-			const studentId = Number(params.id);
 			await invalidateFinanceCaches(studentId);
 
 			return { success: true };
 		},
 		{
 			body: t.Object({
+				nominalScheduled: t.Optional(t.Number()),
+				dueDate: t.Optional(t.Nullable(t.String())),
+				status: t.Optional(t.String()),
 				nominalPaid: t.Optional(t.Number()),
-				paymentDate: t.Optional(t.String()),
-				buktiBayarUrl: t.Optional(t.String()),
-				notes: t.Optional(t.String()),
+				paymentDate: t.Optional(t.Nullable(t.String())),
+				buktiBayarUrl: t.Optional(t.Nullable(t.String())),
+				notes: t.Optional(t.Nullable(t.String())),
 				isTalangan: t.Optional(t.Boolean()),
-				installmentMonth: t.Optional(t.String()),
-				periodNotes: t.Optional(t.String()),
+				installmentMonth: t.Optional(t.Nullable(t.String())),
+				periodNotes: t.Optional(t.Nullable(t.String())),
 			}),
 		},
 	)
@@ -961,6 +1148,7 @@ export const financeRoutes = new Elysia()
 
 			const semesterId = Number(params.semesterId);
 			const installmentId = Number(params.installmentId);
+			const studentId = Number(params.id);
 
 			const inst = await db.query.financeSemesterInstallments.findFirst({
 				where: and(
@@ -1001,9 +1189,20 @@ export const financeRoutes = new Elysia()
 						updatedAt: new Date(),
 					})
 					.where(eq(financeSemesters.id, semesterId));
+
+				if (current.semesterNumber === 1) {
+					const isLunas = newStatus === "LUNAS";
+					await db
+						.update(financeData)
+						.set({
+							mandiriSemesterStatus: isLunas,
+							mandiriSemesterPaidDate: isLunas ? new Date() : null,
+							updatedAt: new Date(),
+						})
+						.where(eq(financeData.studentId, studentId));
+				}
 			}
 
-			const studentId = Number(params.id);
 			await invalidateFinanceCaches(studentId);
 
 			return { success: true };
@@ -1066,9 +1265,9 @@ export const financeRoutes = new Elysia()
 			body: t.Object({
 				stage: t.String(),
 				nominalPaid: t.Number(),
-				paymentDate: t.Optional(t.String()),
-				buktiBayarUrl: t.Optional(t.String()),
-				notes: t.Optional(t.String()),
+				paymentDate: t.Optional(t.Nullable(t.String())),
+				buktiBayarUrl: t.Optional(t.Nullable(t.String())),
+				notes: t.Optional(t.Nullable(t.String())),
 			}),
 		},
 	)
@@ -1109,9 +1308,9 @@ export const financeRoutes = new Elysia()
 		{
 			body: t.Object({
 				nominalPaid: t.Optional(t.Number()),
-				paymentDate: t.Optional(t.String()),
-				buktiBayarUrl: t.Optional(t.String()),
-				notes: t.Optional(t.String()),
+				paymentDate: t.Optional(t.Nullable(t.String())),
+				buktiBayarUrl: t.Optional(t.Nullable(t.String())),
+				notes: t.Optional(t.Nullable(t.String())),
 			}),
 		},
 	)

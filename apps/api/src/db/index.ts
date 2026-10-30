@@ -758,6 +758,13 @@ export async function ensureDatabaseSchema() {
 			ALTER TABLE finance_data ADD COLUMN IF NOT EXISTS t2_keberangkatan_paid_date TIMESTAMP;
 			ALTER TABLE finance_semester_installments ADD COLUMN IF NOT EXISTS installment_month TEXT;
 			ALTER TABLE finance_semester_installments ADD COLUMN IF NOT EXISTS period_notes TEXT;
+			ALTER TABLE finance_semester_installments ADD COLUMN IF NOT EXISTS nominal_scheduled INTEGER DEFAULT 0;
+			ALTER TABLE finance_semester_installments ADD COLUMN IF NOT EXISTS due_date TIMESTAMP;
+			ALTER TABLE finance_semester_installments ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'BELUM_BAYAR';
+			UPDATE finance_semester_installments 
+			SET nominal_scheduled = COALESCE(NULLIF(nominal_scheduled, 0), nominal_paid, 0),
+			    status = CASE WHEN COALESCE(nominal_paid, 0) > 0 THEN 'LUNAS' ELSE 'BELUM_BAYAR' END
+			WHERE nominal_scheduled IS NULL OR nominal_scheduled = 0;
 		`);
 	} catch (err) {
 		console.warn("[Database] Schema check warning:", err);

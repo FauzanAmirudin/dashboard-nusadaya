@@ -15,12 +15,14 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { API_URL, getToken } from "@/lib/eden";
+import { formatRupiah } from "@/utils/format";
 import { BiayaTambahanSection } from "./BiayaTambahanSection";
 import { CustomFieldModal } from "./CustomFieldModal";
 import { DanaTalanganSection } from "./DanaTalanganSection";
 import { InstallmentModal } from "./InstallmentModal";
 import { PartisiBiayaCard } from "./PartisiBiayaCard";
 import { PartitionModal } from "./PartitionModal";
+import { PaymentConfirmationModal } from "./PaymentConfirmationModal";
 import { PembayaranUtamaSection } from "./PembayaranUtamaSection";
 import { TalanganInstallmentModal } from "./TalanganInstallmentModal";
 
@@ -56,29 +58,44 @@ export function TabKeuangan({
 	const [loadingSemesters, setLoadingSemesters] = useState(false);
 	const [expandedSemesters, setExpandedSemesters] = useState<number[]>([]);
 
-	// Add Installment Modal
+	// Add / Edit Schedule Modal
 	const [installmentModalOpen, setInstallmentModalOpen] = useState(false);
 	const [activeSemester, setActiveSemester] = useState<any>(null);
 	const [activeInstallment, setActiveInstallment] = useState<any>(null);
 	const [installmentLoading, setInstallmentLoading] = useState(false);
-	const [installmentForm, setInstallmentForm] = useState<{
-		nominalPaid: string;
-		paymentDate: string;
+	const [scheduleForm, setScheduleForm] = useState<{
+		nominalScheduled: string;
+		dueDate: string;
 		notes: string;
-		isTalangan: boolean;
-		file: File | null;
-		buktiBayarUrl: string;
-		installmentMonth?: string;
+		installmentMonth: string;
 		periodNotes?: string;
 	}>({
-		nominalPaid: "",
-		paymentDate: new Date().toISOString().split("T")[0],
+		nominalScheduled: "",
+		dueDate: new Date().toISOString().split("T")[0],
 		notes: "",
-		isTalangan: false,
-		file: null,
-		buktiBayarUrl: "",
 		installmentMonth: "",
 		periodNotes: "",
+	});
+
+	// Payment Confirmation Modal
+	const [paymentConfirmModalOpen, setPaymentConfirmModalOpen] = useState(false);
+	const [paymentActiveInstallment, setPaymentActiveInstallment] =
+		useState<any>(null);
+	const [paymentActiveSemester, setPaymentActiveSemester] = useState<any>(null);
+	const [paymentForm, setPaymentForm] = useState<{
+		paymentDate: string;
+		nominalPaid: string;
+		notes: string;
+		file: File | null;
+		buktiBayarUrl: string;
+		status: string;
+	}>({
+		paymentDate: new Date().toISOString().split("T")[0],
+		nominalPaid: "",
+		notes: "",
+		file: null,
+		buktiBayarUrl: "",
+		status: "LUNAS",
 	});
 
 	const [deletedInstallments, setDeletedInstallments] = useState<
@@ -150,6 +167,13 @@ export function TabKeuangan({
 	const [newFieldLabel, setNewFieldLabel] = useState("");
 	const [isAddingField, setIsAddingField] = useState(false);
 	const [isDeletingField, setIsDeletingField] = useState(false);
+
+	const [installmentToDelete, setInstallmentToDelete] = useState<{
+		semesterId: number;
+		installmentId: number;
+	} | null>(null);
+	const [talanganToDelete, setTalanganToDelete] = useState<number | null>(null);
+	const [isDeletingInstallment, setIsDeletingInstallment] = useState(false);
 
 	const fetchApi = (endpoint: string, options: RequestInit = {}) => {
 		const token = getToken();
@@ -397,36 +421,34 @@ export function TabKeuangan({
 		}
 	};
 
-	const openInstallmentModal = (semester: any, installment?: any) => {
-		if (!canEdit || !isEditingUtama) {
-			toast.error(
-				"Silakan klik 'Edit Data' pada Pembayaran Utama terlebih dahulu untuk menambah atau mengedit cicilan.",
-			);
+	const openScheduleModal = (semester: any, installment?: any) => {
+		if (!canEdit) {
+			toast.error("Anda tidak memiliki akses untuk mengubah data keuangan.");
 			return;
 		}
 		setActiveSemester(semester);
 		setActiveInstallment(installment || null);
 		if (installment) {
-			setInstallmentForm({
-				nominalPaid: installment.nominalPaid.toString(),
-				paymentDate: installment.paymentDate
-					? installment.paymentDate.split("T")[0]
-					: new Date().toISOString().split("T")[0],
+			setScheduleForm({
+				nominalScheduled: (installment.nominalScheduled !== undefined &&
+				installment.nominalScheduled !== null
+					? installment.nominalScheduled
+					: installment.nominalPaid || ""
+				).toString(),
+				dueDate: installment.dueDate
+					? installment.dueDate.split("T")[0]
+					: installment.paymentDate
+						? installment.paymentDate.split("T")[0]
+						: new Date().toISOString().split("T")[0],
 				notes: installment.notes || "",
-				isTalangan: installment.isTalangan ?? false,
-				file: installment.file || null,
-				buktiBayarUrl: installment.buktiBayarUrl || "",
 				installmentMonth: installment.installmentMonth || "",
 				periodNotes: installment.periodNotes || "",
 			});
 		} else {
-			setInstallmentForm({
-				nominalPaid: "",
-				paymentDate: new Date().toISOString().split("T")[0],
+			setScheduleForm({
+				nominalScheduled: "",
+				dueDate: new Date().toISOString().split("T")[0],
 				notes: "",
-				isTalangan: false,
-				file: null,
-				buktiBayarUrl: "",
 				installmentMonth: "",
 				periodNotes: "",
 			});
@@ -434,143 +456,288 @@ export function TabKeuangan({
 		setInstallmentModalOpen(true);
 	};
 
-	const saveInstallmentModal = () => {
-		const nominal = Number(installmentForm.nominalPaid);
+	const openInstallmentModal = openScheduleModal;
+
+	const saveScheduleModal = async () => {
+		const nominal = Number(scheduleForm.nominalScheduled);
+		if (!nominal || nominal <= 0) {
+			toast.error("Nominal tagihan cicilan harus lebih dari 0");
+			return;
+		}
+		if (!scheduleForm.installmentMonth?.trim()) {
+			toast.error("Pilih atau isi bulan / periode cicilan");
+			return;
+		}
+		if (!activeSemester?.id) {
+			toast.error("Data semester tidak ditemukan");
+			return;
+		}
+
+		// Validasi kapasitas sisa pagu SPP Semester jika pagu sudah ditentukan (> 0)
+		const semTotalBilled = Number(activeSemester?.totalBilled) || 0;
+		if (semTotalBilled > 0) {
+			const existingOtherScheduled = (activeSemester?.installments || [])
+				.filter(
+					(inst: any) => !activeInstallment || inst.id !== activeInstallment.id,
+				)
+				.reduce(
+					(sum: number, inst: any) =>
+						sum + (Number(inst.nominalScheduled) || 0),
+					0,
+				);
+			const maxCapacity = Math.max(0, semTotalBilled - existingOtherScheduled);
+			if (nominal > maxCapacity) {
+				toast.error(
+					`Nominal tagihan cicilan (${formatRupiah(nominal)}) melebihi sisa pagu SPP yang tersedia (${formatRupiah(maxCapacity)} dari total pagu ${formatRupiah(semTotalBilled)}).`,
+					{ duration: 5000 },
+				);
+				return;
+			}
+		}
+
+		const semId = activeSemester.id;
+		setInstallmentLoading(true);
+
+		try {
+			if (activeInstallment && activeInstallment.id > 0) {
+				const res = await fetchApi(
+					`/students/${studentId}/finance/semesters/${semId.toString()}/installments/${activeInstallment.id.toString()}`,
+					{
+						method: "PATCH",
+						body: JSON.stringify({
+							nominalScheduled: nominal,
+							dueDate: scheduleForm.dueDate || null,
+							notes: scheduleForm.notes || null,
+							installmentMonth: scheduleForm.installmentMonth,
+							periodNotes: scheduleForm.periodNotes || null,
+						}),
+					},
+				);
+				if (!res.ok) {
+					const err = await res.json();
+					throw new Error(err.message || "Gagal memperbarui jadwal cicilan");
+				}
+				toast.success("Jadwal cicilan berhasil diperbarui!");
+			} else {
+				const res = await fetchApi(
+					`/students/${studentId}/finance/semesters/${semId.toString()}/installments`,
+					{
+						method: "POST",
+						body: JSON.stringify({
+							nominalScheduled: nominal,
+							dueDate: scheduleForm.dueDate || null,
+							status: "BELUM_BAYAR",
+							nominalPaid: 0,
+							paymentDate: null,
+							notes: scheduleForm.notes || null,
+							isTalangan: false,
+							installmentMonth: scheduleForm.installmentMonth,
+							periodNotes: scheduleForm.periodNotes || null,
+							buktiBayarUrl: null,
+						}),
+					},
+				);
+				if (!res.ok) {
+					const err = await res.json();
+					throw new Error(err.message || "Gagal menyimpan jadwal cicilan baru");
+				}
+				toast.success("Jadwal cicilan baru berhasil disimpan!");
+			}
+
+			setInstallmentModalOpen(false);
+			await fetchSemesters();
+			onUpdate();
+			queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
+			queryClient.invalidateQueries({ queryKey: ["students-list"] });
+			queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+		} catch (e: any) {
+			toast.error(e.message || "Terjadi kesalahan saat menyimpan jadwal");
+		} finally {
+			setInstallmentLoading(false);
+		}
+	};
+
+	const saveInstallmentModal = saveScheduleModal;
+
+	const openPaymentModal = (semester: any, installment: any) => {
+		if (!canEdit) {
+			toast.error("Anda tidak memiliki akses untuk mengubah data keuangan.");
+			return;
+		}
+		setPaymentActiveSemester(semester);
+		setPaymentActiveInstallment(installment);
+		const schedNominal =
+			installment.nominalScheduled !== undefined &&
+			installment.nominalScheduled !== null
+				? installment.nominalScheduled
+				: installment.nominalPaid || 0;
+		const paidNominal =
+			installment.nominalPaid > 0 ? installment.nominalPaid : schedNominal;
+
+		setPaymentForm({
+			paymentDate: installment.paymentDate
+				? installment.paymentDate.split("T")[0]
+				: new Date().toISOString().split("T")[0],
+			nominalPaid: paidNominal ? paidNominal.toString() : "",
+			notes: installment.notes || "",
+			file: installment.file || null,
+			buktiBayarUrl: installment.buktiBayarUrl || "",
+			status:
+				installment.status ||
+				(installment.nominalPaid > 0 ? "LUNAS" : "BELUM_BAYAR"),
+		});
+		setPaymentConfirmModalOpen(true);
+	};
+
+	const savePaymentModal = async () => {
+		const nominal = Number(paymentForm.nominalPaid);
 		if (!nominal || nominal <= 0) {
 			toast.error("Nominal pembayaran harus lebih dari 0");
 			return;
 		}
+		if (!paymentActiveInstallment || !paymentActiveSemester) return;
 
-		const semId = activeSemester.id;
+		const semId = paymentActiveSemester.id;
+		setInstallmentLoading(true);
 
-		if (activeInstallment) {
-			setSemesters((prevSemesters) =>
-				prevSemesters.map((s) => {
-					if (s.id !== semId) return s;
-					const updatedInstallments = (s.installments || []).map(
-						(inst: any) => {
-							if (inst.id === activeInstallment.id) {
-								return {
-									...inst,
-									nominalPaid: nominal,
-									paymentDate: installmentForm.paymentDate,
-									notes: installmentForm.notes,
-									isTalangan: installmentForm.isTalangan,
-									installmentMonth: installmentForm.installmentMonth,
-									periodNotes: installmentForm.periodNotes,
-									file: installmentForm.file || inst.file,
-									buktiBayarUrl:
-										installmentForm.buktiBayarUrl || inst.buktiBayarUrl,
-									isDraftEdited: true,
-								};
-							}
-							return inst;
-						},
-					);
-					const totalPaid = updatedInstallments.reduce(
-						(sum: number, i: any) => sum + i.nominalPaid,
-						0,
-					);
-					const status =
-						totalPaid >= (s.totalBilled || 0) && (s.totalBilled || 0) > 0
-							? "LUNAS"
-							: totalPaid > 0
-								? "SEBAGIAN"
-								: "BELUM_BAYAR";
-					return {
-						...s,
-						installments: updatedInstallments,
-						status: s.isTalangan ? "LUNAS" : status,
-					};
-				}),
-			);
-			toast.info(
-				"Perubahan pembayaran masuk ke draft. Klik 'Simpan' pada Pembayaran Utama untuk menyimpan permanen.",
-			);
-		} else {
-			const tempId = -Date.now();
-			const newInst = {
-				id: tempId,
-				semesterId: semId,
-				installmentNumber: (activeSemester.installments || []).length + 1,
-				nominalPaid: nominal,
-				paymentDate: installmentForm.paymentDate,
-				notes: installmentForm.notes,
-				isTalangan: installmentForm.isTalangan,
-				installmentMonth: installmentForm.installmentMonth,
-				periodNotes: installmentForm.periodNotes,
-				file: installmentForm.file,
-				buktiBayarUrl: installmentForm.buktiBayarUrl || "",
-				isDraftNew: true,
-			};
+		try {
+			let buktiBayarUrl = paymentForm.buktiBayarUrl || "";
 
-			setSemesters((prevSemesters) =>
-				prevSemesters.map((s) => {
-					if (s.id !== semId) return s;
-					const updatedInstallments = [...(s.installments || []), newInst];
-					const totalPaid = updatedInstallments.reduce(
-						(sum: number, i: any) => sum + i.nominalPaid,
-						0,
+			// Upload berkas bukti bayar jika ada file baru yang dipilih
+			if (paymentForm.file) {
+				const fd = new FormData();
+				fd.append("file", paymentForm.file);
+				fd.append("studentId", studentId.toString());
+				fd.append("category", "finance");
+				fd.append("panel", "finance");
+				fd.append("documentKey", "semester_1_installment");
+
+				const upRes = await fetchApi("/files/upload", {
+					method: "POST",
+					body: fd,
+				});
+
+				if (!upRes.ok) {
+					const upErr = await upRes.json().catch(() => ({}));
+					throw new Error(
+						upErr.message || "Gagal mengunggah berkas bukti bayar",
 					);
-					const status =
-						totalPaid >= (s.totalBilled || 0) && (s.totalBilled || 0) > 0
-							? "LUNAS"
-							: totalPaid > 0
-								? "SEBAGIAN"
-								: "BELUM_BAYAR";
-					return {
-						...s,
-						installments: updatedInstallments,
-						status: s.isTalangan ? "LUNAS" : status,
-					};
-				}),
+				}
+				const upData = await upRes.json();
+				if (upData?.data?.id) {
+					buktiBayarUrl = `/files/${upData.data.id}/download`;
+				}
+			}
+
+			const res = await fetchApi(
+				`/students/${studentId}/finance/semesters/${semId.toString()}/installments/${paymentActiveInstallment.id.toString()}`,
+				{
+					method: "PATCH",
+					body: JSON.stringify({
+						nominalPaid: nominal,
+						paymentDate:
+							paymentForm.paymentDate || new Date().toISOString().split("T")[0],
+						notes: paymentForm.notes || null,
+						buktiBayarUrl: buktiBayarUrl || null,
+						status: "LUNAS",
+					}),
+				},
 			);
-			toast.info(
-				"Pembayaran baru masuk ke draft. Klik 'Simpan' pada Pembayaran Utama untuk menyimpan permanen.",
-			);
+
+			if (!res.ok) {
+				const err = await res.json();
+				throw new Error(err.message || "Gagal menyimpan realisasi pembayaran");
+			}
+
+			toast.success("Pembayaran cicilan berhasil dicatat & disimpan!");
+			setPaymentConfirmModalOpen(false);
+			await fetchSemesters();
+			onUpdate();
+			queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
+			queryClient.invalidateQueries({ queryKey: ["students-list"] });
+			queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+		} catch (e: any) {
+			toast.error(e.message || "Terjadi kesalahan saat menyimpan pembayaran");
+		} finally {
+			setInstallmentLoading(false);
 		}
+	};
 
-		setInstallmentModalOpen(false);
+	const cancelPaymentModal = async () => {
+		if (!paymentActiveInstallment || !paymentActiveSemester) return;
+		const semId = paymentActiveSemester.id;
+		setInstallmentLoading(true);
+
+		try {
+			const res = await fetchApi(
+				`/students/${studentId}/finance/semesters/${semId.toString()}/installments/${paymentActiveInstallment.id.toString()}`,
+				{
+					method: "PATCH",
+					body: JSON.stringify({
+						nominalPaid: 0,
+						paymentDate: null,
+						status: "BELUM_BAYAR",
+						buktiBayarUrl: null,
+					}),
+				},
+			);
+
+			if (!res.ok) {
+				const err = await res.json();
+				throw new Error(err.message || "Gagal membatalkan status lunas");
+			}
+
+			toast.success(
+				"Status pembayaran cicilan dibatalkan (kembali ke Belum Bayar)",
+			);
+			setPaymentConfirmModalOpen(false);
+			await fetchSemesters();
+			onUpdate();
+			queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
+			queryClient.invalidateQueries({ queryKey: ["students-list"] });
+			queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+		} catch (e: any) {
+			toast.error(e.message || "Terjadi kesalahan sistem");
+		} finally {
+			setInstallmentLoading(false);
+		}
 	};
 
 	const handleDeleteInstallment = (
 		semesterId: number,
 		installmentId: number,
 	) => {
-		if (!canEdit || !isEditingUtama) return;
+		if (!canEdit) return;
+		setInstallmentToDelete({ semesterId, installmentId });
+	};
 
-		setDeletedInstallments((prev) => [...prev, { semesterId, installmentId }]);
-
-		setSemesters((prevSemesters) =>
-			prevSemesters.map((s) => {
-				if (s.id !== semesterId) return s;
-				const filtered = (s.installments || []).filter(
-					(i: any) => i.id !== installmentId,
+	const confirmDeleteInstallment = async () => {
+		if (!installmentToDelete || !canEdit) return;
+		setIsDeletingInstallment(true);
+		const { semesterId, installmentId } = installmentToDelete;
+		try {
+			if (installmentId > 0) {
+				const res = await fetchApi(
+					`/students/${studentId}/finance/semesters/${semesterId.toString()}/installments/${installmentId.toString()}`,
+					{ method: "DELETE" },
 				);
-				const reindexed = filtered.map((inst: any, idx: number) => ({
-					...inst,
-					installmentNumber: idx + 1,
-				}));
-				const totalPaid = reindexed.reduce(
-					(sum: number, i: any) => sum + i.nominalPaid,
-					0,
-				);
-				const status =
-					totalPaid >= (s.totalBilled || 0) && (s.totalBilled || 0) > 0
-						? "LUNAS"
-						: totalPaid > 0
-							? "SEBAGIAN"
-							: "BELUM_BAYAR";
-				return {
-					...s,
-					installments: reindexed,
-					status: s.isTalangan ? "LUNAS" : status,
-				};
-			}),
-		);
-		toast.info(
-			"Pembayaran ditandai untuk dihapus (Draft). Klik 'Simpan' pada Pembayaran Utama untuk menyimpan permanen.",
-		);
+				if (!res.ok) {
+					const err = await res.json();
+					throw new Error(err.message || "Gagal menghapus jadwal cicilan");
+				}
+				toast.success("Jadwal cicilan berhasil dihapus!");
+			}
+			await fetchSemesters();
+			onUpdate();
+			queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
+			queryClient.invalidateQueries({ queryKey: ["students-list"] });
+			queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+		} catch (e: any) {
+			toast.error(e.message || "Gagal menghapus jadwal cicilan");
+		} finally {
+			setIsDeletingInstallment(false);
+			setInstallmentToDelete(null);
+		}
 	};
 
 	// Talangan Installment Modal Handlers
@@ -578,9 +745,9 @@ export function TabKeuangan({
 		stage: "tahap_1" | "tahap_2",
 		installment?: any,
 	) => {
-		if (!canEdit || !isEditingUtama) {
+		if (!canEdit) {
 			toast.error(
-				"Silakan klik 'Edit Data' pada Pembayaran Utama terlebih dahulu untuk mencatat pembayaran talangan.",
+				"Anda tidak memiliki akses untuk mencatat pembayaran talangan.",
 			);
 			return;
 		}
@@ -608,72 +775,148 @@ export function TabKeuangan({
 		setTalanganModalOpen(true);
 	};
 
-	const saveTalanganModal = () => {
+	const saveTalanganModal = async () => {
 		const nominal = Number(talanganInstallmentForm.nominalPaid);
 		if (!nominal || nominal <= 0) {
 			toast.error("Nominal pembayaran harus lebih dari 0");
 			return;
 		}
 
-		if (activeTalanganInstallment) {
-			setTalanganInstallments((prev) =>
-				prev.map((inst) => {
-					if (inst.id === activeTalanganInstallment.id) {
-						return {
-							...inst,
-							nominalPaid: nominal,
-							paymentDate: talanganInstallmentForm.paymentDate,
-							notes: talanganInstallmentForm.notes,
-							file: talanganInstallmentForm.file || inst.file,
-							buktiBayarUrl:
-								talanganInstallmentForm.buktiBayarUrl || inst.buktiBayarUrl,
-							isDraftEdited: true,
-						};
-					}
-					return inst;
-				}),
-			);
-			toast.info(
-				"Perubahan pembayaran talangan masuk ke draft. Klik 'Simpan' pada Pembayaran Utama untuk menyimpan permanen.",
-			);
-		} else {
-			const tempId = -Date.now();
-			const newInst = {
-				id: tempId,
-				studentId,
-				stage: activeTalanganStage,
-				installmentNumber:
-					talanganInstallments.filter((i) => i.stage === activeTalanganStage)
-						.length + 1,
-				nominalPaid: nominal,
-				paymentDate: talanganInstallmentForm.paymentDate,
-				notes: talanganInstallmentForm.notes,
-				file: talanganInstallmentForm.file,
-				buktiBayarUrl: talanganInstallmentForm.buktiBayarUrl || "",
-				isDraftNew: true,
-			};
-			setTalanganInstallments((prev) => [...prev, newInst]);
-			toast.info(
-				"Pembayaran talangan baru masuk ke draft. Klik 'Simpan' pada Pembayaran Utama untuk menyimpan permanen.",
-			);
-		}
+		setInstallmentLoading(true);
+		try {
+			let buktiBayarUrl = talanganInstallmentForm.buktiBayarUrl || "";
 
-		setTalanganModalOpen(false);
+			if (talanganInstallmentForm.file) {
+				const fd = new FormData();
+				fd.append("file", talanganInstallmentForm.file);
+				fd.append("studentId", studentId.toString());
+				fd.append("category", "finance");
+				fd.append("panel", "finance");
+				fd.append("documentKey", `talangan_${activeTalanganStage}_inst`);
+
+				const upRes = await fetchApi("/files/upload", {
+					method: "POST",
+					body: fd,
+				});
+
+				if (!upRes.ok) {
+					const upErr = await upRes.json().catch(() => ({}));
+					throw new Error(
+						upErr.message || "Gagal mengunggah berkas bukti bayar",
+					);
+				}
+				const upData = await upRes.json();
+				if (upData?.data?.id) {
+					buktiBayarUrl = `/files/${upData.data.id}/download`;
+				}
+			}
+
+			if (activeTalanganInstallment && activeTalanganInstallment.id > 0) {
+				const res = await fetchApi(
+					`/students/${studentId}/finance/talangan-installments/${activeTalanganInstallment.id}`,
+					{
+						method: "PATCH",
+						body: JSON.stringify({
+							nominalPaid: nominal,
+							paymentDate:
+								talanganInstallmentForm.paymentDate ||
+								new Date().toISOString().split("T")[0],
+							notes: talanganInstallmentForm.notes || null,
+							buktiBayarUrl: buktiBayarUrl || null,
+						}),
+					},
+				);
+				if (!res.ok) {
+					const err = await res.json().catch(() => ({}));
+					throw new Error(
+						err.message || "Gagal memperbarui pembayaran talangan",
+					);
+				}
+				toast.success("Pembayaran talangan berhasil diperbarui!");
+			} else {
+				const res = await fetchApi(
+					`/students/${studentId}/finance/talangan-installments`,
+					{
+						method: "POST",
+						body: JSON.stringify({
+							stage: activeTalanganStage,
+							nominalPaid: nominal,
+							paymentDate:
+								talanganInstallmentForm.paymentDate ||
+								new Date().toISOString().split("T")[0],
+							notes: talanganInstallmentForm.notes || null,
+							buktiBayarUrl: buktiBayarUrl || null,
+						}),
+					},
+				);
+				if (!res.ok) {
+					const err = await res.json().catch(() => ({}));
+					throw new Error(err.message || "Gagal mencatat pembayaran talangan");
+				}
+				toast.success("Pembayaran talangan berhasil dicatat!");
+			}
+
+			setTalanganModalOpen(false);
+			await fetchTalanganInstallments();
+			onUpdate();
+			queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
+			queryClient.invalidateQueries({ queryKey: ["students-list"] });
+			queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+		} catch (e: any) {
+			toast.error(
+				e.message || "Terjadi kesalahan saat menyimpan pembayaran talangan",
+			);
+		} finally {
+			setInstallmentLoading(false);
+		}
 	};
 
 	const handleDeleteTalanganInstallment = (id: number) => {
-		if (!canEdit || !isEditingUtama) return;
-		setDeletedTalanganInstallmentIds((prev) => [...prev, id]);
-		setTalanganInstallments((prev) => prev.filter((i) => i.id !== id));
-		toast.info(
-			"Pembayaran talangan ditandai untuk dihapus (Draft). Klik 'Simpan' pada Pembayaran Utama untuk menyimpan permanen.",
-		);
+		if (!canEdit) return;
+		setTalanganToDelete(id);
+	};
+
+	const confirmDeleteTalanganInstallment = async () => {
+		if (!talanganToDelete || !canEdit) return;
+		setIsDeletingInstallment(true);
+		const id = talanganToDelete;
+		try {
+			const res = await fetchApi(
+				`/students/${studentId}/finance/talangan-installments/${id}`,
+				{ method: "DELETE" },
+			);
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				throw new Error(err.message || "Gagal menghapus pembayaran talangan");
+			}
+			toast.success("Pembayaran talangan berhasil dihapus!");
+			await fetchTalanganInstallments();
+			onUpdate();
+			queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
+			queryClient.invalidateQueries({ queryKey: ["students-list"] });
+			queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+		} catch (e: any) {
+			toast.error(e.message || "Gagal menghapus pembayaran talangan");
+		} finally {
+			setIsDeletingInstallment(false);
+			setTalanganToDelete(null);
+		}
 	};
 
 	// Partition Modal Handlers
 	const openPartitionModal = () => {
 		const tb = finState?.totalBiayaPendidikan || 0;
 		setPartitionTotalBiaya(tb);
+
+		if (tb === 0) {
+			setPartitionRegistrasi(0);
+			setPartitionSemesterTotal(0);
+			setPartitionSemesterPerSem(0);
+			setPartitionInterview(0);
+			setPartitionKeberangkatan(0);
+			setPartitionModalOpen(true);
+			return;
+		}
 
 		let reg = Number(formData?.registrasiNominal) || 0;
 		if (reg === 0 && pmbDp > 0) {
@@ -683,16 +926,13 @@ export function TabKeuangan({
 
 		const semTotal =
 			semesters.length > 0
-				? semesters.reduce((sum, s) => sum + (s.totalBilled || 0), 0)
-				: (Number(formData?.mandiriSemesterNominal) || 0) * 6 ||
+				? semesters.find((s: any) => s.semesterNumber === 1)?.totalBilled ||
+					semesters.reduce((sum, s) => sum + (s.totalBilled || 0), 0)
+				: Number(formData?.mandiriSemesterNominal) ||
 					Number(formData?.t1SemesterNominalTotal) ||
 					0;
 		setPartitionSemesterTotal(semTotal);
-		setPartitionSemesterPerSem(
-			semesters.length > 0
-				? semesters[0]?.totalBilled || 0
-				: Math.round(semTotal / 6),
-		);
+		setPartitionSemesterPerSem(semTotal);
 
 		const intv =
 			formData?.metodePembayaran === "dana_talangan"
@@ -710,13 +950,42 @@ export function TabKeuangan({
 	};
 
 	const handleSavePartition = async () => {
+		if (!partitionTotalBiaya || partitionTotalBiaya <= 0) {
+			toast.error(
+				"Total Biaya Pendidikan belum ditentukan oleh PMB (Rp 0). Pembagian partisi belum dapat disimpan.",
+			);
+			return;
+		}
+
+		const totalAllocated =
+			Number(partitionRegistrasi || 0) +
+			Number(partitionSemesterTotal || 0) +
+			Number(partitionInterview || 0) +
+			Number(partitionKeberangkatan || 0);
+
+		if (totalAllocated > partitionTotalBiaya) {
+			toast.error(
+				`Total pembagian termin (${formatRupiah(totalAllocated)}) melebihi Total Biaya Pendidikan (${formatRupiah(partitionTotalBiaya)}). Kelebihan: ${formatRupiah(totalAllocated - partitionTotalBiaya)}.`,
+				{ duration: 5000 },
+			);
+			return;
+		}
+
+		if (totalAllocated !== partitionTotalBiaya) {
+			toast.error(
+				`Total pembagian termin belum pas 100% (${formatRupiah(totalAllocated)} dari ${formatRupiah(partitionTotalBiaya)}). Selisih: ${formatRupiah(Math.abs(partitionTotalBiaya - totalAllocated))}.`,
+				{ duration: 5000 },
+			);
+			return;
+		}
+
 		setPartitionSaving(true);
 		try {
 			const resFin = await fetchApi(`/students/${studentId}/finance`, {
 				method: "PATCH",
 				body: JSON.stringify({
 					registrasiNominal: partitionRegistrasi,
-					mandiriSemesterNominal: partitionSemesterPerSem,
+					mandiriSemesterNominal: partitionSemesterTotal,
 					mandiriInterviewNominal: partitionInterview,
 					t1InterviewNominal: partitionInterview,
 					mandiriKeberangkatanNominal: partitionKeberangkatan,
@@ -736,7 +1005,10 @@ export function TabKeuangan({
 							`/students/${studentId}/finance/semesters/${s.id.toString()}`,
 							{
 								method: "PATCH",
-								body: JSON.stringify({ totalBilled: partitionSemesterPerSem }),
+								body: JSON.stringify({
+									totalBilled:
+										s.semesterNumber === 1 ? partitionSemesterTotal : 0,
+								}),
 							},
 						),
 					),
@@ -858,6 +1130,7 @@ export function TabKeuangan({
 	};
 
 	const executeSaveUtama = async () => {
+		setSaveConfirmOpen(false);
 		setLoadingUtama(true);
 		try {
 			// 1. Process Deleted Semester Installments
@@ -889,13 +1162,19 @@ export function TabKeuangan({
 					if (inst.file) {
 						const fd = new FormData();
 						fd.append("file", inst.file);
-						const upRes = await fetchApi(
-							`/students/${studentId}/finance/documents/semester_${sem.semesterNumber}_inst`,
-							{ method: "POST", body: fd },
-						);
+						fd.append("studentId", studentId.toString());
+						fd.append("category", "finance");
+						fd.append("panel", "finance");
+						fd.append("documentKey", `semester_${sem.semesterNumber}_inst`);
+						const upRes = await fetchApi("/files/upload", {
+							method: "POST",
+							body: fd,
+						});
 						if (upRes.ok) {
 							const upData = await upRes.json();
-							buktiBayarUrl = upData.fileUrl;
+							if (upData?.data?.id) {
+								buktiBayarUrl = `/files/${upData.data.id}/download`;
+							}
 						}
 					}
 
@@ -905,10 +1184,19 @@ export function TabKeuangan({
 							{
 								method: "POST",
 								body: JSON.stringify({
-									nominalPaid: inst.nominalPaid,
-									paymentDate: inst.paymentDate,
-									notes: inst.notes,
-									isTalangan: inst.isTalangan,
+									nominalScheduled:
+										inst.nominalScheduled !== undefined &&
+										inst.nominalScheduled !== null
+											? Number(inst.nominalScheduled)
+											: Number(inst.nominalPaid) || 0,
+									dueDate: inst.dueDate || null,
+									status:
+										inst.status ||
+										(Number(inst.nominalPaid) > 0 ? "LUNAS" : "BELUM_BAYAR"),
+									nominalPaid: Number(inst.nominalPaid) || 0,
+									paymentDate: inst.paymentDate || null,
+									notes: inst.notes || null,
+									isTalangan: inst.isTalangan ?? false,
 									installmentMonth: inst.installmentMonth,
 									periodNotes: inst.periodNotes,
 									buktiBayarUrl,
@@ -921,9 +1209,18 @@ export function TabKeuangan({
 							{
 								method: "PATCH",
 								body: JSON.stringify({
-									nominalPaid: inst.nominalPaid,
-									paymentDate: inst.paymentDate,
-									notes: inst.notes,
+									nominalScheduled:
+										inst.nominalScheduled !== undefined &&
+										inst.nominalScheduled !== null
+											? Number(inst.nominalScheduled)
+											: Number(inst.nominalPaid) || 0,
+									dueDate: inst.dueDate || null,
+									status:
+										inst.status ||
+										(Number(inst.nominalPaid) > 0 ? "LUNAS" : "BELUM_BAYAR"),
+									nominalPaid: Number(inst.nominalPaid) || 0,
+									paymentDate: inst.paymentDate || null,
+									notes: inst.notes || null,
 									isTalangan: inst.isTalangan,
 									installmentMonth: inst.installmentMonth,
 									periodNotes: inst.periodNotes,
@@ -951,13 +1248,19 @@ export function TabKeuangan({
 				if (inst.file) {
 					const fd = new FormData();
 					fd.append("file", inst.file);
-					const upRes = await fetchApi(
-						`/students/${studentId}/finance/documents/talangan_${inst.stage}_inst`,
-						{ method: "POST", body: fd },
-					);
+					fd.append("studentId", studentId.toString());
+					fd.append("category", "finance");
+					fd.append("panel", "finance");
+					fd.append("documentKey", `talangan_${inst.stage}_inst`);
+					const upRes = await fetchApi("/files/upload", {
+						method: "POST",
+						body: fd,
+					});
 					if (upRes.ok) {
 						const upData = await upRes.json();
-						buktiBayarUrl = upData.fileUrl;
+						if (upData?.data?.id) {
+							buktiBayarUrl = `/files/${upData.data.id}/download`;
+						}
 					}
 				}
 
@@ -1039,6 +1342,7 @@ export function TabKeuangan({
 	};
 
 	const executeSaveTambahan = async () => {
+		setSaveConfirmOpen(false);
 		setLoadingTambahan(true);
 		try {
 			// 1. Save standard fields
@@ -1172,14 +1476,12 @@ export function TabKeuangan({
 	const curRegistrasi = Number(formData?.registrasiNominal) || 0;
 	const curSemestersTotal =
 		semesters.length > 0
-			? semesters.reduce((sum: number, s: any) => sum + (s.totalBilled || 0), 0)
-			: (Number(formData?.mandiriSemesterNominal) || 0) * 6 ||
+			? semesters.find((s: any) => s.semesterNumber === 1)?.totalBilled ||
+				semesters.reduce((sum: number, s: any) => sum + (s.totalBilled || 0), 0)
+			: Number(formData?.mandiriSemesterNominal) ||
 				Number(formData?.t1SemesterNominalTotal) ||
 				0;
-	const curSemesterPerSem =
-		semesters.length > 0
-			? semesters[0]?.totalBilled || 0
-			: Math.round(curSemestersTotal / 6);
+	const curSemesterPerSem = curSemestersTotal;
 	const curInterview =
 		formData?.metodePembayaran === "dana_talangan"
 			? Number(formData?.t1InterviewNominal) || 0
@@ -1286,7 +1588,15 @@ export function TabKeuangan({
 			!deletedDocKeysTambahan.includes("rumah_juang"));
 
 	const isRegistrasiLunas = hasRegistrasiDoc;
-	const isSemesterAllLunas = semestersLunasCount === 6;
+	const sem1 = semesters.find((s: any) => s.semesterNumber === 1);
+	const sem1Paid = (sem1?.installments || []).reduce(
+		(sum: number, i: any) => sum + (i.nominalPaid || 0),
+		0,
+	);
+	const isSemesterAllLunas = sem1
+		? (sem1Paid >= (sem1.totalBilled || 0) && (sem1.totalBilled || 0) > 0) ||
+			!!sem1.isTalangan
+		: false;
 
 	const talanganSemesters = semesters.filter((s: any) => s.isTalangan);
 	const talanganSemCount = talanganSemesters.length;
@@ -1304,9 +1614,14 @@ export function TabKeuangan({
 			: Number(formData?.t1SemesterNominalTotal) || 0;
 	const t1InterviewNominal =
 		Number(formData?.t1InterviewNominal) || curInterview || 0;
-	const totalTahap1Nominal = t1SemesterNominal + t1InterviewNominal;
+	const isTalanganSatuTahap = formData?.talanganTipe === "1_tahap";
+	const totalTahap1Nominal = isTalanganSatuTahap
+		? 0
+		: t1SemesterNominal + t1InterviewNominal;
 	const totalTahap2Nominal =
-		Number(formData?.t2KeberangkatanNominal) || curKeberangkatan || 0;
+		isTalanganSatuTahap && Number(formData?.talanganTotalPengajuan) > 0
+			? Number(formData.talanganTotalPengajuan)
+			: Number(formData?.t2KeberangkatanNominal) || curKeberangkatan || 0;
 
 	const t1Installments = talanganInstallments.filter(
 		(i: any) => i.stage === "tahap_1",
@@ -1325,8 +1640,10 @@ export function TabKeuangan({
 
 	const isTahap1Lunas =
 		formData?.metodePembayaran === "dana_talangan"
-			? (totalTahap1Nominal > 0 && t1Paid >= totalTahap1Nominal) ||
-				hasT1InterviewDoc
+			? isTalanganSatuTahap
+				? true
+				: (totalTahap1Nominal > 0 && t1Paid >= totalTahap1Nominal) ||
+					hasT1InterviewDoc
 			: hasMandiriInterviewDoc;
 
 	const isTahap2Lunas =
@@ -1396,7 +1713,9 @@ export function TabKeuangan({
 				expandedSemesters={expandedSemesters}
 				toggleSemesterExpand={toggleSemesterExpand}
 				handleToggleTalangan={handleToggleTalangan}
-				openInstallmentModal={openInstallmentModal}
+				openInstallmentModal={openScheduleModal}
+				openScheduleModal={openScheduleModal}
+				openPaymentModal={openPaymentModal}
 				handleDeleteInstallment={handleDeleteInstallment}
 				isInterviewLunas={isInterviewLunas}
 				isKeberangkatanLunas={isKeberangkatanLunas}
@@ -1491,22 +1810,65 @@ export function TabKeuangan({
 				preventMinus={preventMinus}
 			/>
 
-			{/* Modal Tambah/Edit Cicilan Semester */}
+			{/* Modal Jadwalkan Cicilan Semester 1 */}
 			<InstallmentModal
 				open={installmentModalOpen}
 				onOpenChange={setInstallmentModalOpen}
 				activeSemester={activeSemester}
 				activeInstallment={activeInstallment}
-				installmentForm={installmentForm}
-				setInstallmentForm={setInstallmentForm}
-				isMetodeTalangan={formData?.metodePembayaran === "dana_talangan"}
+				scheduleForm={scheduleForm}
+				setScheduleForm={setScheduleForm}
 				saving={installmentLoading}
-				onSave={saveInstallmentModal}
+				onSave={saveScheduleModal}
+				preventMinus={preventMinus}
+				totalBilled={activeSemester?.totalBilled || 0}
+				totalScheduled={(activeSemester?.installments || []).reduce(
+					(sum: number, i: any) =>
+						sum +
+						(Number(
+							i.nominalScheduled !== undefined && i.nominalScheduled !== null
+								? i.nominalScheduled
+								: i.nominalPaid,
+						) || 0),
+					0,
+				)}
+				remainingUnscheduled={Math.max(
+					0,
+					(activeSemester?.totalBilled || 0) -
+						(activeSemester?.installments || [])
+							.filter((i: any) => i.id !== activeInstallment?.id)
+							.reduce(
+								(sum: number, i: any) =>
+									sum +
+									(Number(
+										i.nominalScheduled !== undefined &&
+											i.nominalScheduled !== null
+											? i.nominalScheduled
+											: i.nominalPaid,
+									) || 0),
+								0,
+							),
+				)}
+			/>
+
+			{/* Modal Konfirmasi Pembayaran Cicilan */}
+			<PaymentConfirmationModal
+				studentId={studentId}
+				open={paymentConfirmModalOpen}
+				onOpenChange={setPaymentConfirmModalOpen}
+				activeSemester={paymentActiveSemester}
+				activeInstallment={paymentActiveInstallment}
+				paymentForm={paymentForm}
+				setPaymentForm={setPaymentForm}
+				saving={installmentLoading}
+				onSave={savePaymentModal}
+				onCancelPayment={cancelPaymentModal}
 				preventMinus={preventMinus}
 			/>
 
 			{/* Modal Tambah/Edit Cicilan Talangan */}
 			<TalanganInstallmentModal
+				studentId={studentId}
 				open={talanganModalOpen}
 				onOpenChange={setTalanganModalOpen}
 				activeStage={activeTalanganStage}
@@ -1551,6 +1913,7 @@ export function TabKeuangan({
 						</AlertDialogCancel>
 						<AlertDialogAction
 							onClick={() => {
+								setSaveConfirmOpen(false);
 								if (sectionToSave === "utama") {
 									executeSaveUtama();
 								} else if (sectionToSave === "tambahan") {
@@ -1586,6 +1949,73 @@ export function TabKeuangan({
 							className="bg-rose-600 hover:bg-rose-700 text-white"
 						>
 							Hapus Permanen
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+			{/* Alert Dialog Konfirmasi Hapus Jadwal Cicilan Utama */}
+			<AlertDialog
+				open={installmentToDelete !== null}
+				onOpenChange={(open) => !open && setInstallmentToDelete(null)}
+			>
+				<AlertDialogContent className="bg-white rounded-2xl max-w-md border-slate-200 shadow-xl">
+					<AlertDialogHeader>
+						<AlertDialogTitle className="text-base font-bold text-slate-900">
+							Hapus Jadwal Cicilan?
+						</AlertDialogTitle>
+						<AlertDialogDescription className="text-xs text-slate-500 leading-relaxed">
+							Apakah Anda yakin ingin menghapus data jadwal pembayaran cicilan
+							ini? Total tagihan dan kalkulasi sisa pembayaran akan diperbarui
+							otomatis.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter className="flex gap-2 sm:justify-end mt-3">
+						<AlertDialogCancel
+							disabled={isDeletingInstallment}
+							className="text-xs h-9 rounded-lg"
+						>
+							Batal
+						</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={confirmDeleteInstallment}
+							disabled={isDeletingInstallment}
+							className="bg-rose-600 hover:bg-rose-700 text-white text-xs h-9 rounded-lg font-bold shadow-xs"
+						>
+							{isDeletingInstallment ? "Menghapus..." : "Ya, Hapus Cicilan"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			{/* Alert Dialog Konfirmasi Hapus Pembayaran Dana Talangan */}
+			<AlertDialog
+				open={talanganToDelete !== null}
+				onOpenChange={(open) => !open && setTalanganToDelete(null)}
+			>
+				<AlertDialogContent className="bg-white rounded-2xl max-w-md border-slate-200 shadow-xl">
+					<AlertDialogHeader>
+						<AlertDialogTitle className="text-base font-bold text-slate-900">
+							Hapus Pembayaran Talangan?
+						</AlertDialogTitle>
+						<AlertDialogDescription className="text-xs text-slate-500 leading-relaxed">
+							Apakah Anda yakin ingin menghapus data pembayaran talangan ini?
+							Data yang dihapus akan mengembalikan sisa kewajiban pinjaman
+							talangan.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter className="flex gap-2 sm:justify-end mt-3">
+						<AlertDialogCancel
+							disabled={isDeletingInstallment}
+							className="text-xs h-9 rounded-lg"
+						>
+							Batal
+						</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={confirmDeleteTalanganInstallment}
+							disabled={isDeletingInstallment}
+							className="bg-rose-600 hover:bg-rose-700 text-white text-xs h-9 rounded-lg font-bold shadow-xs"
+						>
+							{isDeletingInstallment ? "Menghapus..." : "Ya, Hapus Pembayaran"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
