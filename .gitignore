@@ -118,9 +118,9 @@ storage/
 backups/
 **/backups/*
 !**/backups/.gitkeep
-data/
-**/data/*
-!**/data/.gitkeep
+/data/
+!apps/web/src/data/
+!apps/web/src/data/**
 
 # Backup Archives & Database Dumps
 *.tar
