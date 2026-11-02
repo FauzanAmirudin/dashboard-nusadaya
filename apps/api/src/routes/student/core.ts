@@ -1829,20 +1829,27 @@ export const coreRoutes = new Elysia()
 				return autoRes;
 			}
 
-			// Check clearance (PMB ACC & Finance Registrasi Awal Lunas)
+			// Check clearance (Wajib Registrasi Awal / DP Lunas dan Terverifikasi Finance)
 			if (body.nim && !hasRole(user, "superadmin")) {
-				const [pmbRecord, finRecord] = await Promise.all([
-					db.query.pmbData.findFirst({ where: eq(pmbData.studentId, id) }),
+				const [finRecord, planRecord] = await Promise.all([
 					db.query.financeData.findFirst({
 						where: eq(financeData.studentId, id),
 					}),
+					db.query.pmbPaymentPlan.findFirst({
+						where: eq(pmbPaymentPlan.studentId, id),
+					}),
 				]);
-				if (!pmbRecord?.isAcc || !finRecord?.registrasiStatus) {
+				const isFinanceLunas = Boolean(
+					finRecord?.registrasiStatus ||
+						(finRecord as any)?.registrationPaid ||
+						planRecord?.statusDp,
+				);
+				if (!isFinanceLunas) {
 					set.status = 400;
 					return {
 						success: false,
 						message:
-							"Clearance belum terpenuhi: NIM hanya dapat dirilis setelah berkas PMB disetujui (ACC) dan pembayaran Registrasi Awal lunas di Finance.",
+							"NIM mahasiswa tidak dapat di-input atau diedit: Pembayaran registrasi awal (DP) belum lunas dan belum diverifikasi oleh Finance.",
 					};
 				}
 			}
@@ -1941,7 +1948,7 @@ export const coreRoutes = new Elysia()
 	// GET clearance status untuk Gatekeeper Rilis NIM (Task M-1)
 	.get("/:id/clearance-status", async ({ params }: any) => {
 		const id = parseInt(params.id, 10);
-		const [pmb, fin] = await Promise.all([
+		const [pmb, fin, plan] = await Promise.all([
 			db.query.pmbData.findFirst({
 				where: eq(pmbData.studentId, id),
 				columns: { isAcc: true, status: true },
@@ -1950,11 +1957,17 @@ export const coreRoutes = new Elysia()
 				where: eq(financeData.studentId, id),
 				columns: { registrasiStatus: true },
 			}),
+			db.query.pmbPaymentPlan.findFirst({
+				where: eq(pmbPaymentPlan.studentId, id),
+				columns: { statusDp: true },
+			}),
 		]);
 
 		const pmbCleared = Boolean(pmb?.isAcc || pmb?.status === "ACC");
-		const financeCleared = Boolean(fin?.registrasiStatus);
-		const canReleaseNim = pmbCleared && financeCleared;
+		const financeCleared = Boolean(
+			fin?.registrasiStatus || (fin as any)?.registrationPaid || plan?.statusDp,
+		);
+		const canReleaseNim = financeCleared;
 
 		return {
 			success: true,

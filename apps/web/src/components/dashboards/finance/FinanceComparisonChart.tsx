@@ -141,6 +141,8 @@ export function FinanceComparisonChart({
 			PMB: c.pmb,
 			"SPP Taiwan": c.spp_taiwan,
 			"SPP Malaysia": c.spp_malaysia,
+			"SPP Indonesia": c.spp_indonesia,
+			"SPP Timur Tengah": c.spp_timur_tengah,
 			Total: c.total,
 		}));
 	}, [cohortBreakdown]);
@@ -171,6 +173,28 @@ export function FinanceComparisonChart({
 				percentage:
 					streams.find((s) => s.category === "spp_malaysia")?.percentage || 0,
 				color: "#10b981",
+			},
+			{
+				name: "SPP Indonesia",
+				value:
+					streams.find((s) => s.category === "spp_indonesia")?.realisasi || 0,
+				target:
+					streams.find((s) => s.category === "spp_indonesia")?.target || 0,
+				percentage:
+					streams.find((s) => s.category === "spp_indonesia")?.percentage || 0,
+				color: "#f43f5e",
+			},
+			{
+				name: "SPP Timur Tengah",
+				value:
+					streams.find((s) => s.category === "spp_timur_tengah")?.realisasi ||
+					0,
+				target:
+					streams.find((s) => s.category === "spp_timur_tengah")?.target || 0,
+				percentage:
+					streams.find((s) => s.category === "spp_timur_tengah")?.percentage ||
+					0,
+				color: "#f59e0b",
 			},
 		];
 	}, [streams]);
@@ -297,18 +321,9 @@ export function FinanceComparisonChart({
 							<BarChart3 className="w-4 h-4" />
 						</div>
 						<div>
-							<div className="flex items-center gap-2">
-								<CardTitle className="text-base font-bold text-slate-900 tracking-tight">
-									Grafik Analisis Proyeksi & Realisasi
-								</CardTitle>
-								<Badge className="bg-blue-100/80 text-[#0517B0] border-blue-200 text-[10px] font-bold px-2 py-0.5">
-									Zustand Reactive Store
-								</Badge>
-							</div>
-							<p className="text-xs text-slate-500 mt-0.5">
-								Visualisasi dinamis target pagu vs realisasi kas masuk riil per
-								sumber dan angkatan.
-							</p>
+							<CardTitle className="text-base font-bold text-slate-900 tracking-tight">
+								Grafik Analisis Proyeksi & Realisasi
+							</CardTitle>
 						</div>
 					</div>
 
@@ -778,7 +793,7 @@ export function FinanceComparisonChart({
 
 						<div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100 px-1">
 							<span>
-								Distribusi kontribusi kas masuk riil antar 3 lumbung utama
+								Distribusi kontribusi kas masuk riil seluruh sumber penerimaan
 							</span>
 							<span className="font-bold text-[#0517B0]">
 								Total Masuk: {formatRupiah(total.realisasi)}
@@ -851,6 +866,42 @@ export function FinanceComparisonChart({
 													stopOpacity={0.7}
 												/>
 											</linearGradient>
+											<linearGradient
+												id="gradIndonesia"
+												x1="0"
+												y1="0"
+												x2="0"
+												y2="1"
+											>
+												<stop
+													offset="0%"
+													stopColor="#f43f5e"
+													stopOpacity={0.9}
+												/>
+												<stop
+													offset="100%"
+													stopColor="#fb7185"
+													stopOpacity={0.7}
+												/>
+											</linearGradient>
+											<linearGradient
+												id="gradTimurTengah"
+												x1="0"
+												y1="0"
+												x2="0"
+												y2="1"
+											>
+												<stop
+													offset="0%"
+													stopColor="#f59e0b"
+													stopOpacity={0.9}
+												/>
+												<stop
+													offset="100%"
+													stopColor="#fbbf24"
+													stopOpacity={0.7}
+												/>
+											</linearGradient>
 										</defs>
 										<CartesianGrid
 											strokeDasharray="3 3"
@@ -895,6 +946,20 @@ export function FinanceComparisonChart({
 											dataKey="SPP Malaysia"
 											name="SPP D3 Malaysia"
 											fill="url(#gradMalaysia)"
+											radius={[5, 5, 0, 0]}
+											maxBarSize={32}
+										/>
+										<Bar
+											dataKey="SPP Indonesia"
+											name="SPP D3 Indonesia"
+											fill="url(#gradIndonesia)"
+											radius={[5, 5, 0, 0]}
+											maxBarSize={32}
+										/>
+										<Bar
+											dataKey="SPP Timur Tengah"
+											name="SPP Timur Tengah"
+											fill="url(#gradTimurTengah)"
 											radius={[5, 5, 0, 0]}
 											maxBarSize={32}
 										/>

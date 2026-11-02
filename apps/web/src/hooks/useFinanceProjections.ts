@@ -3,10 +3,17 @@ import { toast } from "sonner";
 import { API_URL, getToken } from "@/lib/eden";
 
 export interface StreamItem {
-	category: "pmb" | "spp_taiwan" | "spp_malaysia";
+	category:
+		| "pmb"
+		| "spp_taiwan"
+		| "spp_malaysia"
+		| "spp_indonesia"
+		| "spp_timur_tengah";
 	label: string;
 	subLabel: string;
 	target: number;
+	targetSemester?: number;
+	targetBulanan?: number;
 	realisasi: number;
 	percentage: number;
 	sisa: number;
@@ -18,16 +25,22 @@ export interface CohortBreakdownItem {
 	pmb: number;
 	spp_taiwan: number;
 	spp_malaysia: number;
+	spp_indonesia: number;
+	spp_timur_tengah: number;
 	total: number;
 }
 
 export interface FinanceProjectionsData {
 	cohort: string;
 	year: number;
+	academicYear?: string;
 	availableCohorts: number[];
+	availableYears?: number[];
 	streams: StreamItem[];
 	total: {
 		target: number;
+		targetSemester?: number;
+		targetBulanan?: number;
 		realisasi: number;
 		percentage: number;
 		sisa: number;
@@ -39,6 +52,7 @@ export interface FinanceProjectionsData {
 export interface UseFinanceProjectionsParams {
 	cohort?: string;
 	year?: number;
+	academicYear?: string;
 	month?: number;
 	startDate?: string;
 	endDate?: string;
@@ -51,6 +65,7 @@ export function useFinanceProjections(
 	const {
 		cohort = "all",
 		year = new Date().getFullYear(),
+		academicYear,
 		month = 0,
 		startDate,
 		endDate,
@@ -60,13 +75,14 @@ export function useFinanceProjections(
 	return useQuery({
 		queryKey: [
 			"finance-projections",
-			{ cohort, year, month, startDate, endDate },
+			{ cohort, year, academicYear, month, startDate, endDate },
 		],
 		queryFn: async (): Promise<FinanceProjectionsData> => {
 			const token = getToken();
 			const searchParams = new URLSearchParams();
 			if (cohort) searchParams.set("cohort", cohort);
 			if (year) searchParams.set("year", year.toString());
+			if (academicYear) searchParams.set("academicYear", academicYear);
 			if (month) searchParams.set("month", month.toString());
 			if (startDate) searchParams.set("startDate", startDate);
 			if (endDate) searchParams.set("endDate", endDate);
@@ -102,6 +118,7 @@ export function useFinanceProjections(
 export interface UpdateProjectionTargetsPayload {
 	cohort: number;
 	year: number;
+	academicYear?: string;
 	month?: number;
 	targets: Array<{
 		category: string;

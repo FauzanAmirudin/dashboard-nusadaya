@@ -162,6 +162,24 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" })
 		}
 
 		const budgetRequestId = body.budgetRequestId;
+
+		// Validasi: Pengajuan praktik harus berstatus 'disetujui' (ACC oleh Finance)
+		const targetBudgetReq = await db.query.practicesBudgetRequests.findFirst({
+			where: eq(practicesBudgetRequests.id, parseInt(budgetRequestId, 10)),
+		});
+		if (!targetBudgetReq) {
+			set.status = 404;
+			return { success: false, message: "Pengajuan praktik tidak ditemukan" };
+		}
+		if (targetBudgetReq.status !== "disetujui") {
+			set.status = 400;
+			return {
+				success: false,
+				message:
+					"Laporan sisa bahan hanya dapat diunggah untuk pengajuan praktik yang telah disetujui (ACC) oleh Finance",
+			};
+		}
+
 		let daftarSisaBahan = body.daftarSisaBahan;
 		const catatanDosen = body.catatanDosen;
 		let fileUrl = body.fileUrl;
@@ -229,6 +247,20 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" })
 		}
 
 		const budgetRequestId = body.budgetRequestId;
+		if (budgetRequestId) {
+			const targetBudgetReq = await db.query.practicesBudgetRequests.findFirst({
+				where: eq(practicesBudgetRequests.id, parseInt(budgetRequestId, 10)),
+			});
+			if (!targetBudgetReq || targetBudgetReq.status !== "disetujui") {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Laporan sisa bahan hanya dapat dihubungkan dengan pengajuan praktik yang telah disetujui (ACC) oleh Finance",
+				};
+			}
+		}
+
 		let daftarSisaBahan = body.daftarSisaBahan;
 		const catatanDosen = body.catatanDosen;
 		let fileUrl = body.fileUrl;

@@ -4,6 +4,7 @@ import {
 	Building2,
 	CheckCircle,
 	Clock,
+	Compass,
 	Edit,
 	Globe2,
 	GraduationCap,
@@ -31,6 +32,8 @@ interface FinanceProjectionTableProps {
 	streams: StreamItem[];
 	total: {
 		target: number;
+		targetSemester?: number;
+		targetBulanan?: number;
 		realisasi: number;
 		percentage: number;
 		sisa: number;
@@ -45,6 +48,8 @@ const STREAM_ICONS: Record<string, React.ReactNode> = {
 	pmb: <GraduationCap className="w-4 h-4 text-sky-600" />,
 	spp_taiwan: <Building2 className="w-4 h-4 text-indigo-600" />,
 	spp_malaysia: <Globe2 className="w-4 h-4 text-emerald-600" />,
+	spp_indonesia: <Compass className="w-4 h-4 text-rose-600" />,
+	spp_timur_tengah: <Sparkles className="w-4 h-4 text-amber-600" />,
 };
 
 export function FinanceProjectionTable({
@@ -161,7 +166,14 @@ export function FinanceProjectionTable({
 											</span>
 										</TableCell>
 										<TableCell className="py-3 px-4 text-right font-mono text-xs font-bold text-slate-700">
-											{formatRupiah(stream.target)}
+											<div>{formatRupiah(stream.target)}</div>
+											<div className="text-[10px] text-slate-400 font-normal">
+												{formatRupiah(
+													stream.targetBulanan ||
+														Math.round(stream.target / 12),
+												)}
+												/bln
+											</div>
 										</TableCell>
 										<TableCell className="py-3 px-4 text-right font-mono text-xs font-black text-slate-900">
 											{formatRupiah(stream.realisasi)}
@@ -239,7 +251,13 @@ export function FinanceProjectionTable({
 									</span>
 								</TableCell>
 								<TableCell className="py-3.5 px-4 text-right font-mono text-xs font-black text-slate-900">
-									{formatRupiah(total.target)}
+									<div>{formatRupiah(total.target)}</div>
+									<div className="text-[10px] text-blue-900/70 font-semibold">
+										{formatRupiah(
+											total.targetBulanan || Math.round(total.target / 12),
+										)}
+										/bln
+									</div>
 								</TableCell>
 								<TableCell className="py-3.5 px-4 text-right font-mono text-sm font-black text-[#0517B0]">
 									{formatRupiah(total.realisasi)}

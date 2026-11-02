@@ -1781,6 +1781,15 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 				return { success: false, message: "Request not found" };
 			}
 
+			if (request.status !== "disetujui") {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Laporan sisa bahan hanya dapat diunggah untuk pengajuan praktik yang telah disetujui (ACC) oleh Finance",
+				};
+			}
+
 			const validDosenId =
 				(await getValidUserId(user)) || request.dosenId || user?.id;
 

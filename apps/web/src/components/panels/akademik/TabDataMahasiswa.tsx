@@ -198,9 +198,8 @@ export function TabDataMahasiswa({
 
 	// Has NIM already been assigned?
 	const isAlreadyHasNim = Boolean(studentData?.nim);
-	// Can edit NIM: if clearance passed OR student already has NIM (to allow updating)
-	const canEditNim =
-		canEdit && (clearanceStatus.canReleaseNim || isAlreadyHasNim);
+	// Can edit NIM: HANYA KETIKA pembayaran awal atau DP sudah lunas dan terverifikasi di panel Finance
+	const canEditNim = Boolean(canEdit && clearanceStatus.financeCleared);
 
 	// ── Save Handlers ─────────────────────────────────────
 	const handleSaveStatus = async () => {
@@ -438,9 +437,9 @@ export function TabDataMahasiswa({
 								<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold px-2.5 py-0.5">
 									✓ Terdaftar
 								</Badge>
-							) : clearanceStatus.canReleaseNim ? (
-								<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold px-2.5 py-0.5">
-									Siap Rilis
+							) : clearanceStatus.financeCleared ? (
+								<Badge className="bg-blue-50 text-blue-700 border-blue-200 text-xs font-semibold px-2.5 py-0.5">
+									Siap Diinput
 								</Badge>
 							) : (
 								<Badge className="bg-rose-50 text-rose-700 border-rose-200 text-xs font-semibold px-2.5 py-0.5">
@@ -476,7 +475,7 @@ export function TabDataMahasiswa({
 										<CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />{" "}
 										NIM Aktif
 									</Badge>
-								) : clearanceStatus.canReleaseNim ? (
+								) : clearanceStatus.financeCleared ? (
 									<Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px] font-bold animate-pulse">
 										Siap Rilis Otomatis
 									</Badge>
@@ -502,7 +501,9 @@ export function TabDataMahasiswa({
 								</div>
 
 								<div className="flex items-center justify-between bg-white px-2.5 py-1.5 rounded-lg border border-slate-100 text-[11px]">
-									<span className="text-slate-600 font-medium">Finance:</span>
+									<span className="text-slate-600 font-medium">
+										Finance (DP/Reg):
+									</span>
 									{clearanceStatus.financeCleared ? (
 										<span className="text-emerald-600 font-bold flex items-center gap-1">
 											<CheckCircle2 className="w-3 h-3" /> Lunas
@@ -515,14 +516,15 @@ export function TabDataMahasiswa({
 								</div>
 							</div>
 
-							{!isAlreadyHasNim && !clearanceStatus.canReleaseNim && (
+							{!clearanceStatus.financeCleared && (
 								<p className="text-[10px] text-amber-700 bg-amber-50/80 p-2 rounded-lg border border-amber-200 leading-relaxed">
-									Selesaikan clearance PMB & Finance (pembayaran Registrasi
-									Awal) agar NIM mahasiswa dapat diterbitkan oleh sistem.
+									NIM terkunci: Pembayaran Registrasi Awal (DP) mahasiswa wajib
+									lunas dan divalidasi oleh Finance sebelum NIM dapat di-input
+									atau diedit di panel Akademik.
 								</p>
 							)}
 
-							{!isAlreadyHasNim && clearanceStatus.canReleaseNim && (
+							{!isAlreadyHasNim && clearanceStatus.financeCleared && (
 								<div className="pt-1">
 									<Button
 										size="sm"
@@ -547,20 +549,24 @@ export function TabDataMahasiswa({
 							<div className="flex items-center justify-between">
 								<Label className="text-xs font-semibold text-slate-700">
 									{isAlreadyHasNim
-										? "Perbarui NIM Manual"
-										: "Input NIM Manual (Opsional)"}
+										? "Perbarui NIM Mahasiswa"
+										: "Input NIM Manual"}
 								</Label>
-								{isAlreadyHasNim && (
+								{clearanceStatus.financeCleared ? (
 									<span className="text-[10px] text-emerald-600 font-semibold">
-										Terdaftar Resmi
+										Finance Lunas: Siap Diinput/Edit
+									</span>
+								) : (
+									<span className="text-[10px] text-rose-600 font-semibold">
+										Terkunci (DP Belum Lunas)
 									</span>
 								)}
 							</div>
 							<Input
 								placeholder={
 									canEditNim
-										? "Contoh: 250001"
-										: "NIM terkunci (menunggu clearance PMB & Finance)"
+										? "Contoh: 260001"
+										: "NIM terkunci (menunggu pembayaran registrasi awal/DP lunas di Finance)"
 								}
 								value={nim}
 								onKeyDown={preventNonNumericKey}
@@ -590,7 +596,7 @@ export function TabDataMahasiswa({
 								disabled={isSavingNim || !canEditNim}
 								className={`w-full text-xs h-10 font-bold rounded-xl shadow-2xs transition-all mt-2 ${
 									canEditNim
-										? "bg-violet-600 hover:bg-violet-700 text-white"
+										? "bg-violet-600 hover:bg-violet-700 text-white cursor-pointer"
 										: "bg-slate-200 text-slate-400 cursor-not-allowed hover:bg-slate-200"
 								}`}
 							>
@@ -605,7 +611,7 @@ export function TabDataMahasiswa({
 									? isAlreadyHasNim
 										? "Simpan Pembaruan NIM"
 										: "Rilis & Simpan NIM"
-									: "NIM Terkunci (Belum Clearance)"}
+									: "NIM Terkunci (DP Belum Lunas di Finance)"}
 							</Button>
 						)}
 					</CardContent>

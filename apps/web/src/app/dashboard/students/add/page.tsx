@@ -1034,22 +1034,22 @@ export default function AddStudentPage() {
 									<Label className="flex items-center gap-1.5 font-semibold text-slate-700">
 										NIM (Nomor Induk Mahasiswa)
 									</Label>
-									<Badge className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-semibold">
-										Diterbitkan Otomatis
+									<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-semibold">
+										Terkunci (Menunggu DP Finance)
 									</Badge>
 								</div>
 								<Input
-									placeholder="Otomatis diterbitkan sistem setelah Registrasi Awal divalidasi Finance"
+									placeholder="Dapat di-input/diedit atau diterbitkan sistem setelah pembayaran registrasi awal divalidasi Finance"
 									value={formData.nim || ""}
 									disabled={true}
 									className="bg-slate-50 text-slate-500 font-mono text-xs cursor-not-allowed"
 								/>
 								<p className="text-[11px] text-slate-500 leading-relaxed">
-									Sesuai standar operasional (Segmen 5 & 12), NIM resmi
-									diterbitkan secara otomatis oleh sistem segera setelah
-									kelengkapan pembayaran Registrasi Awal tervalidasi Finance dan
-									berkas PMB disetujui. Akun login awal mahasiswa menggunakan
-									Email.
+									Sesuai standar operasional, NIM mahasiswa dapat di-input,
+									diedit, atau diterbitkan otomatis oleh sistem segera setelah
+									kelengkapan pembayaran Registrasi Awal / DP lunas dan
+									terverifikasi di panel Finance. Akun login awal mahasiswa
+									menggunakan Email.
 								</p>
 							</div>
 							<div className="space-y-2">

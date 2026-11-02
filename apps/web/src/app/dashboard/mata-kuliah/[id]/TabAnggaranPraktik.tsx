@@ -21,7 +21,7 @@ import {
 	UploadCloud,
 	XCircle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -157,6 +157,11 @@ export function TabAnggaranPraktik({
 	]);
 	const [catatanDosen, setCatatanDosen] = useState("");
 	const [reportFile, setReportFile] = useState<File | null>(null);
+
+	// Hanya pengajuan praktik yang telah disetujui (ACC) oleh Finance yang dapat dilaporkan sisa bahannya
+	const approvedRequests = useMemo(() => {
+		return requests.filter((r) => r.status === "disetujui");
+	}, [requests]);
 
 	const fetchRequests = async () => {
 		try {
@@ -456,8 +461,16 @@ export function TabAnggaranPraktik({
 
 	// Section 2: Material Report Handlers
 	const handleOpenNewReportModal = () => {
+		if (approvedRequests.length === 0) {
+			toast.error(
+				"Belum ada pengajuan bahan praktik yang disetujui (ACC) oleh Finance untuk mata kuliah ini.",
+			);
+			return;
+		}
 		setEditingReportId(null);
-		setSelectedRequestId("");
+		setSelectedRequestId(
+			approvedRequests.length === 1 ? approvedRequests[0].id.toString() : "",
+		);
 		setSisaItems([
 			{ namaItem: "", jumlahSisa: 0, satuan: "pcs", kondisi: "Baik" },
 		]);
@@ -1292,9 +1305,16 @@ export function TabAnggaranPraktik({
 
 					<div className="space-y-5 py-3">
 						<div>
-							<Label className="text-xs font-bold text-slate-700 block mb-1.5">
-								Pilih Pengajuan Praktik *
-							</Label>
+							<div className="flex items-center justify-between mb-1.5">
+								<Label className="text-xs font-bold text-slate-700">
+									Pilih Pengajuan Praktik (Hanya yang Telah di-ACC) *
+								</Label>
+								{approvedRequests.length > 0 && (
+									<span className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+										{approvedRequests.length} Pengajuan di-ACC
+									</span>
+								)}
+							</div>
 							<Select
 								value={selectedRequestId}
 								onValueChange={(val) => setSelectedRequestId(val || "")}
@@ -1304,7 +1324,9 @@ export function TabAnggaranPraktik({
 										if (!selectedRequestId) {
 											return (
 												<span className="text-slate-400">
-													Pilih Kebutuhan Bahan Praktikum yang Dilaporkan...
+													{approvedRequests.length === 0
+														? "Tidak ada pengajuan bahan yang telah di-ACC Finance..."
+														: "Pilih Kebutuhan Praktikum yang Telah di-ACC Finance..."}
 												</span>
 											);
 										}
@@ -1324,15 +1346,15 @@ export function TabAnggaranPraktik({
 												<span className="font-semibold text-slate-800 truncate">
 													{summary}
 												</span>
-												<span className="text-xs text-indigo-700 font-bold ml-2 shrink-0 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-													{formatRupiah(selectedReq.totalNominal)}
+												<span className="text-xs text-emerald-700 font-bold ml-2 shrink-0 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+													✓ ACC: {formatRupiah(selectedReq.totalNominal)}
 												</span>
 											</div>
 										);
 									})()}
 								</SelectTrigger>
 								<SelectContent className="max-h-[300px]">
-									{requests.map((r) => {
+									{approvedRequests.map((r) => {
 										const summary = getItemsSummary(r);
 										const count = r.daftarKebutuhan?.length || 0;
 										const dateStr = r.createdAt
@@ -1354,8 +1376,8 @@ export function TabAnggaranPraktik({
 														<span className="font-bold text-slate-900 text-xs sm:text-sm">
 															{summary}
 														</span>
-														<span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 shrink-0">
-															{formatRupiah(r.totalNominal)}
+														<span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shrink-0">
+															✓ ACC ({formatRupiah(r.totalNominal)})
 														</span>
 													</div>
 													<div className="flex items-center gap-2 text-[11px] text-slate-500 font-normal">
@@ -1367,10 +1389,15 @@ export function TabAnggaranPraktik({
 											</SelectItem>
 										);
 									})}
-									{requests.length === 0 && (
-										<div className="p-4 text-center text-xs text-slate-400">
-											Belum ada data pengajuan kebutuhan praktik untuk mata
-											kuliah ini.
+									{approvedRequests.length === 0 && (
+										<div className="p-4 text-center text-xs text-amber-700 bg-amber-50/80 rounded-lg space-y-1">
+											<p className="font-bold">
+												Tidak ada pengajuan yang telah di-ACC
+											</p>
+											<p className="text-[11px] text-amber-900/80">
+												Hanya pengajuan bahan praktik yang telah disetujui (ACC)
+												oleh divisi Finance yang dapat dilaporkan sisa bahannya.
+											</p>
 										</div>
 									)}
 								</SelectContent>
@@ -1569,7 +1596,9 @@ export function TabAnggaranPraktik({
 						</Button>
 						<Button
 							onClick={handleSaveMaterialReport}
-							disabled={isSaving}
+							disabled={
+								isSaving || !selectedRequestId || approvedRequests.length === 0
+							}
 							className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5 h-9 px-6 font-bold"
 						>
 							{isSaving ? (

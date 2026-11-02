@@ -111,6 +111,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 			.where(
 				and(
 					eq(financeProjectionTargets.year, yearParam),
+					eq(financeProjectionTargets.month, monthParam),
 					cohortNum > 0
 						? eq(financeProjectionTargets.cohort, cohortNum)
 						: or(
@@ -125,6 +126,8 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 		let targetPmb = 0;
 		let targetTaiwan = 0;
 		let targetMalaysia = 0;
+		let targetIndonesia = 0;
+		let targetTimurTengah = 0;
 
 		if (cohortNum > 0) {
 			const pmb = targetRecords.find(
@@ -136,9 +139,17 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 			const my = targetRecords.find(
 				(r) => r.cohort === cohortNum && r.category === "spp_malaysia",
 			);
+			const idn = targetRecords.find(
+				(r) => r.cohort === cohortNum && r.category === "spp_indonesia",
+			);
+			const me = targetRecords.find(
+				(r) => r.cohort === cohortNum && r.category === "spp_timur_tengah",
+			);
 			targetPmb = pmb ? Number(pmb.targetNominal) : 0;
 			targetTaiwan = tw ? Number(tw.targetNominal) : 0;
 			targetMalaysia = my ? Number(my.targetNominal) : 0;
+			targetIndonesia = idn ? Number(idn.targetNominal) : 0;
+			targetTimurTengah = me ? Number(me.targetNominal) : 0;
 		} else {
 			const globalPmb = targetRecords.find(
 				(r) => r.cohort === 0 && r.category === "pmb",
@@ -149,11 +160,19 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 			const globalMy = targetRecords.find(
 				(r) => r.cohort === 0 && r.category === "spp_malaysia",
 			);
+			const globalIdn = targetRecords.find(
+				(r) => r.cohort === 0 && r.category === "spp_indonesia",
+			);
+			const globalMe = targetRecords.find(
+				(r) => r.cohort === 0 && r.category === "spp_timur_tengah",
+			);
 
-			if (globalPmb || globalTw || globalMy) {
+			if (globalPmb || globalTw || globalMy || globalIdn || globalMe) {
 				targetPmb = globalPmb ? Number(globalPmb.targetNominal) : 0;
 				targetTaiwan = globalTw ? Number(globalTw.targetNominal) : 0;
 				targetMalaysia = globalMy ? Number(globalMy.targetNominal) : 0;
+				targetIndonesia = globalIdn ? Number(globalIdn.targetNominal) : 0;
+				targetTimurTengah = globalMe ? Number(globalMe.targetNominal) : 0;
 			} else {
 				targetPmb = targetRecords
 					.filter((r) => r.category === "pmb")
@@ -163,6 +182,12 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 					.reduce((acc, r) => acc + Number(r.targetNominal), 0);
 				targetMalaysia = targetRecords
 					.filter((r) => r.category === "spp_malaysia")
+					.reduce((acc, r) => acc + Number(r.targetNominal), 0);
+				targetIndonesia = targetRecords
+					.filter((r) => r.category === "spp_indonesia")
+					.reduce((acc, r) => acc + Number(r.targetNominal), 0);
+				targetTimurTengah = targetRecords
+					.filter((r) => r.category === "spp_timur_tengah")
 					.reduce((acc, r) => acc + Number(r.targetNominal), 0);
 			}
 		}
@@ -229,17 +254,23 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 			return dateObj >= startDate && dateObj <= endDate;
 		};
 
-		// Available cohorts
+		// Available cohorts (Format Angkatan resmi: 14, 15, 16, 17, 18, dst. - bukan format tahun 4 digit)
 		const cohortsSet = new Set<number>();
 		studentsList.forEach((s) => {
-			if (s.cohort) cohortsSet.add(s.cohort);
+			if (s.cohort && s.cohort > 0 && s.cohort < 100) {
+				cohortsSet.add(s.cohort);
+			}
 		});
+		// Pastikan angkatan standar institusi (14, 15, 16, 17, 18) selalu tersedia
+		[14, 15, 16, 17, 18].forEach((c) => cohortsSet.add(c));
 		const availableCohorts = Array.from(cohortsSet).sort((a, b) => b - a);
 
 		// Realization per category
 		let realPmb = 0;
 		let realTaiwan = 0;
 		let realMalaysia = 0;
+		let realIndonesia = 0;
+		let realTimurTengah = 0;
 
 		// Cohort breakdown for comparison chart (Angkatan 15 vs 16, etc.)
 		const cohortComparisonMap: Record<
@@ -249,6 +280,8 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 				pmb: number;
 				spp_taiwan: number;
 				spp_malaysia: number;
+				spp_indonesia: number;
+				spp_timur_tengah: number;
 				total: number;
 			}
 		> = {};
@@ -258,15 +291,33 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 			let pmbPaid = 0;
 			let sppTaiwanPaid = 0;
 			let sppMalaysiaPaid = 0;
+			let sppIndonesiaPaid = 0;
+			let sppTimurTengahPaid = 0;
 
 			const dest =
 				`${s.subProgram || ""} ${s.destinationCountry || ""} ${s.program || ""}`.toLowerCase();
 			const isMalaysia = dest.includes("malaysia");
+			const isTimurTengah =
+				dest.includes("timur tengah") ||
+				dest.includes("timur-tengah") ||
+				dest.includes("middle east") ||
+				dest.includes("arab");
+			const isIndonesia =
+				dest.includes("indonesia") ||
+				dest.includes("reguler") ||
+				(!isMalaysia && !dest.includes("taiwan") && !isTimurTengah);
 
 			const addSpp = (amount: number) => {
 				if (amount <= 0) return;
-				if (isMalaysia) sppMalaysiaPaid += amount;
-				else sppTaiwanPaid += amount;
+				if (isMalaysia) {
+					sppMalaysiaPaid += amount;
+				} else if (isTimurTengah) {
+					sppTimurTengahPaid += amount;
+				} else if (isIndonesia) {
+					sppIndonesiaPaid += amount;
+				} else {
+					sppTaiwanPaid += amount;
+				}
 			};
 
 			// 1. SPP dari cicilan semester mandiri (finance_semester_installments)
@@ -358,20 +409,30 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 						pmb: 0,
 						spp_taiwan: 0,
 						spp_malaysia: 0,
+						spp_indonesia: 0,
+						spp_timur_tengah: 0,
 						total: 0,
 					};
 				}
 				cohortComparisonMap[c].pmb += pmbPaid;
 				cohortComparisonMap[c].spp_taiwan += sppTaiwanPaid;
 				cohortComparisonMap[c].spp_malaysia += sppMalaysiaPaid;
+				cohortComparisonMap[c].spp_indonesia += sppIndonesiaPaid;
+				cohortComparisonMap[c].spp_timur_tengah += sppTimurTengahPaid;
 				cohortComparisonMap[c].total +=
-					pmbPaid + sppTaiwanPaid + sppMalaysiaPaid;
+					pmbPaid +
+					sppTaiwanPaid +
+					sppMalaysiaPaid +
+					sppIndonesiaPaid +
+					sppTimurTengahPaid;
 			}
 
 			if (cohortNum === 0 || s.cohort === cohortNum) {
 				realPmb += pmbPaid;
 				realTaiwan += sppTaiwanPaid;
 				realMalaysia += sppMalaysiaPaid;
+				realIndonesia += sppIndonesiaPaid;
+				realTimurTengah += sppTimurTengahPaid;
 			}
 		});
 
@@ -380,8 +441,14 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 			return Number(((real / target) * 100).toFixed(1));
 		};
 
-		const totalTarget = targetPmb + targetTaiwan + targetMalaysia;
-		const totalReal = realPmb + realTaiwan + realMalaysia;
+		const totalTarget =
+			targetPmb +
+			targetTaiwan +
+			targetMalaysia +
+			targetIndonesia +
+			targetTimurTengah;
+		const totalReal =
+			realPmb + realTaiwan + realMalaysia + realIndonesia + realTimurTengah;
 
 		const streams = [
 			{
@@ -389,6 +456,8 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 				label: "PMB (Registrasi Awal)",
 				subLabel: "Biaya masuk / daftar ulang mahasiswa baru",
 				target: targetPmb,
+				targetSemester: Math.round(targetPmb / 2),
+				targetBulanan: Math.round(targetPmb / 12),
 				realisasi: realPmb,
 				percentage: computePct(realPmb, targetPmb),
 				sisa: Math.max(0, targetPmb - realPmb),
@@ -399,6 +468,8 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 				label: "SPP Taiwan",
 				subLabel: "Biaya kuliah semester program persiapan Taiwan",
 				target: targetTaiwan,
+				targetSemester: Math.round(targetTaiwan / 2),
+				targetBulanan: Math.round(targetTaiwan / 12),
 				realisasi: realTaiwan,
 				percentage: computePct(realTaiwan, targetTaiwan),
 				sisa: Math.max(0, targetTaiwan - realTaiwan),
@@ -409,15 +480,43 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 				label: "SPP D3 Malaysia",
 				subLabel: "Biaya kuliah semester program vokasi Malaysia",
 				target: targetMalaysia,
+				targetSemester: Math.round(targetMalaysia / 2),
+				targetBulanan: Math.round(targetMalaysia / 12),
 				realisasi: realMalaysia,
 				percentage: computePct(realMalaysia, targetMalaysia),
 				sisa: Math.max(0, targetMalaysia - realMalaysia),
 				surplus: Math.max(0, realMalaysia - targetMalaysia),
 			},
+			{
+				category: "spp_indonesia",
+				label: "SPP D3 Indonesia",
+				subLabel: "Biaya kuliah semester program vokasi Indonesia",
+				target: targetIndonesia,
+				targetSemester: Math.round(targetIndonesia / 2),
+				targetBulanan: Math.round(targetIndonesia / 12),
+				realisasi: realIndonesia,
+				percentage: computePct(realIndonesia, targetIndonesia),
+				sisa: Math.max(0, targetIndonesia - realIndonesia),
+				surplus: Math.max(0, realIndonesia - targetIndonesia),
+			},
+			{
+				category: "spp_timur_tengah",
+				label: "SPP Timur Tengah",
+				subLabel: "Biaya kuliah semester program persiapan Timur Tengah",
+				target: targetTimurTengah,
+				targetSemester: Math.round(targetTimurTengah / 2),
+				targetBulanan: Math.round(targetTimurTengah / 12),
+				realisasi: realTimurTengah,
+				percentage: computePct(realTimurTengah, targetTimurTengah),
+				sisa: Math.max(0, targetTimurTengah - realTimurTengah),
+				surplus: Math.max(0, realTimurTengah - targetTimurTengah),
+			},
 		];
 
 		const total = {
 			target: totalTarget,
+			targetSemester: Math.round(totalTarget / 2),
+			targetBulanan: Math.round(totalTarget / 12),
 			realisasi: totalReal,
 			percentage: computePct(totalReal, totalTarget),
 			sisa: Math.max(0, totalTarget - totalReal),
@@ -433,7 +532,9 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 			data: {
 				cohort: cohortParam,
 				year: yearParam,
+				academicYear: `${yearParam}/${yearParam + 1}`,
 				availableCohorts,
+				availableYears: [2024, 2025, 2026, 2027],
 				streams,
 				total,
 				cohortBreakdown,
@@ -456,21 +557,27 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 
 			const cohort = Number(body.cohort) || 0;
 			const year = Number(body.year) || new Date().getFullYear();
-			const month = Number(body.month) || 0;
+			const academicYear = body.academicYear
+				? String(body.academicYear)
+				: `${year}/${year + 1}`;
 			const targets = Array.isArray(body.targets) ? body.targets : [];
 
 			for (const item of targets) {
 				const cat = String(item.category);
 				const nominal = Math.max(0, Number(item.targetNominal) || 0);
-				const notes = item.notes ? String(item.notes) : null;
+				const notes = item.notes
+					? String(item.notes)
+					: `Pagu Target T.A. ${academicYear}`;
 
+				// 1. Simpan target tahunan (month: 0, periodType: 'yearly')
 				await db
 					.insert(financeProjectionTargets)
 					.values({
 						cohort,
 						category: cat,
 						year,
-						month,
+						month: 0,
+						periodType: "yearly",
 						targetNominal: nominal,
 						notes,
 						updatedBy: user.id,
@@ -485,18 +592,52 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 						],
 						set: {
 							targetNominal: nominal,
+							periodType: "yearly",
 							notes,
 							updatedBy: user.id,
 							updatedAt: new Date(),
 						},
 					});
+
+				// 2. Pembagian otomatis per bulan (12 bulan per 1 tahun ajaran)
+				const monthlyNominal = Math.round(nominal / 12);
+				for (let m = 1; m <= 12; m++) {
+					await db
+						.insert(financeProjectionTargets)
+						.values({
+							cohort,
+							category: cat,
+							year,
+							month: m,
+							periodType: "monthly",
+							targetNominal: monthlyNominal,
+							notes: `Alokasi Otomatis Bulan ke-${m} (T.A. ${academicYear})`,
+							updatedBy: user.id,
+							updatedAt: new Date(),
+						})
+						.onConflictDoUpdate({
+							target: [
+								financeProjectionTargets.cohort,
+								financeProjectionTargets.category,
+								financeProjectionTargets.year,
+								financeProjectionTargets.month,
+							],
+							set: {
+								targetNominal: monthlyNominal,
+								periodType: "monthly",
+								notes: `Alokasi Otomatis Bulan ke-${m} (T.A. ${academicYear})`,
+								updatedBy: user.id,
+								updatedAt: new Date(),
+							},
+						});
+				}
 			}
 
 			await invalidateFinanceCache();
 
 			return {
 				success: true,
-				message: "Pagu target proyeksi berhasil diperbarui",
+				message: `Pagu target proyeksi T.A. ${academicYear} berhasil diperbarui (termasuk pembagian otomatis 12 bulan & 2 semester)`,
 			};
 		},
 		{
@@ -504,6 +645,7 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 				cohort: t.Number(),
 				year: t.Number(),
 				month: t.Optional(t.Number()),
+				academicYear: t.Optional(t.String()),
 				targets: t.Array(
 					t.Object({
 						category: t.String(),
@@ -1808,11 +1950,25 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 
 	.post(
 		"/laporan-sisa-bahan",
-		async ({ body, user }: any) => {
+		async ({ body, set, user }: any) => {
 			if (!hasRole(user, "dosen", "akademik"))
 				return { success: false, message: "Forbidden" };
+
+			const reqId = parseInt(body.budgetRequestId, 10);
+			const targetReq = await db.query.practicesBudgetRequests.findFirst({
+				where: eq(practicesBudgetRequests.id, reqId),
+			});
+			if (!targetReq || targetReq.status !== "disetujui") {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Laporan sisa bahan hanya dapat diunggah untuk pengajuan praktik yang telah disetujui (ACC) oleh Finance",
+				};
+			}
+
 			await db.insert(practicesMaterialReports).values({
-				budgetRequestId: parseInt(body.budgetRequestId),
+				budgetRequestId: reqId,
 				dosenId: user.id,
 				daftarSisaBahan: body.daftarSisaBahan,
 				catatanDosen: body.catatanDosen,

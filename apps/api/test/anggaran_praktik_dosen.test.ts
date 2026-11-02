@@ -434,4 +434,83 @@ describe("Segmen 13: Anggaran Praktik Dosen & Tombol Persetujuan Finance (ACC/To
 		expect(updated?.approvedAt).toBeNull();
 		expect(updated?.buktiPencairanUrl).toBeNull();
 	});
+
+	it("TC-PRAKTIK-11: Uploading material report for budget request with status 'menunggu' is rejected with 400", async () => {
+		// When request status is 'menunggu' (unapproved), uploading report must be blocked
+		const form = new FormData();
+		form.append("budgetRequestId", createdRequestId.toString());
+		form.append(
+			"daftarSisaBahan",
+			JSON.stringify([
+				{
+					namaItem: "Biji Kopi Sisa",
+					jumlahSisa: 200,
+					satuan: "gram",
+					kondisi: "Baik",
+				},
+			]),
+		);
+		form.append("catatanDosen", "Sisa bahan praktik");
+
+		const res = await app.handle(
+			new Request("http://localhost:3001/dosen/laporan-sisa-bahan", {
+				method: "POST",
+				headers: { Authorization: `Bearer ${dosenToken}` },
+				body: form,
+			}),
+		);
+
+		expect(res.status).toBe(400);
+		const json = (await res.json()) as any;
+		expect(json.success).toBe(false);
+		expect(json.message).toContain("disetujui");
+	});
+
+	it("TC-PRAKTIK-12: Uploading material report succeeds after budget request is approved (ACC) by Finance", async () => {
+		// Approve the budget request first
+		await app.handle(
+			new Request(
+				`http://localhost:3001/finance/anggaran-praktik/${createdRequestId}/approve`,
+				{
+					method: "PATCH",
+					headers: {
+						Authorization: `Bearer ${financeToken}`,
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						buktiPencairanUrl: "/files/999/download",
+						buktiPencairanFileName: "Transfer_Bahan_Praktik.pdf",
+					}),
+				},
+			),
+		);
+
+		const form = new FormData();
+		form.append("budgetRequestId", createdRequestId.toString());
+		form.append(
+			"daftarSisaBahan",
+			JSON.stringify([
+				{
+					namaItem: "Biji Kopi Sisa",
+					jumlahSisa: 200,
+					satuan: "gram",
+					kondisi: "Baik",
+				},
+			]),
+		);
+		form.append("catatanDosen", "Sisa bahan praktik");
+
+		const res = await app.handle(
+			new Request("http://localhost:3001/dosen/laporan-sisa-bahan", {
+				method: "POST",
+				headers: { Authorization: `Bearer ${dosenToken}` },
+				body: form,
+			}),
+		);
+
+		expect(res.status).toBe(200);
+		const json = (await res.json()) as any;
+		expect(json.success).toBe(true);
+		expect(json.data).toBeDefined();
+	});
 });

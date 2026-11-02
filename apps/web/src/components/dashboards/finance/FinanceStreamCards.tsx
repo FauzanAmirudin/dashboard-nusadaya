@@ -3,6 +3,7 @@
 import {
 	Building2,
 	CheckCircle,
+	Compass,
 	CreditCard,
 	Edit,
 	Globe2,
@@ -33,6 +34,8 @@ interface FinanceStreamCardsProps {
 	streams: StreamItem[];
 	total: {
 		target: number;
+		targetSemester?: number;
+		targetBulanan?: number;
 		realisasi: number;
 		percentage: number;
 		sisa: number;
@@ -48,6 +51,8 @@ const STREAM_ICONS: Record<string, React.ReactNode> = {
 	pmb: <GraduationCap className="w-5 h-5 text-sky-600" />,
 	spp_taiwan: <Building2 className="w-5 h-5 text-indigo-600" />,
 	spp_malaysia: <Globe2 className="w-5 h-5 text-emerald-600" />,
+	spp_indonesia: <Compass className="w-5 h-5 text-rose-600" />,
+	spp_timur_tengah: <Sparkles className="w-5 h-5 text-amber-600" />,
 };
 
 const STREAM_GRADIENTS: Record<
@@ -69,6 +74,16 @@ const STREAM_GRADIENTS: Record<
 		border: "border-emerald-200/80",
 		bar: "bg-linear-to-r from-teal-500 to-emerald-600",
 	},
+	spp_indonesia: {
+		bg: "from-rose-50/70 via-rose-50/20 to-white",
+		border: "border-rose-200/80",
+		bar: "bg-linear-to-r from-rose-500 to-red-600",
+	},
+	spp_timur_tengah: {
+		bg: "from-amber-50/70 via-amber-50/20 to-white",
+		border: "border-amber-200/80",
+		bar: "bg-linear-to-r from-amber-500 to-orange-600",
+	},
 };
 
 export function FinanceStreamCards({
@@ -88,15 +103,6 @@ export function FinanceStreamCards({
 						<TrendingUp className="w-4 h-4 text-[#0517B0]" />
 						Pagu Target vs Realisasi Uang Masuk per Sumber
 					</h3>
-					<p className="text-xs text-slate-500 mt-0.5">
-						Rincian capaian keuangan per sumber penerimaan resmi (PMB, SPP
-						Taiwan, SPP Malaysia) untuk{" "}
-						<span className="font-semibold text-slate-700">
-							{selectedCohort === "all"
-								? "Semua Angkatan"
-								: `Angkatan ${selectedCohort}`}
-						</span>
-					</p>
 				</div>
 
 				{canEdit && (
@@ -112,8 +118,8 @@ export function FinanceStreamCards({
 				)}
 			</div>
 
-			{/* 4 Cards Grid: 3 Streams + 1 Total Agregat */}
-			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+			{/* 6 Cards Grid: 5 Streams + 1 Total Agregat (3 cards per row, 2 rows) */}
+			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
 				{streams.map((stream) => {
 					const styling = STREAM_GRADIENTS[stream.category] || {
 						bg: "from-slate-50 to-white",
@@ -170,10 +176,23 @@ export function FinanceStreamCards({
 									</div>
 									<div className="flex items-baseline justify-between text-xs">
 										<span className="text-[11px] text-slate-400">
-											Target Pagu:
+											Target Pagu (T.A.):
 										</span>
 										<span className="text-xs font-bold text-slate-600 font-mono">
 											{formatRupiah(stream.target)}
+										</span>
+									</div>
+									<div className="flex items-center justify-between text-[10px] text-slate-400 font-medium pt-0.5">
+										<span>Otomatis:</span>
+										<span className="font-mono text-slate-500">
+											{formatRupiah(
+												stream.targetBulanan || Math.round(stream.target / 12),
+											)}
+											/bln ·{" "}
+											{formatRupiah(
+												stream.targetSemester || Math.round(stream.target / 2),
+											)}
+											/sem
 										</span>
 									</div>
 								</div>
@@ -223,7 +242,7 @@ export function FinanceStreamCards({
 										Total Agregat Eksekutif
 									</h4>
 									<p className="text-[10px] text-slate-500 line-clamp-1">
-										Akumulasi kas 3 sumber pendapatan
+										Akumulasi kas 5 sumber pendapatan
 									</p>
 								</div>
 							</div>
@@ -243,10 +262,23 @@ export function FinanceStreamCards({
 							</div>
 							<div className="flex items-baseline justify-between text-xs">
 								<span className="text-[11px] text-slate-500">
-									Total Target:
+									Total Target (T.A.):
 								</span>
 								<span className="text-xs font-bold text-slate-700 font-mono">
 									{formatRupiah(total.target)}
+								</span>
+							</div>
+							<div className="flex items-center justify-between text-[10px] text-blue-900/70 font-medium pt-0.5">
+								<span>Otomatis:</span>
+								<span className="font-mono text-[#0517B0]">
+									{formatRupiah(
+										total.targetBulanan || Math.round(total.target / 12),
+									)}
+									/bln ·{" "}
+									{formatRupiah(
+										total.targetSemester || Math.round(total.target / 2),
+									)}
+									/sem
 								</span>
 							</div>
 						</div>
