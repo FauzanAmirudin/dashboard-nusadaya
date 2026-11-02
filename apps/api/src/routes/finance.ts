@@ -18,6 +18,7 @@ import {
 	students,
 } from "../db/schema";
 import { cacheDel, cacheInvalidatePattern } from "../lib/cache";
+import { autoIssueStudentNim } from "../lib/nim-helper";
 import { getValidUserId, hasRole } from "../lib/permissions";
 import { requireRole } from "../middleware/rbac";
 import { fileService } from "../modules/file/service/file.service";
@@ -825,7 +826,21 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 				});
 
 			await invalidateFinanceCache(sId);
-			return { success: true };
+
+			// Trigger penerbitan NIM otomatis jika registrasi awal tervalidasi Finance (Segmen 5 & 12)
+			let nimIssued: string | undefined;
+			if (body.registrasiStatus === true) {
+				const validUploaderId = await getValidUserId(user);
+				const issueRes = await autoIssueStudentNim(
+					sId,
+					validUploaderId ?? undefined,
+				);
+				if (issueRes.success && !issueRes.alreadyIssued && issueRes.nim) {
+					nimIssued = issueRes.nim;
+				}
+			}
+
+			return { success: true, nimIssued };
 		},
 		{
 			body: t.Object({
@@ -1178,6 +1193,19 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 				return {
 					success: false,
 					message: "File bukti transfer tidak ditemukan dalam request",
+				};
+			}
+
+			// Standarisasi seluruh dokumen keuangan berformat PDF (Segmen 5 & 12)
+			if (
+				file.type !== "application/pdf" &&
+				!file.name.toLowerCase().endsWith(".pdf")
+			) {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Format berkas tidak valid. Dokumen bukti transfer keuangan wajib berformat PDF sesuai standar sistem.",
 				};
 			}
 
@@ -1630,6 +1658,19 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 				return {
 					success: false,
 					message: "File bukti pencairan tidak ditemukan dalam request",
+				};
+			}
+
+			// Standarisasi seluruh dokumen keuangan berformat PDF (Segmen 5 & 12)
+			if (
+				file.type !== "application/pdf" &&
+				!file.name.toLowerCase().endsWith(".pdf")
+			) {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Format berkas tidak valid. Dokumen bukti pencairan anggaran wajib berformat PDF sesuai standar sistem.",
 				};
 			}
 

@@ -51,7 +51,8 @@ import {
 	cacheInvalidatePattern,
 	cacheSet,
 } from "../../lib/cache";
-import { hasRole } from "../../lib/permissions";
+import { autoIssueStudentNim } from "../../lib/nim-helper";
+import { getValidUserId, hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 import { fileService } from "../../modules/file/service/file.service";
 
@@ -1816,6 +1817,18 @@ export const coreRoutes = new Elysia()
 				return { success: false, message: "Forbidden" };
 			}
 			const id = parseInt(params.id, 10);
+
+			// Jika body.generateAuto true atau body.nim kosong, gunakan penerbitan otomatis
+			if (body.generateAuto || !body.nim) {
+				const validUserId = await getValidUserId(user);
+				const autoRes = await autoIssueStudentNim(id, validUserId ?? undefined);
+				if (!autoRes.success) {
+					set.status = 400;
+					return autoRes;
+				}
+				return autoRes;
+			}
+
 			// Check clearance (PMB ACC & Finance Registrasi Awal Lunas)
 			if (body.nim && !hasRole(user, "superadmin")) {
 				const [pmbRecord, finRecord] = await Promise.all([
@@ -1852,6 +1865,18 @@ export const coreRoutes = new Elysia()
 				.set({ nim: body.nim || null, updatedAt: new Date() })
 				.where(eq(students.id, id));
 
+			// Sinkronisasi username user mahasiswa jika ada
+			const studentRec = await db.query.students.findFirst({
+				where: eq(students.id, id),
+				columns: { studentUserId: true },
+			});
+			if (studentRec?.studentUserId && body.nim) {
+				await db
+					.update(users)
+					.set({ username: body.nim, updatedAt: new Date() })
+					.where(eq(users.id, studentRec.studentUserId));
+			}
+
 			await Promise.all([
 				cacheDel(`cache:student:${id}`),
 				cacheInvalidatePattern("cache:students:list:*"),
@@ -1863,9 +1888,24 @@ export const coreRoutes = new Elysia()
 		{
 			body: t.Object({
 				nim: t.Optional(t.String()),
+				generateAuto: t.Optional(t.Boolean()),
 			}),
 		},
 	)
+	// POST trigger generate NIM otomatis setelah clearance registrasi awal (Segmen 5 & 12)
+	.post("/:id/generate-nim", async ({ params, set, user }: any) => {
+		if (!hasRole(user, "superadmin", "akademik", "finance")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+		const id = parseInt(params.id, 10);
+		const validUserId = await getValidUserId(user);
+		const result = await autoIssueStudentNim(id, validUserId ?? undefined);
+		if (!result.success) {
+			set.status = 400;
+		}
+		return result;
+	})
 	// PATCH student PA assignment (Hanya Akademik & Superadmin - Task L-2)
 	.patch(
 		"/:id/pa",

@@ -94,9 +94,16 @@ export const documentsRoutes = new Elysia()
 				return { success: false, message: "Unauthorized" };
 			}
 
-			if (file?.type !== "application/pdf") {
+			if (
+				file?.type !== "application/pdf" &&
+				!file?.name?.toLowerCase().endsWith(".pdf")
+			) {
 				set.status = 400;
-				return { success: false, message: "Harus berupa file PDF" };
+				return {
+					success: false,
+					message:
+						"Seluruh dokumen keuangan dan administrasi wajib berformat PDF sesuai standar sistem",
+				};
 			}
 			if (file.size > 5 * 1024 * 1024) {
 				set.status = 400;

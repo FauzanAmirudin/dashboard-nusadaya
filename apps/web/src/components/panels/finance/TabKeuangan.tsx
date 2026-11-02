@@ -1064,9 +1064,18 @@ export function TabKeuangan({
 			});
 
 			if (res.ok) {
-				toast.success(
-					`Status ${nextStatus ? "Lunas" : "Belum Lunas"} berhasil diperbarui`,
-				);
+				const json = await res.json().catch(() => ({}));
+				if (json?.nimIssued) {
+					toast.success(
+						`Status Pembayaran Registrasi Awal Lunas! Sistem otomatis menerbitkan NIM: ${json.nimIssued}`,
+						{ duration: 6000 },
+					);
+				} else {
+					toast.success(
+						`Status ${nextStatus ? "Lunas" : "Belum Lunas"} berhasil diperbarui`,
+					);
+				}
+				onUpdate();
 				queryClient.invalidateQueries({ queryKey: ["finance-projections"] });
 				queryClient.invalidateQueries({ queryKey: ["students-list"] });
 				queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
@@ -1317,7 +1326,15 @@ export function TabKeuangan({
 			});
 
 			if (res.ok) {
-				toast.success("Data Pembayaran Utama berhasil disimpan!");
+				const json = await res.json().catch(() => ({}));
+				if (json?.nimIssued) {
+					toast.success(
+						`Data Pembayaran Utama berhasil disimpan! Sistem resmi menerbitkan NIM: ${json.nimIssued}`,
+						{ duration: 6000 },
+					);
+				} else {
+					toast.success("Data Pembayaran Utama berhasil disimpan!");
+				}
 				setIsEditingUtama(false);
 				setStagedDocsUtama({});
 				setDeletedDocKeysUtama([]);

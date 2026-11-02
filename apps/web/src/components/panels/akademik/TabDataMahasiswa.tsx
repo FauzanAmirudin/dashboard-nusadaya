@@ -7,6 +7,7 @@ import {
 	Loader2,
 	Lock,
 	Save,
+	Sparkles,
 	User,
 	Users2,
 	XCircle,
@@ -246,6 +247,36 @@ export function TabDataMahasiswa({
 		}
 	};
 
+	const handleAutoGenerateNim = async () => {
+		if (!canEditNim) return;
+		setIsSavingNim(true);
+		try {
+			const res = await fetch(`${API_URL}/students/${studentId}/generate-nim`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${getToken()}`,
+					"Content-Type": "application/json",
+				},
+			});
+			const json = await res.json();
+			if (res.ok && json.success) {
+				toast.success(
+					json.message ||
+						`NIM resmi ${json.nim} berhasil diterbitkan otomatis!`,
+				);
+				setNim(json.nim);
+				onUpdate();
+				fetchClearance();
+			} else {
+				toast.error(json.message || "Gagal menerbitkan NIM otomatis");
+			}
+		} catch (err) {
+			toast.error("Terjadi kesalahan jaringan saat menerbitkan NIM");
+		} finally {
+			setIsSavingNim(false);
+		}
+	};
+
 	const handleSavePa = async () => {
 		if (!canEdit) return;
 		setIsSavingPa(true);
@@ -441,12 +472,13 @@ export function TabDataMahasiswa({
 									Alur Syarat Rilis NIM (Clearance):
 								</span>
 								{isAlreadyHasNim ? (
-									<span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
-										<CheckCircle2 className="w-3.5 h-3.5" /> NIM Aktif
-									</span>
+									<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px] font-bold gap-1 px-2 py-0.5">
+										<CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />{" "}
+										NIM Aktif
+									</Badge>
 								) : clearanceStatus.canReleaseNim ? (
-									<Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-										Siap Rilis
+									<Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px] font-bold animate-pulse">
+										Siap Rilis Otomatis
 									</Badge>
 								) : (
 									<Badge className="bg-rose-100 text-rose-700 border-rose-200 text-[10px] font-bold">
@@ -484,18 +516,46 @@ export function TabDataMahasiswa({
 							</div>
 
 							{!isAlreadyHasNim && !clearanceStatus.canReleaseNim && (
-								<p className="text-[10px] text-amber-700 bg-amber-50/80 p-2 rounded-lg border border-amber-200">
-									Selesaikan clearance PMB & Finance sebelum NIM baru dapat
-									dirilis.
+								<p className="text-[10px] text-amber-700 bg-amber-50/80 p-2 rounded-lg border border-amber-200 leading-relaxed">
+									Selesaikan clearance PMB & Finance (pembayaran Registrasi
+									Awal) agar NIM mahasiswa dapat diterbitkan oleh sistem.
 								</p>
+							)}
+
+							{!isAlreadyHasNim && clearanceStatus.canReleaseNim && (
+								<div className="pt-1">
+									<Button
+										size="sm"
+										type="button"
+										onClick={handleAutoGenerateNim}
+										disabled={isSavingNim}
+										className="w-full text-xs h-9 font-bold rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-xs gap-1.5 cursor-pointer"
+									>
+										{isSavingNim ? (
+											<Loader2 className="w-3.5 h-3.5 animate-spin" />
+										) : (
+											<Sparkles className="w-3.5 h-3.5" />
+										)}
+										⚡ Terbitkan NIM Otomatis (Sistem)
+									</Button>
+								</div>
 							)}
 						</div>
 
 						{/* Form Control */}
 						<div className="space-y-1.5 flex-1 flex flex-col justify-center">
-							<Label className="text-xs font-semibold text-slate-700">
-								{isAlreadyHasNim ? "Perbarui NIM" : "Masukkan NIM Baru"}
-							</Label>
+							<div className="flex items-center justify-between">
+								<Label className="text-xs font-semibold text-slate-700">
+									{isAlreadyHasNim
+										? "Perbarui NIM Manual"
+										: "Input NIM Manual (Opsional)"}
+								</Label>
+								{isAlreadyHasNim && (
+									<span className="text-[10px] text-emerald-600 font-semibold">
+										Terdaftar Resmi
+									</span>
+								)}
+							</div>
 							<Input
 								placeholder={
 									canEditNim

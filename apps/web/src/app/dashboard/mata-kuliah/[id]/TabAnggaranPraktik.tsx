@@ -1524,13 +1524,35 @@ export function TabAnggaranPraktik({
 						</div>
 
 						<div>
-							<Label className="text-xs font-bold text-slate-700 block mb-1.5">
-								Upload Berkas Dokumen Laporan (PDF / Excel)
+							<Label className="text-xs font-bold text-slate-700 block mb-1">
+								Upload Berkas Dokumen Laporan (Wajib Berformat PDF)
 							</Label>
+							<p className="text-[11px] text-slate-500 mb-1.5">
+								Standar administrasi akademik (Segmen 5 & 12): Berkas lampiran
+								sisa bahan praktik wajib berformat PDF.
+							</p>
 							<Input
 								type="file"
-								accept=".pdf,.xlsx,.xls,.doc,.docx"
-								onChange={(e) => setReportFile(e.target.files?.[0] || null)}
+								accept=".pdf,application/pdf"
+								onChange={(e) => {
+									const f = e.target.files?.[0];
+									if (f) {
+										if (
+											f.type !== "application/pdf" &&
+											!f.name.toLowerCase().endsWith(".pdf")
+										) {
+											toast.error(
+												"Format berkas tidak valid. Dokumen laporan sisa bahan wajib berformat PDF.",
+											);
+											e.target.value = "";
+											setReportFile(null);
+											return;
+										}
+										setReportFile(f);
+									} else {
+										setReportFile(null);
+									}
+								}}
 								className="text-xs h-10 cursor-pointer bg-slate-50/50"
 							/>
 						</div>

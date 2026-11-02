@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1029,27 +1030,26 @@ export default function AddStudentPage() {
 
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div className="space-y-2">
-								<Label>NIM / NIS</Label>
+								<div className="flex items-center justify-between">
+									<Label className="flex items-center gap-1.5 font-semibold text-slate-700">
+										NIM (Nomor Induk Mahasiswa)
+									</Label>
+									<Badge className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-semibold">
+										Diterbitkan Otomatis
+									</Badge>
+								</div>
 								<Input
-									placeholder="Nomor Induk"
-									value={formData.nim}
-									onKeyDown={preventNonNumericKey}
-									onChange={(e) =>
-										updateData(
-											"nim",
-											filterNumeric(
-												e.target.value,
-												20,
-												"NIM hanya boleh berisi angka",
-											),
-										)
-									}
+									placeholder="Otomatis diterbitkan sistem setelah Registrasi Awal divalidasi Finance"
+									value={formData.nim || ""}
+									disabled={true}
+									className="bg-slate-50 text-slate-500 font-mono text-xs cursor-not-allowed"
 								/>
-								<p className="text-xs text-slate-400">
-									Opsional. Sesuai standarisasi OneData, NIM resmi dirilis
-									setelah berkas PMB disetujui (ACC) dan pembayaran Registrasi
-									Awal lunas di Finance. Jika dikosongkan, username login akun
-									mahasiswa menggunakan Email.
+								<p className="text-[11px] text-slate-500 leading-relaxed">
+									Sesuai standar operasional (Segmen 5 & 12), NIM resmi
+									diterbitkan secara otomatis oleh sistem segera setelah
+									kelengkapan pembayaran Registrasi Awal tervalidasi Finance dan
+									berkas PMB disetujui. Akun login awal mahasiswa menggunakan
+									Email.
 								</p>
 							</div>
 							<div className="space-y-2">

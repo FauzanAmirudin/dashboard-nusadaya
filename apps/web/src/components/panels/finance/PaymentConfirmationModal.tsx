@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -239,17 +240,31 @@ export function PaymentConfirmationModal({
 
 					{/* Bukti Pembayaran */}
 					<div>
-						<Label className="text-xs font-semibold text-slate-700 block mb-1.5">
-							Bukti Pembayaran (PDF / Gambar)
+						<Label className="text-xs font-semibold text-slate-700 block mb-1">
+							Bukti Pembayaran (Wajib Berformat PDF)
 						</Label>
+						<p className="text-[11px] text-slate-500 mb-2">
+							Sesuai standar sistem (Segmen 5 & 12), seluruh dokumen keuangan
+							dan administrasi wajib berformat PDF.
+						</p>
 						<input
 							ref={fileInputRef}
 							type="file"
-							accept="application/pdf,image/*"
+							accept=".pdf,application/pdf"
 							className="hidden"
 							onChange={(e) => {
 								const f = e.target.files?.[0];
 								if (f) {
+									if (
+										f.type !== "application/pdf" &&
+										!f.name.toLowerCase().endsWith(".pdf")
+									) {
+										toast.error(
+											"Format berkas tidak valid. Dokumen pembayaran wajib berformat PDF.",
+										);
+										e.target.value = "";
+										return;
+									}
 									setPaymentForm((prev) => ({
 										...prev,
 										file: f,

@@ -174,6 +174,18 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" })
 		}
 
 		if (body.file && body.file instanceof File && body.file.size > 0) {
+			// Standarisasi seluruh dokumen administrasi berformat PDF (Segmen 5 & 12)
+			if (
+				body.file.type !== "application/pdf" &&
+				!body.file.name.toLowerCase().endsWith(".pdf")
+			) {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Format berkas tidak valid. Dokumen laporan sisa bahan wajib berformat PDF sesuai standar sistem.",
+				};
+			}
 			try {
 				const uploadRes = await fileService.uploadFile({
 					file: body.file,
@@ -229,6 +241,18 @@ export const dosenRouter = new Elysia({ prefix: "/dosen" })
 		}
 
 		if (body.file && body.file instanceof File && body.file.size > 0) {
+			// Standarisasi seluruh dokumen administrasi berformat PDF (Segmen 5 & 12)
+			if (
+				body.file.type !== "application/pdf" &&
+				!body.file.name.toLowerCase().endsWith(".pdf")
+			) {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Format berkas tidak valid. Dokumen laporan sisa bahan wajib berformat PDF sesuai standar sistem.",
+				};
+			}
 			try {
 				const uploadRes = await fileService.uploadFile({
 					file: body.file,

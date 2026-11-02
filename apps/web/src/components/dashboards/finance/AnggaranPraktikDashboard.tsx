@@ -1615,10 +1615,22 @@ export function AnggaranPraktikDashboard() {
 												<div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
 													<Input
 														type="file"
-														accept=".pdf,.jpg,.jpeg,.png"
+														accept=".pdf,application/pdf"
 														onChange={(e) => {
 															const f = e.target.files?.[0];
-															if (f) setProofFile(f);
+															if (f) {
+																if (
+																	f.type !== "application/pdf" &&
+																	!f.name.toLowerCase().endsWith(".pdf")
+																) {
+																	toast.error(
+																		"Format berkas tidak valid. Dokumen bukti pencairan wajib berformat PDF.",
+																	);
+																	e.target.value = "";
+																	return;
+																}
+																setProofFile(f);
+															}
 														}}
 														className="text-xs h-9 bg-slate-50 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-100 file:text-[#0517B0] cursor-pointer"
 													/>
@@ -1653,7 +1665,7 @@ export function AnggaranPraktikDashboard() {
 										<div className="flex items-center justify-between">
 											<label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
 												<Paperclip className="w-3.5 h-3.5 text-[#0517B0]" />
-												Lampirkan Bukti Transfer (Opsional):
+												Lampirkan Bukti Transfer (Wajib PDF):
 											</label>
 											{proofFile && (
 												<Button
@@ -1669,16 +1681,28 @@ export function AnggaranPraktikDashboard() {
 										</div>
 										<Input
 											type="file"
-											accept=".pdf,.jpg,.jpeg,.png"
+											accept=".pdf,application/pdf"
 											onChange={(e) => {
 												const f = e.target.files?.[0];
-												if (f) setProofFile(f);
+												if (f) {
+													if (
+														f.type !== "application/pdf" &&
+														!f.name.toLowerCase().endsWith(".pdf")
+													) {
+														toast.error(
+															"Format berkas tidak valid. Dokumen bukti transfer wajib berformat PDF.",
+														);
+														e.target.value = "";
+														return;
+													}
+													setProofFile(f);
+												}
 											}}
 											className="text-xs h-8.5 bg-white file:mr-2 file:py-0.5 file:px-2 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-blue-100 file:text-[#0517B0] cursor-pointer"
 										/>
 										<p className="text-[11px] text-slate-400">
-											Anda dapat melampirkan bukti transfer sekarang atau
-											mengunggahnya nanti setelah disetujui.
+											Lampirkan berkas bukti transfer resmi berformat PDF untuk
+											pencairan dana praktik.
 										</p>
 									</div>
 								)}

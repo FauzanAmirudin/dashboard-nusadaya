@@ -2,6 +2,7 @@
 
 import { Eye, FileText, Paperclip, Trash2, UploadCloud } from "lucide-react";
 import React, { useRef } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { API_URL } from "@/lib/eden";
@@ -130,11 +131,23 @@ export function StagedDocumentUpload({
 							<input
 								ref={fileInputRef}
 								type="file"
-								accept="application/pdf,image/*"
+								accept=".pdf,application/pdf"
 								className="hidden"
 								onChange={(e) => {
 									const f = e.target.files?.[0];
-									if (f) onStageFile(f);
+									if (f) {
+										if (
+											f.type !== "application/pdf" &&
+											!f.name.toLowerCase().endsWith(".pdf")
+										) {
+											toast.error(
+												"Format berkas tidak valid. Dokumen keuangan wajib berformat PDF.",
+											);
+											e.target.value = "";
+											return;
+										}
+										onStageFile(f);
+									}
 								}}
 							/>
 						</>
@@ -157,11 +170,23 @@ export function StagedDocumentUpload({
 			<input
 				ref={fileInputRef}
 				type="file"
-				accept="application/pdf,image/*"
+				accept=".pdf,application/pdf"
 				className="hidden"
 				onChange={(e) => {
 					const f = e.target.files?.[0];
-					if (f) onStageFile(f);
+					if (f) {
+						if (
+							f.type !== "application/pdf" &&
+							!f.name.toLowerCase().endsWith(".pdf")
+						) {
+							toast.error(
+								"Format berkas tidak valid. Dokumen keuangan wajib berformat PDF.",
+							);
+							e.target.value = "";
+							return;
+						}
+						onStageFile(f);
+					}
 				}}
 			/>
 			<button
@@ -170,7 +195,7 @@ export function StagedDocumentUpload({
 				className="w-full flex items-center justify-center gap-2 p-3 bg-white border border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50/30 rounded-lg transition-colors text-xs font-medium text-slate-600 hover:text-blue-700 cursor-pointer"
 			>
 				<UploadCloud className="w-4 h-4 text-slate-400" />
-				<span>Pilih Berkas (PDF / Gambar)</span>
+				<span>Pilih Berkas Bukti (Wajib Format PDF)</span>
 			</button>
 		</div>
 	);

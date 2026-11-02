@@ -38,7 +38,8 @@ import {
 	weeklyEvents,
 } from "../../db/schema";
 import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
-import { hasRole } from "../../lib/permissions";
+import { autoIssueStudentNim } from "../../lib/nim-helper";
+import { getValidUserId, hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 
 export async function invalidateFinanceCaches(studentId: number) {
@@ -426,9 +427,22 @@ export const financeRoutes = new Elysia()
 				}
 			}
 
+			// Trigger penerbitan NIM otomatis jika pembayaran registrasi awal tervalidasi Finance (Segmen 5 & 12)
+			let nimIssued: string | undefined;
+			if (cleanUpdates.registrasiStatus === true) {
+				const validUploaderId = await getValidUserId(user);
+				const issueRes = await autoIssueStudentNim(
+					id,
+					validUploaderId ?? undefined,
+				);
+				if (issueRes.success && !issueRes.alreadyIssued && issueRes.nim) {
+					nimIssued = issueRes.nim;
+				}
+			}
+
 			await invalidateFinanceCaches(id);
 
-			return { success: true };
+			return { success: true, nimIssued };
 		},
 		{
 			body: t.Record(t.String(), t.Any()),
