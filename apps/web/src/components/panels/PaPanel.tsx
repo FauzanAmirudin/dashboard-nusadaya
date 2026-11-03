@@ -12,6 +12,7 @@ import {
 	MessageCircle,
 	Users,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AccPanelStatusCard } from "@/components/ui/AccPanelStatusCard";
@@ -76,11 +77,40 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 	const [counselingLogs, setCounselingLogs] = useState<CounselingLog[]>([]);
 	const [tripartiteLogs, setTripartiteLogs] = useState<TripartiteLog[]>([]);
 	const [interviewLogs, setInterviewLogs] = useState<InterviewLog[]>([]);
+	const searchParams = useSearchParams();
+	const subtabParam = searchParams.get("subtab");
 	const [studentNotes, setStudentNotes] = useState<StudentNote[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSaving, setIsSaving] = useState(false);
 	const [loadingItem, setLoadingItem] = useState<string | null>(null);
-	const [activeTab, setActiveTab] = useState("checklist");
+	const [activeTab, setActiveTab] = useState(
+		subtabParam &&
+			["checklist", "hafalan", "konseling", "tripartit", "interview"].includes(
+				subtabParam,
+			)
+			? subtabParam
+			: "checklist",
+	);
+
+	useEffect(() => {
+		if (
+			subtabParam &&
+			["checklist", "hafalan", "konseling", "tripartit", "interview"].includes(
+				subtabParam,
+			)
+		) {
+			setActiveTab(subtabParam);
+		}
+	}, [subtabParam]);
+
+	const handleTabChange = (val: string) => {
+		setActiveTab(val);
+		if (typeof window !== "undefined") {
+			const url = new URL(window.location.href);
+			url.searchParams.set("subtab", val);
+			window.history.replaceState(null, "", url.toString());
+		}
+	};
 
 	const { completedCount, isAllChecksDone } = calculatePaChecklist(paData);
 	const canEdit = canEditPa(user);
@@ -120,6 +150,31 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 		await fetchPaData();
 		onUpdate();
 		setLoadingItem(null);
+	};
+
+	// Update Vocab Target Handler
+	const handleUpdateVocabTarget = async (newTarget: number) => {
+		if (!canEdit) return;
+		setIsSaving(true);
+		try {
+			await api.students[studentId.toString()].pa.patch({
+				vocabTarget: newTarget,
+			});
+			toast.success(`Target kosakata berhasil diperbarui ke ${newTarget} kata`);
+			await fetchPaData();
+			onUpdate();
+			if (typeof window !== "undefined") {
+				window.dispatchEvent(
+					new CustomEvent("student-pa-hafalan-synced", {
+						detail: { studentId },
+					}),
+				);
+			}
+		} catch {
+			toast.error("Gagal memperbarui target kosakata");
+		} finally {
+			setIsSaving(false);
+		}
 	};
 
 	// Save Discipline Notes (Legacy compatibility)
@@ -219,6 +274,13 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 			toast.success("Setoran hafalan berhasil disimpan");
 			await fetchPaData();
 			onUpdate();
+			if (typeof window !== "undefined") {
+				window.dispatchEvent(
+					new CustomEvent("student-pa-hafalan-synced", {
+						detail: { studentId },
+					}),
+				);
+			}
 		} catch {
 			toast.error("Gagal menyimpan setoran hafalan");
 		} finally {
@@ -254,6 +316,13 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 			toast.success("Setoran hafalan berhasil diperbarui");
 			await fetchPaData();
 			onUpdate();
+			if (typeof window !== "undefined") {
+				window.dispatchEvent(
+					new CustomEvent("student-pa-hafalan-synced", {
+						detail: { studentId },
+					}),
+				);
+			}
 		} catch {
 			toast.error("Gagal memperbarui setoran hafalan");
 		} finally {
@@ -275,6 +344,13 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 			toast.success("Setoran hafalan berhasil dihapus");
 			await fetchPaData();
 			onUpdate();
+			if (typeof window !== "undefined") {
+				window.dispatchEvent(
+					new CustomEvent("student-pa-hafalan-synced", {
+						detail: { studentId },
+					}),
+				);
+			}
 		} catch {
 			toast.error("Gagal menghapus setoran hafalan");
 		} finally {
@@ -489,13 +565,13 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 			{/* Tabs Container */}
 			<Tabs
 				value={activeTab}
-				onValueChange={setActiveTab}
+				onValueChange={handleTabChange}
 				className="w-full space-y-4"
 			>
-				<TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 bg-slate-100 p-1.5 rounded-xl border border-slate-200 h-auto gap-1">
+				<TabsList className="flex overflow-x-auto sm:grid sm:grid-cols-5 w-full bg-slate-100 p-1.5 rounded-xl border border-slate-200 h-auto gap-1 scrollbar-none">
 					<TabsTrigger
 						value="checklist"
-						className="flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
+						className="shrink-0 sm:shrink min-w-[130px] sm:min-w-0 flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
 					>
 						<CheckSquare className="w-4 h-4 text-emerald-600 shrink-0" />
 						<span>Checklist PA</span>
@@ -505,7 +581,7 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 					</TabsTrigger>
 					<TabsTrigger
 						value="hafalan"
-						className="flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
+						className="shrink-0 sm:shrink min-w-[145px] sm:min-w-0 flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
 					>
 						<BookMarked className="w-4 h-4 text-blue-600 shrink-0" />
 						<span>Setoran Hafalan</span>
@@ -515,7 +591,7 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 					</TabsTrigger>
 					<TabsTrigger
 						value="konseling"
-						className="flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
+						className="shrink-0 sm:shrink min-w-[130px] sm:min-w-0 flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
 					>
 						<MessageCircle className="w-4 h-4 text-amber-600 shrink-0" />
 						<span>Log Konseling</span>
@@ -525,7 +601,7 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 					</TabsTrigger>
 					<TabsTrigger
 						value="tripartit"
-						className="flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
+						className="shrink-0 sm:shrink min-w-[130px] sm:min-w-0 flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
 					>
 						<Users className="w-4 h-4 text-indigo-600 shrink-0" />
 						<span>Log Tripartit</span>
@@ -535,7 +611,7 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 					</TabsTrigger>
 					<TabsTrigger
 						value="interview"
-						className="flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
+						className="shrink-0 sm:shrink min-w-[130px] sm:min-w-0 flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
 					>
 						<Briefcase className="w-4 h-4 text-teal-600 shrink-0" />
 						<span>Log Interview</span>
@@ -570,11 +646,13 @@ export function PaPanel({ studentId, onUpdate }: PaPanelProps) {
 					<TabHafalan
 						studentId={studentId}
 						hafalanSessions={hafalanSessions}
+						targetVocab={paData?.vocabTarget || 500}
 						canEdit={canEdit}
 						isSaving={isSaving}
 						onAddHafalan={handleAddHafalan}
 						onEditHafalan={handleEditHafalan}
 						onDeleteHafalan={handleDeleteHafalan}
+						onUpdateTargetVocab={handleUpdateVocabTarget}
 					/>
 				</TabsContent>
 

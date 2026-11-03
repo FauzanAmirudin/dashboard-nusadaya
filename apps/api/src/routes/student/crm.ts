@@ -39,6 +39,7 @@ import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
 import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 import { fileService } from "../../modules/file/service/file.service";
+import { syncAttendanceAggregate } from "../attendance";
 
 export async function invalidateCrmCaches(studentId: number) {
 	await Promise.all([
@@ -93,13 +94,20 @@ export const crmRoutes = new Elysia()
 					with: {
 						createdByUser: { columns: { fullName: true, username: true } },
 					},
-					orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
+					orderBy: (sessions, { desc }) => [
+						desc(sessions.date),
+						desc(sessions.createdAt),
+					],
 				})
 				.catch(() =>
 					db
 						.select()
 						.from(paHafalanSessions)
 						.where(eq(paHafalanSessions.studentId, id))
+						.orderBy(
+							desc(paHafalanSessions.date),
+							desc(paHafalanSessions.createdAt),
+						)
 						.catch(() => [] as any[]),
 				),
 			db.query.vocabLogs
@@ -140,49 +148,158 @@ export const crmRoutes = new Elysia()
 	})
 	.get("/:id/crm/kehadiran", async ({ params, set }) => {
 		const id = Number(params.id);
-		const user = (set as any).user;
 
-		const academic = await db.query.academicData.findFirst({
+		let academic = await db.query.academicData.findFirst({
 			where: eq(academicData.studentId, id),
-			columns: {
-				attendanceTotal: true,
-				attendancePresent: true,
-				attendanceAlphaNote: true,
-			},
 		});
 
 		const courses = await db.query.courseGrades.findMany({
 			where: eq(courseGrades.studentId, id),
-			columns: {
-				courseName: true,
-				courseCode: true,
-				totalMeetings: true,
-				attendancePresent: true,
-			},
 			with: {
 				dosen: { columns: { fullName: true } },
 			},
 		});
 
+		// Auto sync jika attendanceTotal di academicData masih 0 padahal ada mata kuliah
+		if (
+			(!academic || (academic.attendanceTotal ?? 0) === 0) &&
+			courses.length > 0
+		) {
+			try {
+				await syncAttendanceAggregate(id);
+				academic = await db.query.academicData.findFirst({
+					where: eq(academicData.studentId, id),
+				});
+			} catch (err) {
+				console.error(
+					`Gagal auto sync attendance aggregate student ${id}:`,
+					err,
+				);
+			}
+		}
+
 		const crm = await db.query.crmData.findFirst({
 			where: eq(crmData.studentId, id),
-			columns: {
-				practiceAttendance: true,
-			},
 		});
+
+		// Kalkulasi agregat perkuliahan
+		const lectureTotal = courses.reduce(
+			(acc, c) => acc + (c.totalMeetings || 16),
+			0,
+		);
+		const lecturePresent = courses.reduce(
+			(acc, c) => acc + (c.attendancePresent || 0),
+			0,
+		);
+		const lectureRate =
+			lectureTotal > 0 ? Math.round((lecturePresent / lectureTotal) * 100) : 0;
+		const isLectureEligible = lectureRate >= 90;
+
+		const piketTotal = academic?.attendancePiketTotal ?? 0;
+		const piketPresent = academic?.attendancePiketPresent ?? 0;
+		const piketRate =
+			piketTotal > 0 ? Math.round((piketPresent / piketTotal) * 100) : 0;
+
+		const barisTotal = academic?.attendanceBarisTotal ?? 0;
+		const barisPresent = academic?.attendanceBarisPresent ?? 0;
+		const barisLate = academic?.attendanceBarisLate ?? 0;
+		const barisRate =
+			barisTotal > 0 ? Math.round((barisPresent / barisTotal) * 100) : 100;
+
+		const odsTotal = academic?.attendanceOdsTotal ?? 0;
+		const odsPresent = academic?.attendanceOdsPresent ?? 0;
+		const odsRate =
+			odsTotal > 0 ? Math.round((odsPresent / odsTotal) * 100) : 0;
+
+		const pramagangTotal = academic?.attendancePramagangTotal ?? 0;
+		const pramagangPresent = academic?.attendancePramagangPresent ?? 0;
+		const pramagangRate =
+			pramagangTotal > 0
+				? Math.round((pramagangPresent / pramagangTotal) * 100)
+				: 0;
+
+		const practiceDaysTotal =
+			crm?.practiceDaysTotal ?? odsTotal + pramagangTotal;
+		const practiceDaysPresent =
+			crm?.practiceDaysPresent ?? odsPresent + pramagangPresent;
+		const practiceDaysRate =
+			practiceDaysTotal > 0
+				? Math.round((practiceDaysPresent / practiceDaysTotal) * 100)
+				: 0;
 
 		return {
 			success: true,
 			data: {
 				academic: academic || {
-					attendanceTotal: 0,
-					attendancePresent: 0,
+					attendanceTotal: lectureTotal,
+					attendancePresent: lecturePresent,
 					attendanceAlphaNote: null,
+					attendancePiketTotal: 0,
+					attendancePiketPresent: 0,
+					attendanceOdsTotal: 0,
+					attendanceOdsPresent: 0,
+					attendancePramagangTotal: 0,
+					attendancePramagangPresent: 0,
+					attendanceBarisTotal: 0,
+					attendanceBarisPresent: 0,
+					attendanceBarisLate: 0,
 				},
-				courses: courses || [],
-				crm: crm || { practiceAttendance: false },
+				courses: courses.map((c) => {
+					const total = c.totalMeetings || 16;
+					const present = c.attendancePresent || 0;
+					const rate =
+						c.attendanceRate ||
+						(total > 0 ? Math.round((present / total) * 100) : 0);
+					return {
+						id: c.id,
+						courseName: c.courseName,
+						courseCode: c.courseCode,
+						sks: c.sks || 2,
+						totalMeetings: total,
+						attendancePresent: present,
+						attendanceRate: rate,
+						attitudeNote: c.attitudeNote,
+						grade: c.grade,
+						status: c.status,
+						dosen: c.dosen,
+					};
+				}),
+				crm: crm || {
+					practiceAttendance: false,
+					practiceDaysPresent: 0,
+					practiceDaysTotal: 0,
+				},
+				summary: {
+					lectureTotal,
+					lecturePresent,
+					lectureRate,
+					isLectureEligible,
+					piketTotal,
+					piketPresent,
+					piketRate,
+					barisTotal,
+					barisPresent,
+					barisLate,
+					barisRate,
+					odsTotal,
+					odsPresent,
+					odsRate,
+					pramagangTotal,
+					pramagangPresent,
+					pramagangRate,
+					practiceDaysTotal,
+					practiceDaysPresent,
+					practiceDaysRate,
+					isApproved: Boolean(crm?.practiceAttendance),
+				},
 			},
 		};
+	})
+	.post("/:id/crm/kehadiran/sync", async ({ params, set }) => {
+		const id = Number(params.id);
+		await syncAttendanceAggregate(id);
+		await invalidateCrmCaches(id);
+		return { success: true, message: "Data kehadiran berhasil disinkronkan" };
 	})
 	.patch(
 		"/:id/crm",

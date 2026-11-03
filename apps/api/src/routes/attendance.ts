@@ -11,6 +11,7 @@ import {
 	courseMeetingAttendances,
 	courseMeetings,
 	courses,
+	crmData,
 	dutySchedules,
 	morningAssemblyRecords,
 	morningAssemblyScheduleConfig,
@@ -3096,7 +3097,7 @@ export async function syncAttendanceAggregate(studentId: number) {
 	let piketHadir = 0;
 
 	for (const rec of allRecords) {
-		const type = rec.session.sessionType;
+		const type = rec.session?.sessionType;
 		if (type === "kelas" || type === "praktikum") {
 			kelasPraktikumTotal++;
 			if (rec.status === "hadir" || rec.status === "izin")
@@ -3105,6 +3106,23 @@ export async function syncAttendanceAggregate(studentId: number) {
 			piketTotal++;
 			if (rec.status === "hadir" || rec.status === "izin") piketHadir++;
 		}
+	}
+
+	// Agregasi dari tabel courseGrades untuk perkuliahan (karena dosen/akademik menginput absensi per mata kuliah)
+	const studentCourses = await db.query.courseGrades.findMany({
+		where: eq(courseGrades.studentId, studentId),
+	});
+	let courseTotalMeetings = 0;
+	let coursePresentMeetings = 0;
+	for (const cg of studentCourses) {
+		courseTotalMeetings += cg.totalMeetings || 16;
+		coursePresentMeetings += cg.attendancePresent || 0;
+	}
+
+	// Jika perkuliahan di courseGrades lebih lengkap, gunakan courseGrades
+	if (courseTotalMeetings > 0) {
+		kelasPraktikumTotal = Math.max(kelasPraktikumTotal, courseTotalMeetings);
+		kelasPraktikumHadir = Math.max(kelasPraktikumHadir, coursePresentMeetings);
 	}
 
 	// Query ODS
@@ -3142,21 +3160,59 @@ export async function syncAttendanceAggregate(studentId: number) {
 		where: eq(academicData.studentId, studentId),
 	});
 
+	const finalPiketTotal = Math.max(
+		piketTotal,
+		existingData?.attendancePiketTotal || 0,
+	);
+	const finalPiketHadir = Math.max(
+		piketHadir,
+		existingData?.attendancePiketPresent || 0,
+	);
+	const finalOdsTotal = Math.max(
+		odsTotal,
+		existingData?.attendanceOdsTotal || 0,
+	);
+	const finalOdsHadir = Math.max(
+		odsHadir,
+		existingData?.attendanceOdsPresent || 0,
+	);
+	const finalPramagangTotal = Math.max(
+		pramagangTotal,
+		existingData?.attendancePramagangTotal || 0,
+	);
+	const finalPramagangHadir = Math.max(
+		pramagangHadir,
+		existingData?.attendancePramagangPresent || 0,
+	);
+	const finalBarisTotal = Math.max(
+		barisTotal,
+		existingData?.attendanceBarisTotal || 0,
+	);
+	const finalBarisTepatWaktu = Math.max(
+		barisTepatWaktu,
+		existingData?.attendanceBarisPresent || 0,
+	);
+	const finalBarisTerlambat = Math.max(
+		barisTerlambat,
+		existingData?.attendanceBarisLate || 0,
+	);
+
 	if (existingData) {
 		await db
 			.update(academicData)
 			.set({
 				attendanceTotal: kelasPraktikumTotal,
 				attendancePresent: kelasPraktikumHadir,
-				attendancePiketTotal: piketTotal,
-				attendancePiketPresent: piketHadir,
-				attendanceOdsTotal: odsTotal,
-				attendanceOdsPresent: odsHadir,
-				attendancePramagangTotal: pramagangTotal,
-				attendancePramagangPresent: pramagangHadir,
-				attendanceBarisTotal: barisTotal,
-				attendanceBarisPresent: barisTepatWaktu,
-				attendanceBarisLate: barisTerlambat,
+				attendancePiketTotal: finalPiketTotal,
+				attendancePiketPresent: finalPiketHadir,
+				attendanceOdsTotal: finalOdsTotal,
+				attendanceOdsPresent: finalOdsHadir,
+				attendancePramagangTotal: finalPramagangTotal,
+				attendancePramagangPresent: finalPramagangHadir,
+				attendanceBarisTotal: finalBarisTotal,
+				attendanceBarisPresent: finalBarisTepatWaktu,
+				attendanceBarisLate: finalBarisTerlambat,
+				updatedAt: new Date(),
 			})
 			.where(eq(academicData.id, existingData.id));
 	} else {
@@ -3164,15 +3220,40 @@ export async function syncAttendanceAggregate(studentId: number) {
 			studentId,
 			attendanceTotal: kelasPraktikumTotal,
 			attendancePresent: kelasPraktikumHadir,
-			attendancePiketTotal: piketTotal,
-			attendancePiketPresent: piketHadir,
-			attendanceOdsTotal: odsTotal,
-			attendanceOdsPresent: odsHadir,
-			attendancePramagangTotal: pramagangTotal,
-			attendancePramagangPresent: pramagangHadir,
-			attendanceBarisTotal: barisTotal,
-			attendanceBarisPresent: barisTepatWaktu,
-			attendanceBarisLate: barisTerlambat,
+			attendancePiketTotal: finalPiketTotal,
+			attendancePiketPresent: finalPiketHadir,
+			attendanceOdsTotal: finalOdsTotal,
+			attendanceOdsPresent: finalOdsHadir,
+			attendancePramagangTotal: finalPramagangTotal,
+			attendancePramagangPresent: finalPramagangHadir,
+			attendanceBarisTotal: finalBarisTotal,
+			attendanceBarisPresent: finalBarisTepatWaktu,
+			attendanceBarisLate: finalBarisTerlambat,
 		});
+	}
+
+	// Sinkronkan juga practiceDaysPresent & practiceDaysTotal ke crmData jika ada
+	const existingCrm = await db.query.crmData.findFirst({
+		where: eq(crmData.studentId, studentId),
+	});
+	if (existingCrm) {
+		const totalPractice = finalOdsTotal + finalPramagangTotal;
+		const presentPractice = finalOdsHadir + finalPramagangHadir;
+		if (totalPractice > 0 || presentPractice > 0) {
+			await db
+				.update(crmData)
+				.set({
+					practiceDaysTotal: Math.max(
+						existingCrm.practiceDaysTotal || 0,
+						totalPractice,
+					),
+					practiceDaysPresent: Math.max(
+						existingCrm.practiceDaysPresent || 0,
+						presentPractice,
+					),
+					updatedAt: new Date(),
+				})
+				.where(eq(crmData.studentId, studentId));
+		}
 	}
 }

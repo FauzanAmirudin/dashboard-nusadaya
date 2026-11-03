@@ -1131,12 +1131,29 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 					}),
 				]);
 
+			let attendanceTotal = academic?.attendanceTotal ?? 0;
+			let attendancePresent = academic?.attendancePresent ?? 0;
+			if (
+				attendanceTotal === 0 &&
+				courseGradesList &&
+				courseGradesList.length > 0
+			) {
+				attendanceTotal = courseGradesList.reduce(
+					(acc: number, c: any) => acc + (c.totalMeetings || 16),
+					0,
+				);
+				attendancePresent = courseGradesList.reduce(
+					(acc: number, c: any) => acc + (c.attendancePresent || 0),
+					0,
+				);
+			}
+
 			data = {
 				gpa: academic?.gpa ?? 0,
 				creditsCompleted: academic?.creditsCompleted ?? 0,
 				pddiktiInput: academic?.pddiktiInput ?? false,
-				attendanceTotal: academic?.attendanceTotal ?? 0,
-				attendancePresent: academic?.attendancePresent ?? 0,
+				attendanceTotal,
+				attendancePresent,
 				attendanceAlphaNote: academic?.attendanceAlphaNote,
 				utsPassed: academic?.utsPassed ?? false,
 				uasPassed: academic?.uasPassed ?? false,

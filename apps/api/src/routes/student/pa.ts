@@ -40,6 +40,49 @@ import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
 import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 
+async function syncVocabWithCrm(studentId: number) {
+	try {
+		const allHafalan = await db
+			.select({ vocabCount: paHafalanSessions.vocabCount })
+			.from(paHafalanSessions)
+			.where(eq(paHafalanSessions.studentId, studentId));
+
+		const totalVocab = allHafalan.reduce(
+			(acc, item) => acc + (Number(item.vocabCount) || 0),
+			0,
+		);
+
+		const currentPa = await db.query.paData.findFirst({
+			where: eq(paData.studentId, studentId),
+		});
+		const target = currentPa?.vocabTarget || 500;
+
+		const existingCrm = await db.query.crmData.findFirst({
+			where: eq(crmData.studentId, studentId),
+		});
+
+		const isComplete = totalVocab >= target;
+		if (existingCrm) {
+			if (existingCrm.isVocabComplete !== isComplete) {
+				await db
+					.update(crmData)
+					.set({
+						isVocabComplete: isComplete,
+						updatedAt: new Date(),
+					})
+					.where(eq(crmData.studentId, studentId));
+			}
+		} else {
+			await db.insert(crmData).values({
+				studentId,
+				isVocabComplete: isComplete,
+			});
+		}
+	} catch (err) {
+		console.error("Gagal sinkronisasi hafalan ke CRM:", err);
+	}
+}
+
 export const paRoutes = new Elysia()
 	.get("/:id/pa", async (context) => {
 		const id = Number(context.params.id);
@@ -217,6 +260,10 @@ export const paRoutes = new Elysia()
 						.set({ status })
 						.where(eq(paData.studentId, id));
 				}
+
+				if ((body as any).vocabTarget !== undefined) {
+					await syncVocabWithCrm(id);
+				}
 			}
 
 			await Promise.all([
@@ -224,6 +271,7 @@ export const paRoutes = new Elysia()
 				cacheInvalidatePattern("cache:students:*"),
 				cacheInvalidatePattern("cache:mahasiswa:*"),
 				cacheInvalidatePattern("cache:dashboard:*"),
+				cacheInvalidatePattern("cache:crm:*"),
 			]);
 
 			return { success: true, message: "Data PA berhasil diperbarui" };
@@ -411,11 +459,14 @@ export const paRoutes = new Elysia()
 				})
 				.returning();
 
+			await syncVocabWithCrm(id);
+
 			await Promise.all([
 				cacheDel(`cache:student:${id}`),
 				cacheInvalidatePattern("cache:students:*"),
 				cacheInvalidatePattern("cache:mahasiswa:*"),
 				cacheInvalidatePattern("cache:dashboard:*"),
+				cacheInvalidatePattern("cache:crm:*"),
 			]);
 
 			return { success: true, data: inserted[0] };
@@ -530,11 +581,14 @@ export const paRoutes = new Elysia()
 
 		await db.delete(paHafalanSessions).where(eq(paHafalanSessions.id, logId));
 
+		await syncVocabWithCrm(id);
+
 		await Promise.all([
 			cacheDel(`cache:student:${id}`),
 			cacheInvalidatePattern("cache:students:*"),
 			cacheInvalidatePattern("cache:mahasiswa:*"),
 			cacheInvalidatePattern("cache:dashboard:*"),
+			cacheInvalidatePattern("cache:crm:*"),
 		]);
 
 		return { success: true };
@@ -566,11 +620,14 @@ export const paRoutes = new Elysia()
 				})
 				.returning();
 
+			await syncVocabWithCrm(id);
+
 			await Promise.all([
 				cacheDel(`cache:student:${id}`),
 				cacheInvalidatePattern("cache:students:*"),
 				cacheInvalidatePattern("cache:mahasiswa:*"),
 				cacheInvalidatePattern("cache:dashboard:*"),
+				cacheInvalidatePattern("cache:crm:*"),
 			]);
 
 			return { success: true, data: inserted[0] };

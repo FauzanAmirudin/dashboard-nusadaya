@@ -9,9 +9,24 @@ function AlertDialog({ ...props }: AlertDialogPrimitive.Root.Props) {
 	return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />;
 }
 
-function AlertDialogTrigger({ ...props }: AlertDialogPrimitive.Trigger.Props) {
+function AlertDialogTrigger({
+	asChild,
+	children,
+	...props
+}: AlertDialogPrimitive.Trigger.Props & { asChild?: boolean }) {
+	if (asChild && React.isValidElement(children)) {
+		return (
+			<AlertDialogPrimitive.Trigger
+				data-slot="alert-dialog-trigger"
+				render={children}
+				{...props}
+			/>
+		);
+	}
 	return (
-		<AlertDialogPrimitive.Trigger data-slot="alert-dialog-trigger" {...props} />
+		<AlertDialogPrimitive.Trigger data-slot="alert-dialog-trigger" {...props}>
+			{children}
+		</AlertDialogPrimitive.Trigger>
 	);
 }
 
@@ -142,12 +157,16 @@ function AlertDialogDescription({
 
 function AlertDialogAction({
 	className,
+	variant = "default",
+	size = "default",
 	...props
-}: React.ComponentProps<typeof Button>) {
+}: AlertDialogPrimitive.Close.Props &
+	Pick<React.ComponentProps<typeof Button>, "variant" | "size">) {
 	return (
-		<Button
+		<AlertDialogPrimitive.Close
 			data-slot="alert-dialog-action"
 			className={cn(className)}
+			render={<Button variant={variant} size={size} />}
 			{...props}
 		/>
 	);

@@ -122,9 +122,15 @@ export function CrmPanel({
 
 	const fetchPaData = async () => {
 		try {
-			const res = await fetch(`${API_URL}/students/${studentId}/pa`, {
-				headers: { Authorization: `Bearer ${token}` },
-			});
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/pa?_t=${Date.now()}`,
+				{
+					headers: {
+						Authorization: `Bearer ${token}`,
+						"Cache-Control": "no-cache",
+					},
+				},
+			);
 			if (res.ok) {
 				const json = await res.json();
 				if (json.success && json.data) {
@@ -165,6 +171,60 @@ export function CrmPanel({
 		fetchPaData();
 		fetchKehadiranData();
 	}, [studentId, token]);
+
+	// Real-time synchronization listener when PA data or Academic data updates
+	useEffect(() => {
+		const handleSyncEvent = (e: any) => {
+			if (!e?.detail || e.detail.studentId === studentId) {
+				fetchCrmData();
+				fetchPaData();
+				fetchKehadiranData();
+			}
+		};
+
+		window.addEventListener("student-pa-hafalan-synced", handleSyncEvent);
+		window.addEventListener("student-data-updated", handleSyncEvent);
+		window.addEventListener("academic-data-updated", handleSyncEvent);
+		window.addEventListener("attendance-updated", handleSyncEvent);
+		window.addEventListener("student-crm-kehadiran-synced", handleSyncEvent);
+
+		let channel: BroadcastChannel | null = null;
+		try {
+			channel = new BroadcastChannel("dashboard-realtime-sync");
+			channel.onmessage = (msgEvent) => {
+				const data = msgEvent.data;
+				if (
+					data &&
+					(!data.studentId || data.studentId === studentId) &&
+					[
+						"academic-data-updated",
+						"attendance-updated",
+						"student-crm-kehadiran-synced",
+						"student-pa-hafalan-synced",
+					].includes(data.type)
+				) {
+					fetchCrmData();
+					fetchKehadiranData();
+				}
+			};
+		} catch {}
+
+		return () => {
+			window.removeEventListener("student-pa-hafalan-synced", handleSyncEvent);
+			window.removeEventListener("student-data-updated", handleSyncEvent);
+			window.removeEventListener("academic-data-updated", handleSyncEvent);
+			window.removeEventListener("attendance-updated", handleSyncEvent);
+			window.removeEventListener(
+				"student-crm-kehadiran-synced",
+				handleSyncEvent,
+			);
+			if (channel) {
+				try {
+					channel.close();
+				} catch {}
+			}
+		};
+	}, [studentId]);
 
 	const crm = crmState?.crm;
 	const { completedCount, totalChecks, isAllChecksDone } =
@@ -377,6 +437,7 @@ export function CrmPanel({
 							kehadiranState={kehadiranState}
 							canEdit={canEdit}
 							fetchCrmData={fetchCrmData}
+							fetchKehadiranData={fetchKehadiranData}
 							onUpdate={onUpdate}
 							onUpdateField={handleUpdateCrmField}
 						/>
