@@ -1143,6 +1143,7 @@ function StudentDetailContent() {
 								) : currentLink.id === "crm" ? (
 									<CrmPanel
 										studentId={s.id}
+										studentData={s}
 										onUpdate={refetchStudent}
 										onProgressChange={handleCrmProgressChange}
 									/>

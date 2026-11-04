@@ -371,7 +371,22 @@ export const crmRoutes = new Elysia()
 					Boolean(updated.isOds4Report) || Boolean(odsList[3]?.isDone);
 				const hasOds5 =
 					Boolean(updated.isOds5Report) || Boolean(odsList[4]?.isDone);
-				const hasPrammagang = Boolean(updated.isPrammagangReport);
+				const hasPrammagang = Boolean(
+					updated.isPrammagangReport ||
+						updated.pramagangVideoStatus === "DISETUJUI",
+				);
+				const hasMonthlyVideo = Boolean(
+					updated.isMonthlyVideo || updated.monthlyVideoStatus === "DISETUJUI",
+				);
+				const triDharmaList = Array.isArray(updated.triDharmaDetails)
+					? (updated.triDharmaDetails as any[])
+					: [];
+				const hasTriDharma = Boolean(
+					updated.isTriDharma ||
+						triDharmaList.some(
+							(t: any) => t.isDone || t.status === "DISETUJUI",
+						),
+				);
 
 				const crmChecks = [
 					updated.isMonitoringParent,
@@ -384,10 +399,12 @@ export const crmRoutes = new Elysia()
 					hasOds4,
 					hasOds5,
 					hasPrammagang,
+					hasMonthlyVideo,
+					hasTriDharma,
 				];
 
 				const checkedCount = crmChecks.filter(Boolean).length;
-				const totalChecks = 10;
+				const totalChecks = 12;
 
 				let status: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
 					"BUTUH_PERHATIAN";
@@ -416,6 +433,421 @@ export const crmRoutes = new Elysia()
 			body: t.Record(t.String(), t.Any()),
 		},
 	)
+	.post(
+		"/:id/crm/review-pramagang-video",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+
+			if (!user) {
+				set.status = 401;
+				return { success: false, message: "Unauthorized" };
+			}
+
+			if (!hasRole(user, "crm", "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			const id = Number(params.id);
+			const payload = body as {
+				status: "DISETUJUI" | "PERLU_REVISI";
+				notes?: string;
+			};
+			const isApproved = payload.status === "DISETUJUI";
+
+			const updatePayload: any = {
+				pramagangVideoStatus: payload.status,
+				pramagangVideoNotes:
+					payload.notes ||
+					(isApproved
+						? "Disetujui oleh admin CRM"
+						: "Perlu perbaikan tautan video"),
+				pramagangVideoReviewedAt: new Date(),
+				pramagangVideoReviewedBy: user.id,
+				isPrammagangReport: isApproved,
+				updatedAt: new Date(),
+			};
+
+			const current = await db.query.crmData.findFirst({
+				where: eq(crmData.studentId, id),
+			});
+
+			if (!current) {
+				await db.insert(crmData).values({ studentId: id, ...updatePayload });
+			} else {
+				await db
+					.update(crmData)
+					.set(updatePayload)
+					.where(eq(crmData.studentId, id));
+			}
+
+			await invalidateCrmCaches(id);
+
+			return {
+				success: true,
+				message: isApproved
+					? "Video Pra-Magang berhasil disetujui (ACC Laporan Pra-Magang)"
+					: "Status video pra-magang diubah menjadi Perlu Revisi",
+				data: updatePayload,
+			};
+		},
+		{
+			body: t.Object({
+				status: t.Union([t.Literal("DISETUJUI"), t.Literal("PERLU_REVISI")]),
+				notes: t.Optional(t.String()),
+			}),
+		},
+	)
+	.post(
+		"/:id/crm/review-monthly-video",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+
+			if (!user) {
+				set.status = 401;
+				return { success: false, message: "Unauthorized" };
+			}
+
+			if (!hasRole(user, "crm", "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			const id = Number(params.id);
+			const payload = body as {
+				status: "DISETUJUI" | "PERLU_REVISI";
+				notes?: string;
+				videoId?: string;
+			};
+			const isApproved = payload.status === "DISETUJUI";
+
+			const current = await db.query.crmData.findFirst({
+				where: eq(crmData.studentId, id),
+			});
+
+			let existingVideos: any[] = [];
+			if (current?.monthlyVideos) {
+				try {
+					existingVideos =
+						typeof current.monthlyVideos === "string"
+							? JSON.parse(current.monthlyVideos)
+							: (current.monthlyVideos as any[]);
+					if (!Array.isArray(existingVideos)) existingVideos = [];
+				} catch {
+					existingVideos = [];
+				}
+			}
+
+			if (payload.videoId) {
+				existingVideos = existingVideos.map((v: any) =>
+					v.id === payload.videoId
+						? {
+								...v,
+								status: payload.status,
+								notes:
+									payload.notes ||
+									(isApproved
+										? "Disetujui oleh admin CRM"
+										: "Perlu perbaikan video konten"),
+								reviewedAt: new Date().toISOString(),
+								reviewedBy: user.id,
+							}
+						: v,
+				);
+			}
+
+			const hasAnyApproved = existingVideos.some(
+				(v: any) => v.status === "DISETUJUI",
+			);
+
+			const updatePayload: any = {
+				monthlyVideoStatus: payload.videoId
+					? hasAnyApproved
+						? "DISETUJUI"
+						: payload.status
+					: payload.status,
+				monthlyVideoNotes:
+					payload.notes ||
+					(isApproved
+						? "Disetujui oleh admin CRM"
+						: "Perlu perbaikan video konten"),
+				monthlyVideoReviewedAt: new Date(),
+				monthlyVideoReviewedBy: user.id,
+				isMonthlyVideo: payload.videoId ? hasAnyApproved : isApproved,
+				monthlyVideos: existingVideos,
+				updatedAt: new Date(),
+			};
+
+			if (!current) {
+				await db.insert(crmData).values({ studentId: id, ...updatePayload });
+			} else {
+				await db
+					.update(crmData)
+					.set(updatePayload)
+					.where(eq(crmData.studentId, id));
+			}
+
+			await invalidateCrmCaches(id);
+
+			return {
+				success: true,
+				message: isApproved
+					? "Video Konten Bulanan berhasil disetujui (ACC Segmen 10)"
+					: "Status video konten bulanan diubah menjadi Perlu Revisi",
+				data: updatePayload,
+			};
+		},
+		{
+			body: t.Object({
+				status: t.Union([t.Literal("DISETUJUI"), t.Literal("PERLU_REVISI")]),
+				notes: t.Optional(t.String()),
+				videoId: t.Optional(t.String()),
+			}),
+		},
+	)
+	// --- SEGMEN 9: INTEGRASI TRI DHARMA PERGURUAN TINGGI (PKM & PENELITIAN) ---
+	.post(
+		"/:id/crm/tri-dharma",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			const id = Number(params.id);
+
+			if (!user) {
+				set.status = 401;
+				return { success: false, message: "Unauthorized" };
+			}
+
+			if (!hasRole(user, "crm", "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			const current = await db.query.crmData.findFirst({
+				where: eq(crmData.studentId, id),
+			});
+
+			const existingList: any[] = Array.isArray(current?.triDharmaDetails)
+				? (current.triDharmaDetails as any[])
+				: [];
+
+			const payload = body as any;
+			const activityId =
+				payload.id ||
+				`td_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+			const updatedEntry = {
+				id: activityId,
+				category: payload.category || "pkm", // "pkm" | "penelitian"
+				locationType: payload.locationType || "sekolah_mitra", // "sekolah_mitra" | "desa_binaan"
+				locationName: payload.locationName?.trim() || "",
+				title: payload.title?.trim() || "",
+				date: payload.date || "",
+				lecturerName: payload.lecturerName?.trim() || "",
+				description: payload.description?.trim() || "",
+				reportUrl: payload.reportUrl || null,
+				reportName: payload.reportName || null,
+				documentationUrl: payload.documentationUrl || null,
+				status:
+					payload.status || (payload.isDone ? "DISETUJUI" : "MENUNGGU_REVIEW"),
+				isDone: Boolean(payload.isDone),
+				reviewNotes: payload.reviewNotes || null,
+				updatedAt: new Date().toISOString(),
+			};
+
+			const targetIndex = existingList.findIndex(
+				(item) => item.id === activityId,
+			);
+			if (targetIndex >= 0) {
+				existingList[targetIndex] = {
+					...existingList[targetIndex],
+					...updatedEntry,
+				};
+			} else {
+				existingList.push({
+					...updatedEntry,
+					submittedAt: new Date().toISOString(),
+				});
+			}
+
+			const hasAnyDone = existingList.some(
+				(item) => Boolean(item.isDone) || item.status === "DISETUJUI",
+			);
+
+			if (current) {
+				await db
+					.update(crmData)
+					.set({
+						triDharmaDetails: existingList,
+						isTriDharma: hasAnyDone,
+						updatedAt: new Date(),
+					})
+					.where(eq(crmData.studentId, id));
+			} else {
+				await db.insert(crmData).values({
+					studentId: id,
+					triDharmaDetails: existingList,
+					isTriDharma: hasAnyDone,
+				});
+			}
+
+			await invalidateCrmCaches(id);
+
+			return {
+				success: true,
+				message: "Data kegiatan Tri Dharma berhasil disimpan",
+				data: existingList,
+			};
+		},
+		{
+			body: t.Object({
+				id: t.Optional(t.String()),
+				category: t.Optional(
+					t.Union([t.Literal("pkm"), t.Literal("penelitian")]),
+				),
+				locationType: t.Optional(
+					t.Union([t.Literal("sekolah_mitra"), t.Literal("desa_binaan")]),
+				),
+				locationName: t.Optional(t.String()),
+				title: t.Optional(t.String()),
+				date: t.Optional(t.String()),
+				lecturerName: t.Optional(t.String()),
+				description: t.Optional(t.String()),
+				reportUrl: t.Optional(t.Nullable(t.String())),
+				reportName: t.Optional(t.Nullable(t.String())),
+				documentationUrl: t.Optional(t.Nullable(t.String())),
+				status: t.Optional(t.String()),
+				isDone: t.Optional(t.Boolean()),
+				reviewNotes: t.Optional(t.Nullable(t.String())),
+			}),
+		},
+	)
+	.post(
+		"/:id/crm/review-tri-dharma",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			const id = Number(params.id);
+
+			if (!user) {
+				set.status = 401;
+				return { success: false, message: "Unauthorized" };
+			}
+
+			if (!hasRole(user, "crm", "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			const current = await db.query.crmData.findFirst({
+				where: eq(crmData.studentId, id),
+			});
+
+			const existingList: any[] = Array.isArray(current?.triDharmaDetails)
+				? (current.triDharmaDetails as any[])
+				: [];
+
+			const targetIndex = existingList.findIndex(
+				(item) => item.id === body.activityId,
+			);
+			if (targetIndex < 0) {
+				set.status = 404;
+				return {
+					success: false,
+					message: "Data kegiatan Tri Dharma tidak ditemukan",
+				};
+			}
+
+			const isApproved = body.action === "APPROVE";
+			existingList[targetIndex] = {
+				...existingList[targetIndex],
+				status: isApproved ? "DISETUJUI" : "PERLU_REVISI",
+				isDone: isApproved,
+				reviewNotes:
+					body.notes?.trim() ||
+					(isApproved ? "Disetujui oleh tim CRM" : "Perlu perbaikan"),
+				reviewedAt: new Date().toISOString(),
+				reviewedBy: user.id,
+			};
+
+			const hasAnyDone = existingList.some(
+				(item) => Boolean(item.isDone) || item.status === "DISETUJUI",
+			);
+
+			await db
+				.update(crmData)
+				.set({
+					triDharmaDetails: existingList,
+					isTriDharma: hasAnyDone,
+					updatedAt: new Date(),
+				})
+				.where(eq(crmData.studentId, id));
+
+			await invalidateCrmCaches(id);
+
+			return {
+				success: true,
+				message: isApproved
+					? "Kegiatan Tri Dharma berhasil disetujui"
+					: "Status kegiatan Tri Dharma diubah menjadi Perlu Revisi",
+				data: existingList,
+			};
+		},
+		{
+			body: t.Object({
+				activityId: t.String(),
+				action: t.Union([t.Literal("APPROVE"), t.Literal("REVISE")]),
+				notes: t.Optional(t.String()),
+			}),
+		},
+	)
+	.delete("/:id/crm/tri-dharma/:activityId", async (context) => {
+		const { params, set } = context;
+		const user = (context as any).user;
+		const id = Number(params.id);
+		const activityId = params.activityId;
+
+		if (!user) {
+			set.status = 401;
+			return { success: false, message: "Unauthorized" };
+		}
+
+		if (!hasRole(user, "crm", "superadmin")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+
+		const current = await db.query.crmData.findFirst({
+			where: eq(crmData.studentId, id),
+		});
+
+		const existingList: any[] = Array.isArray(current?.triDharmaDetails)
+			? (current.triDharmaDetails as any[])
+			: [];
+
+		const updatedList = existingList.filter((item) => item.id !== activityId);
+		const hasAnyDone = updatedList.some(
+			(item) => Boolean(item.isDone) || item.status === "DISETUJUI",
+		);
+
+		await db
+			.update(crmData)
+			.set({
+				triDharmaDetails: updatedList,
+				isTriDharma: hasAnyDone,
+				updatedAt: new Date(),
+			})
+			.where(eq(crmData.studentId, id));
+
+		await invalidateCrmCaches(id);
+
+		return {
+			success: true,
+			message: "Kegiatan Tri Dharma berhasil dihapus",
+		};
+	})
 	.post(
 		"/:id/crm/log",
 		async (context) => {
@@ -977,6 +1409,13 @@ export const crmRoutes = new Elysia()
 
 		await db.delete(crmDocuments).where(eq(crmDocuments.id, docId));
 
+		if (doc.fileUrl) {
+			const match = doc.fileUrl.match(/\/files\/([^/]+)\/download/);
+			if (match?.[1]) {
+				await fileService.deleteFile(match[1]).catch(() => {});
+			}
+		}
+
 		// Check if any documents with the same documentKey remain for this student
 		const remainingDocs = await db.query.crmDocuments.findMany({
 			where: and(
@@ -1002,12 +1441,44 @@ export const crmRoutes = new Elysia()
 				pramagang_report: "isPrammagangReport",
 				pramagang_documentation: "isPrammagangDocumentation",
 			};
+			const crmUpdate: Record<string, any> = { updatedAt: new Date() };
 			if (flagMap[doc.documentKey]) {
-				await db
-					.update(crmData)
-					.set({ [flagMap[doc.documentKey]]: false, updatedAt: new Date() })
-					.where(eq(crmData.studentId, id));
+				crmUpdate[flagMap[doc.documentKey]] = false;
 			}
+			const odsIdxMap: Record<string, number> = {
+				ods_1_report: 0,
+				ods_1: 0,
+				ods_report: 0,
+				ods_2_report: 1,
+				ods_2: 1,
+				ods_3_report: 2,
+				ods_3: 2,
+				ods_4_report: 3,
+				ods_4: 3,
+				ods_5_report: 4,
+				ods_5: 4,
+			};
+			if (odsIdxMap[doc.documentKey] !== undefined) {
+				const crmRow = await db.query.crmData.findFirst({
+					where: eq(crmData.studentId, id),
+				});
+				let odsList: any[] = [];
+				if (crmRow?.odsDetails) {
+					try {
+						odsList =
+							typeof crmRow.odsDetails === "string"
+								? JSON.parse(crmRow.odsDetails)
+								: (crmRow.odsDetails as any[]);
+						if (!Array.isArray(odsList)) odsList = [];
+					} catch {}
+				}
+				const idx = odsIdxMap[doc.documentKey];
+				if (odsList[idx]) {
+					odsList[idx] = { ...odsList[idx], isDone: false };
+					crmUpdate.odsDetails = odsList;
+				}
+			}
+			await db.update(crmData).set(crmUpdate).where(eq(crmData.studentId, id));
 		}
 
 		// Re-evaluate isOdsReport

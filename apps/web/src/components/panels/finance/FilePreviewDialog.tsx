@@ -20,6 +20,7 @@ interface FilePreviewDialogProps {
 	file?: File | null;
 	fileUrl?: string | null;
 	title?: string;
+	studentId?: number | string;
 }
 
 export function FilePreviewDialog({
@@ -28,6 +29,7 @@ export function FilePreviewDialog({
 	file,
 	fileUrl,
 	title,
+	studentId,
 }: FilePreviewDialogProps) {
 	const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
@@ -101,7 +103,7 @@ export function FilePreviewDialog({
 							size="sm"
 							onClick={() =>
 								openDocumentReview(
-									"preview",
+									studentId || "preview",
 									fileUrl || resolvedUrl,
 									title || fileName,
 									"preview",
@@ -154,7 +156,7 @@ export function FilePreviewDialog({
 								size="sm"
 								onClick={() =>
 									openDocumentReview(
-										"preview",
+										studentId || "preview",
 										fileUrl || resolvedUrl,
 										title || fileName,
 										"preview",

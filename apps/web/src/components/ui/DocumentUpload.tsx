@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { API_URL } from "@/lib/eden";
 import { useAuthStore } from "@/store";
+import { openDocumentReview } from "@/utils/document-review";
 import { formatDeviceDateTime } from "@/utils/format";
 
 interface DocumentUploadProps {
@@ -45,6 +46,7 @@ interface DocumentUploadProps {
 	onDocumentsLoaded?: (documents: any[]) => void;
 	hideLabel?: boolean;
 	viewUrlBase?: string;
+	layout?: "horizontal" | "stacked";
 }
 
 export function DocumentUpload({
@@ -60,6 +62,7 @@ export function DocumentUpload({
 	onDocumentsLoaded,
 	hideLabel = false,
 	viewUrlBase,
+	layout = "horizontal",
 }: DocumentUploadProps) {
 	const { token } = useAuthStore();
 	const [isUploading, setIsUploading] = useState(false);
@@ -68,10 +71,11 @@ export function DocumentUpload({
 
 	const fetchDocuments = async () => {
 		try {
-			const fetchUrl =
+			const baseUrl =
 				panel === "dosen"
 					? `${API_URL}/students/${studentId}/course-grades/${courseId}/documents`
 					: `${API_URL}/students/${studentId}/${panel}/documents`;
+			const fetchUrl = `${baseUrl}?_t=${Date.now()}`;
 
 			const res = await fetch(fetchUrl, {
 				headers: {
@@ -97,6 +101,12 @@ export function DocumentUpload({
 							if (documentKey === "ods_4_report" && d.documentKey === "ods_4")
 								return true;
 							if (documentKey === "ods_5_report" && d.documentKey === "ods_5")
+								return true;
+							if (
+								documentKey === "pramagang_report" &&
+								(d.documentKey === "pramagang" ||
+									d.documentKey === "pramagang_documentation")
+							)
 								return true;
 							return false;
 						});
@@ -215,85 +225,176 @@ export function DocumentUpload({
 
 	return (
 		<div className="w-full mt-2 space-y-3">
-			{documents.map((doc, index) => (
-				<div
-					key={doc.id}
-					className="flex items-center justify-between bg-slate-50 p-2.5 rounded-md border border-slate-200 w-full"
-				>
-					<div className="flex items-center gap-3 overflow-hidden">
-						<div className="w-8 h-8 rounded bg-white flex items-center justify-center border border-slate-200 shrink-0">
-							<FileText className="w-4 h-4 text-[#0517B0]" />
+			{documents.map((doc, index) =>
+				layout === "stacked" ? (
+					<div
+						key={doc.id}
+						className="flex flex-col bg-white p-3.5 rounded-xl border border-slate-200 w-full space-y-2.5 transition-all shadow-2xs hover:border-slate-300"
+					>
+						{/* Baris 1: Ikon + Nama File lengkap tanpa terpotong */}
+						<div className="flex items-start gap-2.5 w-full">
+							<div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center border border-blue-100 shrink-0 mt-0.5 shadow-2xs">
+								<FileText className="w-4 h-4 text-[#0517B0]" />
+							</div>
+							<div className="min-w-0 flex-1">
+								<p
+									className="text-xs font-bold text-slate-800 break-words leading-snug line-clamp-2"
+									title={doc.fileName}
+								>
+									{doc.fileName}
+								</p>
+								<span className="text-[10px] text-slate-400 mt-1 block font-medium">
+									Diunggah{" "}
+									{doc.uploadedAt ? formatDeviceDateTime(doc.uploadedAt) : "-"}
+									{index === 0 && (
+										<span className="ml-1.5 text-emerald-600 font-bold">
+											(Terbaru)
+										</span>
+									)}
+								</span>
+							</div>
 						</div>
-						<div className="min-w-0 flex flex-col items-start">
-							<p className="text-sm font-medium text-slate-700 truncate max-w-[150px] sm:max-w-[200px]">
-								{doc.fileName}
-							</p>
-							<span className="text-[10px] text-slate-400">
-								Diunggah{" "}
-								{doc.uploadedAt ? formatDeviceDateTime(doc.uploadedAt) : "-"}
-								{index === 0 && (
-									<span className="ml-2 text-emerald-600 font-medium">
-										(Terbaru)
-									</span>
-								)}
-							</span>
+
+						{/* Baris 2: Tombol Review & Hapus di bawah nama file */}
+						<div className="flex items-center gap-2 pt-2 border-t border-slate-100 w-full">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								className="flex-1 h-7.5 text-xs font-semibold text-[#0517B0] border-[#0517B0]/25 bg-blue-50/40 hover:bg-blue-100/60 gap-1.5 cursor-pointer shadow-2xs"
+								title="Review Dokumen"
+								onClick={() =>
+									openDocumentReview(
+										studentId,
+										doc.fileUrl,
+										doc.fileName,
+										doc.id || "review",
+									)
+								}
+							>
+								<Eye className="w-3.5 h-3.5" />
+								<span>Review Berkas</span>
+							</Button>
+
+							{canEdit && canDelete && (
+								<AlertDialog>
+									<AlertDialogTrigger
+										render={
+											<Button
+												variant="ghost"
+												size="sm"
+												className="h-7.5 px-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 cursor-pointer"
+												title="Hapus Dokumen"
+											>
+												<Trash2 className="w-3.5 h-3.5" />
+											</Button>
+										}
+									/>
+									<AlertDialogContent className="bg-white border-slate-200 text-slate-800 rounded-2xl">
+										<AlertDialogTitle>Hapus Dokumen</AlertDialogTitle>
+										<AlertDialogDescription className="text-slate-500 text-xs">
+											Apakah Anda yakin ingin menghapus berkas{" "}
+											<b>{doc.fileName}</b>? Tindakan ini tidak dapat
+											dibatalkan.
+										</AlertDialogDescription>
+										<div className="flex justify-end gap-3 mt-4">
+											<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50 text-slate-600 h-8 text-xs">
+												Batal
+											</AlertDialogCancel>
+											<AlertDialogAction
+												onClick={() => handleDelete(doc.id)}
+												className="bg-rose-600 hover:bg-rose-700 text-white h-8 text-xs font-bold"
+											>
+												Ya, Hapus
+											</AlertDialogAction>
+										</div>
+									</AlertDialogContent>
+								</AlertDialog>
+							)}
 						</div>
 					</div>
-					<div className="flex items-center gap-1.5 ml-4 shrink-0">
-						<Button
-							variant="outline"
-							size="sm"
-							className="h-8 text-xs font-medium text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 gap-1.5"
-							title="Review Dokumen"
-							onClick={() =>
-								window.open(
-									viewUrlBase
-										? `${viewUrlBase}?url=${encodeURIComponent(doc.fileUrl)}&name=${encodeURIComponent(doc.fileName)}&token=${token}`
-										: `/dashboard/students/${studentId}/documents/${doc.id}?url=${encodeURIComponent(doc.fileUrl)}&name=${encodeURIComponent(doc.fileName)}&token=${token}`,
-									"_blank",
-								)
-							}
-						>
-							<Eye className="w-3.5 h-3.5" />
-							<span className="hidden sm:inline">Review</span>
-						</Button>
-						{canEdit && canDelete && (
-							<AlertDialog>
-								<AlertDialogTrigger
-									render={
-										<Button
-											variant="ghost"
-											size="sm"
-											className="h-8 w-8 p-0 text-slate-500 hover:text-rose-600 hover:bg-rose-50"
-											title="Hapus Dokumen"
-										>
-											<Trash2 className="w-4 h-4" />
-										</Button>
-									}
-								/>
-								<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
-									<AlertDialogTitle>Hapus Dokumen</AlertDialogTitle>
-									<AlertDialogDescription className="text-slate-500">
-										Apakah Anda yakin ingin menghapus dokumen ini? Tindakan ini
-										tidak dapat dibatalkan dan file akan dihapus dari server.
-									</AlertDialogDescription>
-									<div className="flex justify-end gap-3 mt-4">
-										<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50 text-slate-600">
-											Batal
-										</AlertDialogCancel>
-										<AlertDialogAction
-											onClick={() => handleDelete(doc.id)}
-											className="bg-rose-600 hover:bg-rose-700 text-white"
-										>
-											Ya, Hapus
-										</AlertDialogAction>
-									</div>
-								</AlertDialogContent>
-							</AlertDialog>
-						)}
+				) : (
+					<div
+						key={doc.id}
+						className="flex items-center justify-between bg-slate-50 p-2.5 rounded-md border border-slate-200 w-full"
+					>
+						<div className="flex items-center gap-3 overflow-hidden">
+							<div className="w-8 h-8 rounded bg-white flex items-center justify-center border border-slate-200 shrink-0">
+								<FileText className="w-4 h-4 text-[#0517B0]" />
+							</div>
+							<div className="min-w-0 flex flex-col items-start">
+								<p className="text-sm font-medium text-slate-700 truncate max-w-[150px] sm:max-w-[200px]">
+									{doc.fileName}
+								</p>
+								<span className="text-[10px] text-slate-400">
+									Diunggah{" "}
+									{doc.uploadedAt ? formatDeviceDateTime(doc.uploadedAt) : "-"}
+									{index === 0 && (
+										<span className="ml-2 text-emerald-600 font-medium">
+											(Terbaru)
+										</span>
+									)}
+								</span>
+							</div>
+						</div>
+						<div className="flex items-center gap-1.5 ml-4 shrink-0">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								className="h-8 text-xs font-medium text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 gap-1.5 cursor-pointer"
+								title="Review Dokumen"
+								onClick={() =>
+									openDocumentReview(
+										studentId,
+										doc.fileUrl,
+										doc.fileName,
+										doc.id || "review",
+									)
+								}
+							>
+								<Eye className="w-3.5 h-3.5" />
+								<span className="hidden sm:inline">Review</span>
+							</Button>
+							{canEdit && canDelete && (
+								<AlertDialog>
+									<AlertDialogTrigger
+										render={
+											<Button
+												variant="ghost"
+												size="sm"
+												className="h-8 w-8 p-0 text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+												title="Hapus Dokumen"
+											>
+												<Trash2 className="w-4 h-4" />
+											</Button>
+										}
+									/>
+									<AlertDialogContent className="bg-white border-slate-200 text-slate-800">
+										<AlertDialogTitle>Hapus Dokumen</AlertDialogTitle>
+										<AlertDialogDescription className="text-slate-500">
+											Apakah Anda yakin ingin menghapus dokumen ini? Tindakan
+											ini tidak dapat dibatalkan dan file akan dihapus dari
+											server.
+										</AlertDialogDescription>
+										<div className="flex justify-end gap-3 mt-4">
+											<AlertDialogCancel className="bg-transparent border-slate-200 hover:bg-slate-50 text-slate-600">
+												Batal
+											</AlertDialogCancel>
+											<AlertDialogAction
+												onClick={() => handleDelete(doc.id)}
+												className="bg-rose-600 hover:bg-rose-700 text-white"
+											>
+												Ya, Hapus
+											</AlertDialogAction>
+										</div>
+									</AlertDialogContent>
+								</AlertDialog>
+							)}
+						</div>
 					</div>
-				</div>
-			))}
+				),
+			)}
 
 			{documents.length === 0 && !canEdit && (
 				<div className="flex items-center justify-center p-3 rounded-lg border border-dashed border-slate-200 bg-slate-50/50 text-slate-400 text-xs font-medium">

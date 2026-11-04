@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
 import {
@@ -44,6 +44,7 @@ import {
 } from "../lib/cache";
 import { GradeCalculationService } from "../modules/academic/grade-calculation.service";
 import { fileService } from "../modules/file/service/file.service";
+import { invalidateCrmCaches } from "./student/crm";
 
 function computeFinanceProgress(
 	finance: any,
@@ -437,7 +438,7 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 		const pmbTotal = 17;
 		const pmbPercent = Math.round((pmbCompleted / pmbTotal) * 100);
 
-		// Hitung Progress CRM (11 kriteria)
+		// Hitung Progress CRM (11 kriteria mencakup Segmen 9 Pra-Magang & Segmen 10 Konten Bulanan)
 		const crmChecklist = [
 			crm?.isMonitoringParent,
 			crm?.isMonitoringIndustry,
@@ -448,10 +449,11 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			crm?.isOds3Report,
 			crm?.isOds4Report,
 			crm?.isOds5Report,
-			crm?.isPrammagangReport,
+			crm?.isPrammagangReport || crm?.pramagangVideoStatus === "DISETUJUI",
+			crm?.isMonthlyVideo || crm?.monthlyVideoStatus === "DISETUJUI",
 		];
 		const crmCompleted = crmChecklist.filter(Boolean).length;
-		const crmTotal = 10;
+		const crmTotal = crmChecklist.length; // 11 kriteria
 		const crmPercent = Math.round((crmCompleted / crmTotal) * 100);
 		const crmPresent = crm?.practiceDaysPresent ?? 0;
 		const crmDaysTotal = crm?.practiceDaysTotal ?? 0;
@@ -764,6 +766,8 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			return { success: false, message: "Unauthorized" };
 		}
 
+		set.headers["cache-control"] = "no-store, no-cache, must-revalidate";
+
 		const panelKey = params.panelKey;
 		const cacheKey = `cache:mahasiswa:${user.id}:panel:${panelKey}`;
 		const cached = await cacheGet<any>(cacheKey);
@@ -796,6 +800,7 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			]);
 
 			data = {
+				studentId: studentData.id,
 				// 4 Checklist Utama
 				formReceived: pmb?.formReceived ?? false,
 				documentsComplete: pmb?.documentsComplete ?? false,
@@ -877,6 +882,7 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			]);
 
 			data = {
+				studentId: studentData.id,
 				// Old & New Checklist
 				odsActive: crm?.odsActive ?? false,
 				studentMonitoring: crm?.studentMonitoring ?? false,
@@ -901,6 +907,25 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				pramagangEndDate: crm?.pramagangEndDate,
 				pramagangIndustry: crm?.pramagangIndustry,
 				pramagangVideoLink: crm?.pramagangVideoLink,
+				pramagangVideoStatus: crm?.pramagangVideoStatus ?? "BELUM_DIUNGGAH",
+				pramagangVideoNotes: crm?.pramagangVideoNotes,
+				pramagangVideoSubmittedAt: crm?.pramagangVideoSubmittedAt,
+				pramagangVideoReviewedAt: crm?.pramagangVideoReviewedAt,
+
+				// Konten Bulanan (Segmen 10)
+				isMonthlyVideo: crm?.isMonthlyVideo ?? false,
+				monthlyVideoLink: crm?.monthlyVideoLink,
+				monthlyVideoTitle: crm?.monthlyVideoTitle,
+				monthlyVideoPlatform: crm?.monthlyVideoPlatform,
+				monthlyVideoStatus: crm?.monthlyVideoStatus ?? "BELUM_DIUNGGAH",
+				monthlyVideoNotes: crm?.monthlyVideoNotes,
+				monthlyVideoSubmittedAt: crm?.monthlyVideoSubmittedAt,
+				monthlyVideoReviewedAt: crm?.monthlyVideoReviewedAt,
+				monthlyVideos: crm?.monthlyVideos ?? [],
+
+				// Segmen 9: Tri Dharma Perguruan Tinggi (PKM & Penelitian)
+				isTriDharma: crm?.isTriDharma ?? false,
+				triDharmaDetails: crm?.triDharmaDetails ?? [],
 
 				// Kehadiran & Kasus
 				practiceAttendance: crm?.practiceAttendance ?? false,
@@ -967,6 +992,7 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			]);
 
 			data = {
+				studentId: studentData.id,
 				// Plafon & Partisi Biaya Pendidikan
 				totalBiayaPendidikan: finance?.totalBiayaPendidikan ?? 0,
 				metodePembayaran: finance?.metodePembayaran ?? "mandiri",
@@ -1133,16 +1159,12 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 
 			let attendanceTotal = academic?.attendanceTotal ?? 0;
 			let attendancePresent = academic?.attendancePresent ?? 0;
-			if (
-				attendanceTotal === 0 &&
-				courseGradesList &&
-				courseGradesList.length > 0
-			) {
-				attendanceTotal = courseGradesList.reduce(
+			if (attendanceTotal === 0 && grades && grades.length > 0) {
+				attendanceTotal = grades.reduce(
 					(acc: number, c: any) => acc + (c.totalMeetings || 16),
 					0,
 				);
-				attendancePresent = courseGradesList.reduce(
+				attendancePresent = grades.reduce(
 					(acc: number, c: any) => acc + (c.attendancePresent || 0),
 					0,
 				);
@@ -1585,4 +1607,538 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 		await cacheSet(cacheKey, data, 60);
 
 		return { success: true, data };
-	});
+	})
+	.post(
+		"/panel/crm/pramagang-video",
+		async ({ user, body, set }: any) => {
+			if (!user) {
+				set.status = 401;
+				return { success: false, message: "Unauthorized" };
+			}
+
+			const studentData = await db.query.students.findFirst({
+				where: eq(students.studentUserId, user.id),
+			});
+
+			if (!studentData) {
+				set.status = 404;
+				return { success: false, message: "Data mahasiswa tidak ditemukan" };
+			}
+
+			const current = await db.query.crmData.findFirst({
+				where: eq(crmData.studentId, studentData.id),
+			});
+
+			if (current?.isAcc) {
+				set.status = 403;
+				return {
+					success: false,
+					message:
+						"Panel CRM telah disetujui resmi (ACC). Data video pra-magang tidak dapat diubah.",
+				};
+			}
+
+			if (current?.pramagangVideoStatus === "DISETUJUI") {
+				set.status = 403;
+				return {
+					success: false,
+					message:
+						"Laporan video pra-magang telah disetujui resmi oleh admin CRM dan tidak dapat diubah.",
+				};
+			}
+
+			const videoLink = body?.videoLink?.trim();
+			if (!videoLink) {
+				set.status = 400;
+				return {
+					success: false,
+					message: "Tautan video laporan pra-magang wajib diisi",
+				};
+			}
+
+			const updatePayload: any = {
+				pramagangVideoLink: videoLink,
+				pramagangVideoStatus: "MENUNGGU_REVIEW",
+				pramagangVideoNotes: null,
+				pramagangVideoSubmittedAt: new Date(),
+				updatedAt: new Date(),
+			};
+
+			if (!current) {
+				await db.insert(crmData).values({
+					studentId: studentData.id,
+					...updatePayload,
+				});
+			} else {
+				await db
+					.update(crmData)
+					.set(updatePayload)
+					.where(eq(crmData.studentId, studentData.id));
+			}
+
+			await invalidateCrmCaches(studentData.id);
+			await cacheInvalidatePattern(`cache:mahasiswa:${user.id}:*`);
+
+			return {
+				success: true,
+				message:
+					"Tautan laporan video pra-magang berhasil disetor dan menunggu review admin CRM.",
+				data: updatePayload,
+			};
+		},
+		{
+			body: t.Object({
+				videoLink: t.String(),
+			}),
+		},
+	)
+	.post(
+		"/panel/crm/monthly-video",
+		async ({ user, body, set }: any) => {
+			if (!user) {
+				set.status = 401;
+				return { success: false, message: "Unauthorized" };
+			}
+
+			const studentData = await db.query.students.findFirst({
+				where: eq(students.studentUserId, user.id),
+			});
+
+			if (!studentData) {
+				set.status = 404;
+				return { success: false, message: "Data mahasiswa tidak ditemukan" };
+			}
+
+			const videoLink = body?.videoLink?.trim();
+			if (!videoLink) {
+				set.status = 400;
+				return {
+					success: false,
+					message: "Tautan video konten bulanan wajib diisi",
+				};
+			}
+
+			const current = await db.query.crmData.findFirst({
+				where: eq(crmData.studentId, studentData.id),
+			});
+
+			if (current?.isAcc) {
+				set.status = 403;
+				return {
+					success: false,
+					message:
+						"Panel CRM telah disetujui resmi (ACC). Data video konten bulanan tidak dapat diubah.",
+				};
+			}
+
+			const existingVideos = Array.isArray(current?.monthlyVideos)
+				? (current.monthlyVideos as any[])
+				: [];
+
+			const editId = body?.editId?.trim();
+			const cleanLink = videoLink.toLowerCase();
+
+			// Validasi tautan tidak boleh sama dengan yang sudah ada
+			const isDuplicateLink = existingVideos.some(
+				(v: any) =>
+					v.videoLink?.trim()?.toLowerCase() === cleanLink &&
+					(!editId || v.id !== editId),
+			);
+			if (isDuplicateLink) {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Tautan video ini sudah pernah disetorkan sebelumnya! Silakan gunakan tautan video konten yang berbeda.",
+				};
+			}
+
+			const month = body?.month?.trim() || "Januari";
+			const year = Number(body?.year) || new Date().getFullYear();
+			const title =
+				body?.title?.trim() || `Video Konten Promosi Bulan ${month}`;
+			const platform = body?.platform?.trim() || "Instagram";
+
+			let updatedVideos: any[] = [];
+
+			if (editId) {
+				const target = existingVideos.find((v: any) => v.id === editId);
+				if (target && target.status === "DISETUJUI") {
+					set.status = 403;
+					return {
+						success: false,
+						message:
+							"Video konten yang sudah disetujui (ACC) tidak dapat diedit lagi.",
+					};
+				}
+				updatedVideos = existingVideos.map((v: any) =>
+					v.id === editId
+						? {
+								...v,
+								month,
+								year,
+								title,
+								platform,
+								videoLink,
+								status: "MENUNGGU_REVIEW",
+								notes: null,
+								submittedAt: new Date().toISOString(),
+							}
+						: v,
+				);
+			} else {
+				// Cek apakah untuk bulan dan tahun yang sama sudah pernah disetujui
+				const approvedSameMonth = existingVideos.find(
+					(v: any) =>
+						v.month === month &&
+						Number(v.year) === year &&
+						v.status === "DISETUJUI",
+				);
+				if (approvedSameMonth) {
+					set.status = 400;
+					return {
+						success: false,
+						message: `Video konten untuk ${month} ${year} sudah disetujui resmi oleh admin CRM. Anda dapat menyetor untuk bulan lainnya.`,
+					};
+				}
+
+				const newEntry = {
+					id: crypto.randomUUID(),
+					month,
+					year,
+					title,
+					platform,
+					videoLink,
+					status: "MENUNGGU_REVIEW",
+					notes: null,
+					submittedAt: new Date().toISOString(),
+				};
+
+				// Gantikan jika sebelumnya ada entri belum disetujui pada bulan yang sama, atau tambahkan baru
+				const filtered = existingVideos.filter(
+					(v: any) => !(v.month === month && Number(v.year) === year),
+				);
+				updatedVideos = [newEntry, ...filtered];
+			}
+
+			const hasAnyApproved = updatedVideos.some(
+				(v: any) => v.status === "DISETUJUI",
+			);
+
+			const updatePayload: any = {
+				monthlyVideoLink: videoLink,
+				monthlyVideoTitle: title,
+				monthlyVideoPlatform: platform,
+				monthlyVideoStatus: hasAnyApproved ? "DISETUJUI" : "MENUNGGU_REVIEW",
+				monthlyVideoSubmittedAt: new Date(),
+				isMonthlyVideo: hasAnyApproved,
+				monthlyVideos: updatedVideos,
+				updatedAt: new Date(),
+			};
+
+			if (!current) {
+				await db.insert(crmData).values({
+					studentId: studentData.id,
+					...updatePayload,
+				});
+			} else {
+				await db
+					.update(crmData)
+					.set(updatePayload)
+					.where(eq(crmData.studentId, studentData.id));
+			}
+
+			await invalidateCrmCaches(studentData.id);
+			await cacheInvalidatePattern(`cache:mahasiswa:${user.id}:*`);
+
+			return {
+				success: true,
+				message: `Tautan video konten bulanan (${month} ${year}) berhasil disetor dan menunggu review admin CRM.`,
+				data: updatePayload,
+			};
+		},
+		{
+			body: t.Object({
+				videoLink: t.String(),
+				month: t.Optional(t.String()),
+				year: t.Optional(t.Number()),
+				title: t.Optional(t.String()),
+				platform: t.Optional(t.String()),
+				editId: t.Optional(t.String()),
+			}),
+		},
+	)
+	.delete(
+		"/panel/crm/monthly-video/:videoId",
+		async ({ user, params, set }: any) => {
+			if (!user) {
+				set.status = 401;
+				return { success: false, message: "Unauthorized" };
+			}
+
+			const studentData = await db.query.students.findFirst({
+				where: eq(students.studentUserId, user.id),
+			});
+
+			if (!studentData) {
+				set.status = 404;
+				return { success: false, message: "Data mahasiswa tidak ditemukan" };
+			}
+
+			const current = await db.query.crmData.findFirst({
+				where: eq(crmData.studentId, studentData.id),
+			});
+
+			if (current?.isAcc) {
+				set.status = 403;
+				return {
+					success: false,
+					message:
+						"Panel CRM telah disetujui resmi (ACC). Data video tidak dapat dihapus.",
+				};
+			}
+
+			const videoId = params.videoId;
+			const existingVideos = Array.isArray(current?.monthlyVideos)
+				? (current.monthlyVideos as any[])
+				: [];
+
+			const target = existingVideos.find((v: any) => v.id === videoId);
+			if (!target) {
+				set.status = 404;
+				return { success: false, message: "Data video tidak ditemukan" };
+			}
+
+			if (target.status === "DISETUJUI") {
+				set.status = 403;
+				return {
+					success: false,
+					message:
+						"Video konten yang sudah disetujui (ACC) tidak dapat dihapus.",
+				};
+			}
+
+			const updatedVideos = existingVideos.filter((v: any) => v.id !== videoId);
+			const hasAnyApproved = updatedVideos.some(
+				(v: any) => v.status === "DISETUJUI",
+			);
+			const latest = updatedVideos[0];
+
+			await db
+				.update(crmData)
+				.set({
+					monthlyVideos: updatedVideos,
+					isMonthlyVideo: hasAnyApproved,
+					monthlyVideoLink: latest?.videoLink || null,
+					monthlyVideoTitle: latest?.title || null,
+					monthlyVideoPlatform: latest?.platform || null,
+					monthlyVideoStatus: latest?.status || "BELUM_DIUNGGAH",
+					updatedAt: new Date(),
+				})
+				.where(eq(crmData.studentId, studentData.id));
+
+			await invalidateCrmCaches(studentData.id);
+			await cacheInvalidatePattern(`cache:mahasiswa:${user.id}:*`);
+
+			return {
+				success: true,
+				message: "Video konten bulanan berhasil dihapus.",
+			};
+		},
+	)
+	.post(
+		"/panel/crm/tri-dharma",
+		async ({ user, body, set }: any) => {
+			if (!user) {
+				set.status = 401;
+				return { success: false, message: "Unauthorized" };
+			}
+
+			const studentData = await db.query.students.findFirst({
+				where: eq(students.studentUserId, user.id),
+			});
+
+			if (!studentData) {
+				set.status = 404;
+				return { success: false, message: "Data mahasiswa tidak ditemukan" };
+			}
+
+			const current = await db.query.crmData.findFirst({
+				where: eq(crmData.studentId, studentData.id),
+			});
+
+			if (current?.isAcc) {
+				set.status = 403;
+				return {
+					success: false,
+					message:
+						"Panel CRM telah disetujui resmi (ACC). Data kegiatan Tri Dharma tidak dapat diubah.",
+				};
+			}
+
+			const existingList: any[] = Array.isArray(current?.triDharmaDetails)
+				? (current.triDharmaDetails as any[])
+				: [];
+
+			const activityId =
+				body?.id ||
+				`td_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+			const targetIndex = existingList.findIndex(
+				(item) => item.id === activityId,
+			);
+
+			if (
+				targetIndex >= 0 &&
+				existingList[targetIndex].status === "DISETUJUI"
+			) {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Kegiatan Tri Dharma yang telah disetujui tidak dapat diubah.",
+				};
+			}
+
+			const entryData = {
+				id: activityId,
+				category: body.category || "pkm", // "pkm" | "penelitian"
+				locationType: body.locationType || "sekolah_mitra", // "sekolah_mitra" | "desa_binaan"
+				locationName: body.locationName?.trim() || "",
+				title: body.title?.trim() || "",
+				date: body.date || "",
+				lecturerName: body.lecturerName?.trim() || "",
+				description: body.description?.trim() || "",
+				reportUrl: body.reportUrl || null,
+				reportName: body.reportName || null,
+				documentationUrl: body.documentationUrl || null,
+				status: "MENUNGGU_REVIEW",
+				isDone: false,
+				reviewNotes: null,
+				submittedAt: new Date().toISOString(),
+			};
+
+			if (targetIndex >= 0) {
+				existingList[targetIndex] = {
+					...existingList[targetIndex],
+					...entryData,
+				};
+			} else {
+				existingList.push(entryData);
+			}
+
+			if (current) {
+				await db
+					.update(crmData)
+					.set({
+						triDharmaDetails: existingList,
+						updatedAt: new Date(),
+					})
+					.where(eq(crmData.studentId, studentData.id));
+			} else {
+				await db.insert(crmData).values({
+					studentId: studentData.id,
+					triDharmaDetails: existingList,
+				});
+			}
+
+			await invalidateCrmCaches(studentData.id);
+			await cacheInvalidatePattern(`cache:mahasiswa:${user.id}:*`);
+
+			return {
+				success: true,
+				message: "Kegiatan Tri Dharma berhasil disetorkan dan menunggu review",
+				data: existingList,
+			};
+		},
+		{
+			body: t.Object({
+				id: t.Optional(t.String()),
+				category: t.Union([t.Literal("pkm"), t.Literal("penelitian")]),
+				locationType: t.Union([
+					t.Literal("sekolah_mitra"),
+					t.Literal("desa_binaan"),
+				]),
+				locationName: t.String(),
+				title: t.String(),
+				date: t.String(),
+				lecturerName: t.Optional(t.String()),
+				description: t.Optional(t.String()),
+				reportUrl: t.Optional(t.Nullable(t.String())),
+				reportName: t.Optional(t.Nullable(t.String())),
+				documentationUrl: t.Optional(t.Nullable(t.String())),
+			}),
+		},
+	)
+	.delete(
+		"/panel/crm/tri-dharma/:activityId",
+		async ({ user, params, set }: any) => {
+			if (!user) {
+				set.status = 401;
+				return { success: false, message: "Unauthorized" };
+			}
+
+			const studentData = await db.query.students.findFirst({
+				where: eq(students.studentUserId, user.id),
+			});
+
+			if (!studentData) {
+				set.status = 404;
+				return { success: false, message: "Data mahasiswa tidak ditemukan" };
+			}
+
+			const current = await db.query.crmData.findFirst({
+				where: eq(crmData.studentId, studentData.id),
+			});
+
+			if (current?.isAcc) {
+				set.status = 403;
+				return {
+					success: false,
+					message:
+						"Panel CRM telah disetujui resmi (ACC). Data kegiatan Tri Dharma tidak dapat dihapus.",
+				};
+			}
+
+			const existingList: any[] = Array.isArray(current?.triDharmaDetails)
+				? (current.triDharmaDetails as any[])
+				: [];
+
+			const target = existingList.find((item) => item.id === params.activityId);
+			if (!target) {
+				set.status = 404;
+				return {
+					success: false,
+					message: "Data kegiatan Tri Dharma tidak ditemukan",
+				};
+			}
+
+			if (target.status === "DISETUJUI") {
+				set.status = 403;
+				return {
+					success: false,
+					message:
+						"Kegiatan Tri Dharma yang sudah disetujui tidak dapat dihapus.",
+				};
+			}
+
+			const updatedList = existingList.filter(
+				(item) => item.id !== params.activityId,
+			);
+
+			await db
+				.update(crmData)
+				.set({
+					triDharmaDetails: updatedList,
+					updatedAt: new Date(),
+				})
+				.where(eq(crmData.studentId, studentData.id));
+
+			await invalidateCrmCaches(studentData.id);
+			await cacheInvalidatePattern(`cache:mahasiswa:${user.id}:*`);
+
+			return {
+				success: true,
+				message: "Kegiatan Tri Dharma berhasil dihapus",
+			};
+		},
+	);

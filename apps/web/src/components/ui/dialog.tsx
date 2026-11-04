@@ -2,7 +2,7 @@
 
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { XIcon } from "lucide-react";
-import type * as React from "react";
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -35,8 +35,25 @@ function DialogPortal({ ...props }: DialogPrimitive.Portal.Props) {
 	return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
 }
 
-function DialogClose({ ...props }: DialogPrimitive.Close.Props) {
-	return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
+function DialogClose({
+	asChild,
+	children,
+	...props
+}: DialogPrimitive.Close.Props & { asChild?: boolean }) {
+	if (asChild && React.isValidElement(children)) {
+		return (
+			<DialogPrimitive.Close
+				data-slot="dialog-close"
+				render={children}
+				{...props}
+			/>
+		);
+	}
+	return (
+		<DialogPrimitive.Close data-slot="dialog-close" {...props}>
+			{children}
+		</DialogPrimitive.Close>
+	);
 }
 
 function DialogOverlay({

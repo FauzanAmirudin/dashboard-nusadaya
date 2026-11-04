@@ -16,6 +16,14 @@ export function calculateCrmChecklist(crm: any): {
 	isAllChecksDone: boolean;
 } {
 	const odsList = Array.isArray(crm?.odsDetails) ? crm.odsDetails : [];
+	const triDharmaList = Array.isArray(crm?.triDharmaDetails)
+		? crm.triDharmaDetails
+		: [];
+	const isTriDharmaDone = Boolean(
+		crm?.isTriDharma ||
+			triDharmaList.some((t: any) => t.isDone || t.status === "DISETUJUI"),
+	);
+
 	const completedCount = [
 		Boolean(crm?.isMonitoringParent),
 		Boolean(crm?.isMonitoringIndustry),
@@ -26,10 +34,14 @@ export function calculateCrmChecklist(crm: any): {
 		Boolean(crm?.isOds3Report || odsList[2]?.isDone),
 		Boolean(crm?.isOds4Report || odsList[3]?.isDone),
 		Boolean(crm?.isOds5Report || odsList[4]?.isDone),
-		Boolean(crm?.isPrammagangReport),
+		Boolean(
+			crm?.isPrammagangReport || crm?.pramagangVideoStatus === "DISETUJUI",
+		),
+		Boolean(crm?.isMonthlyVideo || crm?.monthlyVideoStatus === "DISETUJUI"),
+		isTriDharmaDone,
 	].filter(Boolean).length;
 
-	const totalChecks = 10;
+	const totalChecks = 12;
 	return {
 		completedCount,
 		totalChecks,

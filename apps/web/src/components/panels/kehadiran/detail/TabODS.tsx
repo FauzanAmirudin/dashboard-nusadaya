@@ -7,6 +7,7 @@ import {
 	CheckCircle2,
 	Clock,
 	ExternalLink,
+	Eye,
 	FileText,
 	Info,
 	Loader2,
@@ -22,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { API_URL, api, getFileUrl, getToken } from "@/lib/eden";
 import { cn } from "@/lib/utils";
+import { openDocumentReview } from "@/utils/document-review";
 
 export function TabODS({ studentId }: { studentId: number }) {
 	const [records, setRecords] = useState<any[]>([]);
@@ -269,10 +271,16 @@ export function TabODS({ studentId }: { studentId: number }) {
 								{/* Bukti Dokumen Laporan ODS */}
 								<div className="pt-2 border-t border-slate-200/60 mt-auto">
 									{matchingDoc ? (
-										<a
-											href={`/dashboard/students/${studentId}/documents/${matchingDoc.id}?url=${encodeURIComponent(matchingDoc.fileUrl)}&name=${encodeURIComponent(matchingDoc.fileName)}&token=${getToken() || ""}`}
-											target="_blank"
-											rel="noreferrer"
+										<button
+											type="button"
+											onClick={() =>
+												openDocumentReview(
+													studentId,
+													matchingDoc.fileUrl,
+													matchingDoc.fileName || `Laporan ODS Sesi ${num}.pdf`,
+													matchingDoc.id || num,
+												)
+											}
 											className="inline-flex items-center justify-between gap-1.5 px-2 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-[#0517B0] hover:bg-blue-100 border border-blue-200/80 transition-colors w-full group shadow-2xs cursor-pointer"
 											title={`Review Dokumen Laporan ODS #${num}`}
 										>
@@ -280,8 +288,8 @@ export function TabODS({ studentId }: { studentId: number }) {
 												<FileText className="w-3.5 h-3.5 text-[#0517B0] shrink-0" />
 												<span className="truncate">Laporan ODS</span>
 											</span>
-											<ExternalLink className="w-3 h-3 text-blue-400 group-hover:text-[#0517B0] shrink-0" />
-										</a>
+											<Eye className="w-3 h-3 text-[#0517B0] group-hover:scale-110 transition-transform shrink-0" />
+										</button>
 									) : isDone ? (
 										<div className="text-[10px] text-slate-400 italic flex items-center gap-1 py-0.5">
 											<Info className="w-3 h-3 text-slate-300 shrink-0" />

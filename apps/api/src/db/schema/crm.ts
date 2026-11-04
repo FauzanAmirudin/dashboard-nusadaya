@@ -49,6 +49,36 @@ export const crmData = pgTable(
 		pramagangEndDate: timestamp("pramagang_end_date", { mode: "string" }),
 		pramagangIndustry: varchar("pramagang_industry", { length: 255 }),
 		pramagangVideoLink: text("pramagang_video_link"),
+		pramagangVideoStatus: varchar("pramagang_video_status", {
+			length: 50,
+		}).default("BELUM_DIUNGGAH"),
+		pramagangVideoNotes: text("pramagang_video_notes"),
+		pramagangVideoSubmittedAt: timestamp("pramagang_video_submitted_at"),
+		pramagangVideoReviewedAt: timestamp("pramagang_video_reviewed_at"),
+		pramagangVideoReviewedBy: integer("pramagang_video_reviewed_by").references(
+			() => users.id,
+		),
+
+		// Segmen 10: Kewajiban 1 Video Konten Promosi / Kegiatan Bulanan (Unggah Mandiri Mahasiswa)
+		monthlyVideoLink: text("monthly_video_link"),
+		monthlyVideoTitle: varchar("monthly_video_title", { length: 255 }),
+		monthlyVideoPlatform: varchar("monthly_video_platform", { length: 50 }),
+		monthlyVideoStatus: varchar("monthly_video_status", { length: 50 }).default(
+			"BELUM_DIUNGGAH",
+		),
+		monthlyVideoNotes: text("monthly_video_notes"),
+		monthlyVideoSubmittedAt: timestamp("monthly_video_submitted_at"),
+		monthlyVideoReviewedAt: timestamp("monthly_video_reviewed_at"),
+		monthlyVideoReviewedBy: integer("monthly_video_reviewed_by").references(
+			() => users.id,
+		),
+		isMonthlyVideo: boolean("is_monthly_video").default(false),
+		monthlyVideos: jsonb("monthly_videos").default("[]"),
+
+		// Segmen 9: Integrasi Tri Dharma Perguruan Tinggi (PKM & Penelitian di Sekolah Mitra / Desa Binaan)
+		isTriDharma: boolean("is_tri_dharma").default(false),
+		triDharmaDetails: jsonb("tri_dharma_details").default("[]"),
+
 		caseNotes: text("case_notes"),
 		isAcc: boolean("is_acc").default(false),
 		accAt: timestamp("acc_at"),

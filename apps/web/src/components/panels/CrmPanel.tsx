@@ -8,6 +8,7 @@ import {
 	CheckCircle2,
 	Clock,
 	CreditCard,
+	FileDown,
 	Loader2,
 	PhoneCall,
 	Search,
@@ -42,6 +43,7 @@ import { api } from "@/lib/eden";
 import { hasRole, useAuthStore } from "@/store";
 import { formatDeviceDateTime } from "@/utils/format";
 import { calculateCrmChecklist, updateCrmField } from "@/utils/panel-logic";
+import { CrmReportExportModal } from "./crm/CrmReportExportModal";
 import { TabHafalan } from "./crm/TabHafalan";
 import { TabKehadiran } from "./crm/TabKehadiran";
 import { TabMonitoring } from "./crm/TabMonitoring";
@@ -51,12 +53,14 @@ import { TabRegistrasiAwal } from "./crm/TabRegistrasiAwal";
 
 interface CrmPanelProps {
 	studentId: number;
+	studentData?: any;
 	onUpdate: () => void;
 	onProgressChange?: (completed: number, total: number) => void;
 }
 
 export function CrmPanel({
 	studentId,
+	studentData,
 	onUpdate,
 	onProgressChange,
 }: CrmPanelProps) {
@@ -85,10 +89,28 @@ export function CrmPanel({
 		academic: any;
 		courses: any[];
 		crm: any;
+		summary?: any;
 	} | null>(null);
 
 	const [isLoading, setIsLoading] = useState(true);
 	const [isAccSaving, setIsAccSaving] = useState(false);
+	const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+	const [fetchedStudent, setFetchedStudent] = useState<any>(null);
+
+	useEffect(() => {
+		if (!studentData && studentId) {
+			api.students[studentId.toString()]
+				.get()
+				.then((res: any) => {
+					if (res.data?.success && res.data.data) {
+						setFetchedStudent(res.data.data.student || res.data.data);
+					}
+				})
+				.catch(() => null);
+		}
+	}, [studentId, studentData]);
+
+	const currentStudent = studentData || fetchedStudent;
 
 	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -347,6 +369,17 @@ export function CrmPanel({
 							Progres: {completedCount}/{totalChecks}
 						</span>
 					}
+					actions={
+						<Button
+							type="button"
+							onClick={() => setIsExportModalOpen(true)}
+							className="bg-[#0517B0] hover:bg-blue-800 text-white font-bold text-xs h-9 px-3.5 gap-2 rounded-xl shadow-xs cursor-pointer transition-all"
+							title="Eksport Rekap"
+						>
+							<FileDown className="w-4 h-4" />
+							<span>Eksport Rekap</span>
+						</Button>
+					}
 					badge={
 						<PanelStatusBadge
 							isAcc={crm?.isAcc}
@@ -491,15 +524,38 @@ export function CrmPanel({
 							? `Menunggu Kelengkapan Checklist (${totalChecks - completedCount} item belum selesai)`
 							: "ACC Panel CRM (Customer Relationship Management)"
 					}
-					pendingDescription="Selesaikan semua 10 indikator monitoring CRM sebelum memberikan persetujuan ACC."
-					readyDescription="Seluruh 10 checklist CRM telah lengkap. Anda dapat memberikan persetujuan ACC resmi sekarang."
+					pendingDescription={`Selesaikan semua ${totalChecks} indikator monitoring CRM sebelum memberikan persetujuan ACC.`}
+					readyDescription={`Seluruh ${totalChecks} checklist CRM telah lengkap. Anda dapat memberikan persetujuan ACC resmi sekarang.`}
 					canEdit={canEdit}
 					isSaving={isAccSaving}
 					onAcc={handleAcc}
 					onCancelAcc={handleCancelAcc}
 					cancelDialogTitle="Konfirmasi Pembatalan ACC CRM"
 					cancelDialogDescription="Apakah Anda yakin ingin membatalkan status ACC untuk panel CRM mahasiswa ini? Status CRM akan kembali ke tahap berproses."
-					disabledReason="Harus menyelesaikan 10/10 checklist CRM sebelum ACC"
+					disabledReason={`Harus menyelesaikan ${totalChecks}/${totalChecks} checklist CRM sebelum ACC`}
+				/>
+
+				{/* Modal Ekspor Rekapitulasi PDF untuk Orang Tua / Wali */}
+				<CrmReportExportModal
+					open={isExportModalOpen}
+					onOpenChange={setIsExportModalOpen}
+					studentId={studentId}
+					student={currentStudent}
+					crm={crm}
+					summary={kehadiranState?.summary}
+					courses={kehadiranState?.courses}
+					pa={paState?.data || paState?.pa || crmState?.pa}
+					hafalanSessions={
+						paState?.hafalanSessions && paState.hafalanSessions.length > 0
+							? paState.hafalanSessions
+							: crmState?.hafalanSessions || []
+					}
+					vocabLogs={
+						paState?.vocabLogs && paState.vocabLogs.length > 0
+							? paState.vocabLogs
+							: crmState?.vocabLogs || []
+					}
+					counselingLogs={paState?.data?.counselingLogs || []}
 				/>
 			</div>
 		</TooltipProvider>

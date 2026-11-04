@@ -42,9 +42,11 @@ import { invalidatePmbCache } from "./pmb";
 
 export const documentsRoutes = new Elysia()
 	.get("/:id/:panel/documents", async (context) => {
-		const { params } = context;
+		const { params, set } = context;
 		const studentId = Number(params.id);
 		const panel = params.panel as string;
+
+		set.headers["cache-control"] = "no-store, no-cache, must-revalidate";
 
 		let table: any;
 		switch (panel) {
@@ -176,12 +178,31 @@ export const documentsRoutes = new Elysia()
 					"pramagang_report",
 					"pramagang",
 					"pramagang_documentation",
+					"tri_dharma_report",
+					"tri_dharma_pkm_report",
+					"tri_dharma_penelitian_report",
+					"tri_dharma_documentation",
 				];
-				if (!crmAllowedKeys.includes(documentKey)) {
+				const isAllowedKey =
+					crmAllowedKeys.includes(documentKey) ||
+					documentKey.startsWith("tri_dharma");
+				if (!isAllowedKey) {
 					set.status = 403;
 					return {
 						success: false,
 						message: "Jenis dokumen tidak diizinkan untuk diupload mahasiswa",
+					};
+				}
+
+				const currentCrm = await db.query.crmData.findFirst({
+					where: eq(crmData.studentId, studentId),
+				});
+				if (currentCrm?.isAcc) {
+					set.status = 403;
+					return {
+						success: false,
+						message:
+							"Panel CRM telah disetujui resmi (ACC). Dokumen tidak dapat diunggah.",
 					};
 				}
 			}
@@ -337,8 +358,88 @@ export const documentsRoutes = new Elysia()
 				await invalidateFinanceCaches(studentId);
 			}
 
-			// Jika panel crm, invalidate cache
+			// Jika panel crm, update flag checklist & odsDetails terkait
 			if (panel === "crm") {
+				const crmUpdate: Record<string, any> = { updatedAt: new Date() };
+
+				const odsIndexMap: Record<string, number> = {
+					ods_1_report: 0,
+					ods_1: 0,
+					ods_report: 0,
+					ods_2_report: 1,
+					ods_2: 1,
+					ods_3_report: 2,
+					ods_3: 2,
+					ods_4_report: 3,
+					ods_4: 3,
+					ods_5_report: 4,
+					ods_5: 4,
+				};
+
+				if (
+					documentKey === "ods_1_report" ||
+					documentKey === "ods_1" ||
+					documentKey === "ods_report"
+				) {
+					crmUpdate.isOds1Report = true;
+				} else if (documentKey === "ods_2_report" || documentKey === "ods_2") {
+					crmUpdate.isOds2Report = true;
+				} else if (documentKey === "ods_3_report" || documentKey === "ods_3") {
+					crmUpdate.isOds3Report = true;
+				} else if (documentKey === "ods_4_report" || documentKey === "ods_4") {
+					crmUpdate.isOds4Report = true;
+				} else if (documentKey === "ods_5_report" || documentKey === "ods_5") {
+					crmUpdate.isOds5Report = true;
+				} else if (
+					documentKey === "pramagang_report" ||
+					documentKey === "pramagang"
+				) {
+					crmUpdate.isPrammagangReport = true;
+				} else if (documentKey.startsWith("tri_dharma")) {
+					crmUpdate.isTriDharma = true;
+				}
+
+				const currentCrm = await db.query.crmData.findFirst({
+					where: eq(crmData.studentId, studentId),
+				});
+
+				let odsList: any[] = [];
+				if (currentCrm?.odsDetails) {
+					try {
+						odsList =
+							typeof currentCrm.odsDetails === "string"
+								? JSON.parse(currentCrm.odsDetails)
+								: (currentCrm.odsDetails as any[]);
+						if (!Array.isArray(odsList)) odsList = [];
+					} catch {
+						odsList = [];
+					}
+				}
+				while (odsList.length < 5) {
+					odsList.push({ date: "", industry: "", isDone: false });
+				}
+
+				if (odsIndexMap[documentKey] !== undefined) {
+					const idx = odsIndexMap[documentKey];
+					odsList[idx] = {
+						...odsList[idx],
+						isDone: true,
+					};
+					crmUpdate.odsDetails = odsList;
+				}
+
+				if (currentCrm) {
+					await db
+						.update(crmData)
+						.set(crmUpdate)
+						.where(eq(crmData.studentId, studentId));
+				} else {
+					await db.insert(crmData).values({
+						studentId,
+						...crmUpdate,
+					});
+				}
+
 				await invalidateCrmCaches(studentId);
 			}
 
@@ -460,6 +561,14 @@ export const documentsRoutes = new Elysia()
 				const crmRow = await db.query.crmData.findFirst({
 					where: eq(crmData.studentId, studentId),
 				});
+				if (crmRow?.isAcc) {
+					set.status = 403;
+					return {
+						success: false,
+						message:
+							"Panel CRM telah disetujui resmi (ACC). Dokumen tidak dapat dihapus.",
+					};
+				}
 				const docKey = docToCheck.documentKey;
 				// Map documentKey ke field checklist
 				const odsKeyMap: Record<
@@ -506,9 +615,99 @@ export const documentsRoutes = new Elysia()
 			}
 		}
 
+		let deletedCrmDocKey: string | null = null;
+		let deletedFileUrl: string | null = null;
+		if (panel === "crm") {
+			const existingDoc = await db.query.crmDocuments.findFirst({
+				where: and(
+					eq(crmDocuments.studentId, studentId),
+					eq(crmDocuments.id, docId),
+				),
+			});
+			if (existingDoc) {
+				deletedCrmDocKey = existingDoc.documentKey;
+				deletedFileUrl = existingDoc.fileUrl;
+			}
+		}
+
 		await db
 			.delete(table)
 			.where(and(eq(table.studentId, studentId), eq(table.id, docId)));
+
+		if (deletedFileUrl) {
+			const match = deletedFileUrl.match(/\/files\/([^/]+)\/download/);
+			if (match?.[1]) {
+				await fileService.deleteFile(match[1]).catch(() => {});
+			}
+		}
+
+		if (panel === "crm" && deletedCrmDocKey) {
+			const remainingDocs = await db.query.crmDocuments.findMany({
+				where: and(
+					eq(crmDocuments.studentId, studentId),
+					eq(crmDocuments.documentKey, deletedCrmDocKey),
+				),
+			});
+			if (remainingDocs.length === 0) {
+				const flagMap: Record<string, string> = {
+					ods_report: "isOds1Report",
+					ods_1_report: "isOds1Report",
+					ods_1: "isOds1Report",
+					ods_2_report: "isOds2Report",
+					ods_2: "isOds2Report",
+					ods_3_report: "isOds3Report",
+					ods_3: "isOds3Report",
+					ods_4_report: "isOds4Report",
+					ods_4: "isOds4Report",
+					ods_5_report: "isOds5Report",
+					ods_5: "isOds5Report",
+					pramagang_report: "isPrammagangReport",
+					tri_dharma_report: "isTriDharma",
+					tri_dharma: "isTriDharma",
+				};
+				const crmUpdate: Record<string, any> = { updatedAt: new Date() };
+				if (flagMap[deletedCrmDocKey]) {
+					crmUpdate[flagMap[deletedCrmDocKey]] = false;
+				}
+				const odsIdxMap: Record<string, number> = {
+					ods_1_report: 0,
+					ods_1: 0,
+					ods_report: 0,
+					ods_2_report: 1,
+					ods_2: 1,
+					ods_3_report: 2,
+					ods_3: 2,
+					ods_4_report: 3,
+					ods_4: 3,
+					ods_5_report: 4,
+					ods_5: 4,
+				};
+				if (odsIdxMap[deletedCrmDocKey] !== undefined) {
+					const crmRow = await db.query.crmData.findFirst({
+						where: eq(crmData.studentId, studentId),
+					});
+					let odsList: any[] = [];
+					if (crmRow?.odsDetails) {
+						try {
+							odsList =
+								typeof crmRow.odsDetails === "string"
+									? JSON.parse(crmRow.odsDetails)
+									: (crmRow.odsDetails as any[]);
+							if (!Array.isArray(odsList)) odsList = [];
+						} catch {}
+					}
+					const idx = odsIdxMap[deletedCrmDocKey];
+					if (odsList[idx]) {
+						odsList[idx] = { ...odsList[idx], isDone: false };
+						crmUpdate.odsDetails = odsList;
+					}
+				}
+				await db
+					.update(crmData)
+					.set(crmUpdate)
+					.where(eq(crmData.studentId, studentId));
+			}
+		}
 
 		if (panel === "finance") {
 			await invalidateFinanceCaches(studentId);

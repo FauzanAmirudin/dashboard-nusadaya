@@ -765,6 +765,12 @@ export async function ensureDatabaseSchema() {
 			SET nominal_scheduled = COALESCE(NULLIF(nominal_scheduled, 0), nominal_paid, 0),
 			    status = CASE WHEN COALESCE(nominal_paid, 0) > 0 THEN 'LUNAS' ELSE 'BELUM_BAYAR' END
 			WHERE nominal_scheduled IS NULL OR nominal_scheduled = 0;
+
+			-- CRM Segmen 9 & 10: Video Konten Bulanan & Integrasi Tri Dharma
+			ALTER TABLE crm_data ADD COLUMN IF NOT EXISTS is_monthly_video BOOLEAN DEFAULT false;
+			ALTER TABLE crm_data ADD COLUMN IF NOT EXISTS monthly_videos JSONB DEFAULT '[]'::jsonb;
+			ALTER TABLE crm_data ADD COLUMN IF NOT EXISTS is_tri_dharma BOOLEAN DEFAULT false;
+			ALTER TABLE crm_data ADD COLUMN IF NOT EXISTS tri_dharma_details JSONB DEFAULT '[]'::jsonb;
 		`);
 	} catch (err) {
 		console.warn("[Database] Schema check warning:", err);

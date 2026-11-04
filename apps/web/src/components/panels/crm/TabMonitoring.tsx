@@ -5,6 +5,7 @@ import {
 	Calendar,
 	CheckCircle2,
 	Clock,
+	FileDown,
 	FileText,
 	Image as ImageIcon,
 	Loader2,
@@ -162,27 +163,46 @@ export function TabMonitoring({
 								</div>
 							</div>
 
-							{canEdit && (
+							<div className="flex items-center gap-2">
 								<Button
+									type="button"
 									size="sm"
-									variant={crm?.isMonitoringParent ? "outline" : "default"}
+									variant="outline"
 									onClick={() =>
-										handleToggleStatus(
-											"isMonitoringParent",
-											!crm?.isMonitoringParent,
+										window.open(
+											`/dashboard/students/${studentId}/crm/rekap-pdf`,
+											"_blank",
 										)
 									}
-									className={
-										crm?.isMonitoringParent
-											? "border-slate-300 text-slate-700 hover:bg-slate-50 text-xs"
-											: "bg-[#0517B0] hover:bg-blue-800 text-white text-xs font-bold"
-									}
+									className="border-blue-200 text-[#0517B0] hover:bg-blue-50 text-xs font-semibold gap-1.5 h-8 shadow-2xs cursor-pointer"
+									title="Eksport Rekapitulasi Mahasiswa untuk Orang Tua (PDF)"
 								>
-									{crm?.isMonitoringParent
-										? "Batalkan Status Selesai"
-										: "Tandai Monitoring Selesai"}
+									<FileDown className="w-3.5 h-3.5" />
+									<span>Eksport Rekap</span>
 								</Button>
-							)}
+
+								{canEdit && (
+									<Button
+										size="sm"
+										variant={crm?.isMonitoringParent ? "outline" : "default"}
+										onClick={() =>
+											handleToggleStatus(
+												"isMonitoringParent",
+												!crm?.isMonitoringParent,
+											)
+										}
+										className={
+											crm?.isMonitoringParent
+												? "border-slate-300 text-slate-700 hover:bg-slate-50 text-xs h-8"
+												: "bg-[#0517B0] hover:bg-blue-800 text-white text-xs font-bold h-8"
+										}
+									>
+										{crm?.isMonitoringParent
+											? "Batalkan Status Selesai"
+											: "Tandai Monitoring Selesai"}
+									</Button>
+								)}
+							</div>
 						</CardContent>
 					</Card>
 

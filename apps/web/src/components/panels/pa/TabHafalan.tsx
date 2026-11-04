@@ -887,7 +887,7 @@ export function TabHafalan({
 						<div className="w-auto min-w-[130px]">
 							<Select
 								value={selectedLanguage}
-								onValueChange={setSelectedLanguage}
+								onValueChange={(val) => setSelectedLanguage(val || "all")}
 							>
 								<SelectTrigger className="h-9 text-xs rounded-xl border-slate-200 bg-slate-50/60">
 									<SelectValue placeholder="Semua Bahasa" />
@@ -2274,7 +2274,7 @@ export function TabHafalan({
 									onValueChange={(val) =>
 										setQuickTotalForm((p) => ({
 											...p,
-											language: val,
+											language: val || "inggris",
 											languageCustom: val === "lainnya" ? p.languageCustom : "",
 										}))
 									}

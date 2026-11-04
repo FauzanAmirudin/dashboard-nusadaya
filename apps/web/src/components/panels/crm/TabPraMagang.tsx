@@ -1,13 +1,17 @@
 "use client";
 
 import {
+	AlertCircle,
 	Calendar,
 	CheckCircle2,
 	Clock,
+	ExternalLink,
 	FileText,
 	Link as LinkIcon,
 	Loader2,
+	MessageSquare,
 	RotateCcw,
+	Video,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -16,9 +20,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DocumentUpload } from "@/components/ui/DocumentUpload";
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/eden";
+import { useAuthStore } from "@/store";
 
 interface TabPraMagangProps {
 	studentId: number;
@@ -38,11 +53,25 @@ export function TabPraMagang({
 	onUpdateField,
 }: TabPraMagangProps) {
 	const crm = crmState?.crm;
+	const { token } = useAuthStore();
+	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
 	const [isLoading, setIsLoading] = useState(false);
 	const [isEditing, setIsEditing] = useState(false);
+	const [isReviewing, setIsReviewing] = useState(false);
 	const [praMagangDocsCount, setPraMagangDocsCount] = useState<number | null>(
 		null,
 	);
+
+	// Revision dialog state
+	const [revisionDialogOpen, setRevisionDialogOpen] = useState(false);
+	const [revisionTarget, setRevisionTarget] = useState<
+		"pramagang" | "monthly" | null
+	>(null);
+	const [revisionVideoId, setRevisionVideoId] = useState<string | undefined>(
+		undefined,
+	);
+	const [revisionNotes, setRevisionNotes] = useState("");
 
 	const isReportActuallyUploaded =
 		praMagangDocsCount !== null
@@ -68,7 +97,6 @@ export function TabPraMagang({
 	}, [crm]);
 
 	const handleSave = async () => {
-		// Validate past dates (tidak boleh disetting mundur dari hari ini)
 		const cleanStart = startDate ? startDate.split("T")[0] : null;
 		const cleanEnd = endDate ? endDate.split("T")[0] : null;
 
@@ -136,13 +164,175 @@ export function TabPraMagang({
 		}
 	};
 
+	const handleReviewPramagangVideo = async (
+		status: "DISETUJUI" | "PERLU_REVISI",
+		notes?: string,
+	) => {
+		if (!canEdit) return;
+		setIsReviewing(true);
+		try {
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/crm/review-pramagang-video`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${token}`,
+					},
+					body: JSON.stringify({ status, notes }),
+				},
+			);
+			const json = await res.json();
+			if (!res.ok || !json.success) {
+				throw new Error(json.message || "Gagal mereview video pra-magang");
+			}
+			toast.success(
+				status === "DISETUJUI"
+					? "Video Pra-Magang disetujui (ACC Laporan Pra-Magang)!"
+					: "Status video pra-magang diubah menjadi Perlu Revisi",
+			);
+			setRevisionDialogOpen(false);
+			fetchCrmData();
+			onUpdate();
+		} catch (err: any) {
+			toast.error(err.message || "Terjadi kesalahan saat mereview video");
+		} finally {
+			setIsReviewing(false);
+		}
+	};
+
+	const handleReviewMonthlyVideo = async (
+		status: "DISETUJUI" | "PERLU_REVISI",
+		notes?: string,
+		videoId?: string,
+	) => {
+		if (!canEdit) return;
+		setIsReviewing(true);
+		try {
+			const res = await fetch(
+				`${API_URL}/students/${studentId}/crm/review-monthly-video`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${token}`,
+					},
+					body: JSON.stringify({ status, notes, videoId }),
+				},
+			);
+			const json = await res.json();
+			if (!res.ok || !json.success) {
+				throw new Error(json.message || "Gagal mereview video konten bulanan");
+			}
+			toast.success(
+				status === "DISETUJUI"
+					? "Video Konten Bulanan disetujui (ACC Segmen 10)!"
+					: "Status video konten bulanan diubah menjadi Perlu Revisi",
+			);
+			setRevisionDialogOpen(false);
+			setRevisionVideoId(undefined);
+			setRevisionNotes("");
+			fetchCrmData();
+			onUpdate();
+		} catch (err: any) {
+			toast.error(
+				err.message || "Terjadi kesalahan saat mereview video konten",
+			);
+		} finally {
+			setIsReviewing(false);
+		}
+	};
+
+	const openRevisionDialog = (
+		target: "pramagang" | "monthly",
+		videoId?: string,
+		initialNotes?: string,
+	) => {
+		setRevisionTarget(target);
+		setRevisionVideoId(videoId);
+		if (target === "pramagang") {
+			setRevisionNotes(
+				crm?.pramagangVideoNotes ||
+					"Tautan video tidak dapat diakses atau belum memenuhi kriteria laporan pra-magang.",
+			);
+		} else {
+			setRevisionNotes(
+				initialNotes ||
+					crm?.monthlyVideoNotes ||
+					"Konten belum memenuhi ketentuan promosi/kegiatan bulanan kampus Nusadaya.",
+			);
+		}
+		setRevisionDialogOpen(true);
+	};
+
+	const handleConfirmRevision = async () => {
+		if (!revisionTarget) return;
+		if (revisionTarget === "pramagang") {
+			await handleReviewPramagangVideo("PERLU_REVISI", revisionNotes);
+		} else {
+			await handleReviewMonthlyVideo(
+				"PERLU_REVISI",
+				revisionNotes,
+				revisionVideoId,
+			);
+		}
+	};
+
 	const handleUploadSuccess = async () => {
 		fetchCrmData();
 		onUpdate();
 	};
 
+	const renderVideoBadge = (status?: string | null) => {
+		switch (status) {
+			case "DISETUJUI":
+				return (
+					<Badge className="bg-emerald-100 text-emerald-800 border-0 text-xs font-semibold">
+						<CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+						Disetujui
+					</Badge>
+				);
+			case "MENUNGGU_REVIEW":
+				return (
+					<Badge className="bg-amber-100 text-amber-800 border-0 text-xs font-semibold animate-pulse">
+						<Clock className="w-3.5 h-3.5 mr-1 text-amber-600" />
+						Menunggu Review
+					</Badge>
+				);
+			case "PERLU_REVISI":
+				return (
+					<Badge className="bg-rose-100 text-rose-800 border-0 text-xs font-semibold">
+						<AlertCircle className="w-3.5 h-3.5 mr-1 text-rose-600" />
+						Perlu Revisi
+					</Badge>
+				);
+			default:
+				return (
+					<Badge
+						variant="outline"
+						className="text-slate-400 border-slate-200 text-xs font-normal"
+					>
+						<Clock className="w-3.5 h-3.5 mr-1 text-slate-400" />
+						Belum Diunggah
+					</Badge>
+				);
+		}
+	};
+
+	const formatDate = (dateStr?: string | null) => {
+		if (!dateStr) return "-";
+		return new Date(dateStr).toLocaleString("id-ID", {
+			day: "numeric",
+			month: "short",
+			year: "numeric",
+			hour: "2-digit",
+			minute: "2-digit",
+		});
+	};
+
 	return (
 		<div className="space-y-6">
+			{/* Card 1: Data Pra Magang Utama */}
 			<Card className="border border-slate-200 shadow-sm overflow-hidden">
 				<div className="bg-slate-50 border-b border-slate-200 p-4 flex justify-between items-center">
 					<h3 className="font-bold text-slate-800 text-lg">
@@ -296,21 +486,33 @@ export function TabPraMagang({
 								Upload Tautan Video Dokumentasi
 							</Label>
 							{!isEditing ? (
-								<div className="p-3 bg-white border border-slate-200 rounded-md shadow-sm flex items-center gap-3">
-									<LinkIcon className="w-4 h-4 text-blue-500 shrink-0" />
-									{videoLink ? (
+								<div className="p-3 bg-white border border-slate-200 rounded-md shadow-sm flex items-center justify-between gap-3">
+									<div className="flex items-center gap-3 min-w-0">
+										<LinkIcon className="w-4 h-4 text-blue-500 shrink-0" />
+										{videoLink ? (
+											<a
+												href={videoLink}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="text-blue-600 hover:text-blue-800 hover:underline font-medium truncate"
+											>
+												{videoLink}
+											</a>
+										) : (
+											<span className="text-slate-400 italic">
+												Belum ada tautan video
+											</span>
+										)}
+									</div>
+									{videoLink && (
 										<a
 											href={videoLink}
 											target="_blank"
 											rel="noopener noreferrer"
-											className="text-blue-600 hover:text-blue-800 hover:underline font-medium truncate"
+											className="inline-flex items-center gap-1 text-xs text-[#0517B0] hover:underline font-bold shrink-0"
 										>
-											{videoLink}
+											<ExternalLink className="w-3.5 h-3.5" /> Buka
 										</a>
-									) : (
-										<span className="text-slate-400 italic">
-											Belum ada tautan video
-										</span>
 									)}
 								</div>
 							) : (
@@ -332,7 +534,6 @@ export function TabPraMagang({
 								variant="outline"
 								onClick={() => {
 									setIsEditing(false);
-									// Revert values
 									setStartDate(crm?.pramagangStartDate || "");
 									setEndDate(crm?.pramagangEndDate || "");
 									setIndustry(crm?.pramagangIndustry || "");
@@ -361,7 +562,359 @@ export function TabPraMagang({
 				</CardContent>
 			</Card>
 
-			{/* Upload Dokumen & Checklist Persetujuan Section */}
+			{/* Card 2: Review Segmen 9 - Video Pra-Magang (Unggah Mandiri Mahasiswa) */}
+			<Card
+				className={`shadow-sm overflow-hidden border ${
+					crm?.pramagangVideoStatus === "DISETUJUI"
+						? "border-emerald-200 bg-emerald-50/10"
+						: crm?.pramagangVideoStatus === "PERLU_REVISI"
+							? "border-rose-200 bg-rose-50/10"
+							: crm?.pramagangVideoStatus === "MENUNGGU_REVIEW"
+								? "border-amber-200 bg-amber-50/10"
+								: "border-slate-200 bg-white"
+				}`}
+			>
+				<div className="bg-slate-50/80 border-b border-slate-200 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+					<div className="flex items-center gap-2.5">
+						<Video className="w-4 h-4 text-blue-600 shrink-0" />
+						<div>
+							<h4 className="text-sm font-bold text-slate-800">
+								Segmen 9: Tautan Video Laporan Pra-Magang (Unggah Mandiri)
+							</h4>
+							<p className="text-[11px] text-slate-500">
+								Disetor langsung oleh mahasiswa via portal akun mahasiswa untuk
+								diverifikasi admin CRM.
+							</p>
+						</div>
+					</div>
+					<div>{renderVideoBadge(crm?.pramagangVideoStatus)}</div>
+				</div>
+
+				<CardContent className="p-5 space-y-4">
+					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div className="space-y-1.5">
+							<span className="text-xs font-semibold text-slate-500 block">
+								Tautan Video Diserahkan:
+							</span>
+							{crm?.pramagangVideoLink ? (
+								<div className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+									<a
+										href={crm.pramagangVideoLink}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="text-xs font-semibold text-blue-600 hover:underline truncate flex-1"
+									>
+										{crm.pramagangVideoLink}
+									</a>
+									<a
+										href={crm.pramagangVideoLink}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-xs font-bold shrink-0 transition-colors"
+									>
+										<ExternalLink className="w-3 h-3" /> Tonton Video
+									</a>
+								</div>
+							) : (
+								<p className="text-xs text-slate-400 italic p-2.5 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+									Mahasiswa belum menyetorkan tautan video laporan pra-magang.
+								</p>
+							)}
+						</div>
+
+						<div className="space-y-1.5 text-xs text-slate-600">
+							<div className="flex justify-between py-1 border-b border-slate-100">
+								<span className="text-slate-400">Waktu Disetor:</span>
+								<span className="font-medium text-slate-700">
+									{formatDate(crm?.pramagangVideoSubmittedAt)}
+								</span>
+							</div>
+							<div className="flex justify-between py-1 border-b border-slate-100">
+								<span className="text-slate-400">Terakhir Direview:</span>
+								<span className="font-medium text-slate-700">
+									{formatDate(crm?.pramagangVideoReviewedAt)}
+								</span>
+							</div>
+						</div>
+					</div>
+
+					{crm?.pramagangVideoNotes && (
+						<div
+							className={`p-3 rounded-xl border text-xs ${
+								crm?.pramagangVideoStatus === "PERLU_REVISI"
+									? "bg-rose-50 border-rose-200 text-rose-800"
+									: "bg-slate-50 border-slate-200 text-slate-700"
+							}`}
+						>
+							<span className="font-bold flex items-center gap-1.5 mb-1">
+								<MessageSquare className="w-3.5 h-3.5 text-slate-500" /> Catatan
+								Review Admin:
+							</span>
+							<p className="whitespace-pre-wrap">{crm.pramagangVideoNotes}</p>
+						</div>
+					)}
+
+					{canEdit && (
+						<div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() => openRevisionDialog("pramagang")}
+								disabled={isReviewing || !crm?.pramagangVideoLink}
+								className="text-rose-700 border-rose-200 hover:bg-rose-50 hover:text-rose-800 font-semibold text-xs"
+							>
+								<AlertCircle className="w-3.5 h-3.5 mr-1 text-rose-500" />
+								Minta Revisi
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								onClick={() => handleReviewPramagangVideo("DISETUJUI")}
+								disabled={
+									isReviewing ||
+									!crm?.pramagangVideoLink ||
+									crm?.pramagangVideoStatus === "DISETUJUI"
+								}
+								className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs"
+							>
+								{isReviewing ? (
+									<Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+								) : (
+									<CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+								)}
+								Setujui Video (ACC Laporan)
+							</Button>
+						</div>
+					)}
+				</CardContent>
+			</Card>
+
+			{/* Card 3: Review Segmen 10 - Kewajiban 1 Video Konten Promosi / Kegiatan Bulanan */}
+			{(() => {
+				let monthlyVideosList: any[] = [];
+				if (crm?.monthlyVideos) {
+					try {
+						monthlyVideosList =
+							typeof crm.monthlyVideos === "string"
+								? JSON.parse(crm.monthlyVideos)
+								: crm.monthlyVideos;
+						if (!Array.isArray(monthlyVideosList)) monthlyVideosList = [];
+					} catch {
+						monthlyVideosList = [];
+					}
+				}
+				if (monthlyVideosList.length === 0 && crm?.monthlyVideoLink) {
+					monthlyVideosList = [
+						{
+							id: "legacy",
+							month: "Januari",
+							year: new Date().getFullYear(),
+							title: crm?.monthlyVideoTitle || "Video Konten Promosi Bulanan",
+							platform: crm?.monthlyVideoPlatform || "Instagram",
+							videoLink: crm?.monthlyVideoLink,
+							status: crm?.monthlyVideoStatus || "MENUNGGU_REVIEW",
+							notes: crm?.monthlyVideoNotes,
+							submittedAt: crm?.monthlyVideoSubmittedAt,
+							reviewedAt: crm?.monthlyVideoReviewedAt,
+						},
+					];
+				}
+
+				return (
+					<Card
+						className={`shadow-sm overflow-hidden border ${
+							crm?.isMonthlyVideo || crm?.monthlyVideoStatus === "DISETUJUI"
+								? "border-emerald-200 bg-emerald-50/10"
+								: crm?.monthlyVideoStatus === "PERLU_REVISI"
+									? "border-rose-200 bg-rose-50/10"
+									: crm?.monthlyVideoStatus === "MENUNGGU_REVIEW"
+										? "border-amber-200 bg-amber-50/10"
+										: "border-slate-200 bg-white"
+						}`}
+					>
+						<div className="bg-slate-50/80 border-b border-slate-200 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+							<div className="flex items-center gap-2.5">
+								<Video className="w-4 h-4 text-purple-600 shrink-0" />
+								<div>
+									<h4 className="text-sm font-bold text-slate-800">
+										Segmen 10: Kewajiban Video Konten Bulanan (Promosi /
+										Kegiatan)
+									</h4>
+									<p className="text-[11px] text-slate-500">
+										Kewajiban mahasiswa mengunggah video konten kegiatan bulanan
+										ke medsos per bulan.
+									</p>
+								</div>
+							</div>
+							<div className="flex items-center gap-2">
+								<Badge
+									className={
+										crm?.isMonthlyVideo
+											? "bg-emerald-100 text-emerald-800 border-0 text-xs font-bold"
+											: "bg-slate-100 text-slate-600 border-0 text-xs font-semibold"
+									}
+								>
+									{crm?.isMonthlyVideo ? "✓ Terpenuhi" : "Belum Terpenuhi"}
+								</Badge>
+							</div>
+						</div>
+
+						<CardContent className="p-5 space-y-4">
+							<div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100 flex-wrap gap-2">
+								<div className="flex items-center gap-2">
+									<span className="text-slate-500 font-semibold">
+										Total Disetor:
+									</span>
+									<Badge variant="secondary" className="font-bold text-xs">
+										{monthlyVideosList.length} Video Bulanan
+									</Badge>
+								</div>
+								{crm?.monthlyVideoReviewedAt && (
+									<span className="text-slate-400 text-[11px]">
+										Terakhir direview: {formatDate(crm.monthlyVideoReviewedAt)}
+									</span>
+								)}
+							</div>
+
+							{monthlyVideosList.length === 0 ? (
+								<p className="text-xs text-slate-400 italic p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center">
+									Mahasiswa belum menyetorkan video konten bulanan via portal
+									mahasiswa.
+								</p>
+							) : (
+								<div className="space-y-3.5">
+									{monthlyVideosList.map((item: any, idx: number) => {
+										const isApproved = item.status === "DISETUJUI";
+										const isPending = item.status === "MENUNGGU_REVIEW";
+										const isRevision = item.status === "PERLU_REVISI";
+
+										return (
+											<div
+												key={item.id || idx}
+												className={`p-4 rounded-xl border transition-all space-y-3 ${
+													isApproved
+														? "bg-emerald-50/20 border-emerald-200"
+														: isRevision
+															? "bg-rose-50/20 border-rose-200"
+															: isPending
+																? "bg-amber-50/20 border-amber-200"
+																: "bg-slate-50 border-slate-200"
+												}`}
+											>
+												<div className="flex items-start justify-between gap-3">
+													<div>
+														<div className="flex items-center gap-2 flex-wrap">
+															<Badge className="bg-purple-100 text-purple-900 border-0 text-xs font-bold">
+																{item.month || "Bulanan"} {item.year || ""}
+															</Badge>
+															<Badge
+																variant="outline"
+																className="text-xs text-slate-600"
+															>
+																{item.platform || "Instagram / TikTok"}
+															</Badge>
+														</div>
+														<h5 className="font-bold text-slate-800 text-sm mt-1.5">
+															{item.title || "Video Konten Promosi Bulanan"}
+														</h5>
+													</div>
+													<div>{renderVideoBadge(item.status)}</div>
+												</div>
+
+												<div className="flex items-center gap-2 p-2.5 bg-white border border-slate-200 rounded-lg text-xs">
+													<a
+														href={item.videoLink}
+														target="_blank"
+														rel="noopener noreferrer"
+														className="text-purple-700 hover:underline truncate flex-1 font-mono font-medium"
+													>
+														{item.videoLink}
+													</a>
+													<a
+														href={item.videoLink}
+														target="_blank"
+														rel="noopener noreferrer"
+														className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded text-xs font-bold shrink-0 transition-colors"
+													>
+														<ExternalLink className="w-3.5 h-3.5" /> Tonton
+														Konten
+													</a>
+												</div>
+
+												<div className="flex items-center justify-between text-[11px] text-slate-400">
+													<span>Disetor: {formatDate(item.submittedAt)}</span>
+													{item.reviewedAt && (
+														<span>Direview: {formatDate(item.reviewedAt)}</span>
+													)}
+												</div>
+
+												{item.notes && (
+													<div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800">
+														<span className="font-bold flex items-center gap-1.5 mb-0.5">
+															<MessageSquare className="w-3.5 h-3.5 text-rose-600" />{" "}
+															Catatan Revisi Admin:
+														</span>
+														<p className="whitespace-pre-wrap pl-5">
+															{item.notes}
+														</p>
+													</div>
+												)}
+
+												{canEdit && (
+													<div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+														<Button
+															type="button"
+															variant="outline"
+															size="sm"
+															onClick={() =>
+																openRevisionDialog(
+																	"monthly",
+																	item.id,
+																	item.notes,
+																)
+															}
+															disabled={isReviewing}
+															className="h-7 text-rose-700 border-rose-200 hover:bg-rose-50 hover:text-rose-800 font-semibold text-xs"
+														>
+															<AlertCircle className="w-3.5 h-3.5 mr-1 text-rose-500" />
+															Minta Revisi
+														</Button>
+														<Button
+															type="button"
+															size="sm"
+															onClick={() =>
+																handleReviewMonthlyVideo(
+																	"DISETUJUI",
+																	undefined,
+																	item.id,
+																)
+															}
+															disabled={isReviewing || isApproved}
+															className="h-7 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs"
+														>
+															{isReviewing ? (
+																<Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+															) : (
+																<CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+															)}
+															{isApproved
+																? "Sudah Disetujui"
+																: "Setujui Video Ini"}
+														</Button>
+													</div>
+												)}
+											</div>
+										);
+									})}
+								</div>
+							)}
+						</CardContent>
+					</Card>
+				);
+			})()}
+
+			{/* Card 4: Upload Dokumen & Checklist Persetujuan Section */}
 			<Card
 				className={`shadow-sm overflow-hidden transition-all ${
 					crm?.isPrammagangReport
@@ -386,7 +939,7 @@ export function TabPraMagang({
 								className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer flex items-center gap-2"
 							>
 								<FileText className="w-4 h-4 text-indigo-600 inline" /> Laporan
-								Akhir Pra Magang
+								Akhir Pra Magang (Berkas PDF)
 							</label>
 							<p className="text-[11px] text-slate-500 mt-0.5">
 								Dokumen laporan akhir Pra Magang yang telah disetujui resmi
@@ -435,6 +988,68 @@ export function TabPraMagang({
 					</div>
 				</CardContent>
 			</Card>
+
+			{/* Modal Dialog: Input Catatan Minta Revisi */}
+			<Dialog open={revisionDialogOpen} onOpenChange={setRevisionDialogOpen}>
+				<DialogContent className="sm:max-w-md rounded-2xl">
+					<DialogHeader>
+						<DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+							<AlertCircle className="w-5 h-5 text-rose-600" />
+							{revisionTarget === "pramagang"
+								? "Minta Revisi Video Laporan Pra-Magang"
+								: "Minta Revisi Video Konten Bulanan"}
+						</DialogTitle>
+						<DialogDescription className="text-xs text-slate-500">
+							Berikan catatan perbaikan yang jelas agar mahasiswa dapat
+							memperbaiki dan menyetorkan kembali tautan video yang benar.
+						</DialogDescription>
+					</DialogHeader>
+
+					<div className="space-y-3 py-2">
+						<Label className="text-xs font-semibold text-slate-700">
+							Catatan Perbaikan untuk Mahasiswa:
+						</Label>
+						<Textarea
+							value={revisionNotes}
+							onChange={(e) => setRevisionNotes(e.target.value)}
+							placeholder="Tuliskan catatan detail revisi di sini..."
+							rows={4}
+							className="text-xs leading-relaxed"
+						/>
+					</div>
+
+					<DialogFooter className="flex gap-2 sm:justify-end">
+						<DialogClose
+							render={
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									disabled={isReviewing}
+								>
+									Batal
+								</Button>
+							}
+						/>
+						<Button
+							type="button"
+							size="sm"
+							onClick={handleConfirmRevision}
+							disabled={isReviewing || !revisionNotes.trim()}
+							className="bg-rose-600 hover:bg-rose-700 text-white font-bold"
+						>
+							{isReviewing ? (
+								<>
+									<Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+									Mengirim...
+								</>
+							) : (
+								"Kirim Catatan Revisi"
+							)}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }
