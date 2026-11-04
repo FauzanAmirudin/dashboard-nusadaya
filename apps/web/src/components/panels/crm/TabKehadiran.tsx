@@ -578,12 +578,12 @@ export function TabKehadiran({
 												Setujui Kehadiran Mahasiswa
 											</AlertDialogTitle>
 											<AlertDialogDescription className="text-xs text-slate-600 space-y-2">
-												<p>
+												<div>
 													Anda akan menyetujui kriteria kehadiran mahasiswa ini.
 													Aksi ini akan mencentang checklist{" "}
 													<b>Presensi / Kehadiran Praktik ODS</b> pada modul
 													CRM.
-												</p>
+												</div>
 												{!isEligible && (
 													<div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs">
 														<strong>Catatan:</strong> Persentase perkuliahan
