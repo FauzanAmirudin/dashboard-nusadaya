@@ -365,21 +365,25 @@ export const statusRoutes = new Elysia().get(
 		const magangItems = [
 			{ prop: internship?.passportReady, name: "Paspor" },
 			{ prop: internship?.interviewReady, name: "Interview User" },
-			{ prop: internship?.contractReady, name: "Kontrak Magang" },
 			{
-				prop:
-					internship?.loaConfirmed ||
-					internship?.loaReady ||
-					internship?.lolReady ||
-					internship?.moaReady,
-				name: "Surat Izin Penerimaan Negara Tujuan (LoA)",
+				prop: internship?.mouReady || internship?.moaReady,
+				name: "MOU Kampus & Hotel",
 			},
-			{ prop: internship?.mcuReady, name: "Medical Check Up (MCU)" },
+			{
+				prop: internship?.loaConfirmed || internship?.loaReady,
+				name: "Letter of Acceptance (LoA)",
+			},
+			{ prop: internship?.contractReady, name: "Kontrak Magang" },
+			{ prop: internship?.suhanReady, name: "Suhan Taiwan" },
+			{ prop: internship?.mcuReady, name: "Medical Check Up (MCU) Full" },
 			{ prop: internship?.visaReady, name: "Visa" },
-			{ prop: internship?.pdtReady, name: "PDT (Pembekalan)" },
-			{ prop: internship?.dokumentasiReady, name: "Dokumentasi Keberangkatan" },
 			{ prop: internship?.ticketReady, name: "Keberangkatan (Tiket)" },
-			{ prop: internship?.agenReady, name: "Dokumen Agen" },
+			{
+				prop: internship?.asesmenReady || internship?.pdtReady,
+				name: "Asesmen & Pengarahan",
+			},
+			{ prop: internship?.dokumentasiReady, name: "Dokumentasi Keberangkatan" },
+			{ prop: internship?.agenReady, name: "Mitra Penempatan" },
 		];
 		const magangCompleted = magangItems.filter((i) => i.prop).length;
 		magangItems

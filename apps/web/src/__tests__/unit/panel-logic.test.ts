@@ -31,7 +31,7 @@ describe("Tahap 3 — Panel Business Logic", () => {
 	// ============================================================
 	describe("Panel CRM (CrmPanel)", () => {
 		describe("Task 3.1 — CRM Checklist Completion Count", () => {
-			it("should return completedCount = 10 when all 10 indicators are true", () => {
+			it("should return completedCount = 12 when all 12 indicators are true", () => {
 				const fullCrm = {
 					isMonitoringParent: true,
 					isMonitoringIndustry: true,
@@ -43,10 +43,12 @@ describe("Tahap 3 — Panel Business Logic", () => {
 					isOds4Report: true,
 					isOds5Report: true,
 					isPrammagangReport: true,
+					isMonthlyVideo: true,
+					isTriDharma: true,
 				};
 				const result = calculateCrmChecklist(fullCrm);
-				expect(result.completedCount).toBe(10);
-				expect(result.totalChecks).toBe(10);
+				expect(result.completedCount).toBe(12);
+				expect(result.totalChecks).toBe(12);
 				expect(result.isAllChecksDone).toBe(true);
 			});
 
@@ -767,8 +769,13 @@ describe("Tahap 3 — Panel Business Logic", () => {
 				expect(res.completedCount).toBe(1);
 			});
 
-			it("should count lolReady when true", () => {
-				const res = calculateInternshipDokumenChecklist({ lolReady: true });
+			it("should count suhanReady when true", () => {
+				const res = calculateInternshipDokumenChecklist({ suhanReady: true });
+				expect(res.completedCount).toBe(1);
+			});
+
+			it("should count mouReady when true", () => {
+				const res = calculateInternshipDokumenChecklist({ mouReady: true });
 				expect(res.completedCount).toBe(1);
 			});
 
@@ -791,14 +798,14 @@ describe("Tahap 3 — Panel Business Logic", () => {
 				const allReady = {
 					passportReady: true,
 					interviewReady: true,
-					lolReady: true,
+					mouReady: true,
 					loaConfirmed: true,
-					moaReady: true,
 					contractReady: true,
+					suhanReady: true,
 					mcuReady: true,
 					visaReady: true,
 					ticketReady: true,
-					pdtReady: true,
+					asesmenReady: true,
 					dokumentasiReady: true,
 					agenReady: true,
 				};

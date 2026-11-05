@@ -62,24 +62,31 @@ export function TabDokumen({
 	handleSaveNotes,
 	isSaving,
 }: TabDokumenProps) {
-	// Hitung kelengkapan dokumen kesiapan keberangkatan
+	// Hitung kelengkapan dokumen kesiapan keberangkatan (Standarisasi 6 Dokumen Taiwan & Dokumen Keberangkatan)
 	const checklistKeys = [
 		"passportReady",
 		"interviewReady",
-		"lolReady",
+		"mouReady",
 		"loaConfirmed",
-		"moaReady",
 		"contractReady",
+		"suhanReady",
 		"mcuReady",
 		"visaReady",
 		"ticketReady",
-		"pdtReady",
+		"asesmenReady",
 		"dokumentasiReady",
 		"agenReady",
 		"languageCertReady",
 	];
 
-	const completedCount = checklistKeys.filter((k) => !!data?.[k]).length;
+	const isChecklistDone = (key: string) => {
+		if (key === "mouReady") return Boolean(data?.mouReady ?? data?.moaReady);
+		if (key === "asesmenReady")
+			return Boolean(data?.asesmenReady ?? data?.pdtReady);
+		return Boolean(data?.[key]);
+	};
+
+	const completedCount = checklistKeys.filter((k) => isChecklistDone(k)).length;
 	const isAllCompleted = completedCount === checklistKeys.length;
 	return (
 		<div className="space-y-6">
@@ -315,10 +322,10 @@ export function TabDokumen({
 							</div>
 						</div>
 
-						{/* 3. Letter of Offer (LOL) */}
+						{/* 3. MOU Kampus & Hotel Mitra (Urutan 1 Dokumen Taiwan) */}
 						<div
 							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								data?.lolReady
+								isChecklistDone("mouReady")
 									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
 									: "border-slate-200 bg-white shadow-xs"
 							}`}
@@ -326,30 +333,36 @@ export function TabDokumen({
 							<div className="flex items-start justify-between gap-3">
 								<div className="flex items-start gap-3">
 									<Checkbox
-										id="chk-lolReady"
-										checked={!!data?.lolReady}
-										disabled={!canEdit || loadingItem === "lolReady"}
-										onCheckedChange={(checked) =>
-											handleToggleField("lolReady", !!checked)
+										id="chk-mouReady"
+										checked={isChecklistDone("mouReady")}
+										disabled={
+											!canEdit ||
+											loadingItem === "mouReady" ||
+											loadingItem === "moaReady"
 										}
+										onCheckedChange={(checked) => {
+											handleToggleField("mouReady", !!checked);
+											handleToggleField("moaReady", !!checked);
+										}}
 										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
 									/>
 									<div>
 										<label
-											htmlFor="chk-lolReady"
+											htmlFor="chk-mouReady"
 											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
 										>
-											3. Letter of Offer (LOL)
+											3. MOU Kampus & Hotel Mitra
 										</label>
 										<p className="text-[11px] text-slate-500 mt-0.5">
-											Surat penawaran magang resmi dari pihak institusi / hotel
+											Nota kesepahaman kerjasama penempatan magang antara
+											institusi kampus dan hotel mitra
 										</p>
 									</div>
 								</div>
 								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "lolReady" ? (
+									{loadingItem === "mouReady" || loadingItem === "moaReady" ? (
 										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : data?.lolReady ? (
+									) : isChecklistDone("mouReady") ? (
 										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
 											✓ Selesai
 										</Badge>
@@ -367,36 +380,46 @@ export function TabDokumen({
 							<div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
 								<div className="space-y-1">
 									<Label className="text-[11px] font-semibold text-slate-600">
-										Tanggal Terbit LOL
+										Tanggal Terbit MOU
 									</Label>
 									<Input
 										type="date"
 										className="h-8 text-xs bg-white"
 										value={
-											data?.lolDate
-												? new Date(data.lolDate).toISOString().split("T")[0]
-												: ""
+											data?.mouDate
+												? new Date(data.mouDate).toISOString().split("T")[0]
+												: data?.moaDate
+													? new Date(data.moaDate).toISOString().split("T")[0]
+													: ""
 										}
 										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("lolDate", e.target.value)
-										}
-										onBlur={() => handleBlurField("lolDate")}
+										onChange={(e) => {
+											handleLocalChange("mouDate", e.target.value);
+											handleLocalChange("moaDate", e.target.value);
+										}}
+										onBlur={() => {
+											handleBlurField("mouDate");
+											handleBlurField("moaDate");
+										}}
 									/>
 								</div>
 								<div className="space-y-1">
 									<Label className="text-[11px] font-semibold text-slate-600">
-										Catatan Penawaran
+										Catatan MOU Kerjasama
 									</Label>
 									<Input
-										placeholder="Catatan penawaran"
+										placeholder="Catatan nomor / klausul MOU"
 										className="h-8 text-xs bg-white"
-										value={data?.lolNotes || ""}
+										value={data?.mouNotes || data?.moaNotes || ""}
 										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("lolNotes", e.target.value)
-										}
-										onBlur={() => handleBlurField("lolNotes")}
+										onChange={(e) => {
+											handleLocalChange("mouNotes", e.target.value);
+											handleLocalChange("moaNotes", e.target.value);
+										}}
+										onBlur={() => {
+											handleBlurField("mouNotes");
+											handleBlurField("moaNotes");
+										}}
 									/>
 								</div>
 							</div>
@@ -405,14 +428,14 @@ export function TabDokumen({
 								<DocumentUpload
 									studentId={studentId}
 									panel="magang"
-									documentKey="lol"
+									documentKey="mou"
 									canEdit={canEdit}
 									onUploadSuccess={fetchInternshipData}
 								/>
 							</div>
 						</div>
 
-						{/* 4. Letter of Acceptance (LOA) */}
+						{/* 4. Letter of Acceptance (LOA) (Urutan 2 Dokumen Taiwan) */}
 						<div
 							className={`p-4 rounded-xl border transition-colors space-y-3 ${
 								data?.loaConfirmed
@@ -439,7 +462,8 @@ export function TabDokumen({
 											4. Letter of Acceptance (LOA)
 										</label>
 										<p className="text-[11px] text-slate-500 mt-0.5">
-											Surat penerimaan dan konfirmasi penempatan resmi
+											Surat penerimaan dan konfirmasi penempatan resmi dari
+											mitra industri / hotel
 										</p>
 									</div>
 								</div>
@@ -490,104 +514,7 @@ export function TabDokumen({
 							</div>
 						</div>
 
-						{/* 5. Memorandum of Agreement (MOA) */}
-						<div
-							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								data?.moaReady
-									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-									: "border-slate-200 bg-white shadow-xs"
-							}`}
-						>
-							<div className="flex items-start justify-between gap-3">
-								<div className="flex items-start gap-3">
-									<Checkbox
-										id="chk-moaReady"
-										checked={!!data?.moaReady}
-										disabled={!canEdit || loadingItem === "moaReady"}
-										onCheckedChange={(checked) =>
-											handleToggleField("moaReady", !!checked)
-										}
-										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-									/>
-									<div>
-										<label
-											htmlFor="chk-moaReady"
-											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-										>
-											5. Memorandum of Agreement (MOA)
-										</label>
-										<p className="text-[11px] text-slate-500 mt-0.5">
-											Perjanjian kerjasama tripartite / penempatan magang
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "moaReady" ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : data?.moaReady ? (
-										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-											✓ Selesai
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="text-slate-400 border-slate-200 text-[10px]"
-										>
-											Belum
-										</Badge>
-									)}
-								</div>
-							</div>
-
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Tanggal MOA
-									</Label>
-									<Input
-										type="date"
-										className="h-8 text-xs bg-white"
-										value={
-											data?.moaDate
-												? new Date(data.moaDate).toISOString().split("T")[0]
-												: ""
-										}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("moaDate", e.target.value)
-										}
-										onBlur={() => handleBlurField("moaDate")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Catatan MOA
-									</Label>
-									<Input
-										placeholder="Catatan perjanjian"
-										className="h-8 text-xs bg-white"
-										value={data?.moaNotes || ""}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("moaNotes", e.target.value)
-										}
-										onBlur={() => handleBlurField("moaNotes")}
-									/>
-								</div>
-							</div>
-
-							<div className="pt-2 border-t border-slate-100">
-								<DocumentUpload
-									studentId={studentId}
-									panel="magang"
-									documentKey="moa"
-									canEdit={canEdit}
-									onUploadSuccess={fetchInternshipData}
-								/>
-							</div>
-						</div>
-
-						{/* 6. Kontrak Kerja Magang */}
+						{/* 5. Kontrak Kerja Magang (Urutan 3 Dokumen Taiwan) */}
 						<div
 							className={`p-4 rounded-xl border transition-colors space-y-3 ${
 								data?.contractReady
@@ -611,11 +538,11 @@ export function TabDokumen({
 											htmlFor="chk-contractReady"
 											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
 										>
-											6. Kontrak Kerja Magang
+											5. Kontrak Kerja Magang
 										</label>
 										<p className="text-[11px] text-slate-500 mt-0.5">
 											Kontrak magang yang ditandatangani mahasiswa dan mitra
-											kerja
+											kerja industri luar negeri
 										</p>
 									</div>
 								</div>
@@ -668,7 +595,120 @@ export function TabDokumen({
 							</div>
 						</div>
 
-						{/* 7. Medical Check Up (MCU) */}
+						{/* 6. Suhan — Surat Persetujuan Magang Taiwan (Urutan 4 Dokumen Taiwan) */}
+						<div
+							className={`p-4 rounded-xl border transition-colors space-y-3 ${
+								data?.suhanReady
+									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
+									: "border-slate-200 bg-white shadow-xs"
+							}`}
+						>
+							<div className="flex items-start justify-between gap-3">
+								<div className="flex items-start gap-3">
+									<Checkbox
+										id="chk-suhanReady"
+										checked={!!data?.suhanReady}
+										disabled={!canEdit || loadingItem === "suhanReady"}
+										onCheckedChange={(checked) =>
+											handleToggleField("suhanReady", !!checked)
+										}
+										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
+									/>
+									<div>
+										<label
+											htmlFor="chk-suhanReady"
+											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
+										>
+											6. Suhan — Izin Magang Taiwan
+										</label>
+										<p className="text-[11px] text-slate-500 mt-0.5">
+											Suhan: Surat Persetujuan Magang Mahasiswa WNI di Taiwan
+											dari Biro Kepariwisataan / Otoritas Taiwan
+										</p>
+									</div>
+								</div>
+								<div className="flex items-center gap-2 shrink-0">
+									{loadingItem === "suhanReady" ? (
+										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+									) : data?.suhanReady ? (
+										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+											✓ Selesai
+										</Badge>
+									) : (
+										<Badge
+											variant="outline"
+											className="text-slate-400 border-slate-200 text-[10px]"
+										>
+											Belum
+										</Badge>
+									)}
+								</div>
+							</div>
+
+							<div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+								<div className="space-y-1">
+									<Label className="text-[11px] font-semibold text-slate-600">
+										Nomor Izin Suhan
+									</Label>
+									<Input
+										placeholder="Nomor izin Suhan Taiwan"
+										className="h-8 text-xs bg-white"
+										value={data?.suhanNo || ""}
+										disabled={!canEdit}
+										onChange={(e) =>
+											handleLocalChange("suhanNo", e.target.value)
+										}
+										onBlur={() => handleBlurField("suhanNo")}
+									/>
+								</div>
+								<div className="space-y-1">
+									<Label className="text-[11px] font-semibold text-slate-600">
+										Tanggal Terbit Suhan
+									</Label>
+									<Input
+										type="date"
+										className="h-8 text-xs bg-white"
+										value={
+											data?.suhanDate
+												? new Date(data.suhanDate).toISOString().split("T")[0]
+												: ""
+										}
+										disabled={!canEdit}
+										onChange={(e) =>
+											handleLocalChange("suhanDate", e.target.value)
+										}
+										onBlur={() => handleBlurField("suhanDate")}
+									/>
+								</div>
+								<div className="space-y-1">
+									<Label className="text-[11px] font-semibold text-slate-600">
+										Catatan Izin Suhan
+									</Label>
+									<Input
+										placeholder="Keterangan perizinan"
+										className="h-8 text-xs bg-white"
+										value={data?.suhanNotes || ""}
+										disabled={!canEdit}
+										onChange={(e) =>
+											handleLocalChange("suhanNotes", e.target.value)
+										}
+										onBlur={() => handleBlurField("suhanNotes")}
+									/>
+								</div>
+							</div>
+
+							<div className="pt-2 border-t border-slate-100">
+								<DocumentUpload
+									studentId={studentId}
+									panel="magang"
+									documentKey="suhan"
+									canEdit={canEdit}
+									onUploadSuccess={fetchInternshipData}
+								/>
+							</div>
+						</div>
+
+						{/* 7. Medical Check Up (MCU) Full (Urutan 5 Dokumen Taiwan) */}
 						<div
 							className={`p-4 rounded-xl border transition-colors space-y-3 ${
 								data?.mcuReady
@@ -692,11 +732,11 @@ export function TabDokumen({
 											htmlFor="chk-mcuReady"
 											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
 										>
-											7. Medical Check Up (MCU)
+											7. Medical Check Up (MCU) Full
 										</label>
 										<p className="text-[11px] text-slate-500 mt-0.5">
-											Hasil pemeriksaan kesehatan laboratorium & rekomendasi
-											dokter
+											Pemeriksaan kesehatan menyeluruh standar penempatan
+											penerbangan di RS/Klinik rujukan
 										</p>
 									</div>
 								</div>
@@ -721,7 +761,7 @@ export function TabDokumen({
 							<div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
 								<div className="space-y-1">
 									<Label className="text-[11px] font-semibold text-slate-600">
-										Tempat MCU
+										Tempat / RS MCU Full
 									</Label>
 									<Input
 										placeholder="RS / Lab Klinik"
@@ -736,7 +776,7 @@ export function TabDokumen({
 								</div>
 								<div className="space-y-1">
 									<Label className="text-[11px] font-semibold text-slate-600">
-										Tanggal MCU
+										Tanggal MCU Full
 									</Label>
 									<Input
 										type="date"
@@ -1018,10 +1058,10 @@ export function TabDokumen({
 							</div>
 						</div>
 
-						{/* 10. Pelatihan Pra-Keberangkatan (PDT) */}
+						{/* 10. Asesmen dan Pengarahan Keberangkatan (Restrukturisasi PDT ke format 2 berkas) */}
 						<div
 							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								data?.pdtReady
+								isChecklistDone("asesmenReady")
 									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
 									: "border-slate-200 bg-white shadow-xs"
 							}`}
@@ -1029,30 +1069,37 @@ export function TabDokumen({
 							<div className="flex items-start justify-between gap-3">
 								<div className="flex items-start gap-3">
 									<Checkbox
-										id="chk-pdtReady"
-										checked={!!data?.pdtReady}
-										disabled={!canEdit || loadingItem === "pdtReady"}
-										onCheckedChange={(checked) =>
-											handleToggleField("pdtReady", !!checked)
+										id="chk-asesmenReady"
+										checked={isChecklistDone("asesmenReady")}
+										disabled={
+											!canEdit ||
+											loadingItem === "asesmenReady" ||
+											loadingItem === "pdtReady"
 										}
+										onCheckedChange={(checked) => {
+											handleToggleField("asesmenReady", !!checked);
+											handleToggleField("pdtReady", !!checked);
+										}}
 										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
 									/>
 									<div>
 										<label
-											htmlFor="chk-pdtReady"
+											htmlFor="chk-asesmenReady"
 											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
 										>
-											10. Pelatihan Pra-Keberangkatan (PDT)
+											10. Asesmen dan Pengarahan Keberangkatan
 										</label>
 										<p className="text-[11px] text-slate-500 mt-0.5">
-											Pembekalan mental, SOP kerja, bahasa, dan kesiapan budaya
+											Evaluasi kesiapan akhir, pembekalan budaya & SOP kerja,
+											serta surat pernyataan keberangkatan (2 Berkas Wajib)
 										</p>
 									</div>
 								</div>
 								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "pdtReady" ? (
+									{loadingItem === "asesmenReady" ||
+									loadingItem === "pdtReady" ? (
 										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : data?.pdtReady ? (
+									) : isChecklistDone("asesmenReady") ? (
 										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
 											✓ Selesai
 										</Badge>
@@ -1070,7 +1117,7 @@ export function TabDokumen({
 							<div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
 								<div className="space-y-1">
 									<Label className="text-[11px] font-semibold text-slate-600">
-										Tempat PDT
+										Tempat Asesmen
 									</Label>
 									<Input
 										placeholder="Kampus / Balai Latihan"
@@ -1085,26 +1132,32 @@ export function TabDokumen({
 								</div>
 								<div className="space-y-1">
 									<Label className="text-[11px] font-semibold text-slate-600">
-										Tanggal Mulai
+										Tanggal Asesmen / Mulai
 									</Label>
 									<Input
 										type="date"
 										className="h-8 text-xs bg-white"
 										value={
-											data?.pdtDate
-												? new Date(data.pdtDate).toISOString().split("T")[0]
-												: ""
+											data?.asesmenDate
+												? new Date(data.asesmenDate).toISOString().split("T")[0]
+												: data?.pdtDate
+													? new Date(data.pdtDate).toISOString().split("T")[0]
+													: ""
 										}
 										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("pdtDate", e.target.value)
-										}
-										onBlur={() => handleBlurField("pdtDate")}
+										onChange={(e) => {
+											handleLocalChange("asesmenDate", e.target.value);
+											handleLocalChange("pdtDate", e.target.value);
+										}}
+										onBlur={() => {
+											handleBlurField("asesmenDate");
+											handleBlurField("pdtDate");
+										}}
 									/>
 								</div>
 								<div className="space-y-1">
 									<Label className="text-[11px] font-semibold text-slate-600">
-										Tanggal Selesai
+										Tanggal Pengarahan / Selesai
 									</Label>
 									<Input
 										type="date"
@@ -1123,17 +1176,36 @@ export function TabDokumen({
 								</div>
 							</div>
 
-							<div className="pt-2 border-t border-slate-100">
-								<DocumentUpload
-									studentId={studentId}
-									panel="magang"
-									documentKey="pdt"
-									canEdit={canEdit}
-									onUploadSuccess={fetchInternshipData}
-								/>
+							{/* 2 Slot Dokumen: Hasil Asesmen & Surat Pernyataan Keberangkatan */}
+							<div className="pt-2 border-t border-slate-100 space-y-3">
+								<div className="space-y-1">
+									<Label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
+										<FileText className="w-3.5 h-3.5 text-blue-600" />
+										Berkas 1: Hasil Asesmen Kompetensi & Pengarahan
+									</Label>
+									<DocumentUpload
+										studentId={studentId}
+										panel="magang"
+										documentKey="asesmen_kompetensi"
+										canEdit={canEdit}
+										onUploadSuccess={fetchInternshipData}
+									/>
+								</div>
+								<div className="space-y-1 pt-1 border-t border-slate-100/70">
+									<Label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
+										<FileCheck className="w-3.5 h-3.5 text-emerald-600" />
+										Berkas 2: Surat Pernyataan Keberangkatan Mahasiswa
+									</Label>
+									<DocumentUpload
+										studentId={studentId}
+										panel="magang"
+										documentKey="surat_pernyataan_keberangkatan"
+										canEdit={canEdit}
+										onUploadSuccess={fetchInternshipData}
+									/>
+								</div>
 							</div>
 						</div>
-
 						{/* 11. Dokumentasi Keberangkatan */}
 						<div
 							className={`p-4 rounded-xl border transition-colors space-y-3 ${
@@ -1238,11 +1310,11 @@ export function TabDokumen({
 											htmlFor="chk-agenReady"
 											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
 										>
-											12. Mitra Penempatan & Agen Sponsor
+											12. Mitra Penempatan & Dokumen Tambahan
 										</label>
 										<p className="text-[11px] text-slate-500 mt-0.5">
-											Detail perusahaan tempat magang, durasi kerja, dan kota
-											tujuan
+											Detail mitra penempatan, peminatan departemen, dan dokumen
+											tambahan agensi
 										</p>
 									</div>
 								</div>

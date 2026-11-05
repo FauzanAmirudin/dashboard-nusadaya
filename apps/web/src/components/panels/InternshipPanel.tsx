@@ -2,6 +2,7 @@
 
 import {
 	AlertTriangle,
+	Building2,
 	CalendarClock,
 	CheckCircle,
 	CheckCircle2,
@@ -46,6 +47,8 @@ import { hasRole, useAuthStore } from "@/store";
 import { formatDeviceDateTime } from "@/utils/format";
 import { TabDanaTalangan } from "./magang/TabDanaTalangan";
 import { TabDokumen } from "./magang/TabDokumen";
+import { TabKhsTranskrip } from "./magang/TabKhsTranskrip";
+import { TabPenempatan } from "./magang/TabPenempatan";
 import { TabPraPaspor } from "./magang/TabPraPaspor";
 import { TabSyaratAkhir } from "./magang/TabSyaratAkhir";
 
@@ -59,6 +62,7 @@ interface InternshipData {
 	praPasporSuratIzinOrtu?: boolean;
 	praPasporSl21?: boolean;
 	praPasporSkma?: boolean;
+	praPasporLos?: boolean;
 	praPasporRekomendasiDisdik?: boolean;
 	praPasporKhs?: boolean;
 	praPasporKrs?: boolean;
@@ -74,17 +78,24 @@ interface InternshipData {
 	interviewReady: boolean;
 	interviewDate: string | null;
 	interviewResult: string | null;
-	lolReady: boolean;
-	lolDate: string | null;
-	lolNotes: string | null;
+	mouReady?: boolean;
+	mouDate?: string | null;
+	mouNotes?: string | null;
 	loaReady?: boolean;
 	loaConfirmed: boolean;
 	loaDate: string | null;
-	moaReady: boolean;
-	moaDate: string | null;
-	moaNotes: string | null;
 	contractReady: boolean;
 	contractDate: string | null;
+	suhanReady?: boolean;
+	suhanNo?: string | null;
+	suhanDate?: string | null;
+	suhanNotes?: string | null;
+	moaReady?: boolean;
+	moaDate?: string | null;
+	moaNotes?: string | null;
+	lolReady?: boolean;
+	lolDate?: string | null;
+	lolNotes?: string | null;
 	mcuReady: boolean;
 	mcuPlace: string | null;
 	mcuDate: string | null;
@@ -97,11 +108,15 @@ interface InternshipData {
 	ticketAirline: string | null;
 	ticketDate: string | null;
 	ticketFlight: string | null;
-	pdtReady: boolean;
-	pdtDate: string | null;
-	pdtEndDate: string | null;
-	pdtPlace: string | null;
-	estDepartureDate: string | null;
+	pdtReady?: boolean;
+	pdtDate?: string | null;
+	pdtEndDate?: string | null;
+	pdtPlace?: string | null;
+	asesmenReady?: boolean;
+	asesmenDate?: string | null;
+	asesmenResult?: string | null;
+	asesmenNotes?: string | null;
+	asesmenPernyataanReady?: boolean;
 	destinationCity: string | null;
 	internshipDuration: string | null;
 	internshipCompany: string | null;
@@ -110,6 +125,7 @@ interface InternshipData {
 	agenReady?: boolean;
 	agenNegaraTujuan: string | null;
 	agenPeminatan: string | null;
+	mitraPenempatanNama?: string | null;
 
 	// Syarat Akhir
 	logbookReady?: boolean;
@@ -353,23 +369,29 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 	const dokumenKeys = [
 		"passportReady",
 		"interviewReady",
-		"lolReady",
+		"mouReady",
 		"loaConfirmed",
-		"moaReady",
 		"contractReady",
+		"suhanReady",
 		"mcuReady",
 		"visaReady",
 		"ticketReady",
-		"pdtReady",
+		"asesmenReady",
 		"dokumentasiReady",
 		"agenReady",
 	];
 
-	const dokumenCompleted = dokumenKeys.filter(
-		(k) => !!(data as any)?.[k],
+	const isDokumenItemDone = (key: string) => {
+		if (key === "mouReady") return Boolean(data?.mouReady ?? data?.moaReady);
+		if (key === "asesmenReady")
+			return Boolean(data?.asesmenReady ?? data?.pdtReady);
+		return Boolean((data as any)?.[key]);
+	};
+
+	const dokumenCompleted = dokumenKeys.filter((k) =>
+		isDokumenItemDone(k),
 	).length;
 	const dokumenTotal = dokumenKeys.length;
-
 	const syaratAkhirKeys = [
 		"logbookReady",
 		"laporanAkhirReady",
@@ -377,7 +399,7 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 	];
 
 	const syaratAkhirCompleted = syaratAkhirKeys.filter(
-		(k) => !!(data as any)?.[k],
+		(k) => !!(data as unknown as Record<string, unknown>)?.[k],
 	).length;
 	const syaratAkhirTotal = syaratAkhirKeys.length;
 
@@ -387,9 +409,8 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 		...dokumenKeys,
 		...syaratAkhirKeys,
 	];
-	const validatedCount = allChecklistKeys.filter(
-		(k) => !!(data as any)?.[k],
-	).length;
+	const validatedCount =
+		praPasporCompleted + dokumenCompleted + syaratAkhirCompleted;
 	const totalCount = allChecklistKeys.length;
 	const progressPercent =
 		totalCount > 0 ? Math.round((validatedCount / totalCount) * 100) : 0;
@@ -433,7 +454,7 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 
 				{/* TABS NAVIGATION */}
 				<Tabs defaultValue="dokumen" className="w-full">
-					<TabsList className="mb-6 grid w-full grid-cols-2 md:grid-cols-4 bg-slate-100 p-1 rounded-xl h-auto gap-1">
+					<TabsList className="mb-6 grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 bg-slate-100 p-1 rounded-xl h-auto gap-1">
 						<TabsTrigger
 							value="pra-paspor"
 							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-lg py-2.5 transition-all font-bold text-xs flex items-center justify-center gap-2"
@@ -450,6 +471,45 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 							>
 								{praPasporCompleted}/{praPasporTotal}
 							</Badge>
+						</TabsTrigger>
+
+						<TabsTrigger
+							value="khs-transkrip"
+							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-lg py-2.5 transition-all font-bold text-xs flex items-center justify-center gap-2"
+						>
+							<GraduationCap className="w-4 h-4 text-blue-600" />
+							<span>KHS & Transkrip</span>
+							{data?.praPasporKhs && data?.praPasporTranskrip ? (
+								<Badge
+									variant="outline"
+									className="text-[10px] px-1.5 py-0 bg-emerald-50 text-emerald-700 border-emerald-200"
+								>
+									✓
+								</Badge>
+							) : (
+								<Badge
+									variant="outline"
+									className="text-[10px] px-1.5 py-0 bg-slate-100 text-slate-600 border-slate-200"
+								>
+									BAAK
+								</Badge>
+							)}
+						</TabsTrigger>
+
+						<TabsTrigger
+							value="penempatan"
+							className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-lg py-2.5 transition-all font-bold text-xs flex items-center justify-center gap-2"
+						>
+							<Building2 className="w-4 h-4" />
+							<span>Penempatan Magang</span>
+							{data?.agenReady && (
+								<Badge
+									variant="outline"
+									className="text-[10px] px-1.5 py-0 bg-emerald-50 text-emerald-700 border-emerald-200"
+								>
+									✓
+								</Badge>
+							)}
 						</TabsTrigger>
 
 						<TabsTrigger
@@ -505,6 +565,27 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 							canEdit={canEdit}
 							loadingItem={loadingItem}
 							handleToggleField={handleToggleField}
+							fetchInternshipData={fetchInternshipData}
+						/>
+					</TabsContent>
+
+					<TabsContent value="khs-transkrip">
+						<TabKhsTranskrip
+							studentId={studentId}
+							data={data as unknown as Record<string, unknown>}
+							canEdit={canEdit}
+							fetchInternshipData={fetchInternshipData}
+						/>
+					</TabsContent>
+					<TabsContent value="penempatan">
+						<TabPenempatan
+							studentId={studentId}
+							data={data as unknown as Record<string, unknown>}
+							canEdit={canEdit}
+							loadingItem={loadingItem}
+							handleToggleField={handleToggleField}
+							handleLocalChange={handleLocalChange}
+							handleBlurField={handleBlurField}
 							fetchInternshipData={fetchInternshipData}
 						/>
 					</TabsContent>

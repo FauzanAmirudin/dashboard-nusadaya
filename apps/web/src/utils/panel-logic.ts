@@ -455,7 +455,7 @@ export const PRA_PASPOR_ALL_16_KEYS = [
 ] as const;
 
 export function calculatePraPasporChecklist(
-	data: any,
+	data: Record<string, unknown> | null | undefined,
 	keys: readonly string[] = PRA_PASPOR_ALL_16_KEYS,
 ): {
 	completedCount: number;
@@ -465,7 +465,12 @@ export function calculatePraPasporChecklist(
 		return { completedCount: 0, totalCount: keys.length };
 	}
 
-	const completedCount = keys.filter((k) => Boolean(data[k])).length;
+	const completedCount = keys.filter((k) => {
+		if (k === "praPasporSkma") {
+			return Boolean(data.praPasporSkma ?? data.praPasporLos);
+		}
+		return Boolean(data[k]);
+	}).length;
 	return {
 		completedCount,
 		totalCount: keys.length,
@@ -475,19 +480,21 @@ export function calculatePraPasporChecklist(
 export const INTERNSHIP_MAIN_KEYS = [
 	"passportReady",
 	"interviewReady",
-	"lolReady",
+	"mouReady",
 	"loaConfirmed",
-	"moaReady",
 	"contractReady",
+	"suhanReady",
 	"mcuReady",
 	"visaReady",
 	"ticketReady",
-	"pdtReady",
+	"asesmenReady",
 	"dokumentasiReady",
 	"agenReady",
 ] as const;
 
-export function calculateInternshipDokumenChecklist(data: any): {
+export function calculateInternshipDokumenChecklist(
+	data: Record<string, unknown> | null | undefined,
+): {
 	completedCount: number;
 	totalCount: number;
 	isInternshipReady: boolean;
@@ -500,9 +507,12 @@ export function calculateInternshipDokumenChecklist(data: any): {
 		};
 	}
 
-	const completedCount = INTERNSHIP_MAIN_KEYS.filter((k) =>
-		Boolean(data[k]),
-	).length;
+	const completedCount = INTERNSHIP_MAIN_KEYS.filter((k) => {
+		if (k === "mouReady") return Boolean(data.mouReady ?? data.moaReady);
+		if (k === "asesmenReady")
+			return Boolean(data.asesmenReady ?? data.pdtReady);
+		return Boolean(data[k]);
+	}).length;
 	const totalCount = INTERNSHIP_MAIN_KEYS.length;
 
 	return {

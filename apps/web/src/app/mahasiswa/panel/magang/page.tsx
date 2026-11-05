@@ -161,27 +161,36 @@ export default function MagangPanelMahasiswa() {
 	const praPasporCompleted = praPasporItems.filter((i) => i.checked).length;
 	const praPasporPercent = (praPasporCompleted / praPasporItems.length) * 100;
 
-	// Checklist Dokumen & Tahapan Magang
+	// Checklist Dokumen & Tahapan Magang (Standarisasi 6 Dokumen Taiwan & Dokumen Keberangkatan)
 	const mainMagangItems = [
 		{ key: "passportReady", label: "Paspor Fisik Valid" },
 		{ key: "interviewReady", label: "Interview Perusahaan / User" },
-		{ key: "loaReady", label: "Surat Izin Masuk (LoA)" },
-		{ key: "lolReady", label: "Surat Rekomendasi Kerja (LoL)" },
-		{ key: "moaReady", label: "Perjanjian Kerjasama (MoA)" },
+		{ key: "mouReady", label: "MOU Kampus & Hotel Mitra" },
+		{ key: "loaConfirmed", label: "Surat Penerimaan (LoA)" },
 		{ key: "contractReady", label: "Kontrak Magang Resmi" },
-		{ key: "mcuReady", label: "Medical Check-Up (MCU)" },
+		{ key: "suhanReady", label: "Suhan Izin Magang Taiwan" },
+		{ key: "mcuReady", label: "Medical Check-Up (MCU) Full" },
 		{ key: "visaReady", label: "Penerbitan Visa Magang" },
 		{ key: "ticketReady", label: "Tiket Penerbangan" },
-		{ key: "pdtReady", label: "Pembekalan Pra-Keberangkatan (PDT)" },
+		{ key: "asesmenReady", label: "Asesmen & Pengarahan Keberangkatan" },
 		{ key: "dokumentasiReady", label: "Dokumentasi Keberangkatan" },
-		{ key: "agenReady", label: "Verifikasi Dokumen Agen" },
+		{ key: "agenReady", label: "Verifikasi Mitra Penempatan" },
 	];
 
-	const completedCount = mainMagangItems.filter(
-		(item) => data?.[item.key],
+	const isMainItemChecked = (item: { key: string }) => {
+		if (item.key === "mouReady")
+			return Boolean(data?.mouReady ?? data?.moaReady);
+		if (item.key === "asesmenReady")
+			return Boolean(data?.asesmenReady ?? data?.pdtReady);
+		if (item.key === "loaConfirmed")
+			return Boolean(data?.loaConfirmed ?? data?.loaReady);
+		return Boolean(data?.[item.key]);
+	};
+
+	const completedCount = mainMagangItems.filter((item) =>
+		isMainItemChecked(item),
 	).length;
 	const checklistPercentage = (completedCount / mainMagangItems.length) * 100;
-
 	const formatDate = (dateString: string | null | undefined) => {
 		if (!dateString) return "-";
 		return new Date(dateString).toLocaleDateString("id-ID", {
@@ -434,7 +443,7 @@ export default function MagangPanelMahasiswa() {
 								<div className="flex items-center justify-between">
 									<span className="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
 										<Stethoscope className="w-4 h-4 text-emerald-600" /> Medical
-										Check-Up
+										Check-Up (MCU) Full
 									</span>
 									{data?.mcuReady ? (
 										<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px]">
@@ -511,9 +520,9 @@ export default function MagangPanelMahasiswa() {
 								<div className="flex items-center justify-between">
 									<span className="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
 										<GraduationCap className="w-4 h-4 text-purple-600" />{" "}
-										Pembekalan PDT
+										Asesmen & Pengarahan
 									</span>
-									{data?.pdtReady ? (
+									{data?.asesmenReady || data?.pdtReady ? (
 										<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px]">
 											Selesai
 										</Badge>
@@ -534,9 +543,11 @@ export default function MagangPanelMahasiswa() {
 										</span>
 									</p>
 									<p className="text-slate-500">
-										Jadwal PDT:{" "}
+										Jadwal Asesmen:{" "}
 										<span className="font-medium text-slate-700">
-											{data?.pdtDate ? formatDate(data.pdtDate) : "-"}
+											{data?.asesmenDate || data?.pdtDate
+												? formatDate(data?.asesmenDate || data?.pdtDate)
+												: "-"}
 											{data?.pdtEndDate
 												? ` s/d ${formatDate(data.pdtEndDate)}`
 												: ""}
@@ -549,7 +560,7 @@ export default function MagangPanelMahasiswa() {
 							<div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
 								<div className="flex items-center justify-between">
 									<span className="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
-										<Users className="w-4 h-4 text-blue-600" /> Verifikasi Agen
+										<Users className="w-4 h-4 text-blue-600" /> Mitra Penempatan
 									</span>
 									{data?.agenReady ? (
 										<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px]">

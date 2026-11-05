@@ -1,12 +1,13 @@
 "use client";
 
 import {
-	BookOpen,
 	CheckCircle,
 	CheckCircle2,
 	Clock,
 	FileCheck,
 	FolderCheck,
+	GraduationCap,
+	Info,
 	Loader2,
 	ShieldCheck,
 } from "lucide-react";
@@ -18,11 +19,11 @@ import { DocumentUpload } from "@/components/ui/DocumentUpload";
 
 interface TabPraPasporProps {
 	studentId: number;
-	data: any;
-	passportClearance: any;
+	data: Record<string, unknown> | null;
+	passportClearance: { isGapYear?: boolean } | null;
 	canEdit: boolean;
 	loadingItem?: string | null;
-	handleToggleField: (field: string, value: any) => Promise<void> | void;
+	handleToggleField: (field: string, value: unknown) => Promise<void> | void;
 	fetchInternshipData: () => Promise<void>;
 }
 
@@ -35,6 +36,7 @@ export function TabPraPaspor({
 	handleToggleField,
 	fetchInternshipData,
 }: TabPraPasporProps) {
+	// Berkas Pra-Paspor Legalitas & Identitas (Segmen 19: SL-21 Hong Ta, Gap Year Flamboyan, LOS/SKMA Aktif)
 	const docItems = [
 		{
 			label: "1. Pas Foto Terbaru",
@@ -67,63 +69,53 @@ export function TabPraPaspor({
 			desc: "Scan Akta Kelahiran asli calon mahasiswa magang",
 		},
 		{
-			label: "6. Surat Izin Orang Tua",
+			label: "6. Surat Izin Orang Tua / Wali",
 			key: "praPasporSuratIzinOrtu",
 			docKey: "surat_izin_ortu",
 			desc: "Scan Surat Izin Orang Tua / Wali resmi bermaterai",
 		},
 		{
-			label: "7. Statement Letter (SL-21)",
+			label: "7. Surat Pernyataan Usia >21 Tahun (SL-21)",
 			key: "praPasporSl21",
 			docKey: "sl21",
-			desc: "Surat pernyataan kesanggupan dan integritas bermaterai",
+			badge: {
+				text: "Khusus Mitra Hong Ta",
+				className: "bg-indigo-50 text-indigo-700 border-indigo-200",
+			},
+			desc: "Surat pernyataan resmi usia dewasa di atas 21 tahun bermaterai, prasyarat khusus seleksi mitra Hong Ta Taiwan",
 		},
 		{
-			label: "8. Surat Keterangan Mahasiswa Aktif (SKMA)",
+			label: "8. Surat Keterangan Riwayat Gap Year",
+			key: "praPasporGapYear",
+			docKey: "gap_year",
+			badge: {
+				text: "Khusus Mitra Flamboyan",
+				className: "bg-amber-50 text-amber-800 border-amber-200",
+			},
+			desc: "Surat keterangan aktivitas & riwayat kelulusan masa gap year bermaterai, prasyarat khusus seleksi mitra Flamboyan Taiwan",
+		},
+		{
+			label: "9. Letter of Student (LOS / SKMA Aktif)",
 			key: "praPasporSkma",
-			docKey: "skma",
-			desc: "Surat pengantar resmi mahasiswa aktif dari bagian akademik",
+			docKey: "los",
+			badge: {
+				text: "Wajib Imigrasi & Industri",
+				className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+			},
+			desc: "Letter of Student (LOS) resmi bertandatangan pimpinan kampus sebagai syarat verifikasi imigrasi dan seleksi industri luar negeri",
 		},
 		{
-			label: "9. Surat Rekomendasi Disdik",
+			label: "10. Surat Rekomendasi Disdik",
 			key: "praPasporRekomendasiDisdik",
 			docKey: "rekomendasi_disdik",
 			desc: "Surat rekomendasi pembuatan paspor dari Dinas Pendidikan",
 		},
 		{
-			label: "10. Kartu Hasil Studi (KHS)",
-			key: "praPasporKhs",
-			docKey: "khs",
-			desc: "Scan Kartu Hasil Studi (KHS) semester yang telah ditempuh",
-		},
-		{
-			label: "11. Kartu Rencana Studi (KRS)",
-			key: "praPasporKrs",
-			docKey: "krs",
-			desc: "Scan Kartu Rencana Studi (KRS) semester berjalan",
-		},
-		{
-			label: "12. Transkrip Nilai",
-			key: "praPasporTranskrip",
-			docKey: "transkrip",
-			desc: "Scan Transkrip Nilai akademik resmi dan terlegalisir",
-		},
-		{
-			label: "13. Ijazah Pendidikan Terakhir",
+			label: "11. Ijazah Pendidikan Terakhir",
 			key: "praPasporIjazah",
 			docKey: "ijazah",
 			desc: "Scan Ijazah pendidikan formal terakhir asli / legalisir",
 		},
-		...(passportClearance?.isGapYear
-			? [
-					{
-						label: "14. Dokumen Gap Year",
-						key: "praPasporGapYear",
-						docKey: "gap_year",
-						desc: "Surat keterangan kegiatan / riwayat selama masa gap year",
-					},
-				]
-			: []),
 	];
 
 	const completedCount = docItems.filter((item) => !!data?.[item.key]).length;
@@ -131,16 +123,48 @@ export function TabPraPaspor({
 
 	return (
 		<div className="space-y-6">
+			{/* Info Box Pemisahan KHS & Transkrip */}
+			<div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+				<div className="flex items-start gap-3">
+					<div className="p-2 bg-blue-100 text-blue-700 rounded-lg shrink-0 mt-0.5">
+						<GraduationCap className="w-4 h-4" />
+					</div>
+					<div>
+						<h5 className="text-xs font-bold text-slate-800">
+							Rekapitulasi KHS & Transkrip Nilai Dipisahkan
+						</h5>
+						<p className="text-[11px] text-slate-500 mt-0.5">
+							Untuk verifikasi nilai mata kuliah, IPK, SKS, dan unduh dokumen
+							KHS/Transkrip seleksi industri, silakan periksa melalui tab{" "}
+							<strong>KHS & Transkrip</strong>.
+						</p>
+					</div>
+				</div>
+				<div className="shrink-0 flex items-center gap-1.5">
+					{data?.praPasporKhs && data?.praPasporTranskrip ? (
+						<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+							✓ KHS & Transkrip Terhubung
+						</Badge>
+					) : (
+						<Badge variant="outline" className="text-slate-400 text-[10px]">
+							Periksa Tab KHS & Transkrip
+						</Badge>
+					)}
+				</div>
+			</div>
+
+			{/* Main Card: Berkas Persyaratan Pra-Paspor */}
 			<Card className="border border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
 				<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 					<div>
 						<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
 							<FolderCheck className="w-4 h-4 text-[#0517B0]" />
-							Status Kelayakan Pra-Paspor ({docItems.length})
+							Status Kelayakan Pra-Paspor & Dokumen Legalitas ({docItems.length}{" "}
+							Berkas)
 						</CardTitle>
 						<p className="text-[11px] text-slate-500 mt-0.5">
-							Verifikasi berkas persyaratan permohonan dan sidik paspor di
-							Kantor Imigrasi
+							Verifikasi berkas permohonan paspor, dokumen imigrasi, dan
+							persyaratan bersyarat mitra penempatan luar negeri
 						</p>
 					</div>
 					<div className="flex items-center gap-2">
@@ -159,7 +183,7 @@ export function TabPraPaspor({
 				<CardContent className="p-4 sm:p-5 space-y-4">
 					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 						{docItems.map((item) => {
-							const isChecked = !!data?.[item.key];
+							const isChecked = Boolean(data?.[item.key]);
 							const isLoading = loadingItem === item.key;
 
 							return (
@@ -184,28 +208,24 @@ export function TabPraPaspor({
 													className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
 												/>
 												<div>
-													<label
-														htmlFor={`chk-${item.key}`}
-														className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-													>
-														{item.label}
-													</label>
-													<p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+													<div className="flex flex-wrap items-center gap-1.5">
+														<label
+															htmlFor={`chk-${item.key}`}
+															className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
+														>
+															{item.label}
+														</label>
+														{item.badge && (
+															<span
+																className={`text-[9px] px-1.5 py-0.2 font-bold rounded-md border ${item.badge.className}`}
+															>
+																{item.badge.text}
+															</span>
+														)}
+													</div>
+													<p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
 														{item.desc}
 													</p>
-													{[
-														"praPasporKhs",
-														"praPasporKrs",
-														"praPasporTranskrip",
-													].includes(item.key) &&
-														isChecked && (
-															<div className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-blue-700 bg-blue-50/90 px-2 py-0.5 rounded-md border border-blue-200 font-semibold">
-																<ShieldCheck className="w-3 h-3 text-blue-600 shrink-0" />
-																<span>
-																	Tersinkronisasi Otomatis dari BAAK Akademik
-																</span>
-															</div>
-														)}
 												</div>
 											</div>
 											<div className="flex items-center gap-2 shrink-0">
@@ -230,7 +250,7 @@ export function TabPraPaspor({
 									<div className="pt-3 border-t border-slate-100 mt-auto">
 										<DocumentUpload
 											studentId={studentId}
-											panel="pmb"
+											panel="magang"
 											documentKey={item.docKey}
 											canEdit={canEdit}
 											onUploadSuccess={fetchInternshipData}

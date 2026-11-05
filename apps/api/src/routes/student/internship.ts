@@ -26,7 +26,7 @@ function getInternshipChecks(internship: any, isGapYear = false) {
 		Boolean(internship?.praPasporAktaKelahiran),
 		Boolean(internship?.praPasporSuratIzinOrtu),
 		Boolean(internship?.praPasporSl21),
-		Boolean(internship?.praPasporSkma),
+		Boolean(internship?.praPasporSkma || internship?.praPasporLos),
 		Boolean(internship?.praPasporRekomendasiDisdik),
 		Boolean(internship?.praPasporKhs),
 		Boolean(internship?.praPasporKrs),
@@ -38,14 +38,14 @@ function getInternshipChecks(internship: any, isGapYear = false) {
 	const dokumenChecks = [
 		Boolean(internship?.passportReady),
 		Boolean(internship?.interviewReady),
-		Boolean(internship?.lolReady),
+		Boolean(internship?.mouReady ?? internship?.moaReady),
 		Boolean(internship?.loaConfirmed),
-		Boolean(internship?.moaReady),
 		Boolean(internship?.contractReady),
+		Boolean(internship?.suhanReady),
 		Boolean(internship?.mcuReady),
 		Boolean(internship?.visaReady),
 		Boolean(internship?.ticketReady),
-		Boolean(internship?.pdtReady),
+		Boolean(internship?.asesmenReady ?? internship?.pdtReady),
 		Boolean(internship?.dokumentasiReady),
 		Boolean(internship?.agenReady),
 	];
@@ -115,7 +115,16 @@ export const internshipRoutes = new Elysia()
 				hasValidDoc(pmbDocs, "surat_izin_ortu") ||
 				hasValidDoc(internshipDocs, "surat_izin_ortu"),
 			sl21: hasValidDoc(pmbDocs, "sl21") || hasValidDoc(internshipDocs, "sl21"),
-			skma: hasValidDoc(pmbDocs, "skma") || hasValidDoc(internshipDocs, "skma"),
+			skma:
+				hasValidDoc(pmbDocs, "skma") ||
+				hasValidDoc(internshipDocs, "skma") ||
+				hasValidDoc(pmbDocs, "los") ||
+				hasValidDoc(internshipDocs, "los"),
+			los:
+				hasValidDoc(pmbDocs, "skma") ||
+				hasValidDoc(internshipDocs, "skma") ||
+				hasValidDoc(pmbDocs, "los") ||
+				hasValidDoc(internshipDocs, "los"),
 			rekomendasiDisdik:
 				hasValidDoc(pmbDocs, "rekomendasi_disdik") ||
 				hasValidDoc(internshipDocs, "rekomendasi_disdik"),
@@ -178,6 +187,8 @@ export const internshipRoutes = new Elysia()
 			const dateFields = [
 				"passportExp",
 				"interviewDate",
+				"loaDate",
+				"lolDate",
 				"contractDate",
 				"mcuDate",
 				"languageCertDate",
@@ -185,6 +196,10 @@ export const internshipRoutes = new Elysia()
 				"pdtDate",
 				"pdtEndDate",
 				"moaDate",
+				"mouDate",
+				"suhanDate",
+				"asesmenDate",
+				"estDepartureDate",
 				"danaTahap1Date",
 				"danaTahap2Date",
 			];
@@ -199,30 +214,48 @@ export const internshipRoutes = new Elysia()
 				updatedAt: new Date(),
 			};
 
-			// Validate LoL -> LoA -> MoA State Machine
-			if (cleanUpdates.loaConfirmed === true) {
-				const current = await db.query.internshipData.findFirst({
-					where: eq(internshipData.studentId, id),
-				});
-				if (!current?.lolReady && !cleanUpdates.lolReady) {
-					set.status = 400;
-					return {
-						success: false,
-						message: "LoL (Letter of Offer) harus diselesaikan sebelum LoA.",
-					};
-				}
+			// Sinkronisasi backward compatibility untuk MOU, Asesmen, dan LOS/SKMA
+			if (
+				cleanUpdates.praPasporLos !== undefined &&
+				cleanUpdates.praPasporSkma === undefined
+			) {
+				cleanUpdates.praPasporSkma = cleanUpdates.praPasporLos;
 			}
-			if (cleanUpdates.moaReady === true) {
-				const current = await db.query.internshipData.findFirst({
-					where: eq(internshipData.studentId, id),
-				});
-				if (!current?.loaConfirmed && !cleanUpdates.loaConfirmed) {
-					set.status = 400;
-					return {
-						success: false,
-						message: "LoA harus dikonfirmasi sebelum memasukkan dokumen MoA.",
-					};
-				}
+			if (
+				cleanUpdates.praPasporSkma !== undefined &&
+				cleanUpdates.praPasporLos === undefined
+			) {
+				cleanUpdates.praPasporLos = cleanUpdates.praPasporSkma;
+			}
+			if (
+				cleanUpdates.mouReady !== undefined &&
+				cleanUpdates.moaReady === undefined
+			) {
+				cleanUpdates.moaReady = cleanUpdates.mouReady;
+			}
+			if (
+				cleanUpdates.mouDate !== undefined &&
+				cleanUpdates.moaDate === undefined
+			) {
+				cleanUpdates.moaDate = cleanUpdates.mouDate;
+			}
+			if (
+				cleanUpdates.mouNotes !== undefined &&
+				cleanUpdates.moaNotes === undefined
+			) {
+				cleanUpdates.moaNotes = cleanUpdates.mouNotes;
+			}
+			if (
+				cleanUpdates.asesmenReady !== undefined &&
+				cleanUpdates.pdtReady === undefined
+			) {
+				cleanUpdates.pdtReady = cleanUpdates.asesmenReady;
+			}
+			if (
+				cleanUpdates.asesmenDate !== undefined &&
+				cleanUpdates.pdtDate === undefined
+			) {
+				cleanUpdates.pdtDate = cleanUpdates.asesmenDate;
 			}
 
 			// Validate Dana Talangan Tahap 2
@@ -317,6 +350,9 @@ export const internshipRoutes = new Elysia()
 					destinationCity: input.destinationCity ?? null,
 					internshipDuration: input.internshipDuration ?? null,
 					internshipCompany: input.internshipCompany ?? null,
+					mitraPenempatanNama: input.mitraPenempatanNama ?? null,
+					agenNegaraTujuan: input.agenNegaraTujuan ?? null,
+					agenPeminatan: input.agenPeminatan ?? null,
 					updatedAt: new Date(),
 				})
 				.where(eq(internshipData.studentId, id));
@@ -336,6 +372,9 @@ export const internshipRoutes = new Elysia()
 				destinationCity: t.Optional(t.Union([t.String(), t.Null()])),
 				internshipDuration: t.Optional(t.Union([t.String(), t.Null()])),
 				internshipCompany: t.Optional(t.Union([t.String(), t.Null()])),
+				mitraPenempatanNama: t.Optional(t.Union([t.String(), t.Null()])),
+				agenNegaraTujuan: t.Optional(t.Union([t.String(), t.Null()])),
+				agenPeminatan: t.Optional(t.Union([t.String(), t.Null()])),
 			}),
 		},
 	)

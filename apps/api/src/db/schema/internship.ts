@@ -31,6 +31,7 @@ export const internshipData = pgTable(
 		),
 		praPasporSl21: boolean("pra_paspor_sl21").default(false),
 		praPasporSkma: boolean("pra_paspor_skma").default(false),
+		praPasporLos: boolean("pra_paspor_los").default(false),
 		praPasporRekomendasiDisdik: boolean(
 			"pra_paspor_rekomendasi_disdik",
 		).default(false),
@@ -79,22 +80,35 @@ export const internshipData = pgTable(
 		ticketDate: timestamp("ticket_date"),
 		ticketFlight: text("ticket_flight"),
 
-		// 8. PDT
+		// 8. PDT & Asesmen dan Pengarahan Keberangkatan (Segmen 20 & 22)
 		pdtReady: boolean("pdt_ready").default(false),
 		pdtDate: timestamp("pdt_date"),
 		pdtEndDate: timestamp("pdt_end_date"),
 		pdtPlace: text("pdt_place"),
+		asesmenReady: boolean("asesmen_ready").default(false),
+		asesmenDate: timestamp("asesmen_date"),
+		asesmenResult: text("asesmen_result"),
+		asesmenNotes: text("asesmen_notes"),
+		asesmenPernyataanReady: boolean("asesmen_pernyataan_ready").default(false),
 
-		// State Machine Kontrak Taiwan (LoL->LoA->MoA)
+		// Alur Berkas Taiwan (MOU -> LOA -> Kontrak -> Suhan -> MCU Full -> Visa)
+		mouReady: boolean("mou_ready").default(false),
+		mouDate: timestamp("mou_date"),
+		mouNotes: text("mou_notes"),
+		loaConfirmed: boolean("loa_confirmed").default(false),
+		loaDate: timestamp("loa_date"),
+		suhanReady: boolean("suhan_ready").default(false),
+		suhanNo: text("suhan_no"),
+		suhanDate: timestamp("suhan_date"),
+		suhanNotes: text("suhan_notes"),
+
+		// Legacy fields (retained for backward compatibility)
 		lolReady: boolean("lol_ready").default(false),
 		lolDate: timestamp("lol_date"),
 		lolNotes: text("lol_notes"),
-		loaConfirmed: boolean("loa_confirmed").default(false),
-		loaDate: timestamp("loa_date"),
 		moaReady: boolean("moa_ready").default(false),
 		moaDate: timestamp("moa_date"),
 		moaNotes: text("moa_notes"),
-
 		// Schedule
 		estDepartureDate: timestamp("est_departure_date"),
 		destinationCity: text("destination_city"),
@@ -105,6 +119,7 @@ export const internshipData = pgTable(
 		agenReady: boolean("agen_ready").default(false),
 		agenNegaraTujuan: text("agen_negara_tujuan"),
 		agenPeminatan: text("agen_peminatan"),
+		mitraPenempatanNama: text("mitra_penempatan_nama"),
 
 		// Dana Talangan - Tahap 1
 		danaTahap1Amount: integer("dana_tahap1_amount").default(0),

@@ -323,19 +323,31 @@ const getFinanceChecklist = (fin: any, destCountry?: string | null) => {
 	};
 };
 
-const getInternshipChecklist = (internship: any) => {
+const getInternshipChecklist = (
+	internship: Record<string, unknown> | null | undefined,
+) => {
 	const items = [
 		{ name: "Paspor Siap", done: Boolean(internship?.passportReady) },
-		{ name: "Visa Disetujui", done: Boolean(internship?.visaReady) },
-		{ name: "Medical Check Up (MCU)", done: Boolean(internship?.mcuReady) },
-		{ name: "Tiket Keberangkatan", done: Boolean(internship?.ticketReady) },
 		{
-			name: "Letter of Acceptance (LoA)",
-			done: Boolean(internship?.loaConfirmed),
+			name: "MOU & LoA",
+			done: Boolean(
+				(internship?.mouReady ?? internship?.moaReady) ||
+					internship?.loaConfirmed,
+			),
 		},
 		{
-			name: "Kontrak Kerja Industri",
-			done: Boolean(internship?.contractReady),
+			name: "Kontrak & Suhan",
+			done: Boolean(internship?.contractReady || internship?.suhanReady),
+		},
+		{ name: "MCU Full", done: Boolean(internship?.mcuReady) },
+		{ name: "Visa Disetujui", done: Boolean(internship?.visaReady) },
+		{
+			name: "Tiket & Asesmen",
+			done: Boolean(
+				internship?.ticketReady ||
+					internship?.asesmenReady ||
+					internship?.pdtReady,
+			),
 		},
 	];
 	const completed = items.filter((i) => i.done).length;

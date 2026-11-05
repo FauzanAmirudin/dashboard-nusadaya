@@ -169,19 +169,34 @@ export function MagangDashboard({
 		return filteredData.slice(start, start + pageSize);
 	}, [filteredData, currentPage]);
 
-	const getInternshipChecklist = (internship: any) => {
+	const getInternshipChecklist = (
+		internship: Record<string, unknown> | null | undefined,
+	) => {
 		const items = [
-			{
-				name: "Pembekalan & CV",
-				done: Boolean(internship?.praPasporCv),
-			},
 			{ name: "Paspor Siap", done: Boolean(internship?.passportReady) },
-			{ name: "Medical Checkup (MCU)", done: Boolean(internship?.mcuReady) },
-			{ name: "Visa Kerja / Pelajar", done: Boolean(internship?.visaReady) },
-			{ name: "Tiket Keberangkatan", done: Boolean(internship?.ticketReady) },
 			{
-				name: "LoA & Kontrak Kerja",
-				done: Boolean(internship?.loaConfirmed || internship?.contractReady),
+				name: "MOU & LOA",
+				done: Boolean(
+					(internship?.mouReady ?? internship?.moaReady) ||
+						internship?.loaConfirmed,
+				),
+			},
+			{
+				name: "Kontrak & Suhan",
+				done: Boolean(internship?.contractReady || internship?.suhanReady),
+			},
+			{
+				name: "MCU Full",
+				done: Boolean(internship?.mcuReady),
+			},
+			{ name: "Visa Disetujui", done: Boolean(internship?.visaReady) },
+			{
+				name: "Tiket & Asesmen",
+				done: Boolean(
+					internship?.ticketReady ||
+						internship?.asesmenReady ||
+						internship?.pdtReady,
+				),
 			},
 		];
 		const completed = items.filter((i) => i.done).length;
@@ -194,36 +209,54 @@ export function MagangDashboard({
 	};
 
 	const handleExport = () => {
-		const exportData = filteredData.map((s: any) => {
-			const checklist = getInternshipChecklist(s.internship);
-			return {
-				NIM: s.student?.nim || "-",
-				"Nama Mahasiswa": s.student?.name || "-",
-				Angkatan: s.student?.cohort ? `Angkatan ${s.student.cohort}` : "-",
-				"Tahun Ajaran": s.student?.academicYear || s.student?.period || "-",
-				Peminatan:
-					s.student?.subProgram ||
-					s.student?.destinationCountry ||
-					s.student?.program ||
-					"-",
-				"No. WhatsApp": s.student?.phone || "-",
-				"Progress Checklist": `${checklist.completed}/6 Item (${Math.round((checklist.completed / 6) * 100)}%)`,
-				Paspor: s.internship?.passportReady ? "Selesai" : "Belum",
-				Visa: s.internship?.visaReady ? "Selesai" : "Belum",
-				MCU: s.internship?.mcuReady ? "Selesai" : "Belum",
-				Tiket: s.internship?.ticketReady ? "Selesai" : "Belum",
-				LoA: s.internship?.loaConfirmed ? "Selesai" : "Belum",
-				"Kontrak Kerja": s.internship?.contractReady ? "Selesai" : "Belum",
-				"Hotel / Perusahaan": s.internship?.internshipCompany || "-",
-				"Status Magang": s.internship?.isAcc
-					? "Sudah ACC"
-					: s.internship?.status === "AMAN"
-						? "Aman"
-						: s.internship?.status === "PROSES"
-							? "Berproses"
-							: "Butuh Perhatian",
-			};
-		});
+		const exportData = filteredData.map(
+			(s: {
+				student?: Record<string, unknown>;
+				internship?: Record<string, unknown>;
+			}) => {
+				const checklist = getInternshipChecklist(s.internship);
+				return {
+					NIM: (s.student?.nim as string) || "-",
+					"Nama Mahasiswa": (s.student?.name as string) || "-",
+					Angkatan: s.student?.cohort ? `Angkatan ${s.student.cohort}` : "-",
+					"Tahun Ajaran":
+						(s.student?.academicYear as string) ||
+						(s.student?.period as string) ||
+						"-",
+					Peminatan:
+						(s.student?.subProgram as string) ||
+						(s.student?.destinationCountry as string) ||
+						(s.student?.program as string) ||
+						"-",
+					"No. WhatsApp": (s.student?.phone as string) || "-",
+					"Progress Checklist": `${checklist.completed}/6 Item (${Math.round((checklist.completed / 6) * 100)}%)`,
+					Paspor: s.internship?.passportReady ? "Selesai" : "Belum",
+					MOU:
+						(s.internship?.mouReady ?? s.internship?.moaReady)
+							? "Selesai"
+							: "Belum",
+					LoA: s.internship?.loaConfirmed ? "Selesai" : "Belum",
+					"Kontrak Kerja": s.internship?.contractReady ? "Selesai" : "Belum",
+					Suhan: s.internship?.suhanReady ? "Selesai" : "Belum",
+					"MCU Full": s.internship?.mcuReady ? "Selesai" : "Belum",
+					Visa: s.internship?.visaReady ? "Selesai" : "Belum",
+					Tiket: s.internship?.ticketReady ? "Selesai" : "Belum",
+					"Asesmen & Pengarahan":
+						(s.internship?.asesmenReady ?? s.internship?.pdtReady)
+							? "Selesai"
+							: "Belum",
+					"Hotel / Perusahaan":
+						(s.internship?.internshipCompany as string) || "-",
+					"Status Magang": s.internship?.isAcc
+						? "Sudah ACC"
+						: s.internship?.status === "AMAN"
+							? "Aman"
+							: s.internship?.status === "PROSES"
+								? "Berproses"
+								: "Butuh Perhatian",
+				};
+			},
+		);
 		exportToCSV(
 			exportData,
 			`Data_Magang_${new Date().toISOString().split("T")[0]}`,
