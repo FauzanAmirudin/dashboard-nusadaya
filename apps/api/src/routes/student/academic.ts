@@ -964,6 +964,13 @@ export const academicRoutes = new Elysia()
 		}
 	})
 
+	// AKD-06: 1a. Download / Redirect Cetak KHS PDF Resmi
+	.get("/:id/academic/khs/download", async ({ params, query, set }) => {
+		const id = Number(params.id);
+		const semester = (query as any)?.semester || 1;
+		const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+		set.redirect = `${frontendUrl}/dashboard/students/${id}/khs?semester=${semester}&autoPrint=true`;
+	})
 	// AKD-06: 1b. Transkrip Nilai Kumulatif Keseluruhan Masa Studi Mahasiswa
 	.get("/:id/academic/transcript", async ({ params, set }) => {
 		try {
@@ -980,6 +987,12 @@ export const academicRoutes = new Elysia()
 		}
 	})
 
+	// AKD-06: 1c. Download / Redirect Cetak Transkrip Nilai PDF Resmi
+	.get("/:id/academic/transcript/download", async ({ params, set }) => {
+		const id = Number(params.id);
+		const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+		set.redirect = `${frontendUrl}/dashboard/students/${id}/transkrip?autoPrint=true`;
+	})
 	// AKD-06: 2. Pemicu Kalkulasi Ulang Nilai Mahasiswa
 	.post(
 		"/:id/academic/calculate-grades",

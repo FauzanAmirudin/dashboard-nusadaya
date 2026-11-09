@@ -1,5 +1,6 @@
 "use client";
 
+import { jsPDF } from "jspdf";
 import {
 	Award,
 	BookOpen,
@@ -13,6 +14,7 @@ import {
 	GraduationCap,
 	Info,
 	Loader2,
+	Printer,
 	RefreshCw,
 	ShieldAlert,
 	ShieldCheck,
@@ -67,6 +69,8 @@ export function TabKhsTranskrip({
 		useState<AcademicSummaryData | null>(null);
 	const [isLoadingAcademic, setIsLoadingAcademic] = useState(false);
 	const [isSyncingAcademic, setIsSyncingAcademic] = useState(false);
+	const [isExportingKhsPdf, setIsExportingKhsPdf] = useState(false);
+	const [isExportingTranskripPdf, setIsExportingTranskripPdf] = useState(false);
 
 	const fetchAcademicData = async () => {
 		setIsLoadingAcademic(true);
@@ -117,6 +121,438 @@ export function TabKhsTranskrip({
 			toast.error(errMsg);
 		} finally {
 			setIsSyncingAcademic(false);
+		}
+	};
+
+	// Handler Unduh Dokumen KHS PDF Langsung
+	const handleDownloadKhsPdf = async () => {
+		if (
+			!academicSummary ||
+			!academicSummary.grades ||
+			academicSummary.grades.length === 0
+		) {
+			toast.error("Belum ada data nilai KHS yang dapat diunduh");
+			return;
+		}
+
+		setIsExportingKhsPdf(true);
+		const toastId = toast.loading("Membuat dokumen KHS PDF resmi...");
+
+		try {
+			const doc = new jsPDF({
+				orientation: "p",
+				unit: "mm",
+				format: "a4",
+			});
+
+			const studentName = academicSummary.name || "Mahasiswa";
+			const nim = academicSummary.nim || studentId.toString();
+
+			// Header Kop Surat
+			doc.setFontSize(16);
+			doc.setFont("helvetica", "bold");
+			doc.setTextColor(5, 23, 176); // #0517B0
+			doc.text("NUSADAYA ACADEMY", 105, 18, { align: "center" });
+
+			doc.setFontSize(8.5);
+			doc.setFont("helvetica", "normal");
+			doc.setTextColor(71, 85, 105);
+			doc.text(
+				"Kampus Utama: Jl. ZA. Pagar Alam No. 12, Bandar Lampung | Telp: (0721) 701234",
+				105,
+				24,
+				{ align: "center" },
+			);
+			doc.text(
+				"Penyelenggara Pendidikan Vokasi & Penempatan Kerja Luar Negeri Terakreditasi",
+				105,
+				28,
+				{ align: "center" },
+			);
+
+			doc.setDrawColor(5, 23, 176);
+			doc.setLineWidth(0.6);
+			doc.line(15, 31, 195, 31);
+			doc.setLineWidth(0.2);
+			doc.line(15, 32, 195, 32);
+
+			// Judul Dokumen
+			doc.setFontSize(13);
+			doc.setFont("helvetica", "bold");
+			doc.setTextColor(15, 23, 42);
+			doc.text("KARTU HASIL STUDI (KHS) MAHASISWA", 105, 40, {
+				align: "center",
+			});
+			doc.setFontSize(8);
+			doc.setFont("helvetica", "normal");
+			doc.setTextColor(100, 116, 139);
+			doc.text(
+				"Lampiran Dokumen Resmi Seleksi Wawancara Industri Luar Negeri (Segmen 19)",
+				105,
+				45,
+				{ align: "center" },
+			);
+
+			// Data Mahasiswa Box
+			doc.setFillColor(248, 250, 252);
+			doc.roundedRect(15, 49, 180, 24, 2, 2, "F");
+			doc.setDrawColor(226, 232, 240);
+			doc.roundedRect(15, 49, 180, 24, 2, 2, "D");
+
+			doc.setFontSize(8.5);
+			doc.setFont("helvetica", "bold");
+			doc.setTextColor(71, 85, 105);
+			doc.text("Nama Mahasiswa", 20, 56);
+			doc.text("Nomor Induk (NIM)", 20, 62);
+			doc.text("IPK Kumulatif", 20, 68);
+
+			doc.setFont("helvetica", "normal");
+			doc.setTextColor(15, 23, 42);
+			doc.text(`: ${studentName}`, 60, 56);
+			doc.text(`: ${nim}`, 60, 62);
+			doc.text(`: ${academicSummary.gpaDisplay} / 4.00`, 60, 68);
+
+			doc.setFont("helvetica", "bold");
+			doc.setTextColor(71, 85, 105);
+			doc.text("Total SKS Lulus", 120, 56);
+			doc.text("Kelulusan Evaluasi", 120, 62);
+			doc.text("Status Seleksi", 120, 68);
+
+			doc.setFont("helvetica", "normal");
+			doc.setTextColor(15, 23, 42);
+			doc.text(`: ${academicSummary.totalSksPassed} SKS`, 155, 56);
+			doc.text(
+				`: ${academicSummary.allUtsPassed && academicSummary.allUasPassed ? "LULUS" : "PROSES"}`,
+				155,
+				62,
+			);
+			doc.text(
+				`: ${Number(academicSummary.gpaDisplay) >= 2.75 ? "MEMENUHI SYARAT" : "PERLU EVALUASI"}`,
+				155,
+				68,
+			);
+
+			// Tabel Mata Kuliah
+			let startY = 79;
+			doc.setFillColor(5, 23, 176);
+			doc.rect(15, startY, 180, 8, "F");
+
+			doc.setFontSize(8);
+			doc.setFont("helvetica", "bold");
+			doc.setTextColor(255, 255, 255);
+			doc.text("NO", 18, startY + 5.5);
+			doc.text("KODE", 28, startY + 5.5);
+			doc.text("MATA KULIAH", 50, startY + 5.5);
+			doc.text("SKS", 125, startY + 5.5, { align: "center" });
+			doc.text("TIPE", 145, startY + 5.5, { align: "center" });
+			doc.text("NILAI", 165, startY + 5.5, { align: "center" });
+			doc.text("GRADE", 185, startY + 5.5, { align: "center" });
+
+			startY += 8;
+			doc.setFont("helvetica", "normal");
+			doc.setTextColor(15, 23, 42);
+
+			academicSummary.grades.forEach((item, index) => {
+				const rowBg = index % 2 === 0 ? 255 : 248;
+				doc.setFillColor(rowBg, rowBg, rowBg);
+				doc.rect(15, startY, 180, 7, "F");
+				doc.setDrawColor(241, 245, 249);
+				doc.line(15, startY + 7, 195, startY + 7);
+
+				doc.text(String(index + 1), 18, startY + 5);
+				doc.text(item.code || "-", 28, startY + 5);
+				doc.text((item.name || "-").substring(0, 38), 50, startY + 5);
+				doc.text(String(item.sks || 0), 125, startY + 5, { align: "center" });
+				doc.text((item.type || "-").toUpperCase(), 145, startY + 5, {
+					align: "center",
+				});
+				doc.text(
+					String(item.finalScore ? Math.round(item.finalScore) : "-"),
+					165,
+					startY + 5,
+					{ align: "center" },
+				);
+				doc.setFont("helvetica", "bold");
+				doc.text(item.grade || "-", 185, startY + 5, { align: "center" });
+				doc.setFont("helvetica", "normal");
+
+				startY += 7;
+			});
+
+			// Ringkasan Bawah
+			startY += 4;
+			doc.setDrawColor(203, 213, 225);
+			doc.line(15, startY, 195, startY);
+
+			startY += 6;
+			doc.setFontSize(8.5);
+			doc.setFont("helvetica", "bold");
+			doc.text(
+				`Total SKS: ${academicSummary.totalSksTaken} SKS   |   Total SKS Lulus: ${academicSummary.totalSksPassed} SKS   |   IPK Kumulatif: ${academicSummary.gpaDisplay}`,
+				15,
+				startY,
+			);
+
+			// Tanda Tangan & Pengesahan
+			const signY = Math.max(startY + 15, 230);
+			const today = new Date().toLocaleDateString("id-ID", {
+				day: "numeric",
+				month: "long",
+				year: "numeric",
+			});
+
+			doc.setFontSize(8);
+			doc.setFont("helvetica", "normal");
+			doc.text("Mengetahui,", 25, signY);
+			doc.text("Pembimbing Akademik (PA)", 25, signY + 5);
+
+			doc.text(`Bandar Lampung, ${today}`, 135, signY);
+			doc.text("Wakil Direktur Bidang Akademik,", 135, signY + 5);
+
+			// Digital Stamp Badge
+			doc.setFillColor(240, 253, 244);
+			doc.roundedRect(135, signY + 10, 48, 12, 1, 1, "F");
+			doc.setDrawColor(187, 247, 208);
+			doc.roundedRect(135, signY + 10, 48, 12, 1, 1, "D");
+			doc.setFontSize(7);
+			doc.setFont("helvetica", "bold");
+			doc.setTextColor(22, 101, 52);
+			doc.text("TERVALIDASI RESMI SISTEM", 137, signY + 15);
+			doc.setFontSize(6);
+			doc.setFont("helvetica", "normal");
+			doc.text("ONEDATA NUSADAYA ACADEMY", 137, signY + 19);
+
+			doc.setTextColor(15, 23, 42);
+			doc.setFontSize(8);
+			doc.setFont("helvetica", "bold");
+			doc.text("( Tim BAAK Nusadaya )", 25, signY + 30);
+			doc.text("( Bagian Akademik & Kerjasama )", 135, signY + 30);
+
+			const filename = `KHS_${nim}_${studentName.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`;
+			doc.save(filename);
+			toast.success("Dokumen KHS PDF berhasil diunduh!", { id: toastId });
+		} catch (err: unknown) {
+			console.error("Gagal generate KHS PDF:", err);
+			toast.error("Gagal mengunduh KHS PDF. Silakan gunakan tombol cetak A4.", {
+				id: toastId,
+			});
+		} finally {
+			setIsExportingKhsPdf(false);
+		}
+	};
+
+	// Handler Unduh Dokumen Transkrip PDF Langsung
+	const handleDownloadTranskripPdf = async () => {
+		setIsExportingTranskripPdf(true);
+		const toastId = toast.loading("Memuat dan membuat Transkrip Nilai PDF...");
+
+		try {
+			const transRes = await fetch(
+				`${API_URL}/students/${studentId}/academic/transcript`,
+				{
+					headers: { Authorization: `Bearer ${getToken()}` },
+				},
+			);
+			let transcriptData = academicSummary;
+			if (transRes.ok) {
+				const json = await transRes.json();
+				if (json.success && json.data) {
+					transcriptData = json.data;
+				}
+			}
+
+			const doc = new jsPDF({
+				orientation: "p",
+				unit: "mm",
+				format: "a4",
+			});
+
+			const studentName =
+				transcriptData?.name || academicSummary?.name || "Mahasiswa";
+			const nim =
+				transcriptData?.nim || academicSummary?.nim || studentId.toString();
+			const gradesList: CourseGradeItem[] =
+				transcriptData?.grades || academicSummary?.grades || [];
+
+			// Header Kop Surat
+			doc.setFontSize(16);
+			doc.setFont("helvetica", "bold");
+			doc.setTextColor(5, 23, 176);
+			doc.text("NUSADAYA ACADEMY", 105, 18, { align: "center" });
+
+			doc.setFontSize(8.5);
+			doc.setFont("helvetica", "normal");
+			doc.setTextColor(71, 85, 105);
+			doc.text(
+				"Kampus Utama: Jl. ZA. Pagar Alam No. 12, Bandar Lampung | Telp: (0721) 701234",
+				105,
+				24,
+				{ align: "center" },
+			);
+			doc.text(
+				"Penyelenggara Pendidikan Vokasi & Penempatan Kerja Luar Negeri Terakreditasi",
+				105,
+				28,
+				{ align: "center" },
+			);
+
+			doc.setDrawColor(5, 23, 176);
+			doc.setLineWidth(0.6);
+			doc.line(15, 31, 195, 31);
+			doc.setLineWidth(0.2);
+			doc.line(15, 32, 195, 32);
+
+			// Judul Dokumen
+			doc.setFontSize(13);
+			doc.setFont("helvetica", "bold");
+			doc.setTextColor(15, 23, 42);
+			doc.text("TRANSKRIP NILAI AKADEMIK KUMULATIF", 105, 40, {
+				align: "center",
+			});
+			doc.setFontSize(8);
+			doc.setFont("helvetica", "normal");
+			doc.setTextColor(100, 116, 139);
+			doc.text(
+				"Official Academic Transcript Record — Seleksi Industri & Penempatan Magang Luar Negeri",
+				105,
+				45,
+				{ align: "center" },
+			);
+
+			// Info Box
+			doc.setFillColor(248, 250, 252);
+			doc.roundedRect(15, 49, 180, 24, 2, 2, "F");
+			doc.setDrawColor(226, 232, 240);
+			doc.roundedRect(15, 49, 180, 24, 2, 2, "D");
+
+			doc.setFontSize(8.5);
+			doc.setFont("helvetica", "bold");
+			doc.setTextColor(71, 85, 105);
+			doc.text("Nama Mahasiswa", 20, 56);
+			doc.text("Nomor Induk (NIM)", 20, 62);
+			doc.text("Indeks Prestasi (IPK)", 20, 68);
+
+			doc.setFont("helvetica", "normal");
+			doc.setTextColor(15, 23, 42);
+			doc.text(`: ${studentName}`, 60, 56);
+			doc.text(`: ${nim}`, 60, 62);
+			doc.text(`: ${transcriptData?.gpaDisplay || "0.00"} / 4.00`, 60, 68);
+
+			const gpaNum = Number(transcriptData?.gpaDisplay || 0);
+			let predikat = "MEMUASKAN";
+			if (gpaNum >= 3.51) predikat = "DENGAN PUJIAN (CUMLAUDE)";
+			else if (gpaNum >= 3.0) predikat = "SANGAT MEMUASKAN";
+
+			doc.setFont("helvetica", "bold");
+			doc.setTextColor(71, 85, 105);
+			doc.text("Total SKS Lulus", 120, 56);
+			doc.text("Predikat Kelulusan", 120, 62);
+			doc.text("Status Kelayakan", 120, 68);
+
+			doc.setFont("helvetica", "normal");
+			doc.setTextColor(15, 23, 42);
+			doc.text(`: ${transcriptData?.totalSksPassed ?? 0} SKS`, 155, 56);
+			doc.text(`: ${predikat}`, 155, 62);
+			doc.text(
+				`: ${gpaNum >= 2.75 ? "MEMENUHI SYARAT" : "PERLU EVALUASI"}`,
+				155,
+				68,
+			);
+
+			// Tabel Mata Kuliah
+			let startY = 79;
+			doc.setFillColor(15, 23, 42);
+			doc.rect(15, startY, 180, 8, "F");
+
+			doc.setFontSize(8);
+			doc.setFont("helvetica", "bold");
+			doc.setTextColor(255, 255, 255);
+			doc.text("NO", 18, startY + 5.5);
+			doc.text("KODE", 28, startY + 5.5);
+			doc.text("MATA KULIAH", 50, startY + 5.5);
+			doc.text("SKS", 130, startY + 5.5, { align: "center" });
+			doc.text("NILAI AKHIR", 155, startY + 5.5, { align: "center" });
+			doc.text("GRADE", 180, startY + 5.5, { align: "center" });
+
+			startY += 8;
+			doc.setFont("helvetica", "normal");
+			doc.setTextColor(15, 23, 42);
+
+			gradesList.forEach((item, index) => {
+				const rowBg = index % 2 === 0 ? 255 : 248;
+				doc.setFillColor(rowBg, rowBg, rowBg);
+				doc.rect(15, startY, 180, 7, "F");
+				doc.setDrawColor(241, 245, 249);
+				doc.line(15, startY + 7, 195, startY + 7);
+
+				doc.text(String(index + 1), 18, startY + 5);
+				doc.text(item.code || "-", 28, startY + 5);
+				doc.text((item.name || "-").substring(0, 42), 50, startY + 5);
+				doc.text(String(item.sks || 0), 130, startY + 5, { align: "center" });
+				doc.text(
+					String(item.finalScore ? Math.round(item.finalScore) : "-"),
+					155,
+					startY + 5,
+					{ align: "center" },
+				);
+				doc.setFont("helvetica", "bold");
+				doc.text(item.grade || "-", 180, startY + 5, { align: "center" });
+				doc.setFont("helvetica", "normal");
+
+				startY += 7;
+			});
+
+			startY += 4;
+			doc.setDrawColor(203, 213, 225);
+			doc.line(15, startY, 195, startY);
+
+			// Pengesahan Resmi
+			const signY = Math.max(startY + 15, 230);
+			const today = new Date().toLocaleDateString("id-ID", {
+				day: "numeric",
+				month: "long",
+				year: "numeric",
+			});
+
+			doc.setFontSize(8);
+			doc.setFont("helvetica", "normal");
+			doc.text("Disahkan oleh,", 25, signY);
+			doc.text("Bagian Administrasi Akademik (BAAK)", 25, signY + 5);
+
+			doc.text(`Bandar Lampung, ${today}`, 135, signY);
+			doc.text("Direktur Nusadaya Academy,", 135, signY + 5);
+
+			doc.setFillColor(240, 253, 244);
+			doc.roundedRect(135, signY + 10, 48, 12, 1, 1, "F");
+			doc.setDrawColor(187, 247, 208);
+			doc.roundedRect(135, signY + 10, 48, 12, 1, 1, "D");
+			doc.setFontSize(7);
+			doc.setFont("helvetica", "bold");
+			doc.setTextColor(22, 101, 52);
+			doc.text("TERVERIFIKASI RESMI", 137, signY + 15);
+			doc.setFontSize(6);
+			doc.setFont("helvetica", "normal");
+			doc.text("AKREDITASI & VERIFIKASI KP2LN", 137, signY + 19);
+
+			doc.setTextColor(15, 23, 42);
+			doc.setFontSize(8);
+			doc.setFont("helvetica", "bold");
+			doc.text("( Staf BAAK & Verifikator )", 25, signY + 30);
+			doc.text("( Pimpinan Institusi )", 135, signY + 30);
+
+			const filename = `Transkrip_Akademik_${nim}_${studentName.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`;
+			doc.save(filename);
+			toast.success("Dokumen Transkrip Nilai PDF berhasil diunduh!", {
+				id: toastId,
+			});
+		} catch (err: unknown) {
+			console.error("Gagal generate Transkrip PDF:", err);
+			toast.error(
+				"Gagal mengunduh Transkrip PDF. Silakan gunakan tombol cetak A4.",
+				{ id: toastId },
+			);
+		} finally {
+			setIsExportingTranskripPdf(false);
 		}
 	};
 
@@ -242,9 +678,9 @@ export function TabKhsTranskrip({
 				</div>
 			</div>
 
-			{/* CARD 2: TABEL NILAI MATKUL REAL-TIME */}
+			{/* CARD 2: TABEL NILAI MATKUL REAL-TIME & KONTROL DOWNLOAD */}
 			<Card className="border border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
-				<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+				<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-4 sm:px-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
 					<div>
 						<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
 							<BookOpen className="w-4 h-4 text-[#0517B0]" />
@@ -256,22 +692,62 @@ export function TabKhsTranskrip({
 						</p>
 					</div>
 
-					<div className="flex items-center gap-2">
+					{/* KONTROL DOWNLOAD PDF & PRINT PREVIEW LENGKAP */}
+					<div className="flex flex-wrap items-center gap-2">
+						{/* Unduh KHS PDF Langsung */}
+						<Button
+							type="button"
+							size="sm"
+							onClick={handleDownloadKhsPdf}
+							disabled={isExportingKhsPdf || isLoadingAcademic}
+							className="text-xs h-8 bg-[#0517B0] hover:bg-blue-800 text-white font-bold gap-1.5 shadow-xs"
+						>
+							{isExportingKhsPdf ? (
+								<Loader2 className="w-3.5 h-3.5 animate-spin" />
+							) : (
+								<Download className="w-3.5 h-3.5" />
+							)}
+							Unduh KHS PDF
+						</Button>
+
+						{/* Unduh Transkrip PDF Langsung */}
+						<Button
+							type="button"
+							size="sm"
+							onClick={handleDownloadTranskripPdf}
+							disabled={isExportingTranskripPdf || isLoadingAcademic}
+							className="text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 shadow-xs"
+						>
+							{isExportingTranskripPdf ? (
+								<Loader2 className="w-3.5 h-3.5 animate-spin" />
+							) : (
+								<Download className="w-3.5 h-3.5" />
+							)}
+							Unduh Transkrip PDF
+						</Button>
+
+						{/* Buka Cetak KHS Format A4 */}
 						<a
-							href={`${API_URL}/students/${studentId}/academic/khs/download`}
+							href={`/dashboard/students/${studentId}/khs`}
 							target="_blank"
 							rel="noopener noreferrer"
-							className="text-xs font-bold text-blue-700 hover:text-blue-800 inline-flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-xs transition-colors"
+							className="text-xs font-semibold text-slate-700 hover:text-slate-900 inline-flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg shadow-2xs hover:bg-slate-50 transition-colors"
+							title="Buka Lembar Cetak KHS Format A4 Resmi"
 						>
-							<Download className="w-3.5 h-3.5" /> Unduh Dokumen KHS PDF
+							<Printer className="w-3.5 h-3.5 text-blue-600" />
+							Cetak KHS (A4)
 						</a>
+
+						{/* Buka Cetak Transkrip Format A4 */}
 						<a
-							href={`${API_URL}/students/${studentId}/academic/transcript`}
+							href={`/dashboard/students/${studentId}/transkrip`}
 							target="_blank"
 							rel="noopener noreferrer"
-							className="text-xs font-bold text-slate-700 hover:text-slate-800 inline-flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-xs transition-colors"
+							className="text-xs font-semibold text-slate-700 hover:text-slate-900 inline-flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg shadow-2xs hover:bg-slate-50 transition-colors"
+							title="Buka Lembar Cetak Transkrip Format A4 Resmi"
 						>
-							<Download className="w-3.5 h-3.5" /> Unduh Transkrip PDF
+							<Printer className="w-3.5 h-3.5 text-emerald-600" />
+							Cetak Transkrip (A4)
 						</a>
 					</div>
 				</CardHeader>
