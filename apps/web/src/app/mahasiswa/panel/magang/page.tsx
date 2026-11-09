@@ -53,10 +53,18 @@ export default function MagangPanelMahasiswa() {
 		if (hasHydrated && isAuthenticated && user?.role === "mahasiswa") {
 			fetchData();
 		}
+
+		const handleFocus = () => {
+			if (isAuthenticated && user?.role === "mahasiswa") {
+				fetchData(false);
+			}
+		};
+		window.addEventListener("focus", handleFocus);
+		return () => window.removeEventListener("focus", handleFocus);
 	}, [user, hasHydrated, isAuthenticated]);
 
-	const fetchData = async () => {
-		setLoading(true);
+	const fetchData = async (showLoading = true) => {
+		if (showLoading) setLoading(true);
 		try {
 			const res = await api.mahasiswa.panel.magang.get();
 			if (res.data?.success) {
@@ -65,7 +73,7 @@ export default function MagangPanelMahasiswa() {
 		} catch (err) {
 			console.error("Gagal memuat data Magang:", err);
 		} finally {
-			setLoading(false);
+			if (showLoading) setLoading(false);
 		}
 	};
 
@@ -556,38 +564,68 @@ export default function MagangPanelMahasiswa() {
 								</div>
 							</div>
 
-							{/* Agen Verification Card */}
-							<div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
+							{/* Mitra Penempatan Card */}
+							<div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2.5 sm:col-span-2">
 								<div className="flex items-center justify-between">
 									<span className="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
-										<Users className="w-4 h-4 text-blue-600" /> Mitra Penempatan
+										<Users className="w-4 h-4 text-blue-600" /> Informasi
+										Penempatan Magang Industri
 									</span>
 									{data?.agenReady ? (
-										<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px]">
-											Terverifikasi
+										<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px] font-bold">
+											✓ Terverifikasi
 										</Badge>
 									) : (
 										<Badge
 											variant="outline"
 											className="text-slate-500 text-[10px]"
 										>
-											Proses
+											Proses Penempatan
 										</Badge>
 									)}
 								</div>
-								<div className="text-xs space-y-1">
-									<p className="text-slate-500">
-										Negara Tujuan Agen:{" "}
-										<span className="font-medium text-slate-700">
-											{data?.agenNegaraTujuan || data?.destinationCity || "-"}
-										</span>
-									</p>
-									<p className="text-slate-500">
-										Peminatan / Bidang:{" "}
-										<span className="font-medium text-slate-700">
+								<div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs pt-1">
+									<div>
+										<p className="text-slate-500">Mitra Penempatan:</p>
+										<p className="font-semibold text-slate-800">
+											{data?.mitraPenempatanNama ||
+												data?.internshipCompany ||
+												"-"}
+										</p>
+									</div>
+									<div>
+										<p className="text-slate-500">Hotel / Perusahaan:</p>
+										<p className="font-semibold text-slate-800 truncate">
+											{data?.internshipCompany || "-"}
+										</p>
+									</div>
+									<div>
+										<p className="text-slate-500">Kota & Negara Tujuan:</p>
+										<p className="font-semibold text-slate-800">
+											{data?.destinationCity || "-"} (
+											{data?.agenNegaraTujuan || "-"})
+										</p>
+									</div>
+									<div>
+										<p className="text-slate-500">Departemen Peminatan:</p>
+										<p className="font-bold text-blue-700">
 											{data?.agenPeminatan || "-"}
-										</span>
-									</p>
+										</p>
+									</div>
+									<div>
+										<p className="text-slate-500">Durasi Magang:</p>
+										<p className="font-semibold text-slate-800">
+											{data?.internshipDuration || "12 Bulan (1 Tahun)"}
+										</p>
+									</div>
+									<div>
+										<p className="text-slate-500">Estimasi Mulai / Terbang:</p>
+										<p className="font-semibold text-slate-800">
+											{data?.estDepartureDate
+												? formatDate(data.estDepartureDate)
+												: "-"}
+										</p>
+									</div>
 								</div>
 							</div>
 						</div>

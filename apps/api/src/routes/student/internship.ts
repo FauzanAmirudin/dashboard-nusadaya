@@ -290,6 +290,22 @@ export const internshipRoutes = new Elysia()
 					.where(eq(internshipData.studentId, id));
 			}
 
+			// Sinkronkan negara tujuan dan peminatan ke profil tabel students secara real-time
+			const studentUpdates: Record<string, unknown> = {};
+			if (cleanUpdates.agenNegaraTujuan) {
+				studentUpdates.destinationCountry = cleanUpdates.agenNegaraTujuan;
+			}
+			if (cleanUpdates.agenPeminatan) {
+				studentUpdates.subProgram = cleanUpdates.agenPeminatan;
+			}
+			if (Object.keys(studentUpdates).length > 0) {
+				studentUpdates.updatedAt = new Date();
+				await db
+					.update(students)
+					.set(studentUpdates)
+					.where(eq(students.id, id));
+			}
+
 			// Recalculate status
 			const current = await db.query.internshipData.findFirst({
 				where: eq(internshipData.studentId, id),
@@ -356,6 +372,22 @@ export const internshipRoutes = new Elysia()
 					updatedAt: new Date(),
 				})
 				.where(eq(internshipData.studentId, id));
+
+			// Sinkronkan negara tujuan dan peminatan ke profil tabel students secara real-time
+			const scheduleStudentUpdates: Record<string, unknown> = {};
+			if (input.agenNegaraTujuan) {
+				scheduleStudentUpdates.destinationCountry = input.agenNegaraTujuan;
+			}
+			if (input.agenPeminatan) {
+				scheduleStudentUpdates.subProgram = input.agenPeminatan;
+			}
+			if (Object.keys(scheduleStudentUpdates).length > 0) {
+				scheduleStudentUpdates.updatedAt = new Date();
+				await db
+					.update(students)
+					.set(scheduleStudentUpdates)
+					.where(eq(students.id, id));
+			}
 
 			await Promise.all([
 				cacheDel(`cache:student:${id}`),

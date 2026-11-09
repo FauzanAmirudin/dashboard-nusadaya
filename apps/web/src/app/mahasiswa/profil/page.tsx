@@ -1,9 +1,19 @@
 "use client";
 
-import { AlertCircle, Lock, Save, Upload, User } from "lucide-react";
+import {
+	AlertCircle,
+	Building2,
+	CheckCircle2,
+	Clock,
+	Lock,
+	Save,
+	Upload,
+	User,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -51,6 +61,14 @@ export default function MahasiswaProfil() {
 		if (hasHydrated && isAuthenticated && user?.role === "mahasiswa") {
 			fetchData();
 		}
+
+		const handleFocus = () => {
+			if (isAuthenticated && user?.role === "mahasiswa") {
+				fetchData();
+			}
+		};
+		window.addEventListener("focus", handleFocus);
+		return () => window.removeEventListener("focus", handleFocus);
 	}, [user, hasHydrated, isAuthenticated]);
 
 	const fetchData = async () => {
@@ -265,6 +283,99 @@ export default function MahasiswaProfil() {
 								</Label>
 								<p className="font-medium text-slate-800 text-sm truncate">
 									{student?.pa?.fullName || "Belum Ditentukan"}
+								</p>
+							</div>
+						</div>
+					</div>
+
+					{/* DATA PENEMPATAN MAGANG (TERKUNCI) */}
+					<div className="mb-10">
+						<div className="flex items-center justify-between mb-4">
+							<div className="flex items-center gap-2">
+								<Building2 className="w-4 h-4 text-[#0517B0]" />
+								<h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">
+									Informasi Penempatan Magang Industri
+								</h3>
+							</div>
+							{student?.internship?.agenReady ? (
+								<Badge className="bg-emerald-100 text-emerald-800 border-0 text-xs font-semibold gap-1">
+									<CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />{" "}
+									Penempatan Terverifikasi
+								</Badge>
+							) : (
+								<Badge
+									variant="outline"
+									className="text-slate-500 bg-white text-xs font-medium gap-1"
+								>
+									<Clock className="w-3.5 h-3.5 text-amber-500" /> Proses
+									Penempatan
+								</Badge>
+							)}
+						</div>
+						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+							<div>
+								<Label className="text-xs text-slate-500 font-semibold mb-1 block">
+									Mitra Penempatan
+								</Label>
+								<p className="font-semibold text-slate-900 text-sm">
+									{student?.internship?.mitraPenempatanNama ||
+										student?.internship?.internshipCompany ||
+										"-"}
+								</p>
+							</div>
+							<div>
+								<Label className="text-xs text-slate-500 font-semibold mb-1 block">
+									Hotel / Perusahaan Magang
+								</Label>
+								<p className="font-medium text-slate-800 text-sm truncate">
+									{student?.internship?.internshipCompany || "-"}
+								</p>
+							</div>
+							<div>
+								<Label className="text-xs text-slate-500 font-semibold mb-1 block">
+									Kota & Negara Tujuan
+								</Label>
+								<p className="font-medium text-slate-800 text-sm">
+									{student?.internship?.destinationCity || "-"} (
+									{student?.internship?.agenNegaraTujuan ||
+										student?.destinationCountry ||
+										"-"}
+									)
+								</p>
+							</div>
+							<div>
+								<Label className="text-xs text-slate-500 font-semibold mb-1 block">
+									Departemen Peminatan
+								</Label>
+								<p className="font-bold text-blue-700 text-sm">
+									{student?.internship?.agenPeminatan ||
+										student?.subProgram ||
+										"-"}
+								</p>
+							</div>
+							<div>
+								<Label className="text-xs text-slate-500 font-semibold mb-1 block">
+									Durasi Magang
+								</Label>
+								<p className="font-medium text-slate-800 text-sm">
+									{student?.internship?.internshipDuration ||
+										"12 Bulan (1 Tahun)"}
+								</p>
+							</div>
+							<div>
+								<Label className="text-xs text-slate-500 font-semibold mb-1 block">
+									Estimasi Keberangkatan
+								</Label>
+								<p className="font-medium text-slate-800 text-sm">
+									{student?.internship?.estDepartureDate
+										? new Date(
+												student.internship.estDepartureDate,
+											).toLocaleDateString("id-ID", {
+												day: "numeric",
+												month: "long",
+												year: "numeric",
+											})
+										: "-"}
 								</p>
 							</div>
 						</div>

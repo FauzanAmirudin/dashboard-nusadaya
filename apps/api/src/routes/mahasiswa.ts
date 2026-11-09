@@ -347,15 +347,23 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				},
 			},
 		});
-
 		if (!studentData) {
 			set.status = 404;
 			return { success: false, message: "Data mahasiswa tidak ditemukan" };
 		}
 
-		await cacheSet(cacheKey, studentData, 300);
+		const internshipRow = await db.query.internshipData.findFirst({
+			where: eq(internshipData.studentId, studentData.id),
+		});
 
-		return { success: true, data: studentData };
+		const responseData = {
+			...studentData,
+			internship: internshipRow || null,
+		};
+
+		await cacheSet(cacheKey, responseData, 300);
+
+		return { success: true, data: responseData };
 	})
 	.get("/progress", async ({ user, set }: any) => {
 		if (!user) {
@@ -1473,19 +1481,29 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				pdtEndDate: magang?.pdtEndDate,
 				pdtPlace: magang?.pdtPlace,
 
-				// Info Keberangkatan & Instansi
+				// Info Keberangkatan & Penempatan Magang (Segmen 21)
 				estDepartureDate: magang?.estDepartureDate,
 				destinationCity: magang?.destinationCity,
 				internshipCompany: magang?.internshipCompany,
 				internshipDuration: magang?.internshipDuration,
-
-				// Kelengkapan Lainnya
-				dokumentasiReady: magang?.dokumentasiReady ?? false,
-				dokumentasiKeberangkatanLink: magang?.dokumentasiKeberangkatanLink,
-				agenReady: magang?.agenReady ?? false,
+				mitraPenempatanNama: magang?.mitraPenempatanNama,
 				agenNegaraTujuan: magang?.agenNegaraTujuan,
 				agenPeminatan: magang?.agenPeminatan,
+				agenReady: magang?.agenReady ?? false,
 
+				// Alur 6 Berkas Taiwan & Asesmen 2-Slot (Segmen 20 & 22)
+				mouReady: magang?.mouReady ?? magang?.moaReady ?? false,
+				mouDate: magang?.mouDate ?? magang?.moaDate,
+				mouNotes: magang?.mouNotes ?? magang?.moaNotes,
+				suhanReady: magang?.suhanReady ?? false,
+				suhanNo: magang?.suhanNo,
+				suhanDate: magang?.suhanDate,
+				suhanNotes: magang?.suhanNotes,
+				asesmenReady: magang?.asesmenReady ?? magang?.pdtReady ?? false,
+				asesmenDate: magang?.asesmenDate ?? magang?.pdtDate,
+				asesmenResult: magang?.asesmenResult,
+				asesmenNotes: magang?.asesmenNotes,
+				asesmenPernyataanReady: magang?.asesmenPernyataanReady ?? false,
 				// Syarat Akhir
 				logbookReady: magang?.logbookReady ?? false,
 				laporanAkhirReady: magang?.laporanAkhirReady ?? false,

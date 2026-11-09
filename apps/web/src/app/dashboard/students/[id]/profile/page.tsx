@@ -74,6 +74,7 @@ export default function StudentProfilePage() {
 	const [isEditMode, setIsEditMode] = useState(false);
 
 	const [student, setStudent] = useState<any>(null);
+	const [internship, setInternship] = useState<any>(null);
 	const [pmb, setPmb] = useState<any>(null);
 	const [health, setHealth] = useState<any>(null);
 	const [parents, setParents] = useState<any[]>([]);
@@ -249,6 +250,7 @@ export default function StudentProfilePage() {
 				const friendsList = friendsRes?.data || [];
 
 				setStudent(std);
+				setInternship(studentRes.data.data.internship || null);
 				setPmb(pmbDataObj || null);
 				setHealth(healthDataObj || null);
 				setParents(parentsList);
@@ -1074,6 +1076,69 @@ export default function StudentProfilePage() {
 						</CardContent>
 					</Card>
 
+					{/* Card: Penempatan Magang Industri (Segmen 21) */}
+					<Card className="shadow-2xs border-slate-200/90 bg-white">
+						<CardHeader className="py-3.5 px-5 bg-slate-50/80 border-b border-slate-100 flex flex-row items-center justify-between">
+							<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+								<Building2 className="w-4 h-4 text-[#0517B0]" />
+								Informasi Penempatan Magang Industri
+							</CardTitle>
+							{internship?.agenReady ? (
+								<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px] font-bold gap-1">
+									<CheckCircle2 className="w-3 h-3 text-emerald-600" />{" "}
+									Penempatan Terverifikasi
+								</Badge>
+							) : (
+								<Badge
+									variant="outline"
+									className="text-slate-500 bg-white border-slate-200 text-[10px]"
+								>
+									Proses Penempatan
+								</Badge>
+							)}
+						</CardHeader>
+						<CardContent className="p-5">
+							<DataRow
+								label="Mitra Penempatan"
+								value={
+									internship?.mitraPenempatanNama ||
+									internship?.internshipCompany ||
+									"-"
+								}
+							/>
+							<DataRow
+								label="Hotel / Perusahaan Magang"
+								value={internship?.internshipCompany || "-"}
+							/>
+							<DataRow
+								label="Kota & Negara Tujuan"
+								value={`${internship?.destinationCity || "-"} (${internship?.agenNegaraTujuan || student.destinationCountry || "-"})`}
+							/>
+							<DataRow
+								label="Departemen Peminatan (5 Baku)"
+								value={internship?.agenPeminatan || student.subProgram || "-"}
+							/>
+							<DataRow
+								label="Durasi Magang"
+								value={internship?.internshipDuration || "12 Bulan (1 Tahun)"}
+							/>
+							<DataRow
+								label="Estimasi Mulai / Terbang"
+								value={
+									internship?.estDepartureDate
+										? new Date(internship.estDepartureDate).toLocaleDateString(
+												"id-ID",
+												{
+													day: "numeric",
+													month: "long",
+													year: "numeric",
+												},
+											)
+										: "-"
+								}
+							/>
+						</CardContent>
+					</Card>
 					{/* Card 3: Keterangan Fisik & Kesehatan */}
 					<Card className="shadow-2xs border-slate-200/90 bg-white">
 						<CardHeader className="py-3.5 px-5 bg-slate-50/80 border-b border-slate-100 flex flex-row items-center justify-between">
