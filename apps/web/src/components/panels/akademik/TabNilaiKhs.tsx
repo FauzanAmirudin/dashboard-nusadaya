@@ -254,8 +254,6 @@ export function TabNilaiKhs({
 					: "-",
 			"Nilai Akhir": item.finalScore ?? "-",
 			Grade: item.grade || "-",
-			Bobot: ((item.gradePoint || 0) / 100).toFixed(2),
-			Mutu: item.qualityScore?.toFixed(2) || "0.00",
 			Status: item.isPassed ? "Lulus" : "Tidak Lulus",
 		}));
 		const studentNameSlug = (
@@ -527,12 +525,6 @@ export function TabNilaiKhs({
 										<TableHead className="text-center font-bold w-16 bg-blue-50/50 text-[#0517B0]">
 											Grade
 										</TableHead>
-										<TableHead className="text-center font-bold w-16">
-											Bobot
-										</TableHead>
-										<TableHead className="text-center font-bold w-16">
-											Mutu
-										</TableHead>
 										<TableHead className="text-center font-bold w-24">
 											Status
 										</TableHead>
@@ -649,20 +641,6 @@ export function TabNilaiKhs({
 														</span>
 													)}
 												</TableCell>
-												<TableCell className="text-center font-mono text-slate-700 font-semibold">
-													{item.grade &&
-													item.grade !== "-" &&
-													item.status !== "BELUM_DINILAI"
-														? ((item.gradePoint || 0) / 100).toFixed(2)
-														: "-"}
-												</TableCell>
-												<TableCell className="text-center font-mono font-bold text-slate-900">
-													{item.grade &&
-													item.grade !== "-" &&
-													item.status !== "BELUM_DINILAI"
-														? item.qualityScore?.toFixed(2) || "0.00"
-														: "-"}
-												</TableCell>
 												<TableCell className="text-center">
 													{!item.grade ||
 													item.grade === "-" ||
@@ -690,18 +668,18 @@ export function TabNilaiKhs({
 											colSpan={3}
 											className="text-right uppercase tracking-wider text-slate-800"
 										>
-											Total SKS & Nilai Mutu Semester {selectedSemester}:
+											Total SKS Semester {selectedSemester}:
 										</TableCell>
 										<TableCell className="text-center font-mono text-blue-950 text-sm">
 											{totalSksTaken} SKS
 										</TableCell>
 										<TableCell
-											colSpan={8}
+											colSpan={6}
 											className="text-right text-slate-700"
 										>
-											Total Bobot x SKS:{" "}
-											<span className="font-mono text-slate-950">
-												{summaryData?.qualityScoreTotal?.toFixed(2) || "0.00"}
+											Total SKS Lulus:{" "}
+											<span className="font-mono text-emerald-800">
+												{totalSksPassed} SKS
 											</span>
 										</TableCell>
 										<TableCell className="text-center font-mono font-bold text-sm text-[#0517B0]">

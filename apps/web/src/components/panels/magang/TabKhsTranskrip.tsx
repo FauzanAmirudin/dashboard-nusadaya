@@ -520,12 +520,6 @@ export function TabKhsTranskrip({
 										<TableHead className="text-center font-bold w-16 bg-blue-50/50 text-[#0517B0]">
 											Grade
 										</TableHead>
-										<TableHead className="text-center font-bold w-16">
-											Bobot
-										</TableHead>
-										<TableHead className="text-center font-bold w-16">
-											Mutu
-										</TableHead>
 										<TableHead className="text-center font-bold w-24">
 											Status
 										</TableHead>
@@ -640,20 +634,6 @@ export function TabKhsTranskrip({
 															-
 														</span>
 													)}
-												</TableCell>
-												<TableCell className="text-center font-mono text-slate-700 font-semibold">
-													{item.grade &&
-													item.grade !== "-" &&
-													item.status !== "BELUM_DINILAI"
-														? ((item.gradePoint || 0) / 100).toFixed(2)
-														: "-"}
-												</TableCell>
-												<TableCell className="text-center font-mono font-bold text-slate-900">
-													{item.grade &&
-													item.grade !== "-" &&
-													item.status !== "BELUM_DINILAI"
-														? item.qualityScore?.toFixed(2) || "0.00"
-														: "-"}
 												</TableCell>
 												<TableCell className="text-center">
 													{item.isPassed ? (

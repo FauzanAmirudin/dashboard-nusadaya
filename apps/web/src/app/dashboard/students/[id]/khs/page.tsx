@@ -23,14 +23,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
 import { API_URL, getToken } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 
@@ -157,8 +149,6 @@ function StudentKhsPrintContent() {
 			UAS: item.uasScore ?? "-",
 			"Nilai Akhir": item.finalScore ?? "-",
 			Grade: item.grade || "-",
-			Bobot: ((item.gradePoint || 0) / 100).toFixed(2),
-			Mutu: item.qualityScore?.toFixed(2) || "0.00",
 			Status: item.isPassed ? "Lulus" : "Tidak Lulus",
 		}));
 		const studentNameSlug = (
@@ -414,52 +404,46 @@ function StudentKhsPrintContent() {
 					</div>
 
 					{/* Tabel Nilai KHS */}
-					<div className="border border-slate-300 rounded-lg overflow-hidden">
-						<Table className="text-xs">
-							<TableHeader className="bg-slate-100 font-bold text-slate-900 border-b border-slate-300">
-								<TableRow>
-									<TableHead className="w-10 text-center font-bold text-slate-900">
+					<div className="border border-slate-300 rounded-lg overflow-hidden w-full">
+						<table className="w-full text-xs border-collapse">
+							<thead className="bg-slate-100 font-bold text-slate-900 border-b border-slate-300">
+								<tr>
+									<th className="w-10 text-center font-bold text-slate-900 py-2.5 px-2">
 										No
-									</TableHead>
-									<TableHead className="w-24 font-bold text-slate-900">
+									</th>
+									<th className="w-24 font-bold text-slate-900 py-2.5 px-3 text-left">
 										Kode MK
-									</TableHead>
-									<TableHead className="font-bold text-slate-900">
+									</th>
+									<th className="font-bold text-slate-900 py-2.5 px-3 text-left">
 										Mata Kuliah
-									</TableHead>
-									<TableHead className="text-center w-14 font-bold text-slate-900">
+									</th>
+									<th className="text-center w-16 font-bold text-slate-900 py-2.5 px-2">
 										SKS (K)
-									</TableHead>
-									<TableHead className="text-center w-16 font-bold text-slate-900">
+									</th>
+									<th className="text-center w-20 font-bold text-slate-900 py-2.5 px-2">
 										Nilai (N)
-									</TableHead>
-									<TableHead className="text-center w-14 font-bold text-slate-900">
+									</th>
+									<th className="text-center w-16 font-bold text-slate-900 py-2.5 px-2">
 										Grade
-									</TableHead>
-									<TableHead className="text-center w-14 font-bold text-slate-900">
-										Bobot (M)
-									</TableHead>
-									<TableHead className="text-center w-16 font-bold text-slate-900">
-										Mutu (KxM)
-									</TableHead>
-									<TableHead className="text-center w-24 font-bold text-slate-900">
+									</th>
+									<th className="text-center w-28 font-bold text-slate-900 py-2.5 px-3">
 										Keterangan
-									</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
+									</th>
+								</tr>
+							</thead>
+							<tbody className="divide-y divide-slate-200">
 								{grades.map((item: any, idx: number) => (
-									<TableRow
+									<tr
 										key={item.courseId || idx}
-										className="hover:bg-transparent border-b border-slate-200"
+										className="hover:bg-slate-50/50"
 									>
-										<TableCell className="text-center font-mono py-2">
+										<td className="text-center font-mono py-2 px-2">
 											{idx + 1}
-										</TableCell>
-										<TableCell className="font-mono font-bold py-2">
+										</td>
+										<td className="font-mono font-bold py-2 px-3">
 											{item.code}
-										</TableCell>
-										<TableCell className="font-medium py-2">
+										</td>
+										<td className="font-medium py-2 px-3">
 											<div className="flex items-center gap-2">
 												<span>{item.name}</span>
 												{item.isCustomEnrollment && (
@@ -468,39 +452,25 @@ function StudentKhsPrintContent() {
 													</span>
 												)}
 											</div>
-										</TableCell>
-										<TableCell className="text-center font-mono font-bold py-2">
+										</td>
+										<td className="text-center font-mono font-bold py-2 px-2">
 											{item.sks}
-										</TableCell>
-										<TableCell className="text-center font-mono font-bold py-2">
+										</td>
+										<td className="text-center font-mono font-bold py-2 px-2">
 											{item.grade &&
 											item.grade !== "-" &&
 											item.status !== "BELUM_DINILAI"
 												? item.finalScore
 												: "-"}
-										</TableCell>
-										<TableCell className="text-center font-bold py-2">
-											<span className="px-1.5 py-0.5 rounded bg-slate-100 font-bold border border-slate-300">
+										</td>
+										<td className="text-center font-bold py-2 px-2">
+											<span className="px-2 py-0.5 rounded bg-slate-100 font-bold border border-slate-300">
 												{item.grade || "-"}
 											</span>
-										</TableCell>
-										<TableCell className="text-center font-mono py-2">
-											{item.grade &&
-											item.grade !== "-" &&
-											item.status !== "BELUM_DINILAI"
-												? ((item.gradePoint || 0) / 100).toFixed(2)
-												: "-"}
-										</TableCell>
-										<TableCell className="text-center font-mono font-bold py-2">
-											{item.grade &&
-											item.grade !== "-" &&
-											item.status !== "BELUM_DINILAI"
-												? item.qualityScore?.toFixed(2) || "0.00"
-												: "-"}
-										</TableCell>
-										<TableCell className="text-center font-semibold py-2">
+										</td>
+										<td className="text-center font-semibold py-2 px-3">
 											<span
-												className={`text-[11px] px-2 py-0.5 rounded font-bold ${
+												className={`text-[11px] px-2.5 py-0.5 rounded font-bold inline-block ${
 													!item.grade ||
 													item.grade === "-" ||
 													item.status === "BELUM_DINILAI"
@@ -518,33 +488,26 @@ function StudentKhsPrintContent() {
 														? "LULUS"
 														: "MENGULANG"}
 											</span>
-										</TableCell>
-									</TableRow>
+										</td>
+									</tr>
 								))}
 
-								<TableRow className="bg-slate-50 font-bold border-t-2 border-slate-300">
-									<TableCell
-										colSpan={3}
-										className="text-right py-2.5 font-bold"
-									>
+								<tr className="bg-slate-50 font-bold border-t-2 border-slate-300">
+									<td colSpan={3} className="text-right py-2.5 px-4 font-bold">
 										Total SKS Ditempuh:
-									</TableCell>
-									<TableCell className="text-center font-mono font-bold py-2.5">
+									</td>
+									<td className="text-center font-mono font-bold py-2.5 px-2">
 										{totalSksTaken}
-									</TableCell>
-									<TableCell
-										colSpan={3}
-										className="text-right py-2.5 font-bold"
-									>
-										Total Angka Mutu:
-									</TableCell>
-									<TableCell className="text-center font-mono font-bold py-2.5">
-										{summaryData?.qualityScoreTotal?.toFixed(2) || "0.00"}
-									</TableCell>
-									<TableCell />
-								</TableRow>
-							</TableBody>
-						</Table>
+									</td>
+									<td colSpan={2} className="text-right py-2.5 px-4 font-bold">
+										Total SKS Lulus:
+									</td>
+									<td className="text-center font-mono font-bold py-2.5 px-3 text-emerald-800">
+										{totalSksPassed} SKS
+									</td>
+								</tr>
+							</tbody>
+						</table>
 					</div>
 
 					{/* Rangkuman IP & Prestasi */}
