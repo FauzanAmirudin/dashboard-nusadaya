@@ -95,6 +95,29 @@ export function convertScoreToGrade(score: number): {
 	return { grade: "E", gradePoint: 0, isPassed: false };
 }
 
+export function convertGradeToPoint(grade: string): number {
+	switch (grade.trim().toUpperCase()) {
+		case "A":
+			return 400;
+		case "A-":
+			return 375;
+		case "B+":
+			return 350;
+		case "B":
+			return 300;
+		case "B-":
+			return 275;
+		case "C+":
+			return 250;
+		case "C":
+			return 200;
+		case "D":
+			return 100;
+		default:
+			return 0;
+	}
+}
+
 export class GradeCalculationService {
 	/**
 	 * Hitung nilai akhir otomatis untuk 1 mahasiswa dari seluruh komponen perkuliahan pertemuan 1-16
@@ -714,35 +737,81 @@ export class GradeCalculationService {
 		let totalSksTaken = 0;
 		let totalSksPassed = 0;
 
-		const transcriptItems = allGrades.map((g, idx) => {
-			const sks = g.sks || 2;
-			const isEvaluated = g.grade !== "-" && g.status !== "PROSES";
-			const finalScore = g.finalScore ?? 0;
-			const { grade, gradePoint, isPassed } = isEvaluated
-				? convertScoreToGrade(finalScore)
-				: { grade: "-", gradePoint: 0, isPassed: false };
-			const qualityScore = isEvaluated ? sks * (gradePoint / 100) : 0;
+		const transcriptItems: Array<{
+			no: number;
+			courseId: number;
+			code: string;
+			name: string;
+			sks: number;
+			semester: number;
+			finalScore: number;
+			grade: string;
+			gradePoint: number;
+			qualityScore: number;
+			isPassed: boolean;
+		}> = [];
 
-			if (isEvaluated) {
-				totalSksTaken += sks;
-				if (isPassed) totalSksPassed += sks;
-				totalQualityPoints += qualityScore;
+		for (const g of allGrades) {
+			const hasDirectGrade = Boolean(
+				g.grade &&
+					g.grade.trim() !== "" &&
+					g.grade !== "-" &&
+					g.grade.toUpperCase() !== "BELUM_DINILAI" &&
+					g.grade.toUpperCase() !== "PROSES",
+			);
+			const hasFinalScore = g.finalScore != null && g.status !== "PROSES";
+
+			// Jika penilaian belum diselesaikan atau belum input nilai akhir / huruf mutu, lewati (tidak masuk transkrip)
+			if (!hasDirectGrade && !hasFinalScore) {
+				continue;
 			}
 
-			return {
-				no: idx + 1,
-				courseId: g.courseId,
+			let effectiveGrade = "-";
+			let effectiveGradePoint = 0;
+			let isPassed = false;
+
+			if (hasDirectGrade) {
+				effectiveGrade = g.grade!.trim().toUpperCase();
+				effectiveGradePoint = convertGradeToPoint(effectiveGrade);
+				isPassed = !["D", "E"].includes(effectiveGrade);
+			} else if (hasFinalScore) {
+				const converted = convertScoreToGrade(g.finalScore!);
+				effectiveGrade = converted.grade;
+				effectiveGradePoint = converted.gradePoint;
+				isPassed = converted.isPassed;
+			}
+
+			// Validasi akhir: pastikan huruf mutu valid dan bukan tanda kosong / belum dinilai
+			if (
+				!effectiveGrade ||
+				effectiveGrade === "-" ||
+				effectiveGrade === "BELUM_DINILAI" ||
+				effectiveGrade === "PROSES"
+			) {
+				continue;
+			}
+
+			const sks = g.sks || 2;
+			const qualityScore = sks * (effectiveGradePoint / 100);
+
+			totalSksTaken += sks;
+			if (isPassed) totalSksPassed += sks;
+			totalQualityPoints += qualityScore;
+
+			transcriptItems.push({
+				no: transcriptItems.length + 1,
+				courseId: g.courseId ?? 0,
 				code: g.courseCode,
 				name: g.courseName,
 				sks,
 				semester: g.semester || 1,
-				finalScore,
-				grade: g.grade || grade,
-				gradePoint,
+				finalScore: g.finalScore ?? 0,
+				grade: effectiveGrade,
+				gradePoint: effectiveGradePoint,
 				qualityScore,
 				isPassed,
-			};
-		});
+			});
+		}
 
 		const calculatedGpa =
 			totalSksTaken > 0
@@ -778,6 +847,9 @@ export class GradeCalculationService {
 			cohort: student.cohort,
 			rombel: student.rombel || "Kelas A",
 			program: student.program || "Hospitality",
+			subProgram:
+				student.subProgram || student.program || "D1 Perhotelan & Kapal Pesiar",
+			faculty: "Pendidikan & Pelatihan Vokasi",
 			documentNo,
 			paName,
 			totalCourses: transcriptItems.length,

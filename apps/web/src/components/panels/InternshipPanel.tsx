@@ -17,6 +17,7 @@ import {
 	ShieldCheck,
 	Sparkles,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AccPanelStatusCard } from "@/components/ui/AccPanelStatusCard";
@@ -178,6 +179,40 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 	const [uploadedDocs, setUploadedDocs] = useState<any[]>([]);
 
 	const [notes, setNotes] = useState(data?.notes || "");
+
+	const searchParams = useSearchParams();
+	const urlSubtab = searchParams?.get("subtab");
+	const validSubtabs = [
+		"pra-paspor",
+		"khs-transkrip",
+		"penempatan",
+		"dokumen",
+		"dana-talangan",
+		"syarat-akhir",
+	];
+	const initialSubtab = validSubtabs.includes(urlSubtab || "")
+		? urlSubtab!
+		: "pra-paspor";
+	const [activeSubtab, setActiveSubtab] = useState(initialSubtab);
+
+	useEffect(() => {
+		if (
+			urlSubtab &&
+			validSubtabs.includes(urlSubtab) &&
+			urlSubtab !== activeSubtab
+		) {
+			setActiveSubtab(urlSubtab);
+		}
+	}, [urlSubtab]);
+
+	const handleSubtabChange = (newVal: string) => {
+		setActiveSubtab(newVal);
+		if (typeof window !== "undefined") {
+			const url = new URL(window.location.href);
+			url.searchParams.set("subtab", newVal);
+			window.history.replaceState(null, "", url.toString());
+		}
+	};
 
 	const fetchInternshipData = async () => {
 		const res = await api.students[studentId.toString()].internship.get();
@@ -453,7 +488,11 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 				</PanelHeader>
 
 				{/* TABS NAVIGATION */}
-				<Tabs defaultValue="dokumen" className="w-full">
+				<Tabs
+					value={activeSubtab}
+					onValueChange={handleSubtabChange}
+					className="w-full"
+				>
 					<TabsList className="mb-6 grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 bg-slate-100 p-1 rounded-xl h-auto gap-1">
 						<TabsTrigger
 							value="pra-paspor"
@@ -560,7 +599,7 @@ export function InternshipPanel({ studentId, onUpdate }: InternshipPanelProps) {
 					<TabsContent value="pra-paspor">
 						<TabPraPaspor
 							studentId={studentId}
-							data={data}
+							data={data as unknown as Record<string, unknown> | null}
 							passportClearance={passportClearance}
 							canEdit={canEdit}
 							loadingItem={loadingItem}

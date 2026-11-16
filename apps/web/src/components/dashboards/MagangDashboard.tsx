@@ -660,7 +660,7 @@ export function MagangDashboard({
 											<TableCell className="text-right pr-6">
 												<div className="flex items-center justify-end gap-1.5">
 													<Link
-														href={`/dashboard/students/${s.student.id}/profile`}
+														href={`/dashboard/students/${s.student.id}/profile?from=/dashboard/magang`}
 													>
 														<Button
 															size="sm"
@@ -672,7 +672,7 @@ export function MagangDashboard({
 														</Button>
 													</Link>
 													<Link
-														href={`/dashboard/students/${s.student.id}?tab=magang`}
+														href={`/dashboard/students/${s.student.id}?tab=magang&subtab=pra-paspor&from=/dashboard/magang`}
 													>
 														<Button
 															size="sm"

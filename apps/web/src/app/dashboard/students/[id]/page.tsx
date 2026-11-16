@@ -746,7 +746,7 @@ function StudentDetailContent() {
 							"final-decision": "/dashboard/evaluator",
 						};
 
-						const currentContext = requestedTab || rawTab;
+						const currentContext = requestedTab || rawTab || activeTab;
 						if (
 							currentContext &&
 							currentContext !== "catatan" &&
@@ -756,30 +756,35 @@ function StudentDetailContent() {
 							return;
 						}
 
+						if (typeof window !== "undefined" && window.history.length > 1) {
+							router.back();
+							return;
+						}
+
 						// If context is catatan or unknown, route to the user's role primary dashboard
 						if (user?.role) {
-							if (user.role === "superadmin") {
-								router.push("/dashboard/students");
-								return;
-							}
 							if (VALID_PANEL_DASHBOARDS[user.role]) {
 								router.push(VALID_PANEL_DASHBOARDS[user.role]);
+								return;
+							}
+							if (user.role === "superadmin") {
+								router.push("/dashboard/students");
 								return;
 							}
 							router.push(`/dashboard/${user.role}`);
 							return;
 						}
 
-						if (typeof window !== "undefined" && window.history.length > 1) {
-							router.back();
-						} else {
-							router.push("/dashboard");
-						}
+						router.push("/dashboard");
 					}}
 					className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 transition-colors text-xs font-semibold cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-2xs"
 				>
 					<ArrowLeft className="w-3.5 h-3.5" />
-					Kembali ke Dashboard
+					{searchParams.get("from") === "/dashboard/magang" ||
+					searchParams.get("from")?.includes("magang") ||
+					(requestedTab || rawTab || activeTab) === "magang"
+						? "Kembali ke Panel Magang"
+						: "Kembali ke Dashboard"}
 				</button>
 
 				<div className="flex flex-wrap items-center gap-2">

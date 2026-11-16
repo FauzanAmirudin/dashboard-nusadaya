@@ -348,13 +348,14 @@ export function TabNilaiKhs({
 					</Button>
 
 					<Link
-						href={`/dashboard/students/${studentId}/transkrip`}
+						href={`/dashboard/students/${studentId}/transkrip?from=akademik`}
 						target="_blank"
 					>
 						<Button
 							variant="outline"
 							size="sm"
 							className="h-9 text-xs gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold"
+							title="Buka / Cetak Transkrip Nilai Akademik Resmi (Format SIAKAD)"
 						>
 							<Award className="w-3.5 h-3.5 text-amber-600" />
 							Transkrip Nilai

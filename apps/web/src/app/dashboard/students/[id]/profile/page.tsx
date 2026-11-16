@@ -26,7 +26,7 @@ import {
 	X,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -51,6 +51,7 @@ import { filterNumeric, preventNonNumericKey } from "@/utils/form-validators";
 
 export default function StudentProfilePage() {
 	const router = useRouter();
+	const searchParams = useSearchParams();
 	const { id } = useParams();
 	const { user } = useAuthStore();
 
@@ -788,6 +789,11 @@ export default function StudentProfilePage() {
 						variant="outline"
 						size="sm"
 						onClick={() => {
+							const from = searchParams.get("from");
+							if (from) {
+								router.push(from);
+								return;
+							}
 							if (typeof window !== "undefined" && window.history.length > 1) {
 								router.back();
 							} else {

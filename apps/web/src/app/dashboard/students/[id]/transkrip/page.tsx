@@ -1,32 +1,61 @@
 "use client";
 
-import {
-	ArrowLeft,
-	Award,
-	CheckCircle2,
-	Download,
-	GraduationCap,
-	Loader2,
-	Printer,
-	ShieldCheck,
-} from "lucide-react";
+import { ArrowLeft, Award, Download, Loader2, Printer } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import QRCode from "qrcode";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { API_URL, getToken } from "@/lib/eden";
 import { exportToCSV } from "@/lib/export";
 
-export default function StudentTranscriptPrintPage() {
+interface CourseGradeItem {
+	courseId: number;
+	code: string;
+	name: string;
+	sks: number;
+	semester?: number;
+	finalScore?: number;
+	grade: string;
+	gradePoint?: number;
+	qualityScore?: number;
+	isPassed?: boolean;
+}
+
+interface TranscriptData {
+	studentId: number;
+	nim: string;
+	name: string;
+	cohort: number;
+	rombel: string;
+	program: string;
+	subProgram?: string;
+	faculty?: string;
+	documentNo?: string;
+	paName?: string;
+	totalCourses: number;
+	totalSksTaken: number;
+	totalSksPassed: number;
+	qualityScoreTotal: number;
+	gpa: number;
+	gpaDisplay: string;
+	predikatKelulusan: string;
+	grades: CourseGradeItem[];
+}
+
+function StudentTranscriptPrintContent() {
 	const params = useParams();
 	const router = useRouter();
+	const searchParams = useSearchParams();
 
 	const studentId = Number(params.id);
+	const from = searchParams.get("from"); // "magang" | "akademik"
+	const autoPrint = searchParams.get("autoPrint") === "true";
 
 	const [isLoading, setIsLoading] = useState(true);
-	const [summaryData, setSummaryData] = useState<any>(null);
+	const [summaryData, setSummaryData] = useState<TranscriptData | null>(null);
+	const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
 
 	const fetchTranscriptData = useCallback(async () => {
 		setIsLoading(true);
@@ -44,7 +73,7 @@ export default function StudentTranscriptPrintPage() {
 			);
 			const json = await res.json();
 			if (json.success && json.data) {
-				setSummaryData(json.data);
+				setSummaryData(json.data as TranscriptData);
 			} else {
 				toast.error(json.message || "Gagal memuat transkrip nilai");
 			}
@@ -61,11 +90,47 @@ export default function StudentTranscriptPrintPage() {
 		}
 	}, [studentId, fetchTranscriptData]);
 
-	const grades = summaryData?.grades || [];
+	// Generate QR Code for document verification
+	useEffect(() => {
+		if (typeof window !== "undefined" && studentId) {
+			const verificationUrl = `${window.location.origin}/dashboard/students/${studentId}/transkrip`;
+			QRCode.toDataURL(verificationUrl, {
+				width: 180,
+				margin: 1,
+				color: {
+					dark: "#000000",
+					light: "#ffffff",
+				},
+			})
+				.then((url) => setQrCodeUrl(url))
+				.catch((err) => console.error("Error generating QR code:", err));
+		}
+	}, [studentId]);
+
+	// Auto print trigger if query requested
+	useEffect(() => {
+		if (!isLoading && summaryData && autoPrint) {
+			const timer = setTimeout(() => {
+				window.print();
+			}, 600);
+			return () => clearTimeout(timer);
+		}
+	}, [isLoading, summaryData, autoPrint]);
+
+	// Filter hanya mata kuliah yang sudah selesai dinilai dan memiliki nilai akhir / huruf mutu resmi
+	const validGrades = (summaryData?.grades || []).filter(
+		(item) =>
+			item.grade &&
+			item.grade.trim() !== "" &&
+			item.grade !== "-" &&
+			item.grade.toUpperCase() !== "BELUM_DINILAI" &&
+			item.grade.toUpperCase() !== "PROSES",
+	);
+
 	const gpaDisplay = summaryData?.gpaDisplay || "0.00";
-	const gpaNum = Number(gpaDisplay) || 0;
-	const totalSksTaken = summaryData?.totalSksTaken || 0;
-	const totalSksPassed = summaryData?.totalSksPassed || 0;
+	const gpaFormatted = gpaDisplay.replace(".", ",");
+	const totalKredit =
+		summaryData?.totalSksPassed ?? summaryData?.totalSksTaken ?? 0;
 
 	const todayFormatted = new Date().toLocaleDateString("id-ID", {
 		day: "numeric",
@@ -73,51 +138,52 @@ export default function StudentTranscriptPrintPage() {
 		year: "numeric",
 	});
 
-	let predikatKelulusan = "MEMUASKAN";
-	if (gpaNum >= 3.51) {
-		predikatKelulusan = "DENGAN PUJIAN (CUMLAUDE)";
-	} else if (gpaNum >= 3.0) {
-		predikatKelulusan = "SANGAT MEMUASKAN";
-	}
+	// Split courses into two parallel columns (Dual-Column Layout, matching SIAKAD Unila format)
+	const mid = Math.ceil(validGrades.length / 2);
+	const leftGrades = validGrades.slice(0, mid);
+	const rightGrades = validGrades.slice(mid);
 
 	const handleExportCsv = () => {
-		if (!grades || grades.length === 0) {
+		if (!validGrades || validGrades.length === 0) {
 			toast.error("Tidak ada data transkrip untuk diexport");
 			return;
 		}
-		const exportRows = grades.map((item: any, idx: number) => ({
+		const exportRows = validGrades.map((item, idx) => ({
 			No: idx + 1,
-			"Kode MK": item.code || "-",
+			Kode: item.code || "-",
 			"Nama Mata Kuliah": item.name || "-",
-			Semester: item.semester || 1,
-			"SKS (K)": item.sks || 0,
-			"Nilai (N)": item.finalScore ?? "-",
-			Grade: item.grade || "-",
-			Status: item.isPassed ? "Lulus" : "Tidak Lulus",
+			"Kredit (SKS)": item.sks || 0,
+			"Huruf Mutu (HM)": item.grade || "-",
 		}));
 		const studentNameSlug = (
-			summaryData?.name ||
-			summaryData?.studentName ||
-			`Mahasiswa_${studentId}`
+			summaryData?.name || `Mahasiswa_${studentId}`
 		).replace(/[^a-zA-Z0-9]/g, "_");
-		exportToCSV(exportRows, `Transkrip_${studentNameSlug}_Semua_Semester`);
+		exportToCSV(exportRows, `Transkrip_${studentNameSlug}`);
 		toast.success("Dokumen Transkrip berhasil diexport ke CSV");
 	};
 
+	const backHref =
+		from === "magang"
+			? `/dashboard/students/${studentId}?tab=magang&subtab=khs-transkrip&from=/dashboard/magang`
+			: `/dashboard/students/${studentId}?tab=akademik&subtab=nilai-khs`;
+
+	const backLabel =
+		from === "magang" ? "Kembali ke Panel Magang" : "Kembali ke Panel Akademik";
+
 	return (
-		<div className="min-h-screen bg-slate-100/70 p-4 sm:p-6 lg:p-8 print:p-0 print:bg-white text-slate-900">
+		<div className="min-h-screen bg-slate-100/70 p-4 sm:p-6 lg:p-8 print:p-0 print:bg-white text-black font-sans">
 			{/* Aturan Cetak Scoped A4 Portrait & Paginasi Bersih */}
 			<style
 				dangerouslySetInnerHTML={{
 					__html: `
 						@page {
 							size: A4 portrait;
-							margin: 10mm 12mm;
+							margin: 8mm 10mm;
 						}
 						@media print {
 							@page {
 								size: A4 portrait;
-								margin: 10mm 12mm;
+								margin: 8mm 10mm;
 							}
 							html, body {
 								width: 210mm !important;
@@ -160,18 +226,16 @@ export default function StudentTranscriptPrintPage() {
 			/>
 
 			{/* Top Control Bar - Hidden in Print */}
-			<div className="max-w-4xl mx-auto mb-6 flex items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs print:hidden">
+			<div className="max-w-[210mm] mx-auto mb-6 flex items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs print:hidden">
 				<div className="flex items-center gap-3">
-					<Link
-						href={`/dashboard/students/${studentId}?tab=akademik&subtab=nilai-khs`}
-					>
+					<Link href={backHref}>
 						<Button
 							variant="outline"
 							size="sm"
 							className="gap-1.5 text-xs text-slate-600 hover:text-slate-900 border-slate-200"
 						>
 							<ArrowLeft className="w-3.5 h-3.5" />
-							Kembali ke Panel Akademik
+							{backLabel}
 						</Button>
 					</Link>
 				</div>
@@ -181,9 +245,9 @@ export default function StudentTranscriptPrintPage() {
 						variant="outline"
 						size="sm"
 						onClick={handleExportCsv}
-						disabled={isLoading || grades.length === 0}
+						disabled={isLoading || validGrades.length === 0}
 						className="h-8 text-xs gap-1.5 text-slate-700 hover:bg-slate-50 border-slate-200 font-semibold"
-						title="Export seluruh transkrip ke format file CSV / Excel"
+						title="Export data transkrip ke format file CSV / Excel"
 					>
 						<Download className="w-3.5 h-3.5 text-emerald-600" />
 						<span>Export CSV</span>
@@ -202,302 +266,296 @@ export default function StudentTranscriptPrintPage() {
 
 			{/* Main Document Paper Sheet */}
 			{isLoading ? (
-				<div className="max-w-4xl mx-auto bg-white p-16 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center space-y-3">
+				<div className="max-w-[210mm] mx-auto bg-white p-16 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center space-y-3">
 					<Loader2 className="w-8 h-8 animate-spin text-[#0517B0]" />
 					<p className="text-xs text-slate-500 font-medium">
-						Memuat transkrip nilai akademik resmi...
+						Memuat transkrip nilai akademik...
 					</p>
 				</div>
 			) : (
-				<div className="printable-area max-w-4xl mx-auto bg-white p-8 sm:p-12 rounded-xl border border-slate-200 shadow-sm print:shadow-none print:border-none print:p-0 space-y-5">
-					{/* Kop Surat Lembaga Resmi Nusadaya */}
-					<div className="flex items-center justify-between pb-2">
-						<div className="flex items-center gap-4">
-							<img
-								src="/logonusadaya.png"
-								alt="Logo Nusadaya Academy"
-								className="h-16 w-auto object-contain shrink-0"
-							/>
-							<div>
-								<h2 className="text-lg sm:text-xl font-black uppercase text-black font-serif leading-tight">
+				<div className="printable-area relative max-w-[210mm] min-h-[297mm] mx-auto bg-white p-8 sm:p-10 text-black shadow-lg print:shadow-none print:border-none print:p-0 print:m-0 print:w-full print:max-w-none print:min-h-0">
+					{/* Watermark Logo Kampus di Latar Belakang (Identik dengan format Unila) */}
+					<div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0 overflow-hidden">
+						<img
+							src="/logonusadaya.png"
+							alt="Watermark Nusadaya"
+							className="w-[280px] h-[280px] object-contain opacity-[0.06] grayscale contrast-125 print:opacity-[0.07]"
+						/>
+					</div>
+
+					{/* Konten Dokumen Utama */}
+					<div className="relative z-10 space-y-2">
+						{/* 1. Header / Kop Informasi Kampus */}
+						<div className="flex items-center justify-between gap-4">
+							<div className="shrink-0 w-20 flex justify-center">
+								<img
+									src="/logonusadaya.png"
+									alt="Logo Kampus"
+									className="h-16 w-auto object-contain"
+								/>
+							</div>
+							<div className="flex-1 text-center font-serif text-black space-y-0.5">
+								<h1 className="text-[11.5px] font-bold uppercase tracking-wider leading-snug">
+									LEMBAGA PENDIDIKAN VOKASI DAN PELATIHAN KERJA
+								</h1>
+								<h2 className="text-[17px] font-black uppercase tracking-wide leading-tight text-black">
 									NUSADAYA ACADEMY
 								</h2>
-								<p className="text-xs font-bold text-neutral-900 tracking-wide mt-0.5">
-									Lembaga Pendidikan & Pelatihan Kerja Perhotelan & Kapal Pesiar
+								<p className="text-[9.5px] uppercase tracking-wide leading-tight text-neutral-800">
+									JL. RAYA DALUNG NO. 88, KUTA UTARA, BADUNG, BALI
 								</p>
-								<p className="text-[10px] text-neutral-600 mt-0.5 leading-snug">
-									Kampus Utama: Jl. Raya Dalung No. 88, Kuta Utara, Badung, Bali
-									| Telp: (0361) 900-8888
-								</p>
-								<p className="text-[9.5px] text-neutral-500 leading-snug">
-									Website: nusadayaacademy.sch.id | Email:
-									akademik@nusadayaacademy.sch.id
+								<p className="text-[9px] uppercase tracking-wide leading-tight text-neutral-800 font-mono">
+									TELP : (0361) 900-8888, 894-8888 &nbsp;|&nbsp; WEBSITE :
+									WWW.NUSADAYA.AC.ID
 								</p>
 							</div>
+							{/* Spacer kanan penyeimbang kop agar teks tepat di tengah */}
+							<div className="w-20 shrink-0 hidden sm:block" />
 						</div>
-						<div className="text-right hidden sm:block shrink-0">
-							<Badge
-								variant="outline"
-								className="border-slate-800 bg-neutral-100 text-slate-900 text-[10px] font-bold px-2.5 py-0.5"
-							>
-								TRANSKRIP RESMI
-							</Badge>
-							<p className="text-[10px] text-slate-500 font-mono mt-1">
-								Doc: AKD-TRX/VER-2026
-							</p>
-						</div>
-					</div>
 
-					{/* Double-Line Separator Garis Kop Formal */}
-					<div className="border-b-[2px] border-black mt-1 mb-[1.5px]" />
-					<div className="border-b-[0.75px] border-black mb-4" />
+						{/* Garis Pembatas Kop Surat (Solid Black Line) */}
+						<div className="border-b-[2px] border-black mt-2 mb-3" />
 
-					{/* Judul Dokumen */}
-					<div className="text-center space-y-1">
-						<h3 className="text-base sm:text-lg font-black uppercase tracking-wider text-slate-900 underline underline-offset-4">
-							TRANSKRIP AKADEMIK SEMENTARA
-						</h3>
-						<p className="text-xs font-semibold text-[#0517B0] uppercase tracking-wider">
-							OFFICIAL ACADEMIC TRANSCRIPT
-						</p>
-						<p className="text-[11px] font-mono text-slate-500">
-							Nomor: TRX/NUSADAYA/{new Date().getFullYear()}/A
-							{summaryData?.cohort || "14"}/{summaryData?.nim || studentId}
-						</p>
-					</div>
+						{/* 2. Judul Dokumen */}
+						<div className="text-center my-3">
+							<h3 className="text-[14px] font-serif font-black uppercase tracking-[0.25em] text-black">
+								TRANSKRIP AKADEMIK
+							</h3>
+						</div>
 
-					{/* Identitas Mahasiswa */}
-					<div className="grid grid-cols-2 sm:grid-cols-3 gap-y-2 gap-x-4 p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs">
-						<div>
-							<span className="text-slate-500 block text-[11px]">
-								Nama Mahasiswa:
-							</span>
-							<strong className="text-slate-900 font-bold">
-								{summaryData?.name || "-"}
-							</strong>
-						</div>
-						<div>
-							<span className="text-slate-500 block text-[11px]">
-								NIM Mahasiswa:
-							</span>
-							<strong className="text-slate-900 font-mono font-bold">
-								{summaryData?.nim || "-"}
-							</strong>
-						</div>
-						<div>
-							<span className="text-slate-500 block text-[11px]">
-								Angkatan:
-							</span>
-							<strong className="text-slate-900 font-bold">
-								Angkatan {summaryData?.cohort || "-"}
-							</strong>
-						</div>
-						<div>
-							<span className="text-slate-500 block text-[11px]">
-								Jurusan / Program:
-							</span>
-							<strong className="text-slate-900 font-bold">
-								{summaryData?.program || "Hospitality"}
-							</strong>
-						</div>
-						<div>
-							<span className="text-slate-500 block text-[11px]">
-								Total SKS Diakui:
-							</span>
-							<strong className="text-slate-900 font-mono font-bold">
-								{totalSksPassed} SKS
-							</strong>
-						</div>
-						<div>
-							<span className="text-slate-500 block text-[11px]">
-								Predikat Kelulusan:
-							</span>
-							<strong className="text-emerald-700 font-bold">
-								{predikatKelulusan}
-							</strong>
-						</div>
-					</div>
-
-					{/* Tabel Transkrip Lengkap (Clean A4 Table - Tanpa Scrollbar & Tanpa Bobot/Mutu) */}
-					<div className="border border-slate-300 rounded-lg overflow-hidden w-full">
-						<table className="w-full text-xs border-collapse">
-							<thead className="bg-slate-100 font-bold text-slate-900 border-b border-slate-300">
-								<tr>
-									<th className="w-10 text-center font-bold text-slate-900 py-2.5 px-2">
-										No
-									</th>
-									<th className="w-24 font-bold text-slate-900 py-2.5 px-3 text-left">
-										Kode MK
-									</th>
-									<th className="font-bold text-slate-900 py-2.5 px-3 text-left">
-										Nama Mata Kuliah
-									</th>
-									<th className="text-center w-20 font-bold text-slate-900 py-2.5 px-2">
-										Semester
-									</th>
-									<th className="text-center w-16 font-bold text-slate-900 py-2.5 px-2">
-										SKS (K)
-									</th>
-									<th className="text-center w-16 font-bold text-slate-900 py-2.5 px-2">
-										Nilai (N)
-									</th>
-									<th className="text-center w-16 font-bold text-slate-900 py-2.5 px-2">
-										Grade
-									</th>
-									<th className="text-center w-24 font-bold text-slate-900 py-2.5 px-3">
-										Status
-									</th>
-								</tr>
-							</thead>
-							<tbody className="divide-y divide-slate-200">
-								{grades.map((item: any, idx: number) => (
-									<tr
-										key={item.courseId || idx}
-										className="hover:bg-slate-50/50"
-									>
-										<td className="text-center font-mono py-2 px-2">
-											{idx + 1}
-										</td>
-										<td className="font-mono font-bold py-2 px-3">
-											{item.code}
-										</td>
-										<td className="font-medium py-2 px-3">{item.name}</td>
-										<td className="text-center font-mono text-[11px] py-2 px-2 text-slate-600">
-											Sem {item.semester || 1}
-										</td>
-										<td className="text-center font-mono font-bold py-2 px-2">
-											{item.sks}
-										</td>
-										<td className="text-center font-mono font-bold py-2 px-2">
-											{item.grade &&
-											item.grade !== "-" &&
-											item.status !== "BELUM_DINILAI"
-												? item.finalScore
-												: "-"}
-										</td>
-										<td className="text-center font-bold py-2 px-2">
-											<span className="px-2 py-0.5 rounded bg-slate-100 font-bold border border-slate-300">
-												{item.grade || "-"}
-											</span>
-										</td>
-										<td className="text-center font-semibold py-2 px-3">
-											<span
-												className={`text-[11px] px-2.5 py-0.5 rounded font-bold inline-block ${
-													!item.grade ||
-													item.grade === "-" ||
-													item.status === "BELUM_DINILAI"
-														? "text-slate-700 bg-slate-100 border border-slate-300"
-														: item.isPassed
-															? "text-emerald-800 bg-emerald-50 border border-emerald-300"
-															: "text-rose-800 bg-rose-50 border border-rose-300"
-												}`}
-											>
-												{!item.grade ||
-												item.grade === "-" ||
-												item.status === "BELUM_DINILAI"
-													? "BELUM DINILAI"
-													: item.isPassed
-														? "LULUS"
-														: "MENGULANG"}
-											</span>
-										</td>
-									</tr>
-								))}
-
-								<tr className="bg-slate-50 font-bold border-t-2 border-slate-300">
-									<td colSpan={4} className="text-right py-2.5 px-4 font-bold">
-										Total SKS Kumulatif:
-									</td>
-									<td className="text-center font-mono font-bold py-2.5 px-2">
-										{totalSksTaken}
-									</td>
-									<td colSpan={2} className="text-right py-2.5 px-4 font-bold">
-										Total SKS Lulus:
-									</td>
-									<td className="text-center font-mono font-bold py-2.5 px-3 text-emerald-800">
-										{totalSksPassed} SKS
-									</td>
-								</tr>
-							</tbody>
-						</table>
-					</div>
-
-					{/* Rangkuman IPK Final */}
-					<div className="flex flex-col sm:flex-row justify-between items-center p-4 bg-slate-100 rounded-xl font-bold text-xs gap-2 print:bg-white print:border print:border-slate-300">
-						<span className="text-slate-700">
-							TOTAL SKS SELESAI / LULUS:{" "}
-							<span className="font-mono text-emerald-800 text-sm">
-								{totalSksPassed} dari {totalSksTaken} SKS
-							</span>
-						</span>
-						<span className="text-slate-900">
-							INDEKS PRESTASI KUMULATIF (IPK):{" "}
-							<span className="text-base font-mono text-[#0517B0] font-black print:text-black">
-								{gpaDisplay}
-							</span>{" "}
-							/ 4.00
-						</span>
-					</div>
-
-					{/* Lembar Pengesahan Resmi */}
-					<div
-						className="grid grid-cols-2 gap-8 pt-8 text-xs text-center border-t border-slate-300 print:pt-6"
-						style={{ pageBreakInside: "avoid" }}
-					>
-						<div className="space-y-16">
-							<div>
-								<p className="text-slate-600">Mengetahui,</p>
-								<p className="font-bold text-slate-900">
-									Dosen Pembimbing Akademik (PA)
-								</p>
+						{/* 3. Keterangan Mahasiswa (2 Kolom Rapi dan Presisi) */}
+						<div className="grid grid-cols-2 gap-x-8 text-[10px] text-black font-sans mb-3">
+							{/* Kolom Kiri */}
+							<div className="space-y-0.5">
+								<div className="flex">
+									<span className="w-24 shrink-0 uppercase font-semibold">
+										NAMA
+									</span>
+									<span className="mr-1">:</span>
+									<span className="font-bold uppercase tracking-tight truncate">
+										{summaryData?.name || "-"}
+									</span>
+								</div>
+								<div className="flex">
+									<span className="w-24 shrink-0 uppercase font-semibold">
+										NPM
+									</span>
+									<span className="mr-1">:</span>
+									<span className="font-mono font-medium">
+										{summaryData?.nim || "-"}
+									</span>
+								</div>
+								<div className="flex">
+									<span className="w-24 shrink-0 font-semibold">
+										Pemb. Akad.
+									</span>
+									<span className="mr-1">:</span>
+									<span className="truncate">
+										{summaryData?.paName || "Dosen Pembimbing Akademik"}
+									</span>
+								</div>
+								<div className="flex">
+									<span className="w-24 shrink-0 uppercase font-semibold">
+										IPK
+									</span>
+									<span className="mr-1">:</span>
+									<span className="font-bold font-mono">{gpaFormatted}</span>
+								</div>
 							</div>
-							<div>
-								<p className="font-bold underline text-slate-900 uppercase">
-									{summaryData?.paName || "Dosen Pembimbing Akademik"}
-								</p>
-								<p className="text-[11px] text-slate-500">
-									NIDN / NIP Nusadaya Academy
-								</p>
+
+							{/* Kolom Kanan */}
+							<div className="space-y-0.5">
+								<div className="flex">
+									<span className="w-24 shrink-0 font-semibold">Fakultas</span>
+									<span className="mr-1">:</span>
+									<span className="truncate">
+										{summaryData?.faculty || "Pendidikan & Pelatihan Vokasi"}
+									</span>
+								</div>
+								<div className="flex">
+									<span className="w-24 shrink-0 font-semibold">Jurusan</span>
+									<span className="mr-1">:</span>
+									<span className="truncate">
+										{summaryData?.program || "Perhotelan & Pariwisata"}
+									</span>
+								</div>
+								<div className="flex">
+									<span className="w-24 shrink-0 font-semibold">
+										Prog. Studi
+									</span>
+									<span className="mr-1">:</span>
+									<span className="truncate">
+										{summaryData?.subProgram ||
+											summaryData?.program ||
+											"D1 Perhotelan & Kapal Pesiar"}
+									</span>
+								</div>
+								<div className="flex">
+									<span className="w-24 shrink-0 font-semibold">
+										Total Kredit
+									</span>
+									<span className="mr-1">:</span>
+									<span className="font-bold font-mono">{totalKredit}</span>
+								</div>
 							</div>
 						</div>
 
-						<div className="space-y-16">
-							<div>
-								<p className="text-slate-600">Denpasar, {todayFormatted}</p>
-								<p className="font-bold text-slate-900">
-									Kepala Bagian BAAK Akademik
-								</p>
+						{/* 4. Tabel Mata Kuliah Dua Kolom (Side-by-Side Dual Column Table) */}
+						{validGrades.length === 0 ? (
+							<div className="border-t border-b border-black border-dotted py-6 text-center text-xs text-neutral-500 italic my-4">
+								Belum ada mata kuliah yang diselesaikan atau memiliki nilai
+								akhir resmi untuk ditampilkan dalam transkrip akademik.
 							</div>
-							<div>
-								<p className="font-bold underline text-slate-900 uppercase">
-									Divisi Akademik Nusadaya
-								</p>
-								<p className="text-[11px] text-slate-500">
-									Biro Administrasi Akademik & Kemahasiswaan
-								</p>
-							</div>
-						</div>
-					</div>
+						) : (
+							<div className="w-full mt-2">
+								<div className="grid grid-cols-2 gap-x-4 w-full">
+									{/* Sub-Tabel Kiri */}
+									<div className="w-full">
+										<table className="w-full border-collapse text-[9.5px] leading-tight text-black">
+											<thead>
+												<tr className="border-t border-b border-black border-dotted font-semibold text-black">
+													<th className="py-1 px-1 text-right w-7">No</th>
+													<th className="py-1 px-1 text-left w-20">Kode</th>
+													<th className="py-1 px-1 text-left">Mata Kuliah</th>
+													<th className="py-1 px-1 text-center w-10">Kredit</th>
+													<th className="py-1 px-1 text-center w-8">HM</th>
+												</tr>
+											</thead>
+											<tbody>
+												{leftGrades.map((item, idx) => {
+													const rowNo = idx + 1;
+													return (
+														<tr
+															key={item.courseId || `left-${idx}`}
+															className="align-top"
+														>
+															<td className="py-[1.5px] px-1 text-right font-mono">
+																{rowNo}.
+															</td>
+															<td className="py-[1.5px] px-1 font-mono uppercase font-normal">
+																{item.code || "-"}
+															</td>
+															<td className="py-[1.5px] px-1 font-sans">
+																{item.name || "-"}
+															</td>
+															<td className="py-[1.5px] px-1 text-center font-mono">
+																{item.sks ?? 0}
+															</td>
+															<td className="py-[1.5px] px-1 text-center font-mono font-medium">
+																{item.grade || "-"}
+															</td>
+														</tr>
+													);
+												})}
+											</tbody>
+										</table>
+									</div>
 
-					{/* Footer Catatan Legalitas Dokumen */}
-					<div
-						className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-slate-500 print:pt-2"
-						style={{ pageBreakInside: "avoid" }}
-					>
-						<div className="flex items-center gap-1.5">
-							<ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-							<span>
-								Transkrip ini sah dikeluarkan oleh Nusadaya Academy untuk
-								keperluan akademik, sertifikasi magang luar negeri, dan feeder
-								PDDIKTI.
-							</span>
-						</div>
-						<div className="font-mono shrink-0 text-slate-400">
-							Dicetak: {new Date().toLocaleString("id-ID")}
+									{/* Sub-Tabel Kanan */}
+									<div className="w-full">
+										<table className="w-full border-collapse text-[9.5px] leading-tight text-black">
+											<thead>
+												<tr className="border-t border-b border-black border-dotted font-semibold text-black">
+													<th className="py-1 px-1 text-right w-7">No</th>
+													<th className="py-1 px-1 text-left w-20">Kode</th>
+													<th className="py-1 px-1 text-left">Mata Kuliah</th>
+													<th className="py-1 px-1 text-center w-10">Kredit</th>
+													<th className="py-1 px-1 text-center w-8">HM</th>
+												</tr>
+											</thead>
+											<tbody>
+												{rightGrades.map((item, idx) => {
+													const rowNo = mid + idx + 1;
+													return (
+														<tr
+															key={item.courseId || `right-${idx}`}
+															className="align-top"
+														>
+															<td className="py-[1.5px] px-1 text-right font-mono">
+																{rowNo}.
+															</td>
+															<td className="py-[1.5px] px-1 font-mono uppercase font-normal">
+																{item.code || "-"}
+															</td>
+															<td className="py-[1.5px] px-1 font-sans">
+																{item.name || "-"}
+															</td>
+															<td className="py-[1.5px] px-1 text-center font-mono">
+																{item.sks ?? 0}
+															</td>
+															<td className="py-[1.5px] px-1 text-center font-mono font-medium">
+																{item.grade || "-"}
+															</td>
+														</tr>
+													);
+												})}
+											</tbody>
+										</table>
+									</div>
+								</div>
+
+								{/* Garis Putus-Putus Pembatas Bawah Tabel (Membentang Sejajar di Bawah Kedua Kolom) */}
+								<div className="border-b border-black border-dotted w-full mt-1 mb-4" />
+							</div>
+						)}
+
+						{/* 5. Bagian Bawah: QR Code & Pengesahan Tanda Tangan */}
+						<div
+							className="flex justify-between items-start pt-6 print:pt-4"
+							style={{ pageBreakInside: "avoid" }}
+						>
+							{/* QR Code Verifikasi Dokumen */}
+							<div className="flex flex-col items-start pl-2">
+								{qrCodeUrl ? (
+									<img
+										src={qrCodeUrl}
+										alt="QR Code Verifikasi"
+										className="w-20 h-20 object-contain border border-black/10"
+									/>
+								) : (
+									<div className="w-20 h-20 bg-slate-50 border border-black/20 flex items-center justify-center text-[9px] text-slate-400">
+										QR Code
+									</div>
+								)}
+								<p className="text-[8px] text-slate-500 font-mono mt-1">
+									Scan verifikasi keaslian dokumen
+								</p>
+							</div>
+
+							{/* Lembar Tanda Tangan Resmi BAAK */}
+							<div className="text-[10px] text-black text-left w-64 pr-2 space-y-0.5">
+								<p>Denpasar, {todayFormatted}</p>
+								<p className="leading-tight font-medium">
+									Wakil Direktur Bidang Akademik Dan Kerja Sama,
+								</p>
+								<p className="leading-tight font-medium">Nusadaya Academy</p>
+
+								{/* Ruang Tanda Tangan & Cap Lembaga */}
+								<div className="h-16" />
+
+								<p className="font-bold underline text-black">
+									Dr. I Ketut Suartana, M.Par
+								</p>
+								<p className="font-mono text-[9.5px]">NIDN. 0812058801</p>
+							</div>
 						</div>
 					</div>
 				</div>
 			)}
 		</div>
+	);
+}
+
+export default function StudentTranscriptPrintPage() {
+	return (
+		<Suspense
+			fallback={
+				<div className="min-h-screen bg-slate-100 flex items-center justify-center">
+					<Loader2 className="w-8 h-8 animate-spin text-[#0517B0]" />
+				</div>
+			}
+		>
+			<StudentTranscriptPrintContent />
+		</Suspense>
 	);
 }
