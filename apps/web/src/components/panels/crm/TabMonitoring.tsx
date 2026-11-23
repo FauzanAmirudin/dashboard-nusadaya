@@ -298,7 +298,10 @@ export function TabMonitoring({
 					<MonitoringForm
 						title="Catatan Industri"
 						studentId={studentId}
-						typeOptions={[{ value: "industri_masalah", label: "Masalah" }]}
+						typeOptions={[
+							{ value: "industri_masalah", label: "Masalah" },
+							{ value: "industri_komunikasi", label: "Komunikasi" },
+						]}
 						fetchCrmData={fetchCrmData}
 						canEdit={canEdit}
 						API_URL={API_URL}
@@ -356,11 +359,9 @@ function MonitoringForm({
 			return;
 		}
 
-		if (logType === "orang_tua_masalah" || logType === "orang_tua_komunikasi") {
-			onUpdateField?.("isMonitoringParent", true);
-		} else if (logType === "industri_masalah") {
-			onUpdateField?.("isMonitoringIndustry", true);
-		}
+		// Menyimpan catatan TIDAK lagi otomatis menandai monitoring selesai.
+		// Dulu status ikut berubah di sini, lalu tombol "Tandai Selesai" membaca
+		// status lama sehingga klik berikutnya justru membatalkannya.
 
 		setIsLoading(true);
 		try {
@@ -470,7 +471,11 @@ function MonitoringForm({
 											Judul / Topik
 										</Label>
 										<Input
-											placeholder="Contoh: Diskusi dengan orang tua..."
+											placeholder={
+												title.toLowerCase().includes("industri")
+													? "Contoh: Koordinasi dengan pihak industri..."
+													: "Contoh: Diskusi dengan orang tua..."
+											}
 											value={topic}
 											onChange={(e) => setTopic(e.target.value)}
 											disabled={isLoading}

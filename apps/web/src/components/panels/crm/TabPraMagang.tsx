@@ -582,8 +582,8 @@ export function TabPraMagang({
 								Segmen 9: Tautan Video Laporan Pra-Magang (Unggah Mandiri)
 							</h4>
 							<p className="text-[11px] text-slate-500">
-								Disetor langsung oleh mahasiswa via portal akun mahasiswa untuk
-								diverifikasi admin CRM.
+								Disetor mahasiswa via portal, atau diisi admin CRM bila berkas
+								diterima di luar portal. Tetap perlu diverifikasi admin CRM.
 							</p>
 						</div>
 					</div>
@@ -594,7 +594,7 @@ export function TabPraMagang({
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 						<div className="space-y-1.5">
 							<span className="text-xs font-semibold text-slate-500 block">
-								Tautan Video Diserahkan:
+								Tautan Video:
 							</span>
 							{crm?.pramagangVideoLink ? (
 								<div className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">

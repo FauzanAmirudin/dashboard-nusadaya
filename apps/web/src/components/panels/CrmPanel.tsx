@@ -44,6 +44,7 @@ import { hasRole, useAuthStore } from "@/store";
 import { formatDeviceDateTime } from "@/utils/format";
 import { calculateCrmChecklist, updateCrmField } from "@/utils/panel-logic";
 import { CrmReportExportModal } from "./crm/CrmReportExportModal";
+import { RumahJuangSection } from "./crm/RumahJuangSection";
 import { TabHafalan } from "./crm/TabHafalan";
 import { TabKehadiran } from "./crm/TabKehadiran";
 import { TabMonitoring } from "./crm/TabMonitoring";
@@ -66,7 +67,6 @@ export function CrmPanel({
 }: CrmPanelProps) {
 	const { user, token } = useAuthStore();
 	const isCrmAdmin = hasRole(user, "crm", "superadmin");
-	const canEdit = isCrmAdmin;
 
 	const [crmState, setCrmState] = useState<{
 		crm: any;
@@ -111,6 +111,10 @@ export function CrmPanel({
 	}, [studentId, studentData]);
 
 	const currentStudent = studentData || fetchedStudent;
+	// Waiting list: CRM boleh melihat, input baru terbuka setelah DP diverifikasi Finance
+	const isWaitingPayment =
+		currentStudent?.studentStatus === "menunggu_pembayaran";
+	const canEdit = isCrmAdmin && !isWaitingPayment;
 
 	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -360,6 +364,16 @@ export function CrmPanel({
 	return (
 		<TooltipProvider>
 			<div className="space-y-6">
+				{isWaitingPayment && (
+					<div
+						role="status"
+						className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+					>
+						<span className="font-semibold">Menunggu pembayaran DP.</span> Data
+						CRM bisa dilihat, dan dapat diisi setelah Finance memverifikasi
+						pembayaran.
+					</div>
+				)}
 				<PanelHeader
 					icon={<PhoneCall className="w-5 h-5 text-[#0517B0]" />}
 					title="CRM — Customer Relationship Management"
@@ -437,6 +451,12 @@ export function CrmPanel({
 							canEdit={canEdit}
 							onUpdate={fetchCrmData}
 							API_URL={API_URL}
+						/>
+						{/* Fasilitas Rumah Juang: dikelola CRM setelah DP diverifikasi Finance */}
+						<RumahJuangSection
+							studentId={studentId}
+							studentStatus={currentStudent?.studentStatus}
+							canEdit={canEdit}
 						/>
 					</TabsContent>
 
