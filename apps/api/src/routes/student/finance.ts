@@ -38,8 +38,12 @@ import {
 	weeklyEvents,
 } from "../../db/schema";
 import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
-import { autoIssueStudentNim } from "../../lib/nim-helper";
+import {
+	computeFinanceAccRequirements,
+	parseTidakBerlaku,
+} from "../../lib/finance-acc-requirements";
 import { getValidUserId, hasRole } from "../../lib/permissions";
+import { applyDpVerification } from "../../lib/student-activation";
 import { requireRole } from "../../middleware/rbac";
 
 export async function invalidateFinanceCaches(studentId: number) {
@@ -391,6 +395,14 @@ export const financeRoutes = new Elysia()
 				cleanUpdates.accBy = null;
 			}
 
+			const prevPlanForDp = await db.query.pmbPaymentPlan.findFirst({
+				where: eq(pmbPaymentPlan.studentId, id),
+				columns: { statusDp: true },
+			});
+			const wasPaid = Boolean(
+				current?.registrasiStatus || prevPlanForDp?.statusDp,
+			);
+
 			if (!current) {
 				await db.insert(financeData).values({
 					studentId: id,
@@ -427,25 +439,96 @@ export const financeRoutes = new Elysia()
 				}
 			}
 
-			// Trigger penerbitan NIM otomatis jika pembayaran registrasi awal tervalidasi Finance (Segmen 5 & 12)
+			// Aktivasi mahasiswa + penerbitan NIM saat DP diverifikasi lunas (Segmen 5 & 12)
 			let nimIssued: string | undefined;
-			if (cleanUpdates.registrasiStatus === true) {
+			let studentStatus: string | undefined;
+			if (typeof cleanUpdates.registrasiStatus === "boolean") {
 				const validUploaderId = await getValidUserId(user);
-				const issueRes = await autoIssueStudentNim(
-					id,
-					validUploaderId ?? undefined,
-				);
-				if (issueRes.success && !issueRes.alreadyIssued && issueRes.nim) {
-					nimIssued = issueRes.nim;
-				}
+				const res = await applyDpVerification({
+					studentId: id,
+					paid: cleanUpdates.registrasiStatus,
+					wasPaid,
+					userId: validUploaderId ?? undefined,
+				});
+				nimIssued = res.nimIssued;
+				studentStatus = res.statusChanged ?? undefined;
 			}
 
 			await invalidateFinanceCaches(id);
 
-			return { success: true, nimIssued };
+			return { success: true, nimIssued, studentStatus };
 		},
 		{
 			body: t.Record(t.String(), t.Any()),
+		},
+	)
+	// Tandai / batalkan pos tagihan yang tidak berlaku bagi mahasiswa ini.
+	// Pos ini dilewati saat ACC Keuangan, jadi tidak perlu nominal dummy.
+	.put(
+		"/:id/finance/tidak-berlaku",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!hasRole(user, "finance", "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const id = Number(params.id);
+			const { key, notApplicable, note } = body;
+
+			const current = await db.query.financeData.findFirst({
+				where: eq(financeData.studentId, id),
+			});
+			if (!current) {
+				set.status = 404;
+				return { success: false, message: "Data keuangan tidak ditemukan" };
+			}
+
+			const existing = parseTidakBerlaku(
+				current as unknown as Record<string, unknown>,
+			);
+			if (notApplicable) {
+				const trimmed = (note || "").trim();
+				if (!trimmed) {
+					set.status = 400;
+					return {
+						success: false,
+						message: "Catatan alasan wajib diisi saat menandai tidak berlaku.",
+					};
+				}
+				existing.set(key, trimmed);
+			} else {
+				existing.delete(key);
+			}
+
+			const items = Array.from(existing.entries()).map(([k, n]) => ({
+				key: k,
+				note: n ?? null,
+			}));
+
+			await db
+				.update(financeData)
+				.set({ tidakBerlakuItems: items, updatedAt: new Date() })
+				.where(eq(financeData.studentId, id));
+			await invalidateFinanceCaches(id);
+
+			return { success: true, data: items };
+		},
+		{
+			body: t.Object({
+				// Literal ditulis eksplisit: t.Union atas hasil .map() tidak bisa
+				// disimpulkan TypeScript sehingga tipe Eden jadi salah.
+				key: t.Union([
+					t.Literal("registrasi"),
+					t.Literal("semester"),
+					t.Literal("interview"),
+					t.Literal("keberangkatan"),
+					t.Literal("toeic"),
+					t.Literal("paspor"),
+				]),
+				notApplicable: t.Boolean(),
+				note: t.Optional(t.String({ maxLength: 300 })),
+			}),
 		},
 	)
 	.post("/:id/finance/acc", async (context) => {
@@ -470,36 +553,16 @@ export const financeRoutes = new Elysia()
 			};
 		}
 
-		const isTalangan = currentFinance?.metodePembayaran === "dana_talangan";
-		const isTalanganSatuTahap =
-			isTalangan && currentFinance?.talanganTipe === "1_tahap";
-		const isSemesterDone = isTalangan
-			? isTalanganSatuTahap ||
-				Boolean(
-					currentFinance?.t1SemesterStatus ||
-						currentFinance?.mandiriSemesterStatus,
-				)
-			: Boolean(currentFinance?.mandiriSemesterStatus);
-		const isInterviewDone = isTalangan
-			? isTalanganSatuTahap || Boolean(currentFinance?.t1InterviewStatus)
-			: Boolean(currentFinance?.mandiriInterviewStatus);
-		const isKeberangkatanDone = isTalangan
-			? Boolean(currentFinance?.t2KeberangkatanStatus)
-			: Boolean(currentFinance?.mandiriKeberangkatanStatus);
-
-		if (
-			!currentFinance?.registrasiStatus ||
-			!isSemesterDone ||
-			!isInterviewDone ||
-			!isKeberangkatanDone ||
-			!currentFinance?.toeicStatus ||
-			!currentFinance?.pasporStatus
-		) {
+		// Pos yang ditandai "Tidak berlaku" dilewati (lihat lib/finance-acc-requirements)
+		const req = computeFinanceAccRequirements(
+			currentFinance as unknown as Record<string, unknown>,
+		);
+		if (!req.ok) {
 			set.status = 400;
 			return {
 				success: false,
-				message:
-					"Semua checklist keuangan (6 item) harus lengkap dan lunas sebelum ACC.",
+				code: "FINANCE_CHECKLIST",
+				message: `Checklist keuangan belum lengkap (${req.done}/${req.required}). Belum lunas: ${req.missing.join(", ")}.`,
 			};
 		}
 

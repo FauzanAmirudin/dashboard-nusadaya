@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../../db";
 import {
@@ -6,18 +6,65 @@ import {
 	academicDocuments,
 	internshipData,
 	internshipDocuments,
+	internshipInterviews,
 	pmbData,
 	pmbDocuments,
 	students,
 	users,
 } from "../../db/schema";
 import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
+import { getMagangPrerequisites } from "../../lib/magang-prerequisites";
+
+/** Negara tujuan mahasiswa (untuk aturan khusus Taiwan: Suhan). */
+async function getDestinationCountry(studentId: number) {
+	const row = await db.query.students.findFirst({
+		where: eq(students.id, studentId),
+		columns: { destinationCountry: true },
+	});
+	return row?.destinationCountry ?? null;
+}
+
 import { getValidUserId, hasRole } from "../../lib/permissions";
+
+const interviewBody = t.Object({
+	interviewDate: t.Optional(
+		t.Union([
+			t.String({ format: "date-time" }),
+			t.String({ format: "date" }),
+			t.Null(),
+		]),
+	),
+	partnerName: t.Optional(t.Union([t.String({ maxLength: 200 }), t.Null()])),
+	result: t.Optional(
+		t.Union([
+			t.Literal("lulus"),
+			t.Literal("menunggu"),
+			t.Literal("tidak_lulus"),
+		]),
+	),
+});
+
+async function invalidateInternshipCaches(studentId: number) {
+	await Promise.all([
+		cacheDel(`cache:student:${studentId}`),
+		cacheInvalidatePattern("cache:students:*"),
+		cacheInvalidatePattern("cache:mahasiswa:*"),
+	]);
+}
 
 /**
  * Standard Helper to compute completed count and total items for Magang
  */
-function getInternshipChecks(internship: any, isGapYear = false) {
+/** Alur dokumen & istilah Suhan hanya berlaku untuk penempatan Taiwan. */
+export function isTaiwanDestination(destinationCountry?: string | null) {
+	return (destinationCountry || "").toLowerCase().includes("taiwan");
+}
+
+function getInternshipChecks(
+	internship: any,
+	isGapYear = false,
+	destinationCountry?: string | null,
+) {
 	const praPasporChecks = [
 		Boolean(internship?.praPasporPasFoto),
 		Boolean(internship?.praPasporKtm),
@@ -41,7 +88,10 @@ function getInternshipChecks(internship: any, isGapYear = false) {
 		Boolean(internship?.mouReady ?? internship?.moaReady),
 		Boolean(internship?.loaConfirmed),
 		Boolean(internship?.contractReady),
-		Boolean(internship?.suhanReady),
+		// Suhan = izin Biro Pariwisata Taiwan, hanya wajib untuk tujuan Taiwan
+		...(isTaiwanDestination(destinationCountry)
+			? [Boolean(internship?.suhanReady)]
+			: []),
 		Boolean(internship?.mcuReady),
 		Boolean(internship?.visaReady),
 		Boolean(internship?.ticketReady),
@@ -74,6 +124,112 @@ export const internshipRoutes = new Elysia()
 		});
 
 		return { success: true, data: info || null };
+	})
+	// Prasyarat diproses Panel Magang (ACC PMB, CRM, Akademik + Registrasi & SPP Sem 1)
+	.get("/:id/internship/prerequisites", async ({ params }) => {
+		const data = await getMagangPrerequisites(Number(params.id));
+		return { success: true, data };
+	})
+	// Wawancara user (bisa lebih dari satu): tanggal + hotel/agent + hasil
+	.get("/:id/internship/interviews", async ({ params }) => {
+		const rows = await db
+			.select()
+			.from(internshipInterviews)
+			.where(eq(internshipInterviews.studentId, Number(params.id)))
+			.orderBy(
+				asc(internshipInterviews.interviewDate),
+				asc(internshipInterviews.id),
+			);
+		return { success: true, data: rows };
+	})
+	.post(
+		"/:id/internship/interviews",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!hasRole(user, "magang", "internship", "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const studentId = Number(params.id);
+			const [row] = await db
+				.insert(internshipInterviews)
+				.values({
+					studentId,
+					interviewDate: body.interviewDate
+						? new Date(body.interviewDate)
+						: null,
+					partnerName: body.partnerName?.trim() || null,
+					result: body.result ?? "menunggu",
+				})
+				.returning();
+			await invalidateInternshipCaches(studentId);
+			return { success: true, data: row };
+		},
+		{ body: interviewBody },
+	)
+	.patch(
+		"/:id/internship/interviews/:interviewId",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!hasRole(user, "magang", "internship", "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const studentId = Number(params.id);
+			const updates: Partial<typeof internshipInterviews.$inferInsert> = {
+				updatedAt: new Date(),
+			};
+			if (body.interviewDate !== undefined)
+				updates.interviewDate = body.interviewDate
+					? new Date(body.interviewDate)
+					: null;
+			if (body.partnerName !== undefined)
+				updates.partnerName = body.partnerName?.trim() || null;
+			if (body.result !== undefined) updates.result = body.result;
+			const [row] = await db
+				.update(internshipInterviews)
+				.set(updates)
+				.where(
+					and(
+						eq(internshipInterviews.id, Number(params.interviewId)),
+						eq(internshipInterviews.studentId, studentId),
+					),
+				)
+				.returning();
+			if (!row) {
+				set.status = 404;
+				return { success: false, message: "Data wawancara tidak ditemukan" };
+			}
+			await invalidateInternshipCaches(studentId);
+			return { success: true, data: row };
+		},
+		{ body: interviewBody },
+	)
+	.delete("/:id/internship/interviews/:interviewId", async (context) => {
+		const { params, set } = context;
+		const user = (context as any).user;
+		if (!hasRole(user, "magang", "internship", "superadmin")) {
+			set.status = 403;
+			return { success: false, message: "Forbidden" };
+		}
+		const studentId = Number(params.id);
+		const [row] = await db
+			.delete(internshipInterviews)
+			.where(
+				and(
+					eq(internshipInterviews.id, Number(params.interviewId)),
+					eq(internshipInterviews.studentId, studentId),
+				),
+			)
+			.returning({ id: internshipInterviews.id });
+		if (!row) {
+			set.status = 404;
+			return { success: false, message: "Data wawancara tidak ditemukan" };
+		}
+		await invalidateInternshipCaches(studentId);
+		return { success: true };
 	})
 	.get("/:id/passport-clearance", async ({ params }) => {
 		const id = Number(params.id);
@@ -188,7 +344,6 @@ export const internshipRoutes = new Elysia()
 				"passportExp",
 				"interviewDate",
 				"loaDate",
-				"lolDate",
 				"contractDate",
 				"mcuDate",
 				"languageCertDate",
@@ -202,6 +357,8 @@ export const internshipRoutes = new Elysia()
 				"estDepartureDate",
 				"danaTahap1Date",
 				"danaTahap2Date",
+				"agenDpDate",
+				"agenPelunasanDate",
 			];
 			for (const field of dateFields) {
 				if (updates[field]) {
@@ -315,7 +472,11 @@ export const internshipRoutes = new Elysia()
 					where: eq(pmbData.studentId, id),
 				});
 				const isGapYear = pmbDataRow?.isGapYear || false;
-				const { completed, total } = getInternshipChecks(current, isGapYear);
+				const { completed, total } = getInternshipChecks(
+					current,
+					isGapYear,
+					await getDestinationCountry(id),
+				);
 
 				let newStatus: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
 					"BUTUH_PERHATIAN";
@@ -407,6 +568,17 @@ export const internshipRoutes = new Elysia()
 				mitraPenempatanNama: t.Optional(t.Union([t.String(), t.Null()])),
 				agenNegaraTujuan: t.Optional(t.Union([t.String(), t.Null()])),
 				agenPeminatan: t.Optional(t.Union([t.String(), t.Null()])),
+				// Termin pembayaran kampus ke agensi
+				agenDpPaid: t.Optional(t.Boolean()),
+				agenDpDate: t.Optional(t.Union([t.String(), t.Null()])),
+				agenDpNominal: t.Optional(
+					t.Union([t.Integer({ minimum: 0 }), t.Null()]),
+				),
+				agenPelunasanPaid: t.Optional(t.Boolean()),
+				agenPelunasanDate: t.Optional(t.Union([t.String(), t.Null()])),
+				agenPelunasanNominal: t.Optional(
+					t.Union([t.Integer({ minimum: 0 }), t.Null()]),
+				),
 			}),
 		},
 	)
@@ -433,6 +605,16 @@ export const internshipRoutes = new Elysia()
 			};
 		}
 
+		const prereq = await getMagangPrerequisites(id);
+		if (!prereq.ok) {
+			set.status = 400;
+			return {
+				success: false,
+				code: "MAGANG_PREREQUISITES",
+				message: `Gagal memberikan ACC: mahasiswa belum memenuhi prasyarat Magang (${prereq.missing.join(", ")}).`,
+			};
+		}
+
 		const pmbDataRow = await db.query.pmbData.findFirst({
 			where: eq(pmbData.studentId, id),
 		});
@@ -441,6 +623,7 @@ export const internshipRoutes = new Elysia()
 		const { completed, total, isAllCompleted } = getInternshipChecks(
 			internship,
 			isGapYear,
+			await getDestinationCountry(id),
 		);
 		if (!isAllCompleted) {
 			set.status = 400;
@@ -492,7 +675,11 @@ export const internshipRoutes = new Elysia()
 				where: eq(pmbData.studentId, id),
 			});
 			const isGapYear = pmbDataRow?.isGapYear || false;
-			const { completed, total } = getInternshipChecks(current, isGapYear);
+			const { completed, total } = getInternshipChecks(
+				current,
+				isGapYear,
+				await getDestinationCountry(id),
+			);
 			fallbackStatus =
 				completed === total
 					? "AMAN"

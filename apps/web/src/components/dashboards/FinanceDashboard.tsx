@@ -1,12 +1,12 @@
 "use client";
 
 import {
+	Building2,
 	Calendar,
 	Check,
 	CheckCircle,
 	Clock,
 	CreditCard,
-	Download,
 	Eye,
 	HelpCircle,
 	MessageCircle,
@@ -26,6 +26,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { WaitingListSection } from "@/components/dashboards/finance/WaitingListSection";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,8 +57,12 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+	calculateCohortFromYear,
+	getAcademicYearFromCohort,
+} from "@/lib/cohort-generator";
 import { api } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
+import { getAgencyPaymentTermsSummary } from "@/utils/panel-logic";
 
 function formatRupiah(num: number): string {
 	return new Intl.NumberFormat("id-ID", {
@@ -285,9 +290,48 @@ export function FinanceDashboard({ user, data = [] }: any) {
 			(s: any) =>
 				s.student?.cohort?.toString() === selectedCohort ||
 				(Number(selectedCohort) >= 2000 &&
-					s.student?.cohort === Number(selectedCohort) - 2010),
+					s.student?.cohort ===
+						calculateCohortFromYear(Number(selectedCohort))),
 		);
 	}, [data, selectedCohort]);
+
+	const agencyRemindersQueue = useMemo(() => {
+		const queue: Array<{
+			rowKey: string;
+			studentId: number;
+			name: string;
+			nim: string | null;
+			termKey: "dp" | "pelunasan";
+			termLabel: string;
+			triggerLabel: string;
+			reminderText: string | null;
+			nominal: number | null;
+		}> = [];
+
+		for (const s of cohortData) {
+			if (!s?.student?.id) continue;
+			const terms = getAgencyPaymentTermsSummary(
+				s.internship,
+				s.student?.destinationCountry,
+			);
+			for (const term of terms) {
+				if (!term.isOverdue) continue;
+				queue.push({
+					rowKey: `${s.student.id}-${term.key}`,
+					studentId: s.student.id,
+					name: s.student.name || "-",
+					nim: s.student.nim ?? null,
+					termKey: term.key,
+					termLabel: term.key === "dp" ? "DP Agensi" : "Pelunasan Agensi",
+					triggerLabel: term.triggerLabel,
+					reminderText: term.reminderText,
+					nominal: term.nominal,
+				});
+			}
+		}
+
+		return queue;
+	}, [cohortData]);
 
 	// KPI Metrics based on cohortData
 	const totalStudents = cohortData.length;
@@ -379,40 +423,6 @@ export function FinanceDashboard({ user, data = [] }: any) {
 		const start = (currentPage - 1) * pageSize;
 		return filteredData.slice(start, start + pageSize);
 	}, [filteredData, currentPage]);
-
-	const handleExport = () => {
-		const exportData = filteredData.map((s: any) => ({
-			Nama: s.student?.name || "-",
-			NIM: s.student?.nim || "-",
-			Angkatan: s.student?.cohort || "-",
-			"Tahun Ajaran": s.student?.academicYear || "-",
-			"Program Studi": s.student?.program || "-",
-			Peminatan: s.student?.subProgram || "-",
-			"No. HP/WhatsApp": s.student?.phone || "-",
-			"Total Terbayar": formatRupiah(calculateTotalPaidStudent(s)),
-			"Status Registrasi": s.finance?.registrasiStatus ? "Lunas" : "Belum",
-			"Cicilan Mandiri / T1":
-				s.finance?.mandiriSemesterStatus || s.finance?.t1SemesterStatus
-					? "Lunas"
-					: "Belum",
-			"Biaya Sertifikasi Bahasa": s.finance?.toeicStatus ? "Lunas" : "Belum",
-			"Biaya Paspor": s.finance?.pasporStatus ? "Lunas" : "Belum",
-			"Status Finance":
-				s.finance?.status === "AMAN"
-					? "Aman"
-					: s.finance?.status === "TIDAK_AMAN"
-						? "Tidak Aman"
-						: "Perlu Perhatian",
-			"Status ACC Finance": s.finance?.isAcc ? "Sudah ACC" : "Belum",
-			"Terakhir Diperbarui": s.finance?.updatedAt
-				? new Date(s.finance.updatedAt).toLocaleString("id-ID")
-				: "-",
-		}));
-		exportToCSV(
-			exportData,
-			`Data_Finance_${selectedCohort !== "all" ? `Angkatan_${selectedCohort}_` : ""}${new Date().toISOString().split("T")[0]}`,
-		);
-	};
 
 	const getFinanceChecklist = (fin: any, destCountry?: string | null) => {
 		const isTalangan = fin?.metodePembayaran === "dana_talangan";
@@ -570,16 +580,6 @@ export function FinanceDashboard({ user, data = [] }: any) {
 								Anggaran Praktik
 							</Button>
 						</Link>
-
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={handleExport}
-							className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-8.5 font-semibold shadow-2xs rounded-lg"
-						>
-							<Download className="w-3.5 h-3.5 text-slate-500" />
-							Export CSV
-						</Button>
 					</div>
 				</div>
 			</div>
@@ -596,6 +596,100 @@ export function FinanceDashboard({ user, data = [] }: any) {
 					/>
 				))}
 			</div>
+
+			{/* ─── 2b. ANTREAN TAGIHAN DP (WAITING LIST) ─── */}
+			<WaitingListSection />
+
+			{/* ─── 2c. PENGINGAT PEMBAYARAN KE AGENSI MITRA (READ-ONLY) ─── */}
+			{agencyRemindersQueue.length > 0 && (
+				<Card className="bg-white border-amber-200/90 shadow-2xs overflow-hidden rounded-xl">
+					<CardHeader className="p-4 sm:p-5 border-b border-amber-100/80 bg-amber-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+						<CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+							<Building2 className="w-4 h-4 text-amber-700" />
+							Pembayaran ke Agensi Mitra
+							<Badge
+								variant="outline"
+								className="text-[10px] bg-amber-100/80 text-amber-800 border-amber-300"
+							>
+								{agencyRemindersQueue.length} Tertunggak
+							</Badge>
+						</CardTitle>
+						<p className="text-xs text-slate-500">
+							Dipicu proses Divisi Magang · Status lunas dicatat Divisi Magang
+						</p>
+					</CardHeader>
+					<CardContent className="p-0 overflow-x-auto">
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>Mahasiswa</TableHead>
+									<TableHead>Termin</TableHead>
+									<TableHead>Pemicu</TableHead>
+									<TableHead className="text-right">Nominal</TableHead>
+									<TableHead className="text-right">Aksi</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{agencyRemindersQueue.map((item) => (
+									<TableRow key={item.rowKey}>
+										<TableCell className="text-xs">
+											<div className="font-semibold text-slate-900">
+												{item.name}
+											</div>
+											<div className="font-mono text-[11px] text-slate-500">
+												{item.nim || "Belum ada NIM"}
+											</div>
+										</TableCell>
+										<TableCell className="text-xs">
+											<Badge
+												variant="outline"
+												className={
+													item.termKey === "dp"
+														? "bg-amber-50 text-amber-800 border-amber-200 text-[11px]"
+														: "bg-rose-50 text-rose-800 border-rose-200 text-[11px]"
+												}
+											>
+												{item.termLabel}
+											</Badge>
+										</TableCell>
+										<TableCell className="text-xs text-slate-700">
+											<div className="font-medium">{item.triggerLabel}</div>
+											{item.reminderText && (
+												<div className="text-[11px] text-slate-500">
+													{item.reminderText}
+												</div>
+											)}
+										</TableCell>
+										<TableCell className="text-right text-xs font-mono">
+											{item.nominal !== null ? (
+												<span className="font-semibold text-slate-900">
+													{formatRupiah(item.nominal)}
+												</span>
+											) : (
+												<span className="text-slate-400">Belum diisi</span>
+											)}
+										</TableCell>
+										<TableCell className="text-right">
+											<Link
+												href={`/dashboard/students/${item.studentId}?tab=finance`}
+											>
+												<Button
+													size="sm"
+													variant="outline"
+													className="h-8 text-xs border-blue-200 text-[#0517B0] hover:bg-blue-50 hover:border-blue-300 gap-1 font-semibold"
+												>
+													<Eye className="w-3.5 h-3.5" />
+													Periksa
+												</Button>
+											</Link>
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
+					</CardContent>
+				</Card>
+			)}
 
 			{/* ─── 3. KOMPONEN 1: TABEL KELENGKAPAN FINANCE (MONITORING UTAMA) ─── */}
 			<Card className="bg-white border-slate-200/90 shadow-2xs overflow-hidden rounded-xl">
@@ -797,7 +891,9 @@ export function FinanceDashboard({ user, data = [] }: any) {
 												{s.student.academicYear ||
 													(s.student.cohort &&
 													!Number.isNaN(Number(s.student.cohort))
-														? `${2010 + Number(s.student.cohort)}/${2011 + Number(s.student.cohort)}`
+														? getAcademicYearFromCohort(
+																Number(s.student.cohort),
+															)
 														: s.student.period || (
 																<span className="text-slate-400 italic">-</span>
 															))}

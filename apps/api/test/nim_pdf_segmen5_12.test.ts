@@ -1,12 +1,14 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { jwt } from "@elysiajs/jwt";
 import { and, eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { app } from "../src";
 import { db } from "../src/db";
 import {
+	auditLogs,
 	financeData,
 	financeProjectionTargets,
+	pmbPaymentPlan,
 	students,
 	users,
 } from "../src/db/schema";
@@ -17,6 +19,43 @@ describe("Segmen 5 & 12: Trigger Auto NIM & Standarisasi Dokumen PDF", () => {
 	let financeToken: string;
 	let superToken: string;
 	let testStudentId: number;
+	// Mahasiswa uji milik tes ini (JANGAN memakai data nyata di database)
+	const fixtureIds: number[] = [];
+
+	const createFixtureStudent = async (name: string) => {
+		const [s] = await db
+			.insert(students)
+			.values({
+				name,
+				cohort: 17,
+				rombel: "Kelas A",
+				program: "Indonesia",
+				studentStatus: "menunggu_pembayaran",
+			})
+			.returning();
+		await db.insert(financeData).values({ studentId: s.id });
+		await db.insert(pmbPaymentPlan).values({ studentId: s.id });
+		fixtureIds.push(s.id);
+		return s.id;
+	};
+
+	afterAll(async () => {
+		for (let attempt = 0; attempt < 5; attempt++) {
+			try {
+				for (const id of fixtureIds) {
+					await db
+						.delete(pmbPaymentPlan)
+						.where(eq(pmbPaymentPlan.studentId, id));
+					await db.delete(financeData).where(eq(financeData.studentId, id));
+					await db.delete(auditLogs).where(eq(auditLogs.entityId, id));
+					await db.delete(students).where(eq(students.id, id));
+				}
+				return;
+			} catch {
+				await Bun.sleep(1000);
+			}
+		}
+	});
 
 	beforeAll(async () => {
 		const financeUser = await db.query.users.findFirst({
@@ -51,11 +90,7 @@ describe("Segmen 5 & 12: Trigger Auto NIM & Standarisasi Dokumen PDF", () => {
 		);
 		superToken = await resSuper.text();
 
-		// Find or create a test student
-		const s = await db.query.students.findFirst();
-		if (s) {
-			testStudentId = s.id;
-		}
+		testStudentId = await createFixtureStudent("TEST NIM Auto Student");
 	});
 
 	it("TC-SEGMEN5-01: generateNextNim generates valid 6-digit sequential NIM format [YY][4-digit sequence]", async () => {
@@ -174,33 +209,8 @@ describe("Segmen 5 & 12: Trigger Auto NIM & Standarisasi Dokumen PDF", () => {
 	});
 
 	it("TC-SEGMEN5-03: PATCH /students/:id/nim is rejected with 400 when student DP / initial registration is not paid in Finance", async () => {
-		// Create or find a student without finance DP
-		const unpaidStudent = await db.query.students.findFirst({
-			where: eq(students.name, "Unpaid DP Test Student"),
-		});
-
-		let unpaidId = unpaidStudent?.id;
-		if (!unpaidId) {
-			const [s] = await db
-				.insert(students)
-				.values({
-					name: "Unpaid DP Test Student",
-					cohort: 16,
-					rombel: "Kelas A",
-					program: "D3 Perhotelan",
-				})
-				.returning();
-			unpaidId = s.id;
-			await db.insert(financeData).values({
-				studentId: unpaidId,
-				registrasiStatus: false,
-			});
-		} else {
-			await db
-				.update(financeData)
-				.set({ registrasiStatus: false })
-				.where(eq(financeData.studentId, unpaidId));
-		}
+		// Mahasiswa uji tanpa DP lunas (dibuat sendiri, dibersihkan di afterAll)
+		const unpaidId = await createFixtureStudent("TEST Unpaid DP Student");
 
 		// Try updating NIM as non-superadmin (akademik role)
 		const signer = jwt({ name: "jwt", secret: JWT_SECRET });

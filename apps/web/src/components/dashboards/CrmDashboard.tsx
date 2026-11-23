@@ -4,7 +4,6 @@ import {
 	CheckCircle,
 	CheckCircle2,
 	Clock,
-	Download,
 	Eye,
 	HeartHandshake,
 	HelpCircle,
@@ -51,7 +50,11 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { exportToCSV } from "@/lib/export";
+import {
+	calculateCohortFromYear,
+	getAcademicYearFromCohort,
+} from "@/lib/cohort-generator";
+import { calculateCrmChecklist } from "@/utils/panel-logic";
 import { normalizeStatus } from "@/utils/status";
 
 function formatWhatsAppUrl(phone: string | null | undefined) {
@@ -99,26 +102,42 @@ export function CrmDashboard({
 			(s: any) =>
 				s.student?.cohort?.toString() === selectedCohort ||
 				(Number(selectedCohort) >= 2000 &&
-					s.student?.cohort === Number(selectedCohort) - 2010),
+					s.student?.cohort ===
+						calculateCohortFromYear(Number(selectedCohort))),
 		);
 	}, [data, selectedCohort]);
 
+	// Waiting list (belum lunas DP) ditampilkan di tabel, tapi tidak masuk KPI status CRM
+	const isWaiting = (s: any) =>
+		s.student?.studentStatus === "menunggu_pembayaran";
+	const countWaiting = cohortData.filter(isWaiting).length;
+
 	// KPI Metrics based on cohortData using 4 standardized categories
-	const totalStudents = cohortData.length;
-	const countAcc = cohortData.filter((s: any) => s.crm?.isAcc).length;
-	const countAman = cohortData.filter(
-		(s: any) => normalizeStatus(s.crm?.status, s.crm?.isAcc) === "AMAN",
-	).length;
-	const countProses = cohortData.filter(
-		(s: any) => normalizeStatus(s.crm?.status, s.crm?.isAcc) === "PROSES",
-	).length;
-	const countPerhatian = cohortData.filter(
-		(s: any) =>
-			normalizeStatus(s.crm?.status, s.crm?.isAcc) === "BUTUH_PERHATIAN",
-	).length;
-	const countPracticeOk = cohortData.filter(
-		(s: any) => s.crm?.practiceAttendance || s.crm?.isMonitoringIndustry,
-	).length;
+	const totalStudents = cohortData.length - countWaiting;
+	const countAcc = cohortData
+		.filter((x: any) => !isWaiting(x))
+		.filter((s: any) => s.crm?.isAcc).length;
+	const countAman = cohortData
+		.filter((x: any) => !isWaiting(x))
+		.filter(
+			(s: any) => normalizeStatus(s.crm?.status, s.crm?.isAcc) === "AMAN",
+		).length;
+	const countProses = cohortData
+		.filter((x: any) => !isWaiting(x))
+		.filter(
+			(s: any) => normalizeStatus(s.crm?.status, s.crm?.isAcc) === "PROSES",
+		).length;
+	const countPerhatian = cohortData
+		.filter((x: any) => !isWaiting(x))
+		.filter(
+			(s: any) =>
+				normalizeStatus(s.crm?.status, s.crm?.isAcc) === "BUTUH_PERHATIAN",
+		).length;
+	const countPracticeOk = cohortData
+		.filter((x: any) => !isWaiting(x))
+		.filter(
+			(s: any) => s.crm?.practiceAttendance || s.crm?.isMonitoringIndustry,
+		).length;
 
 	// Filtered students for Table
 	const filteredData = useMemo(() => {
@@ -135,6 +154,8 @@ export function CrmDashboard({
 
 			const crmStatus = normalizeStatus(s.crm?.status, s.crm?.isAcc);
 			let matchStatus = true;
+			if (selectedStatus === "menunggu") return matchSearch && isWaiting(s);
+			if (selectedStatus !== "all" && isWaiting(s)) return false;
 			if (selectedStatus === "acc") matchStatus = crmStatus === "ACC";
 			if (selectedStatus === "aman") matchStatus = crmStatus === "AMAN";
 			if (selectedStatus === "proses") matchStatus = crmStatus === "PROSES";
@@ -155,116 +176,16 @@ export function CrmDashboard({
 		return filteredData.slice(start, start + pageSize);
 	}, [filteredData, currentPage]);
 
+	// Satu sumber progres CRM (12 indikator), sama dengan Panel CRM
 	const getCrmChecklist = (crm: any) => {
-		let odsList = crm?.odsDetails;
-		if (typeof odsList === "string") {
-			try {
-				odsList = JSON.parse(odsList);
-			} catch {
-				odsList = [];
-			}
-		}
-		if (!Array.isArray(odsList)) {
-			odsList = [];
-		}
-		const items = [
-			{
-				name: "Monitoring Orang Tua",
-				done: Boolean(crm?.isMonitoringParent || crm?.parentFollowUp),
-			},
-			{
-				name: "Monitoring Industri",
-				done: Boolean(crm?.isMonitoringIndustry || crm?.studentMonitoring),
-			},
-			{ name: "Kendali Vocab/Bahasa", done: Boolean(crm?.isVocabComplete) },
-			{ name: "Presensi Praktik ODS", done: Boolean(crm?.practiceAttendance) },
-			{
-				name: "Laporan ODS 1",
-				done: Boolean(crm?.isOds1Report || odsList[0]?.isDone),
-			},
-			{
-				name: "Laporan ODS 2",
-				done: Boolean(crm?.isOds2Report || odsList[1]?.isDone),
-			},
-			{
-				name: "Laporan ODS 3",
-				done: Boolean(crm?.isOds3Report || odsList[2]?.isDone),
-			},
-			{
-				name: "Laporan ODS 4",
-				done: Boolean(crm?.isOds4Report || odsList[3]?.isDone),
-			},
-			{
-				name: "Laporan ODS 5",
-				done: Boolean(crm?.isOds5Report || odsList[4]?.isDone),
-			},
-			{ name: "Laporan Pra-Magang", done: Boolean(crm?.isPrammagangReport) },
-		];
-		const completed = items.filter((i) => i.done).length;
+		const { completedCount, totalChecks, isAllChecksDone, items } =
+			calculateCrmChecklist(crm);
 		return {
 			items,
-			completed,
-			total: items.length,
-			isDone: completed === items.length,
+			completed: completedCount,
+			total: totalChecks,
+			isDone: isAllChecksDone,
 		};
-	};
-
-	const handleExport = () => {
-		const exportData = filteredData.map((s: any) => {
-			const checklist = getCrmChecklist(s.crm);
-			let odsList = s.crm?.odsDetails;
-			if (typeof odsList === "string") {
-				try {
-					odsList = JSON.parse(odsList);
-				} catch {
-					odsList = [];
-				}
-			}
-			if (!Array.isArray(odsList)) {
-				odsList = [];
-			}
-			return {
-				NIM: s.student?.nim || "-",
-				"Nama Mahasiswa": s.student?.name || "-",
-				Angkatan: s.student?.cohort ? `Angkatan ${s.student.cohort}` : "-",
-				"Tahun Ajaran": s.student?.academicYear || s.student?.period || "-",
-				Peminatan:
-					s.student?.subProgram ||
-					s.student?.destinationCountry ||
-					s.student?.program ||
-					"-",
-				"No. WhatsApp": s.student?.phone || "-",
-				"Progress Checklist": `${checklist.completed}/10 Item (${Math.round((checklist.completed / 10) * 100)}%)`,
-				"Monitoring Ortu": s.crm?.isMonitoringParent ? "Selesai" : "Belum",
-				"Monitoring Industri": s.crm?.isMonitoringIndustry
-					? "Selesai"
-					: "Belum",
-				"Kendali Vocab": s.crm?.isVocabComplete ? "Selesai" : "Belum",
-				"Presensi Praktik": s.crm?.practiceAttendance ? "Selesai" : "Belum",
-				"Laporan ODS 1":
-					s.crm?.isOds1Report || odsList[0]?.isDone ? "Selesai" : "Belum",
-				"Laporan ODS 2":
-					s.crm?.isOds2Report || odsList[1]?.isDone ? "Selesai" : "Belum",
-				"Laporan ODS 3":
-					s.crm?.isOds3Report || odsList[2]?.isDone ? "Selesai" : "Belum",
-				"Laporan ODS 4":
-					s.crm?.isOds4Report || odsList[3]?.isDone ? "Selesai" : "Belum",
-				"Laporan ODS 5":
-					s.crm?.isOds5Report || odsList[4]?.isDone ? "Selesai" : "Belum",
-				"Laporan Pra-Magang": s.crm?.isPrammagangReport ? "Selesai" : "Belum",
-				"Status CRM": s.crm?.isAcc
-					? "Sudah ACC"
-					: s.crm?.status === "AMAN"
-						? "Aman"
-						: s.crm?.status === "PROSES"
-							? "Berproses"
-							: "Butuh Perhatian",
-			};
-		});
-		exportToCSV(
-			exportData,
-			`Data_CRM_${new Date().toISOString().split("T")[0]}`,
-		);
 	};
 
 	return (
@@ -288,17 +209,7 @@ export function CrmDashboard({
 					</div>
 				</div>
 
-				<div className="flex flex-wrap items-center gap-2.5">
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={handleExport}
-						className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
-					>
-						<Download className="w-3.5 h-3.5" />
-						Export Data CRM
-					</Button>
-				</div>
+				<div className="flex flex-wrap items-center gap-2.5"></div>
 			</div>
 
 			{/* KPI Summary Cards */}
@@ -350,8 +261,12 @@ export function CrmDashboard({
 							Daftar Monitoring Mahasiswa CRM
 						</CardTitle>
 						<p className="text-xs text-slate-500 mt-0.5">
-							Menampilkan {filteredData.length} dari {totalStudents} mahasiswa
-							terdaftar.
+							Menampilkan {filteredData.length} dari {cohortData.length}{" "}
+							mahasiswa
+							{countWaiting > 0
+								? ` (termasuk ${countWaiting} menunggu pembayaran, tidak dihitung pada KPI status)`
+								: ""}
+							.
 						</p>
 					</div>
 
@@ -399,13 +314,15 @@ export function CrmDashboard({
 								<SelectValue placeholder="Status Filter">
 									{selectedStatus === "all"
 										? "Semua Status"
-										: selectedStatus === "acc"
-											? "Sudah ACC"
-											: selectedStatus === "aman"
-												? "Aman"
-												: selectedStatus === "proses"
-													? "Berproses"
-													: "Butuh Perhatian"}
+										: selectedStatus === "menunggu"
+											? `Menunggu Pembayaran (${countWaiting})`
+											: selectedStatus === "acc"
+												? "Sudah ACC"
+												: selectedStatus === "aman"
+													? "Aman"
+													: selectedStatus === "proses"
+														? "Berproses"
+														: "Butuh Perhatian"}
 								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
@@ -414,6 +331,9 @@ export function CrmDashboard({
 								<SelectItem value="aman">Aman</SelectItem>
 								<SelectItem value="proses">Berproses</SelectItem>
 								<SelectItem value="butuh_perhatian">Butuh Perhatian</SelectItem>
+								<SelectItem value="menunggu">
+									Menunggu Pembayaran ({countWaiting})
+								</SelectItem>
 							</SelectContent>
 						</Select>
 
@@ -461,7 +381,7 @@ export function CrmDashboard({
 										No. WhatsApp
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
-										Progress (10)
+										Progress (12)
 									</TableHead>
 									<TableHead className="py-3.5 font-bold text-slate-700 text-xs text-center w-36">
 										Status CRM
@@ -517,7 +437,9 @@ export function CrmDashboard({
 												{s.student.academicYear ||
 													(s.student.cohort &&
 													!Number.isNaN(Number(s.student.cohort))
-														? `${2010 + Number(s.student.cohort)}/${2011 + Number(s.student.cohort)}`
+														? getAcademicYearFromCohort(
+																Number(s.student.cohort),
+															)
 														: s.student.period || (
 																<span className="text-slate-400 italic">-</span>
 															))}
@@ -633,13 +555,20 @@ export function CrmDashboard({
 
 											{/* Status CRM */}
 											<TableCell className="text-center">
-												<PanelStatusBadge
-													status={s.crm?.status}
-													isAcc={s.crm?.isAcc}
-													completed={completed}
-													total={total}
-													size="sm"
-												/>
+												{isWaiting(s) ? (
+													<span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 whitespace-nowrap">
+														<span className="size-1.5 rounded-full bg-amber-500" />
+														Menunggu Pembayaran
+													</span>
+												) : (
+													<PanelStatusBadge
+														status={s.crm?.status}
+														isAcc={s.crm?.isAcc}
+														completed={completed}
+														total={total}
+														size="sm"
+													/>
+												)}
 											</TableCell>
 
 											{/* Action */}

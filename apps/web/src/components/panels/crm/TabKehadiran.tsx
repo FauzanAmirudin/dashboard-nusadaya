@@ -46,8 +46,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api } from "@/lib/eden";
+import { API_URL, api, getToken } from "@/lib/eden";
 import { cn } from "@/lib/utils";
+import { checkPembiasaanEligible } from "@/utils/panel-logic";
 
 interface TabKehadiranProps {
 	studentId: number;
@@ -158,6 +159,14 @@ export function TabKehadiran({
 			? Math.round((practiceDaysPresent / practiceDaysTotal) * 100)
 			: 0;
 
+	// Syarat persetujuan: tiap pembiasaan punya sesi tercatat & kehadiran >= 80%
+	const pembiasaan = checkPembiasaanEligible([
+		{ label: "Piket", total: piketTotal, rate: piketRate },
+		{ label: "Baris Pagi", total: barisTotal, rate: barisRate },
+		{ label: "ODS", total: odsTotal, rate: odsRate },
+		{ label: "Pra-Magang", total: pramagangTotal, rate: pramagangRate },
+	]);
+
 	// Broadcast sinkronisasi agar semua tab & panel langsung terupdate
 	const broadcastAttendanceSync = () => {
 		if (typeof window !== "undefined") {
@@ -191,12 +200,15 @@ export function TabKehadiran({
 	const handleSyncFromAcademic = async () => {
 		setIsSyncing(true);
 		try {
+			// URL & token dari konfigurasi: sebelumnya localhost:3001 ditulis
+			// langsung dan tanpa Authorization, sehingga gagal di server.
 			const res = await fetch(
-				`http://localhost:3001/students/${studentId}/crm/kehadiran/sync`,
+				`${API_URL}/students/${studentId}/crm/kehadiran/sync`,
 				{
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
+						Authorization: `Bearer ${getToken()}`,
 					},
 				},
 			);
@@ -567,17 +579,30 @@ export function TabKehadiran({
 												buttonVariants({ size: "sm" }),
 												"bg-[#0517B0] hover:bg-[#0517B0]/90 text-white rounded-xl text-xs font-semibold h-8 w-full shadow-2xs cursor-pointer",
 											)}
-											disabled={isLoading}
+											disabled={isLoading || !pembiasaan.ok}
+											title={
+												pembiasaan.ok
+													? undefined
+													: `Belum memenuhi syarat: ${pembiasaan.blockers.join("; ")}`
+											}
 										>
 											{isLoading
 												? "Memproses..."
-												: "Setujui Kehadiran Mahasiswa"}
+												: pembiasaan.ok
+													? "Setujui Kehadiran Mahasiswa"
+													: "Pembiasaan belum memenuhi syarat"}
 										</AlertDialogTrigger>
 										<AlertDialogContent className="rounded-2xl">
 											<AlertDialogTitle>
 												Setujui Kehadiran Mahasiswa
 											</AlertDialogTitle>
 											<AlertDialogDescription className="text-xs text-slate-600 space-y-2">
+												{!pembiasaan.ok && (
+													<div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
+														Belum memenuhi syarat pembiasaan (min. 80% dan ada
+														sesi tercatat): {pembiasaan.blockers.join("; ")}
+													</div>
+												)}
 												<div>
 													Anda akan menyetujui kriteria kehadiran mahasiswa ini.
 													Aksi ini akan mencentang checklist{" "}

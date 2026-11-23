@@ -1,26 +1,15 @@
 "use client";
 
+import { ChevronDown, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
-	Briefcase,
-	Building2,
-	Calendar,
-	CheckCircle2,
-	Clock,
-	FileText,
-	Globe,
-	Info,
-	Loader2,
-	MapPin,
-	ShieldCheck,
-	Sparkles,
-} from "lucide-react";
-import React from "react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -28,6 +17,24 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import {
+	ChecklistGroup,
+	ChecklistRow,
+	RowField,
+	rowInputClass,
+	toDateInput,
+} from "./ChecklistRow";
+
+/** Field form Detail Penempatan — disimpan bersama lewat satu tombol. */
+const PENEMPATAN_FIELDS = [
+	"mitraPenempatanNama",
+	"internshipCompany",
+	"agenNegaraTujuan",
+	"destinationCity",
+	"internshipDuration",
+	"agenPeminatan",
+	"estDepartureDate",
+] as const;
 
 interface TabPenempatanProps {
 	studentId: number;
@@ -36,7 +43,8 @@ interface TabPenempatanProps {
 	loadingItem?: string | null;
 	handleToggleField: (field: string, value: unknown) => Promise<void> | void;
 	handleLocalChange: (field: string, value: unknown) => void;
-	handleBlurField: (field: string) => Promise<void> | void;
+	handleSaveFields: (patch: Record<string, unknown>) => Promise<boolean>;
+	isSaving: boolean;
 	fetchInternshipData: () => Promise<void>;
 }
 
@@ -47,7 +55,8 @@ export function TabPenempatan({
 	loadingItem = null,
 	handleToggleField,
 	handleLocalChange,
-	handleBlurField,
+	handleSaveFields,
+	isSaving,
 	fetchInternshipData,
 }: TabPenempatanProps) {
 	const isVerified = Boolean(data?.agenReady);
@@ -65,15 +74,6 @@ export function TabPenempatan({
 		{ value: "Barista", label: "Barista — Spesialis Kopi & Minuman" },
 	];
 
-	// Rekomendasi Mitra Penempatan Terdaftar Nusadaya
-	const MITRA_OPTIONS = [
-		"Hong Ta (Taiwan)",
-		"Flamboyan (Taiwan)",
-		"Prince International (Malaysia)",
-		"MBM (Malaysia)",
-		"Mitra Mandiri Kampus",
-	];
-
 	const DURASI_OPTIONS = [
 		"6 Bulan",
 		"12 Bulan (1 Tahun)",
@@ -89,339 +89,238 @@ export function TabPenempatan({
 		"Lainnya",
 	];
 
+	// Perubahan ditahan di state sampai tombol Simpan ditekan. Nilai kosong tampil sebagai
+	// placeholder, bukan nilai bawaan palsu yang belum pernah tersimpan.
+	const selectField = (
+		field: string,
+		label: string,
+		options: { value: string; label: string }[],
+	) => (
+		<RowField label={label}>
+			<Select
+				value={(data?.[field] as string) || ""}
+				disabled={!canEdit}
+				onValueChange={(val) => handleLocalChange(field, val)}
+			>
+				<SelectTrigger className={`w-full ${rowInputClass}`}>
+					<SelectValue placeholder={`Pilih ${label}`} />
+				</SelectTrigger>
+				<SelectContent>
+					{options.map((o) => (
+						<SelectItem key={o.value} value={o.value}>
+							{o.label}
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
+		</RowField>
+	);
+
+	const asOptions = (list: string[]) =>
+		list.map((v) => ({ value: v, label: v }));
+
+	// Nilai sekarang, dinormalkan agar bisa dibandingkan apa adanya.
+	// Tanggal selalu dibaca sebagai "YYYY-MM-DD": server mengembalikan Date,
+	// sedangkan input mengisi string — tanpa ini keduanya selalu dianggap beda.
+	const readField = (key: string) =>
+		key === "estDepartureDate"
+			? toDateInput(data?.[key])
+			: ((data?.[key] as string | null | undefined) ?? "");
+
+	const current = PENEMPATAN_FIELDS.reduce<Record<string, string>>(
+		(acc, key) => {
+			acc[key] = readField(key);
+			return acc;
+		},
+		{},
+	);
+	const currentKey = JSON.stringify(current);
+
+	// Cuplikan nilai terakhir yang tersimpan, untuk tahu apakah ada perubahan
+	const [saved, setSaved] = useState<string | null>(null);
+	useEffect(() => {
+		// Isi cuplikan sekali saat data pertama kali tersedia
+		if (saved === null && data) setSaved(JSON.stringify(current));
+		// currentKey cukup sebagai penanda isi; `current` berganti identitas tiap render
+	}, [data, saved, currentKey]);
+
+	const isDirty = saved !== null && currentKey !== saved;
+
+	const handleSave = async () => {
+		const patch = PENEMPATAN_FIELDS.reduce<Record<string, unknown>>(
+			(acc, key) => {
+				acc[key] = current[key] === "" ? null : current[key];
+				return acc;
+			},
+			{},
+		);
+		const ok = await handleSaveFields(patch);
+		if (ok) setSaved(currentKey);
+	};
+
 	return (
 		<div className="space-y-6">
-			{/* Banner Notula Info */}
-			<div className="p-4 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex items-start gap-3.5">
-				<div className="p-2 bg-blue-600 text-white rounded-xl shadow-xs mt-0.5 shrink-0">
-					<Building2 className="w-5 h-5" />
+			<section className="rounded-xl border border-slate-200 bg-white">
+				<div className="border-b border-slate-200 px-4 py-3 sm:px-6">
+					<h3 className="text-sm font-semibold text-slate-900 sm:text-base">
+						Detail Penempatan
+					</h3>
 				</div>
-				<div className="space-y-1">
-					<h4 className="text-sm font-bold text-blue-950 flex items-center gap-2">
-						Standarisasi Penempatan Magang & Mitra Penempatan (Segmen 21)
-					</h4>
-					<p className="text-xs text-blue-800 leading-relaxed">
-						Berdasarkan hasil evaluasi rapat institusi, istilah agen sponsor
-						distandarisasi menjadi <strong>Mitra Penempatan</strong>. Peminatan
-						kerja dikunci langsung ke dalam <strong>5 Departemen Utama</strong>{" "}
-						(HK, FBS, FBP, FO, dan Barista) serta penyediaan slot dokumen
-						tambahan spesifik sebelum penerbitan visa.
-					</p>
-				</div>
-			</div>
 
-			{/* Main Form Card: Informasi Penempatan */}
-			<Card className="border border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
-				<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-					<div>
-						<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-							<MapPin className="w-4 h-4 text-[#0517B0]" />
-							Detail Penempatan Magang & Lokasi Industri
-						</CardTitle>
-						<p className="text-[11px] text-slate-500 mt-0.5">
-							Konfigurasi data hotel/mitra kerja, kota tujuan, durasi magang,
-							dan departemen peminatan
+				<div className="space-y-6 p-4 sm:p-6">
+					<div className="space-y-3">
+						<p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+							Mitra &amp; Lokasi
 						</p>
-					</div>
-					<div className="flex items-center gap-2">
-						{isVerified ? (
-							<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-bold gap-1">
-								<CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-								Penempatan Terverifikasi
-							</Badge>
-						) : (
-							<Badge
-								variant="outline"
-								className="text-slate-500 bg-white border-slate-200 text-xs font-semibold gap-1"
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+							{/* Mitra disimpan juga ke internshipCompany (kompatibilitas data) */}
+							<RowField
+								label="Mitra Penempatan"
+								htmlFor="f-mitraPenempatanNama"
 							>
-								<Clock className="w-3.5 h-3.5 text-amber-500" />
-								Menunggu Verifikasi
-							</Badge>
-						)}
-					</div>
-				</CardHeader>
-
-				<CardContent className="p-4 sm:p-5 space-y-5">
-					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-						{/* 1. Mitra Penempatan */}
-						<div className="space-y-1.5">
-							<Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-								<Briefcase className="w-3.5 h-3.5 text-[#0517B0]" />
-								Mitra Penempatan
-							</Label>
-							<div className="space-y-1">
 								<Input
+									id="f-mitraPenempatanNama"
 									placeholder="Contoh: Hong Ta / Flamboyan / MBM"
-									className="h-9 text-xs bg-white border-slate-200"
-									value={
-										(data?.mitraPenempatanNama as string) ||
-										(data?.internshipCompany as string) ||
-										""
-									}
+									className={rowInputClass}
+									value={(data?.mitraPenempatanNama as string) || ""}
 									disabled={!canEdit}
-									onChange={(e) => {
-										handleLocalChange("mitraPenempatanNama", e.target.value);
-										handleLocalChange("internshipCompany", e.target.value);
-									}}
-									onBlur={() => {
-										handleBlurField("mitraPenempatanNama");
-										handleBlurField("internshipCompany");
-									}}
+									onChange={(e) =>
+										handleLocalChange("mitraPenempatanNama", e.target.value)
+									}
 								/>
-								<div className="flex flex-wrap gap-1 mt-1">
-									{MITRA_OPTIONS.slice(0, 4).map((m) => (
-										<button
-											type="button"
-											key={m}
-											disabled={!canEdit}
-											onClick={() => {
-												handleLocalChange("mitraPenempatanNama", m);
-												handleBlurField("mitraPenempatanNama");
-											}}
-											className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded transition-colors"
-										>
-											{m.split(" ")[0]}
-										</button>
-									))}
-								</div>
-							</div>
-						</div>
+							</RowField>
 
-						{/* 2. Nama Hotel / Perusahaan Tempat Magang */}
-						<div className="space-y-1.5">
-							<Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-								<Building2 className="w-3.5 h-3.5 text-indigo-600" />
-								Nama Hotel / Perusahaan
-							</Label>
-							<Input
-								placeholder="Contoh: Grand Hyatt Taipei / Sheraton Taichung"
-								className="h-9 text-xs bg-white border-slate-200"
-								value={(data?.internshipCompany as string) || ""}
-								disabled={!canEdit}
-								onChange={(e) =>
-									handleLocalChange("internshipCompany", e.target.value)
-								}
-								onBlur={() => handleBlurField("internshipCompany")}
-							/>
-						</div>
-
-						{/* 3. Negara Tujuan */}
-						<div className="space-y-1.5">
-							<Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-								<Globe className="w-3.5 h-3.5 text-sky-600" />
-								Negara Tujuan
-							</Label>
-							<Select
-								value={(data?.agenNegaraTujuan as string) || "Taiwan"}
-								disabled={!canEdit}
-								onValueChange={(val) => {
-									handleLocalChange("agenNegaraTujuan", val);
-									handleToggleField("agenNegaraTujuan", val);
-								}}
+							<RowField
+								label="Nama Hotel / Perusahaan"
+								htmlFor="f-internshipCompany"
 							>
-								<SelectTrigger className="h-9 text-xs bg-white border-slate-200">
-									<SelectValue placeholder="Pilih Negara Tujuan" />
-								</SelectTrigger>
-								<SelectContent>
-									{NEGARA_OPTIONS.map((c) => (
-										<SelectItem key={c} value={c}>
-											{c}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
+								<Input
+									id="f-internshipCompany"
+									placeholder="Contoh: Grand Hyatt Taipei"
+									className={rowInputClass}
+									value={(data?.internshipCompany as string) || ""}
+									disabled={!canEdit}
+									onChange={(e) =>
+										handleLocalChange("internshipCompany", e.target.value)
+									}
+								/>
+							</RowField>
 
-						{/* 4. Kota Tujuan */}
-						<div className="space-y-1.5">
-							<Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-								<MapPin className="w-3.5 h-3.5 text-rose-500" />
-								Kota Tujuan Penempatan
-							</Label>
-							<Input
-								placeholder="Contoh: Taipei / Taichung / Kaohsiung / KL"
-								className="h-9 text-xs bg-white border-slate-200"
-								value={(data?.destinationCity as string) || ""}
-								disabled={!canEdit}
-								onChange={(e) =>
-									handleLocalChange("destinationCity", e.target.value)
-								}
-								onBlur={() => handleBlurField("destinationCity")}
-							/>
-						</div>
+							{selectField(
+								"agenNegaraTujuan",
+								"Negara Tujuan",
+								asOptions(NEGARA_OPTIONS),
+							)}
 
-						{/* 5. Durasi Masa Magang */}
-						<div className="space-y-1.5">
-							<Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-								<Clock className="w-3.5 h-3.5 text-amber-600" />
-								Durasi Magang
-							</Label>
-							<Select
-								value={
-									(data?.internshipDuration as string) || "12 Bulan (1 Tahun)"
-								}
-								disabled={!canEdit}
-								onValueChange={(val) => {
-									handleLocalChange("internshipDuration", val);
-									handleToggleField("internshipDuration", val);
-								}}
-							>
-								<SelectTrigger className="h-9 text-xs bg-white border-slate-200">
-									<SelectValue placeholder="Pilih Durasi" />
-								</SelectTrigger>
-								<SelectContent>
-									{DURASI_OPTIONS.map((d) => (
-										<SelectItem key={d} value={d}>
-											{d}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
-
-						{/* 6. Peminatan Departemen Utama (5 Departemen Baku - Segmen 21) */}
-						<div className="space-y-1.5">
-							<Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-								<Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-								Peminatan Departemen (5 Baku)
-							</Label>
-							<Select
-								value={(data?.agenPeminatan as string) || "HK"}
-								disabled={!canEdit}
-								onValueChange={(val) => {
-									handleLocalChange("agenPeminatan", val);
-									handleToggleField("agenPeminatan", val);
-								}}
-							>
-								<SelectTrigger className="h-9 text-xs bg-white border-slate-200 font-semibold text-slate-800">
-									<SelectValue placeholder="Pilih Departemen" />
-								</SelectTrigger>
-								<SelectContent>
-									{DEPARTEMEN_OPTIONS.map((dep) => (
-										<SelectItem key={dep.value} value={dep.value}>
-											{dep.label}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
-
-						{/* 7. Estimasi Tanggal Keberangkatan / Mulai */}
-						<div className="space-y-1.5">
-							<Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-								<Calendar className="w-3.5 h-3.5 text-purple-600" />
-								Estimasi Tanggal Mulai / Terbang
-							</Label>
-							<Input
-								type="date"
-								className="h-9 text-xs bg-white border-slate-200"
-								value={
-									data?.estDepartureDate
-										? new Date(data.estDepartureDate as string)
-												.toISOString()
-												.split("T")[0]
-										: ""
-								}
-								disabled={!canEdit}
-								onChange={(e) =>
-									handleLocalChange("estDepartureDate", e.target.value)
-								}
-								onBlur={() => handleBlurField("estDepartureDate")}
-							/>
-						</div>
-
-						{/* 8. Verifikasi Status Kesiapan Penempatan */}
-						<div className="space-y-1.5 md:col-span-2 lg:col-span-2">
-							<Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-								<ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-								Verifikasi Kelayakan Penempatan
-							</Label>
-							<div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
-								<div className="flex items-center gap-3">
-									<Checkbox
-										id="chk-tabPenempatan-agenReady"
-										checked={isVerified}
-										disabled={!canEdit || isLoading}
-										onCheckedChange={(checked) =>
-											handleToggleField("agenReady", !!checked)
-										}
-										className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-									/>
-									<div>
-										<label
-											htmlFor="chk-tabPenempatan-agenReady"
-											className="text-xs font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-										>
-											Tandai Mitra Penempatan & Lokasi Magang Selesai
-											Diverifikasi
-										</label>
-										<p className="text-[11px] text-slate-500 mt-0.5">
-											Seluruh konfirmasi kuota dan departemen hotel telah valid
-										</p>
-									</div>
-								</div>
-								{isLoading ? (
-									<Loader2 className="w-4 h-4 animate-spin text-slate-400" />
-								) : isVerified ? (
-									<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px] font-bold">
-										✓ Tervalidasi
-									</Badge>
-								) : (
-									<Badge
-										variant="outline"
-										className="text-slate-400 text-[10px]"
-									>
-										Belum
-									</Badge>
-								)}
-							</div>
+							<RowField label="Kota Tujuan" htmlFor="f-destinationCity">
+								<Input
+									id="f-destinationCity"
+									placeholder="Contoh: Taipei / Taichung / KL"
+									className={rowInputClass}
+									value={(data?.destinationCity as string) || ""}
+									disabled={!canEdit}
+									onChange={(e) =>
+										handleLocalChange("destinationCity", e.target.value)
+									}
+								/>
+							</RowField>
 						</div>
 					</div>
-				</CardContent>
-			</Card>
 
-			{/* Card 2: Dokumen Tambahan dari Mitra Penempatan (Segmen 21) */}
-			<Card className="border border-slate-200 shadow-sm border-l-4 border-l-amber-500">
-				<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-4 sm:px-5">
-					<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-						<FileText className="w-4 h-4 text-amber-600" />
-						Dokumen Tambahan dari Mitra Penempatan (Opsional Sebelum Visa)
-					</CardTitle>
-					<p className="text-[11px] text-slate-500 mt-0.5">
-						Wadah unggah dokumen khusus yang diminta spesifik oleh agensi/mitra
-						penempatan (contoh: Surat Keterangan Tunda Wisuda /{" "}
-						<i>Postpone Graduation</i>, <i>Landing Permit</i> / LG Izin Terbang,
-						Surat Pernyataan Lembaga)
-					</p>
-				</CardHeader>
-				<CardContent className="p-4 sm:p-5">
-					<div className="p-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/50 space-y-3">
-						<div className="flex items-start gap-3">
-							<Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-							<div className="text-xs text-slate-600 space-y-1">
-								<p className="font-semibold text-slate-800">
-									Persyaratan Khusus Mitra Penempatan
-								</p>
-								<p className="text-[11px] text-slate-500 leading-relaxed">
-									Beberapa mitra penempatan (seperti Hong Ta untuk Taiwan atau
-									agensi hotel di Malaysia) terkadang mensyaratkan dokumen
-									pelengkap sebelum pengajuan visa resmi. Unggah berkas tersebut
-									pada slot di bawah ini.
-								</p>
-							</div>
-						</div>
-						<div className="pt-2 border-t border-slate-200/80">
-							<DocumentUpload
-								studentId={studentId}
-								panel="magang"
-								documentKey="dokumen_tambahan_mitra"
-								canEdit={canEdit}
-								onUploadSuccess={fetchInternshipData}
-							/>
+					<div className="space-y-3">
+						<p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+							Jadwal &amp; Posisi
+						</p>
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+							{selectField(
+								"internshipDuration",
+								"Durasi Magang",
+								asOptions(DURASI_OPTIONS),
+							)}
+
+							{selectField("agenPeminatan", "Departemen", DEPARTEMEN_OPTIONS)}
+
+							<RowField
+								label="Estimasi Tanggal Terbang"
+								htmlFor="f-estDepartureDate"
+							>
+								<Input
+									id="f-estDepartureDate"
+									type="date"
+									className={rowInputClass}
+									value={toDateInput(data?.estDepartureDate)}
+									disabled={!canEdit}
+									onChange={(e) =>
+										handleLocalChange("estDepartureDate", e.target.value)
+									}
+								/>
+							</RowField>
 						</div>
 					</div>
-				</CardContent>
-			</Card>
+
+					<div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-end">
+						{isDirty && (
+							<p role="status" className="text-xs font-medium text-amber-700">
+								Belum disimpan
+							</p>
+						)}
+						<Button
+							type="button"
+							onClick={handleSave}
+							disabled={!canEdit || !isDirty || isSaving}
+							className="h-11 w-full gap-1.5 bg-[#0517B0] px-5 text-sm font-bold text-white hover:bg-blue-800 sm:w-auto"
+						>
+							{isSaving && <Loader2 className="size-4 animate-spin" />}
+							{isSaving ? "Menyimpan..." : "Simpan Perubahan"}
+						</Button>
+					</div>
+				</div>
+			</section>
+
+			{/* Verifikasi (field yang sama dengan "Mitra Penempatan" di Dokumen Keberangkatan) */}
+			<ChecklistGroup
+				title="Verifikasi Penempatan"
+				done={isVerified ? 1 : 0}
+				total={1}
+			>
+				<ChecklistRow
+					id="tabPenempatan-agenReady"
+					label="Mitra penempatan & lokasi magang sudah diverifikasi"
+					desc="Kuota dan departemen hotel sudah dikonfirmasi."
+					checked={isVerified}
+					loading={isLoading}
+					disabled={!canEdit}
+					onCheckedChange={(checked) => handleToggleField("agenReady", checked)}
+				/>
+			</ChecklistGroup>
+
+			{/* Sekunder: hanya sebagian mitra memintanya — dilipat agar tidak menyita perhatian */}
+			<Collapsible className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+				<CollapsibleTrigger className="group flex min-h-12 w-full items-center justify-between gap-3 px-4 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0517B0]/40 sm:px-6">
+					<span className="text-sm font-semibold text-slate-700">
+						Dokumen Tambahan dari Mitra
+						<span className="ml-2 font-normal text-slate-500">
+							opsional, sebelum visa
+						</span>
+					</span>
+					<ChevronDown className="size-4 shrink-0 text-slate-500 transition-transform group-data-[panel-open]:rotate-180" />
+				</CollapsibleTrigger>
+				<CollapsibleContent>
+					<div className="space-y-3 border-t border-slate-200 p-4 sm:p-6">
+						<p className="text-xs text-slate-500">
+							Misalnya Surat Tunda Wisuda (Postpone Graduation), Landing Permit,
+							atau Surat Pernyataan Lembaga.
+						</p>
+						<DocumentUpload
+							studentId={studentId}
+							panel="magang"
+							documentKey="dokumen_tambahan_mitra"
+							canEdit={canEdit}
+							onUploadSuccess={fetchInternshipData}
+						/>
+					</div>
+				</CollapsibleContent>
+			</Collapsible>
 		</div>
 	);
 }

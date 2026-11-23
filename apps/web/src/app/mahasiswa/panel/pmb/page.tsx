@@ -102,10 +102,6 @@ export default function PmbPanelMahasiswa() {
 
 	const mainChecklist = [
 		{ label: "Penerimaan Formulir", checked: Boolean(data?.formReceived) },
-		{
-			label: "Kelengkapan Dokumen Dasar",
-			checked: Boolean(data?.documentsComplete),
-		},
 		{ label: "Input Data Sistem", checked: Boolean(data?.dataInputted) },
 		{ label: "Follow Up Awal", checked: Boolean(data?.initialFollowUp) },
 		{
@@ -129,10 +125,6 @@ export default function PmbPanelMahasiswa() {
 		{
 			label: "Pre-Medical Check Up (Pre-MCU)",
 			checked: Boolean(data?.docPreMcu),
-		},
-		{
-			label: "Medical Check Up Full (MCU Full)",
-			checked: Boolean(data?.docMcu),
 		},
 		{
 			label: "Service Level Agreement (SLA)",
@@ -266,7 +258,7 @@ export default function PmbPanelMahasiswa() {
 						<div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100 flex items-center justify-between">
 							<div>
 								<span className="text-xs text-blue-700/80 block font-semibold uppercase tracking-wider">
-									Fasilitas Asrama
+									Fasilitas Asrama · dikelola CRM
 								</span>
 								<p className="text-sm font-bold text-blue-950 mt-1 flex items-center gap-1.5">
 									<Building className="w-4 h-4 text-blue-600" />
@@ -391,6 +383,37 @@ export default function PmbPanelMahasiswa() {
 										</div>
 									</div>
 								</div>
+
+								{!data.paymentPlan.statusDp &&
+									data.paymentPlan.billingNumber && (
+										<div className="p-3 mb-4 bg-white rounded-xl border border-amber-300 text-sm text-amber-950">
+											<span className="block text-xs font-semibold text-amber-800 mb-1">
+												Instruksi Pembayaran DP
+											</span>
+											<span className="font-mono font-bold break-all">
+												{data.paymentPlan.billingType === "rekening"
+													? "Rekening"
+													: "Virtual Account"}{" "}
+												{data.paymentPlan.billingBankName
+													? `${data.paymentPlan.billingBankName} `
+													: ""}
+												{data.paymentPlan.billingNumber}
+											</span>
+											{data.paymentPlan.billingAccountHolder && (
+												<span className="block text-xs">
+													a.n. {data.paymentPlan.billingAccountHolder}
+												</span>
+											)}
+											{data.paymentPlan.billingDueDate && (
+												<span className="block text-xs mt-1">
+													Batas bayar:{" "}
+													{new Date(
+														data.paymentPlan.billingDueDate,
+													).toLocaleDateString("id-ID")}
+												</span>
+											)}
+										</div>
+									)}
 
 								{/* Janji Bayar Termin 2 & 3 */}
 								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-amber-200/50">

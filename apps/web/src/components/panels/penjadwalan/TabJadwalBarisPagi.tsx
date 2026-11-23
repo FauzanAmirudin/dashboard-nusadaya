@@ -12,7 +12,6 @@ import {
 	MapPin,
 	Pencil,
 	Plus,
-	RefreshCw,
 	RotateCcw,
 	Search,
 	ShieldCheck,
@@ -571,21 +570,6 @@ export function TabJadwalBarisPagi({ canEdit }: { canEdit: boolean }) {
 							</SelectContent>
 						</Select>
 					</div>
-
-					<Button
-						variant="outline"
-						size="icon"
-						onClick={() => fetchSessions()}
-						disabled={isLoading}
-						className="h-9 w-9 rounded-xl border-slate-200"
-						title="Perbarui daftar jadwal"
-					>
-						<RefreshCw
-							className={`w-4 h-4 text-slate-600 ${
-								isLoading ? "animate-spin text-[#0517B0]" : ""
-							}`}
-						/>
-					</Button>
 				</div>
 			</div>
 

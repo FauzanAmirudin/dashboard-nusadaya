@@ -2,6 +2,7 @@ import type { User } from "@/store";
 import { hasRole } from "@/store";
 import {
 	calculateOverallStatus,
+	calculateProgressStatus,
 	normalizeStatus,
 	type PanelStatusType,
 } from "./status";
@@ -14,8 +15,18 @@ export function calculateCrmChecklist(crm: any): {
 	completedCount: number;
 	totalChecks: number;
 	isAllChecksDone: boolean;
+	items: Array<{ name: string; done: boolean }>;
 } {
-	const odsList = Array.isArray(crm?.odsDetails) ? crm.odsDetails : [];
+	// odsDetails bisa datang sebagai string JSON dari beberapa endpoint
+	let odsRaw = crm?.odsDetails;
+	if (typeof odsRaw === "string") {
+		try {
+			odsRaw = JSON.parse(odsRaw);
+		} catch {
+			odsRaw = [];
+		}
+	}
+	const odsList = Array.isArray(odsRaw) ? odsRaw : [];
 	const triDharmaList = Array.isArray(crm?.triDharmaDetails)
 		? crm.triDharmaDetails
 		: [];
@@ -24,28 +35,54 @@ export function calculateCrmChecklist(crm: any): {
 			triDharmaList.some((t: any) => t.isDone || t.status === "DISETUJUI"),
 	);
 
-	const completedCount = [
-		Boolean(crm?.isMonitoringParent),
-		Boolean(crm?.isMonitoringIndustry),
-		Boolean(crm?.isVocabComplete),
-		Boolean(crm?.practiceAttendance),
-		Boolean(crm?.isOds1Report || odsList[0]?.isDone),
-		Boolean(crm?.isOds2Report || odsList[1]?.isDone),
-		Boolean(crm?.isOds3Report || odsList[2]?.isDone),
-		Boolean(crm?.isOds4Report || odsList[3]?.isDone),
-		Boolean(crm?.isOds5Report || odsList[4]?.isDone),
-		Boolean(
-			crm?.isPrammagangReport || crm?.pramagangVideoStatus === "DISETUJUI",
-		),
-		Boolean(crm?.isMonthlyVideo || crm?.monthlyVideoStatus === "DISETUJUI"),
-		isTriDharmaDone,
-	].filter(Boolean).length;
+	// 12 indikator — satu-satunya sumber progres CRM (panel detail & dashboard)
+	const items = [
+		{ name: "Monitoring Orang Tua", done: Boolean(crm?.isMonitoringParent) },
+		{ name: "Monitoring Industri", done: Boolean(crm?.isMonitoringIndustry) },
+		{ name: "Kendali Vocab/Bahasa", done: Boolean(crm?.isVocabComplete) },
+		{ name: "Kehadiran & Pembiasaan", done: Boolean(crm?.practiceAttendance) },
+		{
+			name: "Laporan ODS 1",
+			done: Boolean(crm?.isOds1Report || odsList[0]?.isDone),
+		},
+		{
+			name: "Laporan ODS 2",
+			done: Boolean(crm?.isOds2Report || odsList[1]?.isDone),
+		},
+		{
+			name: "Laporan ODS 3",
+			done: Boolean(crm?.isOds3Report || odsList[2]?.isDone),
+		},
+		{
+			name: "Laporan ODS 4",
+			done: Boolean(crm?.isOds4Report || odsList[3]?.isDone),
+		},
+		{
+			name: "Laporan ODS 5",
+			done: Boolean(crm?.isOds5Report || odsList[4]?.isDone),
+		},
+		{
+			name: "Laporan Pra-Magang",
+			done: Boolean(
+				crm?.isPrammagangReport || crm?.pramagangVideoStatus === "DISETUJUI",
+			),
+		},
+		{
+			name: "Video Konten Bulanan",
+			done: Boolean(
+				crm?.isMonthlyVideo || crm?.monthlyVideoStatus === "DISETUJUI",
+			),
+		},
+		{ name: "Kegiatan Tri Dharma", done: isTriDharmaDone },
+	];
 
-	const totalChecks = 12;
+	const completedCount = items.filter((i) => i.done).length;
+	const totalChecks = items.length;
 	return {
 		completedCount,
 		totalChecks,
 		isAllChecksDone: completedCount === totalChecks,
+		items,
 	};
 }
 
@@ -103,7 +140,6 @@ export function calculatePmbChecklist(pmbData: any): {
 
 	const mainChecklist = [
 		Boolean(pmbData.formReceived),
-		Boolean(pmbData.documentsComplete),
 		Boolean(pmbData.dataInputted),
 		Boolean(pmbData.initialFollowUp),
 		Boolean(pmbData.pasFoto),
@@ -126,7 +162,9 @@ export function calculatePmbChecklist(pmbData: any): {
 		totalRequiredCompleted16: totalRequiredCompleted,
 		totalRequiredCompleted17: totalRequiredCompleted,
 		totalRequiredCompleted,
-		isAllChecklistDone: totalRequiredCompleted === 14,
+		// 4 berkas utama + 9 dokumen wajib = 13 (sama dengan syarat ACC di server)
+		isAllChecklistDone:
+			totalRequiredCompleted === 4 + PMB_REQUIRED_DOC_KEYS.length,
 	};
 }
 
@@ -167,12 +205,69 @@ export function getFinancePaymentStatus(finState: any): {
 	};
 }
 
+/** Alur dokumen & istilah khusus Taiwan (Suhan) hanya berlaku untuk Taiwan. */
+export function isTaiwanDestination(
+	destinationCountry?: string | null,
+): boolean {
+	return (destinationCountry || "").toLowerCase().includes("taiwan");
+}
+
 export function getPenempatanLabel(destinationCountry?: string | null): string {
 	const dest = (destinationCountry || "").toLowerCase();
 	if (dest.includes("malaysia")) {
 		return "Penempatan Magang D3 Malaysia / Keberangkatan";
 	}
-	return "Penempatan Magang Taiwan / Keberangkatan";
+	if (dest.includes("taiwan")) {
+		return "Penempatan Magang Taiwan / Keberangkatan";
+	}
+	if (dest.includes("indonesia")) {
+		return "Penempatan Magang Indonesia / Keberangkatan";
+	}
+	if (
+		dest.includes("timur tengah") ||
+		dest.includes("middle east") ||
+		dest.includes("arab")
+	) {
+		return "Penempatan Magang Timur Tengah / Keberangkatan";
+	}
+	// Tanpa negara tujuan yang dikenali: pakai istilah netral, bukan Taiwan
+	return "Penempatan Magang / Keberangkatan";
+}
+
+export const FINANCE_CHECK_KEYS = [
+	"registrasi",
+	"semester",
+	"interview",
+	"keberangkatan",
+	"toeic",
+	"paspor",
+] as const;
+
+export type FinanceCheckKey = (typeof FINANCE_CHECK_KEYS)[number];
+
+/**
+ * Pos tagihan yang ditandai tidak berlaku bagi mahasiswa ini.
+ * Cermin parseTidakBerlaku di apps/api/src/lib/finance-acc-requirements.ts.
+ */
+export function parseFinanceTidakBerlaku(
+	finState: any,
+): Map<string, string | undefined> {
+	const map = new Map<string, string | undefined>();
+	const raw = finState?.tidakBerlakuItems;
+	if (!Array.isArray(raw)) return map;
+	for (const entry of raw) {
+		if (typeof entry === "string") map.set(entry, undefined);
+		else if (
+			entry &&
+			typeof entry === "object" &&
+			typeof entry.key === "string"
+		)
+			map.set(
+				entry.key,
+				typeof entry.note === "string" ? entry.note : undefined,
+			);
+	}
+	return map;
 }
 
 export function calculateFinanceChecklist(
@@ -182,7 +277,13 @@ export function calculateFinanceChecklist(
 	completedCount: number;
 	totalChecks: number;
 	isFinanceReady: boolean;
-	items: Array<{ name: string; done: boolean }>;
+	items: Array<{
+		key?: string;
+		name: string;
+		done: boolean;
+		notApplicable?: boolean;
+		note?: string;
+	}>;
 } {
 	if (!finState) {
 		return {
@@ -200,37 +301,51 @@ export function calculateFinanceChecklist(
 		destinationCountry || finState.destinationCountry,
 	);
 
+	// Pos yang ditandai "Tidak berlaku" oleh Finance tidak dihitung sebagai syarat ACC
+	const naMap = parseFinanceTidakBerlaku(finState);
+
 	const items = [
 		{
+			key: "registrasi",
 			name: "Registrasi / Pendaftaran",
 			done: Boolean(finState.registrasiStatus || finState.registrationPaid),
 		},
 		{
+			key: "semester",
 			name: isTalangan
 				? "Pembayaran SPP Semester 1 (Talangan)"
 				: "Pembayaran SPP Semester 1",
 			done: isSemesterDone,
 		},
 		{
+			key: "interview",
 			name: "Kontrak Magang / Suhan",
 			done: isInterviewDone,
 		},
 		{
+			key: "keberangkatan",
 			name: penempatanName,
 			done: isKeberangkatanDone,
 		},
 		{
+			key: "toeic",
 			name: "Sertifikasi Bahasa (TOEIC)",
 			done: Boolean(finState.toeicStatus),
 		},
 		{
+			key: "paspor",
 			name: "Paspor & Dokumen",
 			done: Boolean(finState.pasporStatus),
 		},
-	];
+	].map((i) => ({
+		...i,
+		notApplicable: naMap.has(i.key),
+		note: naMap.get(i.key),
+	}));
 
-	const completedCount = items.filter((i) => i.done).length;
-	const totalChecks = 6;
+	const applicable = items.filter((i) => !i.notApplicable);
+	const completedCount = applicable.filter((i) => i.done).length;
+	const totalChecks = applicable.length;
 
 	return {
 		completedCount,
@@ -238,6 +353,28 @@ export function calculateFinanceChecklist(
 		isFinanceReady: completedCount === totalChecks,
 		items,
 	};
+}
+
+export const PEMBIASAAN_MIN_RATE = 80;
+
+/**
+ * Syarat persetujuan Kehadiran & Pembiasaan oleh CRM:
+ * setiap jenis pembiasaan harus punya sesi tercatat dan kehadiran >= 80%.
+ * Dulu persetujuan bisa diberikan walau semua 0/0 sesi.
+ * Cermin di server: checkPembiasaanEligible (apps/api/src/lib/crm-pembiasaan.ts).
+ */
+export function checkPembiasaanEligible(
+	groups: Array<{ label: string; total: number; rate: number }>,
+): { ok: boolean; blockers: string[] } {
+	const blockers: string[] = [];
+	for (const g of groups) {
+		if (!g.total || g.total <= 0) {
+			blockers.push(`${g.label}: belum ada sesi tercatat`);
+		} else if (g.rate < PEMBIASAAN_MIN_RATE) {
+			blockers.push(`${g.label}: ${g.rate}% (min. ${PEMBIASAAN_MIN_RATE}%)`);
+		}
+	}
+	return { ok: blockers.length === 0, blockers };
 }
 
 // ==========================================
@@ -286,6 +423,12 @@ export const AKADEMIK_BASE_CHECKLIST = [
 		label: "Asesmen Pra-keberangkatan",
 		desc: "Hasil asesmen kesiapan keberangkatan",
 		documentKey: "pre_departure_assessment",
+	},
+	{
+		id: "paCompleted",
+		label: "Pendampingan Akademik (PA)",
+		desc: "Otomatis saat Konseling, Mental Stabil & Disiplin Baik tuntas di Panel PA",
+		documentKey: "pa_completed",
 	},
 ];
 
@@ -494,6 +637,7 @@ export const INTERNSHIP_MAIN_KEYS = [
 
 export function calculateInternshipDokumenChecklist(
 	data: Record<string, unknown> | null | undefined,
+	destinationCountry?: string | null,
 ): {
 	completedCount: number;
 	totalCount: number;
@@ -502,24 +646,298 @@ export function calculateInternshipDokumenChecklist(
 	if (!data) {
 		return {
 			completedCount: 0,
-			totalCount: INTERNSHIP_MAIN_KEYS.length,
+			totalCount: isTaiwanDestination(destinationCountry)
+				? INTERNSHIP_MAIN_KEYS.length
+				: INTERNSHIP_MAIN_KEYS.length - 1,
 			isInternshipReady: false,
 		};
 	}
 
-	const completedCount = INTERNSHIP_MAIN_KEYS.filter((k) => {
+	// Suhan = izin Biro Pariwisata Taiwan, hanya wajib untuk tujuan Taiwan
+	const keys = isTaiwanDestination(destinationCountry)
+		? INTERNSHIP_MAIN_KEYS
+		: INTERNSHIP_MAIN_KEYS.filter((k) => k !== "suhanReady");
+
+	const completedCount = keys.filter((k) => {
 		if (k === "mouReady") return Boolean(data.mouReady ?? data.moaReady);
 		if (k === "asesmenReady")
 			return Boolean(data.asesmenReady ?? data.pdtReady);
 		return Boolean(data[k]);
 	}).length;
-	const totalCount = INTERNSHIP_MAIN_KEYS.length;
+	const totalCount = keys.length;
 
 	return {
 		completedCount,
 		totalCount,
 		isInternshipReady: completedCount === totalCount,
 	};
+}
+
+export const PRA_PASPOR_ACC_KEYS = [
+	"praPasporPasFoto",
+	"praPasporKtm",
+	"praPasporKtp",
+	"praPasporKk",
+	"praPasporAktaKelahiran",
+	"praPasporSuratIzinOrtu",
+	"praPasporSl21",
+	"praPasporSkma",
+	"praPasporRekomendasiDisdik",
+	"praPasporKhs",
+	"praPasporKrs",
+	"praPasporTranskrip",
+	"praPasporIjazah",
+] as const;
+
+export const SYARAT_AKHIR_KEYS = [
+	"logbookReady",
+	"laporanAkhirReady",
+	"videoDokumentasiReady",
+] as const;
+
+type AccGroup = { done: number; total: number; ok: boolean };
+
+/**
+ * Syarat ACC Panel Magang per grup — cermin `getInternshipChecks` di
+ * apps/api/src/routes/student/internship.ts (SKMA atau LOS; Gap Year bila perlu).
+ */
+export function getInternshipAccRequirements(
+	data: Record<string, unknown> | null | undefined,
+	isGapYear = false,
+	destinationCountry?: string | null,
+): {
+	praPaspor: AccGroup;
+	dokumen: AccGroup;
+	syaratAkhir: AccGroup;
+	completed: number;
+	total: number;
+	ok: boolean;
+} {
+	const d = data ?? {};
+	const group = (checks: boolean[]): AccGroup => {
+		const done = checks.filter(Boolean).length;
+		return { done, total: checks.length, ok: done === checks.length };
+	};
+
+	const praPaspor = group([
+		...PRA_PASPOR_ACC_KEYS.map((k) =>
+			k === "praPasporSkma"
+				? Boolean(d.praPasporSkma || d.praPasporLos)
+				: Boolean(d[k]),
+		),
+		...(isGapYear ? [Boolean(d.praPasporGapYear)] : []),
+	]);
+	const { completedCount, totalCount } = calculateInternshipDokumenChecklist(
+		d,
+		destinationCountry,
+	);
+	const dokumen: AccGroup = {
+		done: completedCount,
+		total: totalCount,
+		ok: completedCount === totalCount,
+	};
+	const syaratAkhir = group(SYARAT_AKHIR_KEYS.map((k) => Boolean(d[k])));
+
+	const completed = praPaspor.done + dokumen.done + syaratAkhir.done;
+	const total = praPaspor.total + dokumen.total + syaratAkhir.total;
+	return {
+		praPaspor,
+		dokumen,
+		syaratAkhir,
+		completed,
+		total,
+		ok: completed === total,
+	};
+}
+
+/**
+ * Prasyarat mahasiswa diproses Panel Magang — cermin
+ * apps/api/src/lib/magang-prerequisites.ts (server memakai ini untuk menolak ACC Magang).
+ * ACC PMB + CRM + Akademik, ditambah Registrasi & SPP Semester 1 lunas.
+ */
+export function getMagangPrerequisites(s: {
+	pmb?: { isAcc?: boolean | null } | null;
+	crm?: { isAcc?: boolean | null } | null;
+	academic?: { isAcc?: boolean | null } | null;
+	finance?: Record<string, unknown> | null;
+}): {
+	items: { key: string; label: string; ok: boolean }[];
+	ok: boolean;
+	missing: string[];
+} {
+	const f = s.finance ?? {};
+	const isTalangan = f.metodePembayaran === "dana_talangan";
+	const spp1 = isTalangan
+		? f.talanganTipe === "1_tahap" ||
+			Boolean(f.t1SemesterStatus || f.mandiriSemesterStatus)
+		: Boolean(f.mandiriSemesterStatus);
+	const items = [
+		{ key: "pmb", label: "ACC PMB", ok: Boolean(s.pmb?.isAcc) },
+		{ key: "crm", label: "ACC CRM", ok: Boolean(s.crm?.isAcc) },
+		{ key: "akademik", label: "ACC Akademik", ok: Boolean(s.academic?.isAcc) },
+		{
+			key: "registrasi",
+			label: "Registrasi lunas",
+			ok: Boolean(f.registrasiStatus),
+		},
+		{ key: "spp1", label: "SPP Semester 1 lunas", ok: spp1 },
+	];
+	const missing = items.filter((i) => !i.ok).map((i) => i.label);
+	return { items, ok: missing.length === 0, missing };
+}
+
+/**
+ * Pengingat termin pembayaran kampus ke agensi mitra:
+ * - DP saat Suhan terbit (sebelum MCU Full)
+ * - Pelunasan saat visa terbit (sebelum tiket diterbitkan)
+ * Hanya pengingat: tidak memblokir checklist maupun ACC.
+ */
+export function getAgencyPaymentReminders(
+	internship: Record<string, unknown> | null | undefined,
+	destinationCountry?: string | null,
+): { key: "dp" | "pelunasan"; text: string }[] {
+	const i = internship ?? {};
+	const reminders: { key: "dp" | "pelunasan"; text: string }[] = [];
+	const isTaiwan = isTaiwanDestination(destinationCountry);
+	// Taiwan: DP saat Suhan terbit. Non-Taiwan tidak memakai Suhan, jadi
+	// acuannya kontrak magang yang sudah selesai.
+	const dpTrigger = isTaiwan ? Boolean(i.suhanReady) : Boolean(i.contractReady);
+	if (dpTrigger && !i.agenDpPaid)
+		reminders.push({
+			key: "dp",
+			text: isTaiwan
+				? "Suhan sudah terbit: bayar DP ke agensi sebelum MCU Full."
+				: "Kontrak magang sudah selesai: bayar DP ke agensi sebelum MCU Full.",
+		});
+	if (i.visaReady && !i.agenPelunasanPaid)
+		reminders.push({
+			key: "pelunasan",
+			text: "Visa sudah terbit: lunasi biaya agensi sebelum tiket diterbitkan.",
+		});
+	return reminders;
+}
+
+export interface AgencyPaymentInternshipLike {
+	suhanReady?: boolean | null;
+	contractReady?: boolean | null;
+	visaReady?: boolean | null;
+	agenDpPaid?: boolean | null;
+	agenDpDate?: string | Date | null;
+	agenDpNominal?: number | null;
+	agenPelunasanPaid?: boolean | null;
+	agenPelunasanDate?: string | Date | null;
+	agenPelunasanNominal?: number | null;
+}
+
+export interface AgencyPaymentTermSummary {
+	key: "dp" | "pelunasan";
+	label: string;
+	triggerLabel: string;
+	triggerReady: boolean;
+	paid: boolean;
+	isOverdue: boolean;
+	reminderText: string | null;
+	nominal: number | null;
+	paidDate: string | Date | null;
+}
+
+/**
+ * Ringkasan dua termin pembayaran kampus ke agensi mitra (DP & Pelunasan)
+ * untuk tampilan pantauan Finance (read-only) maupun antrean pengingat dashboard.
+ */
+export function getAgencyPaymentTermsSummary(
+	internship: AgencyPaymentInternshipLike | null | undefined,
+	destinationCountry?: string | null,
+): AgencyPaymentTermSummary[] {
+	const i = internship ?? {};
+	const isTaiwan = isTaiwanDestination(destinationCountry);
+	const reminders = getAgencyPaymentReminders(
+		i as Record<string, unknown>,
+		destinationCountry,
+	);
+	const dpReminder = reminders.find((r) => r.key === "dp") ?? null;
+	const pelunasanReminder =
+		reminders.find((r) => r.key === "pelunasan") ?? null;
+
+	return [
+		{
+			key: "dp",
+			label: "Uang Muka (DP) ke Agensi",
+			triggerLabel: isTaiwan ? "Suhan terbit" : "Kontrak magang selesai",
+			triggerReady: isTaiwan ? Boolean(i.suhanReady) : Boolean(i.contractReady),
+			paid: Boolean(i.agenDpPaid),
+			isOverdue: Boolean(dpReminder),
+			reminderText: dpReminder?.text ?? null,
+			nominal:
+				typeof i.agenDpNominal === "number" && i.agenDpNominal > 0
+					? i.agenDpNominal
+					: null,
+			paidDate: i.agenDpDate ?? null,
+		},
+		{
+			key: "pelunasan",
+			label: "Pelunasan Biaya Agensi",
+			triggerLabel: "Visa terbit",
+			triggerReady: Boolean(i.visaReady),
+			paid: Boolean(i.agenPelunasanPaid),
+			isOverdue: Boolean(pelunasanReminder),
+			reminderText: pelunasanReminder?.text ?? null,
+			nominal:
+				typeof i.agenPelunasanNominal === "number" && i.agenPelunasanNominal > 0
+					? i.agenPelunasanNominal
+					: null,
+			paidDate: i.agenPelunasanDate ?? null,
+		},
+	];
+}
+
+/** Ringkasan 6 tahap keberangkatan untuk tabel Dashboard Magang. */
+export function getMagangDashboardChecklist(
+	internship: Record<string, unknown> | null | undefined,
+	destinationCountry?: string | null,
+): {
+	items: Array<{ name: string; done: boolean }>;
+	completed: number;
+	total: number;
+} {
+	const i = internship ?? {};
+	const isTaiwan = isTaiwanDestination(destinationCountry);
+	const items = [
+		{ name: "Paspor Siap", done: Boolean(i.passportReady) },
+		{
+			name: "MOU & LOA",
+			done: Boolean((i.mouReady ?? i.moaReady) || i.loaConfirmed),
+		},
+		{
+			name: isTaiwan ? "Kontrak & Suhan" : "Kontrak Magang",
+			done: isTaiwan
+				? Boolean(i.contractReady || i.suhanReady)
+				: Boolean(i.contractReady),
+		},
+		{ name: "MCU Full", done: Boolean(i.mcuReady) },
+		{ name: "Visa Disetujui", done: Boolean(i.visaReady) },
+		{
+			name: "Tiket & Asesmen",
+			done: Boolean(i.ticketReady || i.asesmenReady || i.pdtReady),
+		},
+	];
+	return {
+		items,
+		completed: items.filter((it) => it.done).length,
+		total: items.length,
+	};
+}
+
+/** Satu sumber status Dashboard Magang (KPI, filter, pill, export). */
+export function getMagangDashboardStatus(
+	internship: Record<string, unknown> | null | undefined,
+	destinationCountry?: string | null,
+): PanelStatusType {
+	const { completed, total } = getMagangDashboardChecklist(
+		internship,
+		destinationCountry,
+	);
+	return calculateProgressStatus(completed, total, Boolean(internship?.isAcc));
 }
 
 // ==========================================
@@ -587,32 +1005,21 @@ export function canMakeFinalDecision(
 				crmAcc?: { isAcc?: boolean | null };
 				financeAcc?: { isAcc?: boolean | null };
 				academicAcc?: { isAcc?: boolean | null };
-				paAcc?: { isAcc?: boolean | null };
 				internshipAcc?: { isAcc?: boolean | null };
-				dosenAcc?: { isAcc?: boolean | null };
 		  }
 		| null
 		| undefined,
-	requireDosen = false,
 ): boolean {
 	if (!panelsData) return false;
 
+	// Dosen & PA berada di bawah Akademik: ACC Akademik sudah mewakili keduanya.
 	const coreAccs = [
 		Boolean(panelsData.pmbAcc?.isAcc),
 		Boolean(panelsData.crmAcc?.isAcc),
 		Boolean(panelsData.financeAcc?.isAcc),
 		Boolean(panelsData.academicAcc?.isAcc),
-		Boolean(panelsData.paAcc?.isAcc),
 		Boolean(panelsData.internshipAcc?.isAcc),
 	];
 
-	if (coreAccs.some((acc) => !acc)) {
-		return false;
-	}
-
-	if (requireDosen && !panelsData.dosenAcc?.isAcc) {
-		return false;
-	}
-
-	return true;
+	return coreAccs.every(Boolean);
 }

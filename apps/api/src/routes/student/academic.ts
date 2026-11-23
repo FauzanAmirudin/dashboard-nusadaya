@@ -74,6 +74,20 @@ export const academicRoutes = new Elysia()
 			const id = Number(params.id);
 			const updates = body as Record<string, any>;
 
+			// utsPassed & uasPassed dihitung GradeCalculationService dari nilai ujian
+			// sebenarnya. Dulu bisa dicentang manual sehingga gerbang ACC Akademik
+			// bisa dilewati tanpa nilai.
+			const autoFields = ["utsPassed", "uasPassed"];
+			const manualAuto = autoFields.filter((f) => f in updates);
+			if (manualAuto.length > 0) {
+				set.status = 400;
+				return {
+					success: false,
+					code: "AUTO_FIELD_READONLY",
+					message: `Status ${manualAuto.join(" & ")} mengikuti nilai ujian dan tidak dapat diubah manual. Input nilai UTS/UAS pada mata kuliah terkait.`,
+				};
+			}
+
 			const [current, overseasChecklist] = await Promise.all([
 				db.query.academicData.findFirst({
 					where: eq(academicData.studentId, id),
@@ -368,14 +382,32 @@ export const academicRoutes = new Elysia()
 				where: eq(courses.code, input.courseCode),
 			});
 
-			await db.insert(courseGrades).values({
-				studentId: id,
-				courseId: matchingCourse?.id || null, // Hubungkan dengan master course
-				courseCode: input.courseCode,
-				courseName: input.courseName,
-				dosenId: input.dosenId,
-				hasKwu: input.hasKwu ?? false,
-			});
+			// Satu baris per (mahasiswa, kode MK, percobaan): tambah mata kuliah yang
+			// sudah ada hanya memperbarui datanya, tidak membuat baris nilai ganda.
+			await db
+				.insert(courseGrades)
+				.values({
+					studentId: id,
+					courseId: matchingCourse?.id || null, // Hubungkan dengan master course
+					courseCode: input.courseCode,
+					courseName: input.courseName,
+					dosenId: input.dosenId,
+					hasKwu: input.hasKwu ?? false,
+				})
+				.onConflictDoUpdate({
+					target: [
+						courseGrades.studentId,
+						courseGrades.courseCode,
+						courseGrades.attempt,
+					],
+					set: {
+						courseId: matchingCourse?.id || null,
+						courseName: input.courseName,
+						dosenId: input.dosenId,
+						hasKwu: input.hasKwu ?? false,
+						updatedAt: new Date(),
+					},
+				});
 
 			return { success: true };
 		},

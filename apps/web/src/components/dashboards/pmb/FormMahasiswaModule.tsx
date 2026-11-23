@@ -28,16 +28,16 @@ export function FormMahasiswaModule() {
 	return (
 		<div className="space-y-6">
 			<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-				<TabsList className="bg-slate-100 p-1 rounded-lg border border-slate-200">
+				<TabsList className="grid h-auto w-full grid-cols-3 sm:inline-flex sm:w-auto bg-slate-100 p-1 rounded-lg border border-slate-200">
 					<TabsTrigger
 						value="formulir"
-						className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-md px-6"
+						className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-md px-3 sm:px-6 h-11 sm:h-9 text-xs sm:text-sm justify-center"
 					>
 						Formulir
 					</TabsTrigger>
 					<TabsTrigger
 						value="respons"
-						className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-md px-6 flex items-center gap-1.5"
+						className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-md px-3 sm:px-6 h-11 sm:h-9 text-xs sm:text-sm justify-center flex items-center gap-1.5"
 					>
 						<span>Respons</span>
 						{pendingCount !== null && pendingCount > 0 && (
@@ -48,9 +48,10 @@ export function FormMahasiswaModule() {
 					</TabsTrigger>
 					<TabsTrigger
 						value="riwayat"
-						className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-md px-6"
+						className="data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm rounded-md px-3 sm:px-6 h-11 sm:h-9 text-xs sm:text-sm justify-center"
 					>
-						Riwayat Respons
+						<span className="sm:hidden">Riwayat</span>
+						<span className="hidden sm:inline">Riwayat Respons</span>
 					</TabsTrigger>
 				</TabsList>
 

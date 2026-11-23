@@ -42,6 +42,7 @@ import {
 	cacheInvalidatePattern,
 	cacheSet,
 } from "../lib/cache";
+import { PMB_REQUIRED_DOC_FIELDS } from "../lib/pmb-acc-requirements";
 import { GradeCalculationService } from "../modules/academic/grade-calculation.service";
 import { fileService } from "../modules/file/service/file.service";
 import { invalidateCrmCaches } from "./student/crm";
@@ -422,28 +423,11 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			}),
 		]);
 
-		// Hitung Progress PMB (17 item: 5 utama + 12 dokumen fisik)
-		const pmbChecklist = [
-			pmb?.formReceived,
-			pmb?.documentsComplete,
-			pmb?.dataInputted,
-			pmb?.initialFollowUp,
-			pmb?.pasFoto,
-			pmb?.docKtp,
-			pmb?.docKk,
-			pmb?.docCv,
-			pmb?.docIjazah,
-			pmb?.docTranskrip,
-			pmb?.docPassportDepan,
-			pmb?.docPassportVisa,
-			pmb?.docSkbm,
-			pmb?.docPreMcu,
-			pmb?.docMcu,
-			pmb?.docSla,
-			pmb?.docSertifikasiBahasa,
-		];
-		const pmbCompleted = pmbChecklist.filter(Boolean).length;
-		const pmbTotal = 17;
+		// Hitung Progress PMB (13 berkas wajib, sama dengan syarat ACC; opsional tidak dihitung)
+		const pmbCompleted = PMB_REQUIRED_DOC_FIELDS.filter((k) =>
+			Boolean((pmb as Record<string, unknown> | undefined)?.[k]),
+		).length;
+		const pmbTotal = PMB_REQUIRED_DOC_FIELDS.length;
 		const pmbPercent = Math.round((pmbCompleted / pmbTotal) * 100);
 
 		// Hitung Progress CRM (11 kriteria mencakup Segmen 9 Pra-Magang & Segmen 10 Konten Bulanan)
@@ -532,17 +516,18 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 		const praPasporCompleted = praPasporChecklist.filter(Boolean).length;
 		const praPasporPercent = Math.round((praPasporCompleted / 14) * 100);
 
+		// 12 dokumen keberangkatan — sama dengan getInternshipChecks (routes/student/internship.ts)
 		const mainMagangChecklist = [
 			internship?.passportReady,
 			internship?.interviewReady,
-			internship?.loaReady,
-			internship?.lolReady,
-			internship?.moaReady,
+			internship?.mouReady ?? internship?.moaReady,
+			internship?.loaConfirmed,
 			internship?.contractReady,
+			internship?.suhanReady,
 			internship?.mcuReady,
 			internship?.visaReady,
 			internship?.ticketReady,
-			internship?.pdtReady,
+			internship?.asesmenReady ?? internship?.pdtReady,
 			internship?.dokumentasiReady,
 			internship?.agenReady,
 		];
@@ -855,6 +840,11 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 							totalDp: paymentPlan.totalDp,
 							pembayaranAwalDp: paymentPlan.pembayaranAwalDp,
 							statusDp: paymentPlan.statusDp,
+							billingType: paymentPlan.billingType,
+							billingNumber: paymentPlan.billingNumber,
+							billingBankName: paymentPlan.billingBankName,
+							billingAccountHolder: paymentPlan.billingAccountHolder,
+							billingDueDate: paymentPlan.billingDueDate,
 							janjiTahap2: paymentPlan.janjiTahap2,
 							janjiTahap2Nominal: paymentPlan.janjiTahap2Nominal,
 							janjiTahap2Notes: paymentPlan.janjiTahap2Notes,
@@ -1445,10 +1435,7 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				loaConfirmed: magang?.loaConfirmed ?? false,
 				loaDate: magang?.loaDate,
 
-				// 4. LoL & MoA
-				lolReady: magang?.lolReady ?? false,
-				lolDate: magang?.lolDate,
-				lolNotes: magang?.lolNotes,
+				// 4. MoA (LOL dihapus)
 				moaReady: magang?.moaReady ?? false,
 				moaDate: magang?.moaDate,
 				moaNotes: magang?.moaNotes,

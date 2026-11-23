@@ -6,7 +6,6 @@ import {
 	CheckCircle,
 	CheckCircle2,
 	Clock,
-	Download,
 	Edit3,
 	Eye,
 	FileCheck,
@@ -18,7 +17,6 @@ import {
 	MessageCircle,
 	Plane,
 	Printer,
-	RefreshCw,
 	RotateCcw,
 	Search,
 	ShieldAlert,
@@ -84,8 +82,11 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+	calculateCohortFromYear,
+	calculateYearFromCohort,
+} from "@/lib/cohort-generator";
 import { api } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 import {
 	calculateOverallStatus,
 	calculateProgressStatus,
@@ -99,11 +100,6 @@ const getPmbChecklist = (pmb: any) => {
 		{
 			name: "Formulir Masuk",
 			done: Boolean(pmb?.formReceived),
-			category: "Utama",
-		},
-		{
-			name: "Berkas Lengkap",
-			done: Boolean(pmb?.documentsComplete),
 			category: "Utama",
 		},
 		{
@@ -156,11 +152,6 @@ const getPmbChecklist = (pmb: any) => {
 		{
 			name: "Pre-Medical Check Up",
 			done: Boolean(pmb?.docPreMcu),
-			category: "Dokumen",
-		},
-		{
-			name: "Medical Check Up Full",
-			done: Boolean(pmb?.docMcu),
 			category: "Dokumen",
 		},
 		{
@@ -387,7 +378,7 @@ function formatWhatsAppUrl(phone: string | null | undefined) {
 function getAcademicYear(student: any) {
 	if (student?.academicYear) return student.academicYear;
 	if (student?.cohort && !Number.isNaN(Number(student.cohort))) {
-		const startYear = 2010 + Number(student.cohort);
+		const startYear = calculateYearFromCohort(Number(student.cohort));
 		return `${startYear}/${startYear + 1}`;
 	}
 	return student?.period || "-";
@@ -584,7 +575,8 @@ export function EvaluasiFinalisasiDashboard({
 				selectedCohort === "all" ||
 				s.student?.cohort?.toString() === selectedCohort ||
 				(Number(selectedCohort) >= 2000 &&
-					s.student?.cohort === Number(selectedCohort) - 2010);
+					s.student?.cohort ===
+						calculateCohortFromYear(Number(selectedCohort)));
 
 			// Decision filter
 			const studentDecision = s.decision?.evaluatorDecision || "menunggu";
@@ -771,60 +763,6 @@ export function EvaluasiFinalisasiDashboard({
 	};
 
 	// Export CSV handler
-	const handleExport = (tab: "evaluasi" | "finalisasi") => {
-		if (tab === "evaluasi") {
-			const exportData = filteredData.map((s: any) => {
-				const { accCount, overallStatus } = getStudentAccDetails(s);
-				return {
-					NIM: s.student.nim,
-					"Nama Mahasiswa": s.student.name,
-					Angkatan: s.student.cohort,
-					"Tahun Ajaran": getAcademicYear(s.student),
-					"No HP": s.student.phone || "-",
-					Program: s.student.program,
-					"Progress ACC": `${accCount}/7 Modul`,
-					"Status Keseluruhan": overallStatus,
-					"Keputusan Final":
-						s.decision?.evaluatorDecision === "layak_berangkat"
-							? "Layak Berangkat"
-							: s.decision?.evaluatorDecision === "ttd_kontrak"
-								? "TTD Kontrak"
-								: s.decision?.evaluatorDecision === "lanjut_interview"
-									? "Lanjut Interview"
-									: s.decision?.evaluatorDecision === "remedial"
-										? "Remedial / Tunda"
-										: "Menunggu",
-					"Catatan Evaluator": s.decision?.evaluatorNotes || "-",
-				};
-			});
-			exportToCSV(
-				exportData,
-				`Evaluasi_Finalisasi_${new Date().toISOString().split("T")[0]}`,
-			);
-		} else {
-			const exportData = candidatesData.map((s: any) => {
-				return {
-					NIM: s.student.nim,
-					"Nama Mahasiswa": s.student.name,
-					Angkatan: s.student.cohort,
-					"Tahun Ajaran": getAcademicYear(s.student),
-					"No HP": s.student.phone || "-",
-					Program: s.student.program,
-					"Tgl Keberangkatan": s.decision?.departureDate
-						? new Date(s.decision.departureDate).toLocaleDateString("id-ID")
-						: "Belum Diatur",
-					"Status Persetujuan Direktur": s.decision?.isApprovedByDirector
-						? "Disetujui"
-						: "Menunggu",
-					"Catatan Direktur": s.decision?.notes || "-",
-				};
-			});
-			exportToCSV(
-				exportData,
-				`Kandidat_Keberangkatan_SK_${new Date().toISOString().split("T")[0]}`,
-			);
-		}
-	};
 
 	return (
 		<div className="space-y-6 pb-12">
@@ -852,30 +790,6 @@ export function EvaluasiFinalisasiDashboard({
 						<span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
 						Terhubung Real-Time
 					</div>
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => {
-							setIsRefreshing(true);
-							onUpdate?.();
-							setTimeout(() => setIsRefreshing(false), 600);
-						}}
-						disabled={isRefreshing}
-						className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
-					>
-						<RefreshCw
-							className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-[#0517B0]" : ""}`}
-						/>
-						Refresh
-					</Button>
-					<Button
-						size="sm"
-						onClick={() => handleExport(activeTab as any)}
-						className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs gap-1.5 h-9 font-bold shadow-sm"
-					>
-						<Download className="w-3.5 h-3.5" />
-						Export CSV ({activeTab === "evaluasi" ? "Evaluasi" : "Finalisasi"})
-					</Button>
 				</div>
 			</div>
 

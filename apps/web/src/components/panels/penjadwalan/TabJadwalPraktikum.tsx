@@ -3,7 +3,6 @@
 import {
 	Building2,
 	Clock,
-	Download,
 	FlaskConical,
 	GraduationCap,
 	Loader2,
@@ -58,7 +57,6 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { DEFAULT_ROMBEL_OPTIONS, STANDARDIZED_ROOMS } from "@/constants/rooms";
 import { api } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 import { PrintableScheduleView } from "./PrintableScheduleView";
 
 const DAYS_OF_WEEK = [
@@ -277,51 +275,6 @@ export function TabJadwalPraktikum({ canEdit }: { canEdit: boolean }) {
 		setPeminatanFilter("all");
 	};
 
-	const handleExportCSV = () => {
-		if (filteredSchedules.length === 0) {
-			toast.error("Tidak ada data jadwal praktikum untuk diekspor");
-			return;
-		}
-
-		const exportData = filteredSchedules.map((s, idx) => {
-			const dosenUtama = s.dosen?.fullName || s.dosen?.name || "-";
-			const dosenPendamping =
-				s.dosenPendamping?.fullName || s.dosenPendamping?.name || "-";
-			return {
-				No: idx + 1,
-				Hari: s.dayOfWeek || "-",
-				"Jam Mulai": s.startTime || "-",
-				"Jam Selesai": s.endTime || "-",
-				"Mata Kuliah / Sesi": s.subject || "-",
-				"Dosen Pengampu / Instruktur": dosenUtama,
-				"Instruktur Pendamping": dosenPendamping,
-				Laboratorium: s.room || "-",
-				"Rombongan Belajar": s.rombel || "-",
-				Angkatan: s.cohort ? `Angkatan ${s.cohort}` : "-",
-				Catatan: s.notes || "-",
-			};
-		});
-
-		// Format penamaan file sesuai instruksi:
-		// "Jadwal Praktikum NusadayaAcademy" + (Angkatan jika bukan all) + (Minat jika difilter) + (Rombel jika bukan all)
-		const nameParts: string[] = ["Jadwal Praktikum NusadayaAcademy"];
-		if (cohortFilter !== "all") {
-			nameParts.push(`Angkatan ${cohortFilter}`);
-		}
-		if (peminatanFilter !== "all") {
-			nameParts.push(`Minat ${peminatanFilter}`);
-		}
-		if (rombelFilter !== "all") {
-			nameParts.push(rombelFilter);
-		}
-		const filename = nameParts.join(" ");
-
-		exportToCSV(exportData, filename);
-		toast.success(
-			`Berhasil mengekspor ${filteredSchedules.length} data jadwal praktikum`,
-		);
-	};
-
 	const handlePrint = () => {
 		const originalTitle = document.title;
 		const nameParts: string[] = ["Jadwal Praktikum NusadayaAcademy"];
@@ -370,16 +323,6 @@ export function TabJadwalPraktikum({ canEdit }: { canEdit: boolean }) {
 							</div>
 
 							<div className="flex items-center gap-2 w-full sm:w-auto">
-								<Button
-									variant="outline"
-									onClick={handleExportCSV}
-									disabled={filteredSchedules.length === 0}
-									className="border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold px-3 py-2 h-9"
-								>
-									<Download className="w-4 h-4 mr-1.5 text-emerald-600" />
-									Export CSV
-								</Button>
-
 								<Button
 									variant="outline"
 									onClick={handlePrint}

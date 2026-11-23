@@ -6,7 +6,6 @@ import {
 	CheckCircle,
 	CheckCircle2,
 	Clock,
-	Download,
 	Eye,
 	GraduationCap,
 	HeartHandshake,
@@ -30,7 +29,8 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarPersonFallback } from "@/components/ui/AvatarPersonFallback";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,8 +66,11 @@ import {
 	prefetchStudentDetail,
 	useStudentsList,
 } from "@/hooks/useStudentsList";
+import {
+	calculateCohortFromYear,
+	calculateYearFromCohort,
+} from "@/lib/cohort-generator";
 import { API_URL, api } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 import { useAuthStore } from "@/store";
 import {
 	calculateOverallStatus,
@@ -129,7 +132,7 @@ function formatWhatsAppUrl(phone: string | null | undefined) {
 function getAcademicYear(student: any) {
 	if (student?.academicYear) return student.academicYear;
 	if (student?.cohort && !Number.isNaN(Number(student.cohort))) {
-		const startYear = 2010 + Number(student.cohort);
+		const startYear = calculateYearFromCohort(Number(student.cohort));
 		return `${startYear}/${startYear + 1}`;
 	}
 	return student?.period || "-";
@@ -141,11 +144,6 @@ const getPmbChecklist = (pmb: any) => {
 		{
 			name: "Formulir Masuk",
 			done: Boolean(pmb?.formReceived),
-			category: "Utama",
-		},
-		{
-			name: "Berkas Lengkap",
-			done: Boolean(pmb?.documentsComplete),
 			category: "Utama",
 		},
 		{
@@ -198,11 +196,6 @@ const getPmbChecklist = (pmb: any) => {
 		{
 			name: "Pre-Medical Check Up",
 			done: Boolean(pmb?.docPreMcu),
-			category: "Dokumen",
-		},
-		{
-			name: "Medical Check Up Full",
-			done: Boolean(pmb?.docMcu),
 			category: "Dokumen",
 		},
 		{
@@ -738,7 +731,8 @@ function DivisionStudentsView({
 				selectedCohort === "all" ||
 				s.student?.cohort?.toString() === selectedCohort ||
 				(Number(selectedCohort) >= 2000 &&
-					s.student?.cohort === Number(selectedCohort) - 2010);
+					s.student?.cohort ===
+						calculateCohortFromYear(Number(selectedCohort)));
 
 			const checklist = config.getChecklist(s);
 			const isAcc = config.getIsAcc(s);
@@ -811,36 +805,6 @@ function DivisionStudentsView({
 		);
 	}).length;
 
-	const handleExport = () => {
-		if (filteredData.length > 0) {
-			const exportData = filteredData.map((s) => {
-				const checklist = config.getChecklist(s);
-				const isAcc = config.getIsAcc(s);
-				const statusCat = calculateProgressStatus(
-					checklist.completed,
-					checklist.total,
-					isAcc,
-				);
-				return {
-					NIM: s.student?.nim || "-",
-					"Nama Mahasiswa": s.student?.name || "-",
-					Angkatan: s.student?.cohort || "-",
-					Rombel: s.student?.rombel || "Kelas A",
-					"Tahun Ajaran": getAcademicYear(s.student),
-					Peminatan: s.student?.subProgram || s.student?.program || "-",
-					"No WhatsApp": s.student?.phone || "-",
-					Progress: `${checklist.completed}/${checklist.total} (${Math.round((checklist.completed / checklist.total) * 100)}%)`,
-					Status: statusCat,
-					ACC: isAcc ? "Sudah ACC" : "Belum",
-				};
-			});
-			exportToCSV(
-				exportData,
-				`Data_Mahasiswa_${role.toUpperCase()}_${new Date().toISOString().split("T")[0]}`,
-			);
-		}
-	};
-
 	return (
 		<div className="space-y-6 pb-12">
 			{/* Header */}
@@ -892,16 +856,6 @@ function DivisionStudentsView({
 							</Link>
 						</>
 					)}
-
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={handleExport}
-						className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
-					>
-						<Download className="w-3.5 h-3.5" />
-						Export CSV
-					</Button>
 				</div>
 			</div>
 
@@ -1375,7 +1329,8 @@ function SuperadminStudentsView({
 				selectedCohort === "all" ||
 				s.student?.cohort?.toString() === selectedCohort ||
 				(Number(selectedCohort) >= 2000 &&
-					s.student?.cohort === Number(selectedCohort) - 2010);
+					s.student?.cohort ===
+						calculateCohortFromYear(Number(selectedCohort)));
 
 			const { isAllAcc, overallStatus } = getStudentAccDetails(s);
 			let matchStatus = true;
@@ -1414,7 +1369,8 @@ function SuperadminStudentsView({
 			(s) =>
 				s.student?.cohort?.toString() === selectedCohort ||
 				(Number(selectedCohort) >= 2000 &&
-					s.student?.cohort === Number(selectedCohort) - 2010),
+					s.student?.cohort ===
+						calculateCohortFromYear(Number(selectedCohort))),
 		);
 	}, [data, selectedCohort]);
 
@@ -1437,42 +1393,6 @@ function SuperadminStudentsView({
 			s.decision?.evaluatorDecision === "layak_berangkat" ||
 			s.decision?.isApprovedByDirector === true,
 	).length;
-
-	const handleExport = () => {
-		if (filteredData.length > 0) {
-			const exportData = filteredData.map((s) => {
-				const { accCount, overallStatus } = getStudentAccDetails(s);
-				return {
-					NIM: s.student.nim,
-					"Nama Mahasiswa": s.student.name,
-					"Program Studi": s.student.program,
-					Angkatan: s.student.cohort,
-					Rombel: s.student.rombel || "Kelas A",
-					"Tahun Ajaran": getAcademicYear(s.student),
-					"No HP": s.student.phone || "-",
-					"Progress ACC": `${accCount}/7 Modul`,
-					"Status PMB": s.pmb?.status || "-",
-					"Status CRM": s.crm?.status || "-",
-					"Status Finance": s.finance?.status || "-",
-					"Status Akademik": s.academic?.status || "-",
-					"Status PA": s.pa?.status || "-",
-					"Status Magang": s.internship?.status || "-",
-					"Status Keseluruhan": overallStatus,
-					"Keputusan Evaluator": s.decision?.evaluatorDecision || "menunggu",
-					"Disetujui Direktur": s.decision?.isApprovedByDirector
-						? "Ya"
-						: "Belum",
-					"Tgl Keberangkatan": s.decision?.departureDate
-						? new Date(s.decision.departureDate).toLocaleDateString("id-ID")
-						: "-",
-				};
-			});
-			exportToCSV(
-				exportData,
-				`Data_Master_Semua_Mahasiswa_${new Date().toISOString().split("T")[0]}`,
-			);
-		}
-	};
 
 	return (
 		<div className="space-y-6 pb-12">
@@ -1516,16 +1436,6 @@ function SuperadminStudentsView({
 							Tambah Mahasiswa
 						</Button>
 					</Link>
-
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={handleExport}
-						className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
-					>
-						<Download className="w-3.5 h-3.5" />
-						Export CSV
-					</Button>
 				</div>
 			</div>
 
@@ -1752,11 +1662,7 @@ function SuperadminStudentsView({
 																className="w-full h-full object-cover rounded-full"
 															/>
 														) : (
-															<AvatarFallback className="bg-blue-50 text-[#0517B0] font-bold text-xs">
-																{s.student.name
-																	? s.student.name.substring(0, 2).toUpperCase()
-																	: "MH"}
-															</AvatarFallback>
+															<AvatarPersonFallback />
 														)}
 													</Avatar>
 													<div>

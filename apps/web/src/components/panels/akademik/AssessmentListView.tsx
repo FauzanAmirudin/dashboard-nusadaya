@@ -5,7 +5,6 @@ import {
 	CheckCircle2,
 	ClipboardList,
 	Clock,
-	Download,
 	RotateCcw,
 	Search,
 	Users,
@@ -34,7 +33,6 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { API_URL, getToken } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -191,29 +189,6 @@ export function AssessmentListView() {
 
 	// ── Export CSV ────────────────────────────────────────────────────────────
 
-	const handleExport = () => {
-		if (filteredData.length === 0) {
-			toast.error("Tidak ada data untuk diekspor");
-			return;
-		}
-		const exportData = filteredData.map((s) => ({
-			Nama: s.name,
-			NIM: s.nim ?? "-",
-			Program: s.program,
-			"Sub Program": s.subProgram ?? "-",
-			Angkatan: s.cohort,
-			"Tahun Ajaran": s.academicYear ?? "-",
-			Periode: s.period ?? "-",
-			Nilai: s.departureAssessment?.score ?? "-",
-			Status: STATUS_LABEL[getEffectiveStatus(s)],
-		}));
-		exportToCSV(
-			exportData,
-			`Assessment_Pra-keberangkatan_${new Date().toISOString().split("T")[0]}`,
-		);
-		toast.success("Data berhasil diekspor ke CSV");
-	};
-
 	// ── Render ────────────────────────────────────────────────────────────────
 
 	return (
@@ -237,14 +212,6 @@ export function AssessmentListView() {
 						</p>
 					</div>
 				</div>
-				<Button
-					variant="outline"
-					onClick={handleExport}
-					disabled={isLoading || filteredData.length === 0}
-				>
-					<Download className="w-4 h-4 mr-2" />
-					Export CSV
-				</Button>
 			</div>
 
 			{/* KPI Cards */}

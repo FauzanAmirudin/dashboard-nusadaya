@@ -36,6 +36,7 @@ import {
 	weeklyEvents,
 } from "../../db/schema";
 import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
+import { checkPembiasaanEligible } from "../../lib/crm-pembiasaan";
 import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 import { fileService } from "../../modules/file/service/file.service";
@@ -51,6 +52,26 @@ export async function invalidateCrmCaches(studentId: number) {
 }
 
 export const crmRoutes = new Elysia()
+	// Mahasiswa waiting list (DP belum diverifikasi Finance): CRM boleh melihat, belum boleh mengubah data
+	.onBeforeHandle(async ({ request, params, set }: any) => {
+		if (request.method === "GET") return;
+		if (new URL(request.url).pathname.endsWith("/crm/kehadiran/sync")) return;
+		const id = Number(params?.id);
+		if (!id) return;
+		const st = await db.query.students.findFirst({
+			where: eq(students.id, id),
+			columns: { studentStatus: true },
+		});
+		if (st?.studentStatus === "menunggu_pembayaran") {
+			set.status = 400;
+			// `as never`: respons penolakan tidak boleh mengubah tipe respons route CRM (Eden)
+			return {
+				success: false,
+				message:
+					"Data CRM baru bisa diubah setelah pembayaran awal (DP) diverifikasi Finance.",
+			} as never;
+		}
+	})
 	.get("/:id/crm", async ({ params, set }) => {
 		set.headers["cache-control"] = "no-store, no-cache, must-revalidate";
 		const id = Number(params.id);
@@ -320,6 +341,44 @@ export const crmRoutes = new Elysia()
 			const id = Number(params.id);
 			const updates = { ...(body as Record<string, any>) };
 
+			// Persetujuan Kehadiran & Pembiasaan: tiap jenis pembiasaan wajib punya
+			// sesi tercatat dan kehadiran >= 80%. Dulu bisa di-ACC walau 0/0 sesi.
+			if (updates.practiceAttendance === true) {
+				const acad = await db.query.academicData.findFirst({
+					where: eq(academicData.studentId, id),
+				});
+				const eligibility = checkPembiasaanEligible([
+					{
+						label: "Piket",
+						total: acad?.attendancePiketTotal ?? 0,
+						present: acad?.attendancePiketPresent ?? 0,
+					},
+					{
+						label: "Baris Pagi",
+						total: acad?.attendanceBarisTotal ?? 0,
+						present: acad?.attendanceBarisPresent ?? 0,
+					},
+					{
+						label: "ODS",
+						total: acad?.attendanceOdsTotal ?? 0,
+						present: acad?.attendanceOdsPresent ?? 0,
+					},
+					{
+						label: "Pra-Magang",
+						total: acad?.attendancePramagangTotal ?? 0,
+						present: acad?.attendancePramagangPresent ?? 0,
+					},
+				]);
+				if (!eligibility.ok) {
+					set.status = 400;
+					return {
+						success: false,
+						code: "PEMBIASAAN_NOT_ELIGIBLE",
+						message: `Kehadiran & pembiasaan belum memenuhi syarat: ${eligibility.blockers.join("; ")}.`,
+					};
+				}
+			}
+
 			if ("pramagangStartDate" in updates) {
 				if (!updates.pramagangStartDate || updates.pramagangStartDate === "") {
 					updates.pramagangStartDate = null;
@@ -332,12 +391,20 @@ export const crmRoutes = new Elysia()
 				}
 			}
 
+			// Sesi ODS dianggap selesai hanya bila laporan, tanggal, dan nama
+			// industri lengkap. Dulu cukup unggah laporan tanpa tanggal/industri.
 			if ("odsDetails" in updates && Array.isArray(updates.odsDetails)) {
 				for (let i = 0; i < 5; i++) {
 					const num = i + 1;
 					const item = updates.odsDetails[i];
-					const isDone = Boolean(item?.isDone);
+					const isDone =
+						Boolean(item?.isDone) &&
+						Boolean(item?.date) &&
+						String(item?.industry ?? "").trim() !== "";
 					(updates as any)[`isOds${num}Report`] = isDone;
+					if (item && typeof item === "object") {
+						(updates.odsDetails as any[])[i] = { ...item, isDone };
+					}
 				}
 			}
 

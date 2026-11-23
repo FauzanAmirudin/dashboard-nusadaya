@@ -10,7 +10,6 @@ import {
 	ChevronUp,
 	ClipboardCheck,
 	Clock,
-	Edit2,
 	FileText,
 	GraduationCap,
 	Loader2,
@@ -19,7 +18,6 @@ import {
 	Pencil,
 	Save,
 	Sparkles,
-	X,
 	XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -78,13 +76,6 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 	const canEdit = user?.role === "superadmin" || user?.role === "akademik";
 
 	// Edit Agregat Kehadiran Mata Kuliah
-	const [editingCourse, setEditingCourse] = useState<number | null>(null);
-	const [editForm, setEditForm] = useState({
-		attendancePresent: 0,
-		totalMeetings: 16,
-		attitudeNote: "",
-	});
-	const [isSaving, setIsSaving] = useState(false);
 
 	// Modal Edit Detail & Catatan Pertemuan
 	const [meetingModal, setMeetingModal] = useState<MeetingDetailModalState>({
@@ -191,43 +182,6 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 			if (bc) bc.close();
 		};
 	}, [studentId]);
-
-	const handleEditClick = (course: any) => {
-		setEditingCourse(course.id);
-		setEditForm({
-			attendancePresent: course.attendancePresent || 0,
-			totalMeetings: course.totalMeetings || 16,
-			attitudeNote: course.attitudeNote || "",
-		});
-	};
-
-	const handleSaveEdit = async (courseGradeId: number) => {
-		setIsSaving(true);
-		try {
-			const payload: any = {
-				attendancePresent: editForm.attendancePresent,
-				totalMeetings: editForm.totalMeetings,
-				attitudeNote: editForm.attitudeNote,
-			};
-
-			const res = await (api as any).attendance.mahasiswa[studentId][
-				"mata-kuliah"
-			][courseGradeId].patch(payload);
-
-			if (res.data?.success) {
-				toast.success("Berhasil memperbarui data presensi mata kuliah");
-				setEditingCourse(null);
-				await fetchData();
-				broadcastAcademicUpdate();
-			} else {
-				toast.error(res.data?.message || "Gagal menyimpan perubahan");
-			}
-		} catch (error) {
-			toast.error("Terjadi kesalahan sistem saat menyimpan data presensi");
-		} finally {
-			setIsSaving(false);
-		}
-	};
 
 	// 1-Click quick status changer
 	const handleQuickMeetingStatusChange = async (
@@ -367,7 +321,6 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 		<div className="space-y-4">
 			{visibleGrades.map((g: any, index: number) => {
 				const isExpanded = expandedCourse === g.id;
-				const isEditing = editingCourse === g.id;
 
 				const meetingsList = g.meetings || [];
 				const realHadir = meetingsList.filter(
@@ -529,32 +482,6 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 
 							{/* Actions & Chevron Trigger */}
 							<div className="flex items-center gap-2 self-stretch lg:self-auto justify-end pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-								{canEdit && !g.isAcc && (
-									<Button
-										variant="outline"
-										size="sm"
-										onClick={(e) => {
-											e.stopPropagation();
-											if (isEditing) {
-												setEditingCourse(null);
-											} else {
-												handleEditClick(g);
-												if (!isExpanded) setExpandedCourse(g.id);
-											}
-										}}
-										className="h-8 text-xs text-[#0517B0] border-blue-200 hover:bg-blue-50 font-semibold gap-1.5"
-									>
-										{isEditing ? (
-											<X className="w-3.5 h-3.5" />
-										) : (
-											<Edit2 className="w-3.5 h-3.5" />
-										)}
-										<span>
-											{isEditing ? "Tutup Form" : "Koreksi Kehadiran"}
-										</span>
-									</Button>
-								)}
-
 								<CollapsibleTrigger
 									className={cn(
 										buttonVariants({ variant: "ghost", size: "sm" }),
@@ -573,76 +500,12 @@ export function TabMataKuliah({ studentId }: { studentId: number }) {
 
 						{/* Expanded Content */}
 						<CollapsibleContent className="bg-slate-50/50 border-t border-slate-100 p-4 sm:p-5 space-y-4">
-							{/* Form Edit Kehadiran & Sikap (Direct Database Update) */}
-							{isEditing && (
-								<div className="p-4 sm:p-5 bg-white rounded-2xl border border-blue-200 shadow-xs space-y-4 animate-in fade-in-50 duration-150">
-									<div className="flex items-center justify-between border-b border-slate-100 pb-3">
-										<div className="flex items-center gap-2">
-											<Sparkles className="w-4 h-4 text-[#0517B0]" />
-											<h5 className="text-xs sm:text-sm font-bold text-slate-800">
-												Koreksi Kehadiran & Catatan Presensi
-											</h5>
-										</div>
-										<Badge variant="outline" className="text-[10px] font-mono">
-											Update Real-time ke Database
-										</Badge>
-									</div>
-
-									<div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-										<div className="space-y-1">
-											<Label className="text-xs font-semibold text-slate-700">
-												Total Hadir
-											</Label>
-											<Input
-												type="number"
-												className="h-9 text-xs bg-white font-bold"
-												value={editForm.attendancePresent}
-												onChange={(e) =>
-													setEditForm((p) => ({
-														...p,
-														attendancePresent:
-															parseInt(e.target.value, 10) || 0,
-													}))
-												}
-												min={0}
-											/>
-										</div>
-
-										<div className="space-y-1">
-											<Label className="text-xs font-semibold text-slate-700">
-												Total Sesi Perkuliahan
-											</Label>
-											<Input
-												type="number"
-												className="h-9 text-xs bg-white font-bold"
-												value={editForm.totalMeetings}
-												onChange={(e) =>
-													setEditForm((p) => ({
-														...p,
-														totalMeetings: parseInt(e.target.value, 10) || 16,
-													}))
-												}
-												min={1}
-											/>
-										</div>
-
-										<div className="space-y-1">
-											<Button
-												size="sm"
-												onClick={() => handleSaveEdit(g.id)}
-												disabled={isSaving}
-												className="h-9 text-xs text-white bg-[#0517B0] hover:bg-blue-800 font-semibold gap-1.5 shadow-2xs w-full"
-											>
-												{isSaving ? (
-													<Loader2 className="w-3.5 h-3.5 animate-spin" />
-												) : (
-													<Save className="w-3.5 h-3.5" />
-												)}
-												<span>Simpan Presensi</span>
-											</Button>
-										</div>
-									</div>
-								</div>
+							{canEdit && !g.isAcc && (
+								<p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-slate-700">
+									Jumlah hadir dihitung otomatis dari status tiap sesi di bawah.
+									Untuk memperbaiki presensi, ubah status sesi yang bersangkutan
+									— angka total dan nilai akhir ikut diperbarui.
+								</p>
 							)}
 
 							{/* Session List */}

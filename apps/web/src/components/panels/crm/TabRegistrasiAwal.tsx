@@ -239,24 +239,6 @@ export function TabRegistrasiAwal({
 						<div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
 							<div>
 								<span className="text-xs font-bold text-slate-800 block">
-									Berkas Lengkap
-								</span>
-								<span className="text-[11px] text-slate-500">Fisik Berkas</span>
-							</div>
-							{crmState?.pmb?.documentsComplete ? (
-								<Badge className="bg-emerald-500 text-white text-[10px]">
-									Selesai
-								</Badge>
-							) : (
-								<Badge variant="outline" className="text-slate-400 text-[10px]">
-									Belum
-								</Badge>
-							)}
-						</div>
-
-						<div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
-							<div>
-								<span className="text-xs font-bold text-slate-800 block">
 									Input Data Awal
 								</span>
 								<span className="text-[11px] text-slate-500">Entri Sistem</span>
@@ -359,7 +341,7 @@ export function TabRegistrasiAwal({
 					<div>
 						<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
 							<Users className="w-4 h-4 text-[#0517B0]" />
-							Daftar Kontak Kawan Prospek (Leads CRM)
+							Daftar Kontak Teman Prospek (Leads CRM)
 						</CardTitle>
 						<p className="text-xs text-slate-500 mt-0.5">
 							Kontak rekan rekomendasi dari pendaftar untuk prospek calon
@@ -381,7 +363,7 @@ export function TabRegistrasiAwal({
 						</div>
 					) : friendContacts.length === 0 ? (
 						<div className="p-8 text-center text-slate-400 text-xs">
-							Belum ada daftar kontak kawan yang tercatat untuk mahasiswa ini.
+							Belum ada daftar kontak teman yang tercatat untuk mahasiswa ini.
 						</div>
 					) : (
 						<div className="overflow-x-auto">
@@ -389,7 +371,7 @@ export function TabRegistrasiAwal({
 								<thead className="bg-slate-50/70 border-b border-slate-200 text-slate-700 text-[11px] font-semibold">
 									<tr>
 										<th className="py-2.5 px-4 text-left">No</th>
-										<th className="py-2.5 px-4 text-left">Nama Kawan</th>
+										<th className="py-2.5 px-4 text-left">Nama Teman</th>
 										<th className="py-2.5 px-4 text-left">Nomor WhatsApp</th>
 										<th className="py-2.5 px-4 text-left">
 											Asal Sekolah / Hubungan

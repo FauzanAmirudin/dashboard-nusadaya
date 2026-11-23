@@ -57,6 +57,8 @@ export interface UseStudentsListParams {
 	search?: string;
 	archived?: boolean;
 	all?: boolean;
+	/** Sertakan mahasiswa waiting list (belum lunas DP), mis. untuk Panel CRM */
+	includeWaiting?: boolean;
 	enabled?: boolean;
 	refetchInterval?: number | false;
 }
@@ -71,6 +73,7 @@ export function useStudentsList(params: UseStudentsListParams = {}) {
 		search,
 		archived = false,
 		all = false,
+		includeWaiting = false,
 		enabled = true,
 		refetchInterval = 15000,
 	} = params;
@@ -92,6 +95,7 @@ export function useStudentsList(params: UseStudentsListParams = {}) {
 				search: cleanSearch,
 				archived,
 				all,
+				includeWaiting,
 			},
 		],
 		queryFn: async () => {
@@ -105,6 +109,7 @@ export function useStudentsList(params: UseStudentsListParams = {}) {
 			if (cleanStatus) queryObj.status = cleanStatus;
 			if (cleanSearch) queryObj.search = cleanSearch;
 			if (all) queryObj.all = "true";
+			if (includeWaiting) queryObj.includeWaiting = "true";
 
 			const res = await api.students.get({
 				$query: queryObj as any,

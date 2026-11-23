@@ -67,8 +67,11 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+	calculateCohortFromYear,
+	getAcademicYearFromCohort,
+} from "@/lib/cohort-generator";
 import { getToken } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 import { normalizeStatus } from "@/utils/status";
 
 function formatWhatsAppUrl(phone: string | null | undefined) {
@@ -223,7 +226,8 @@ export function AkademikDashboard({
 			(s: any) =>
 				s.student?.cohort?.toString() === selectedCohort ||
 				(Number(selectedCohort) >= 2000 &&
-					s.student?.cohort === Number(selectedCohort) - 2010),
+					s.student?.cohort ===
+						calculateCohortFromYear(Number(selectedCohort))),
 		);
 	}, [data, selectedCohort]);
 
@@ -333,49 +337,6 @@ export function AkademikDashboard({
 		};
 	};
 
-	const handleExport = () => {
-		const exportData = filteredData.map((s: any) => {
-			const checklist = getAcademicChecklist(s);
-			return {
-				NIM: s.student?.nim || "-",
-				"Nama Mahasiswa": s.student?.name || "-",
-				Angkatan: s.student?.cohort ? `Angkatan ${s.student.cohort}` : "-",
-				Rombel: s.student?.rombel || "Kelas A",
-				"Tahun Ajaran": s.student?.academicYear || s.student?.period || "-",
-				Peminatan:
-					s.student?.subProgram ||
-					s.student?.destinationCountry ||
-					s.student?.program ||
-					"-",
-				"No. WhatsApp": s.student?.phone || "-",
-				"Progress Checklist": `${checklist.completed}/7 Item (${Math.round((checklist.completed / 7) * 100)}%)`,
-				"Input PDDIKTI": s.academic?.pddiktiInput ? "Sudah" : "Belum",
-				"Lulus UTS": s.academic?.utsPassed ? "Ya" : "Tidak",
-				"Lulus UAS": s.academic?.uasPassed ? "Ya" : "Tidak",
-				"Indikator Sikap": s.academic?.attitudeIndicator ? "Ya" : "Tidak",
-				"Tugas Selesai": s.academic?.assignmentsCompleted ? "Ya" : "Tidak",
-				"Komunikasi Akademik": s.academic?.academicCommunication
-					? "Ya"
-					: "Tidak",
-				"Asesmen Pra-keberangkatan": s.academic?.assessmentCompleted
-					? "Ya"
-					: "Tidak",
-				"Presensi (≥80%)": checklist.attendanceOk ? "Memenuhi" : "Belum",
-				"Status Akademik": s.academic?.isAcc
-					? "Sudah ACC"
-					: s.academic?.status === "AMAN"
-						? "Aman"
-						: s.academic?.status === "PROSES"
-							? "Berproses"
-							: "Butuh Perhatian",
-			};
-		});
-		exportToCSV(
-			exportData,
-			`Data_Akademik_${new Date().toISOString().split("T")[0]}`,
-		);
-	};
-
 	return (
 		<div className="space-y-6 pb-12">
 			{/* Top Header */}
@@ -395,18 +356,6 @@ export function AkademikDashboard({
 							</p>
 						</div>
 					</div>
-				</div>
-
-				<div className="flex flex-wrap items-center gap-2.5">
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={handleExport}
-						className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
-					>
-						<Download className="w-3.5 h-3.5" />
-						Export Data Akademik
-					</Button>
 				</div>
 			</div>
 
@@ -657,7 +606,9 @@ export function AkademikDashboard({
 												{s.student.academicYear ||
 													(s.student.cohort &&
 													!Number.isNaN(Number(s.student.cohort))
-														? `${2010 + Number(s.student.cohort)}/${2011 + Number(s.student.cohort)}`
+														? getAcademicYearFromCohort(
+																Number(s.student.cohort),
+															)
 														: s.student.period || (
 																<span className="text-slate-400 italic">-</span>
 															))}

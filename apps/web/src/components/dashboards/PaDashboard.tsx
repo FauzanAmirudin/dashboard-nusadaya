@@ -4,7 +4,6 @@ import {
 	CheckCircle,
 	CheckCircle2,
 	Clock,
-	Download,
 	Eye,
 	HeartHandshake,
 	HelpCircle,
@@ -51,8 +50,11 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+	calculateCohortFromYear,
+	getAcademicYearFromCohort,
+} from "@/lib/cohort-generator";
 import { api } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 import { hasRole, useAuthStore } from "@/store";
 import { normalizeStatus } from "@/utils/status";
 
@@ -146,7 +148,8 @@ export function PaDashboard({ user: propUser, data = [], onUpdate }: any) {
 			(s: any) =>
 				s.student?.cohort?.toString() === selectedCohort ||
 				(Number(selectedCohort) >= 2000 &&
-					s.student?.cohort === Number(selectedCohort) - 2010),
+					s.student?.cohort ===
+						calculateCohortFromYear(Number(selectedCohort))),
 		);
 	}, [paFilteredData, selectedCohort]);
 
@@ -217,40 +220,6 @@ export function PaDashboard({ user: propUser, data = [], onUpdate }: any) {
 		};
 	};
 
-	const handleExport = () => {
-		const exportData = filteredData.map((s: any) => {
-			const checklist = getPaChecklist(s.pa);
-			return {
-				NIM: s.student?.nim || "-",
-				"Nama Mahasiswa": s.student?.name || "-",
-				Angkatan: s.student?.cohort ? `Angkatan ${s.student.cohort}` : "-",
-				"Tahun Ajaran": s.student?.academicYear || s.student?.period || "-",
-				Peminatan:
-					s.student?.subProgram ||
-					s.student?.destinationCountry ||
-					s.student?.program ||
-					"-",
-				"No. WhatsApp": s.student?.phone || "-",
-				"Progress Checklist": `${checklist.completed}/3 Indikator (${Math.round((checklist.completed / 3) * 100)}%)`,
-				"Konseling Selesai": s.pa?.counselingDone ? "Ya" : "Belum",
-				"Mental Stabil": s.pa?.mentalStable ? "Ya" : "Belum",
-				"Disiplin Baik": s.pa?.disciplineGood ? "Ya" : "Belum",
-				"Catatan Disiplin": s.pa?.disciplineNotes || "-",
-				"Status PA": s.pa?.isAcc
-					? "Sudah ACC"
-					: s.pa?.status === "AMAN"
-						? "Aman"
-						: s.pa?.status === "PROSES"
-							? "Berproses"
-							: "Butuh Perhatian",
-			};
-		});
-		exportToCSV(
-			exportData,
-			`Data_PA_${new Date().toISOString().split("T")[0]}`,
-		);
-	};
-
 	return (
 		<div className="space-y-6 pb-12">
 			{/* Top Header */}
@@ -300,16 +269,6 @@ export function PaDashboard({ user: propUser, data = [], onUpdate }: any) {
 							</SelectContent>
 						</Select>
 					)}
-
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={handleExport}
-						className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
-					>
-						<Download className="w-3.5 h-3.5" />
-						Export Data PA
-					</Button>
 				</div>
 			</div>
 
@@ -524,7 +483,9 @@ export function PaDashboard({ user: propUser, data = [], onUpdate }: any) {
 												{s.student.academicYear ||
 													(s.student.cohort &&
 													!Number.isNaN(Number(s.student.cohort))
-														? `${2010 + Number(s.student.cohort)}/${2011 + Number(s.student.cohort)}`
+														? getAcademicYearFromCohort(
+																Number(s.student.cohort),
+															)
 														: s.student.period || (
 																<span className="text-slate-400 italic">-</span>
 															))}

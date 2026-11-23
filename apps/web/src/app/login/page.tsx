@@ -523,8 +523,8 @@ function LoginForm() {
 				<div className="flex flex-col items-center text-center mb-7">
 					<div className="w-20 h-20 flex items-center justify-center mb-4">
 						<Image
-							src="/logonusadaya.png"
-							alt="Logo Nusadaya"
+							src="/icon.svg"
+							alt="Logo OneData Nusadaya"
 							width={80}
 							height={80}
 							className="object-contain"
@@ -532,7 +532,7 @@ function LoginForm() {
 						/>
 					</div>
 					<h1 className="text-2xl font-extrabold tracking-tight text-slate-900 mb-1">
-						Nusadaya Academy
+						OneData Nusadaya
 					</h1>
 					<p className="text-sm font-medium text-slate-500">
 						{step === "credentials"
@@ -632,7 +632,7 @@ function LoginForm() {
 
 				{/* Footer */}
 				<div className="mt-8 text-center text-xs font-medium text-slate-400/80">
-					&copy; 2026 Nusadaya Academy. Sistem Internal.
+					&copy; 2026 OneData Nusadaya. Sistem Internal.
 				</div>
 			</div>
 		</div>

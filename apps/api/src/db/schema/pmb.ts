@@ -48,6 +48,10 @@ export const pmbData = pgTable(
 		referralContactName: text("referral_contact_name"),
 		referralContactPhone: text("referral_contact_phone"),
 
+		// Pemberi rekomendasi pendaftaran (diisi tim PMB)
+		recommendedBy: text("recommended_by"),
+		recommenderName: text("recommender_name"),
+
 		// Dokumen Tambahan PMB Validation Checks
 		docKtp: boolean("doc_ktp").default(false),
 		docKk: boolean("doc_kk").default(false),
@@ -92,6 +96,15 @@ export const pmbPaymentPlan = pgTable(
 		janjiTahap3Nominal: integer("janji_tahap3_nominal").default(0),
 		janjiTahap3Notes: text("janji_tahap3_notes"),
 		pengajuanDanaTalangan: text("pengajuan_dana_talangan"),
+
+		// Tagihan DP manual oleh Finance (waiting list)
+		billingType: text("billing_type").default("va"), // "va" | "rekening"
+		billingNumber: text("billing_number"), // nomor VA atau nomor rekening
+		billingBankName: text("billing_bank_name"),
+		billingAccountHolder: text("billing_account_holder"), // hanya untuk rekening
+		billingIssuedAt: timestamp("billing_issued_at"),
+		billingDueDate: timestamp("billing_due_date"),
+		billingIssuedBy: integer("billing_issued_by").references(() => users.id),
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
 	(t) => [index("idx_pmb_payment_plan_student_id").on(t.studentId)],
@@ -262,11 +275,25 @@ export const pmbFormResponses = pgTable(
 		referralContactPhone: text("referral_contact_phone"),
 
 		// Tab 8: Kontak Darurat & Kawan
-		emergencyContactName: text("emergency_contact_name"),
-		emergencyContactPhone: text("emergency_contact_phone"),
-		emergencyContactRelation: text("emergency_contact_relation"),
+		// Kolom lama emergency_contact_name/phone/relation sengaja tidak dipetakan:
+		// Drizzle (json_build_array) membatasi maks. 100 kolom per tabel pada query
+		// relasional. Data lama dipindah ke emergency_contacts (lihat db/index.ts).
+		emergencyContacts: jsonb("emergency_contacts")
+			.$type<
+				Array<{
+					name: string;
+					phone: string;
+					relation: string;
+					note?: string;
+				}>
+			>()
+			.default([]),
 		recommendedBy: text("recommended_by"),
 		recommenderName: text("recommender_name"),
+		// Isian tambahan form tautan (lihat lib/extra-data.ts)
+		extraData: jsonb("extra_data")
+			.$type<import("../../lib/extra-data").ExtraData>()
+			.default({ hasBoneFracture: false, hasSurgery: false }),
 		friendContacts: jsonb("friend_contacts")
 			.$type<Array<{ name: string; phone: string; schoolOrRelation: string }>>()
 			.default([]),

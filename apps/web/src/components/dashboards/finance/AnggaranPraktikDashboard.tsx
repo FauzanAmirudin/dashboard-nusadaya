@@ -13,7 +13,6 @@ import {
 	ChevronRight,
 	Clock,
 	CreditCard,
-	Download,
 	Edit2,
 	ExternalLink,
 	Eye,
@@ -30,7 +29,6 @@ import {
 	Paperclip,
 	Plus,
 	Receipt,
-	RefreshCw,
 	RotateCcw,
 	Search,
 	Sparkles,
@@ -45,6 +43,7 @@ import {
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { AvatarPersonFallback } from "@/components/ui/AvatarPersonFallback";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -55,7 +54,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -606,21 +605,6 @@ export function AnggaranPraktikDashboard() {
 							</p>
 						</div>
 					</div>
-
-					<div className="flex items-center gap-2 self-start sm:self-center">
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={fetchData}
-							disabled={loading}
-							className="h-9 gap-2 border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-xs rounded-xl"
-						>
-							<RefreshCw
-								className={`w-3.5 h-3.5 ${loading ? "animate-spin text-[#0517B0]" : ""}`}
-							/>
-							Muat Ulang
-						</Button>
-					</div>
 				</div>
 			</div>
 
@@ -896,12 +880,6 @@ export function AnggaranPraktikDashboard() {
 												r.dosen?.fullName ||
 												r.dosen?.username ||
 												`Dosen ID ${r.dosenId}`;
-											const initials = dosenFullName
-												.split(" ")
-												.map((n) => n[0])
-												.slice(0, 2)
-												.join("")
-												.toUpperCase();
 
 											const itemsCount = (r.daftarKebutuhan || []).length;
 											const isApproved = r.status === "disetujui";
@@ -919,9 +897,7 @@ export function AnggaranPraktikDashboard() {
 													<TableCell className="py-3.5 px-4">
 														<div className="flex items-center gap-3">
 															<Avatar className="w-8 h-8 rounded-full bg-blue-100 text-[#0517B0] font-bold text-xs border border-blue-200/60 shrink-0">
-																<AvatarFallback className="bg-blue-100 text-[#0517B0] text-xs font-bold">
-																	{initials}
-																</AvatarFallback>
+																<AvatarPersonFallback />
 															</Avatar>
 															<div className="min-w-0">
 																<div className="text-xs font-bold text-slate-900 truncate">
@@ -1131,12 +1107,6 @@ export function AnggaranPraktikDashboard() {
 												rep.dosen?.fullName ||
 												rep.dosen?.username ||
 												`Dosen ID ${rep.dosenId}`;
-											const initials = dosenFullName
-												.split(" ")
-												.map((n) => n[0])
-												.slice(0, 2)
-												.join("")
-												.toUpperCase();
 
 											const sisaCount = (rep.daftarSisaBahan || []).length;
 
@@ -1151,9 +1121,7 @@ export function AnggaranPraktikDashboard() {
 													<TableCell className="py-3.5 px-4">
 														<div className="flex items-center gap-3">
 															<Avatar className="w-8 h-8 rounded-full bg-blue-100 text-[#0517B0] font-bold text-xs border border-blue-200/60 shrink-0">
-																<AvatarFallback className="bg-blue-100 text-[#0517B0] text-xs font-bold">
-																	{initials}
-																</AvatarFallback>
+																<AvatarPersonFallback />
 															</Avatar>
 															<div className="min-w-0">
 																<div className="text-xs font-bold text-slate-900 truncate">

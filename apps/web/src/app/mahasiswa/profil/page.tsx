@@ -8,11 +8,11 @@ import {
 	Lock,
 	Save,
 	Upload,
-	User,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarPersonFallback } from "@/components/ui/AvatarPersonFallback";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -207,9 +207,7 @@ export default function MahasiswaProfil() {
 										: ""
 								}
 							/>
-							<AvatarFallback className="bg-blue-50 text-[#0517B0]">
-								<User className="h-12 w-12" />
-							</AvatarFallback>
+							<AvatarPersonFallback />
 						</Avatar>
 						<div className="flex flex-col items-center sm:items-start gap-2">
 							<h3 className="text-lg font-semibold text-slate-800">

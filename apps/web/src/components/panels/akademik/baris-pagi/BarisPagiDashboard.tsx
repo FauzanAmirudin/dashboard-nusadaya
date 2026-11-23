@@ -12,7 +12,6 @@ import {
 	CheckCircle2,
 	ChevronRight,
 	Clock,
-	Download,
 	ExternalLink,
 	Eye,
 	Filter,
@@ -20,7 +19,6 @@ import {
 	Loader2,
 	MapPin,
 	Plus,
-	RefreshCw,
 	RotateCcw,
 	Save,
 	Search,
@@ -72,7 +70,6 @@ import {
 import { TablePagination } from "@/components/ui/TablePagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { API_URL, getFileUrl, getToken } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store";
 
@@ -898,29 +895,6 @@ export function BarisPagiDashboard({
 	}, [members]);
 
 	// Export Summary to CSV
-	const handleExportSummaryCSV = () => {
-		if (summaryList.length === 0) {
-			toast.error("Tidak ada data untuk diekspor");
-			return;
-		}
-		const exportData = summaryList.map((s, idx) => ({
-			No: idx + 1,
-			NIM: s.nim,
-			Nama: s.name,
-			Angkatan: s.cohort,
-			Rombel: s.rombel,
-			Program: s.program,
-			Total_Sesi: s.totalSesi,
-			Tepat_Waktu: s.totalTepatWaktu,
-			Terlambat: s.totalTerlambat,
-			Kepatuhan_Persen: `${s.complianceRate}%`,
-			Status_Kedisiplinan: s.statusDisiplin,
-		}));
-		exportToCSV(
-			exportData,
-			`Rekap_Kepatuhan_Baris_Pagi_0622_${new Date().toISOString().split("T")[0]}`,
-		);
-	};
 
 	return (
 		<div className="space-y-6">
@@ -976,20 +950,6 @@ export function BarisPagiDashboard({
 								</Button>
 							</Link>
 						)}
-						<Button
-							variant="outline"
-							size="icon"
-							onClick={() => {
-								fetchSessions();
-								if (selectedSessionId) fetchBoardData(selectedSessionId);
-								if (activeTab === "rekap") fetchSummary();
-								toast.info("Data diperbarui");
-							}}
-							className="rounded-xl border-slate-200"
-							title="Segarkan Data"
-						>
-							<RefreshCw className="w-4 h-4 text-slate-600" />
-						</Button>
 					</div>
 				</div>
 			) : (
@@ -1021,20 +981,6 @@ export function BarisPagiDashboard({
 								</Button>
 							</Link>
 						)}
-						<Button
-							variant="outline"
-							size="icon"
-							onClick={() => {
-								fetchSessions();
-								if (selectedSessionId) fetchBoardData(selectedSessionId);
-								if (activeTab === "rekap") fetchSummary();
-								toast.info("Data diperbarui");
-							}}
-							className="rounded-xl border-slate-200"
-							title="Segarkan Data"
-						>
-							<RefreshCw className="w-4 h-4 text-slate-600" />
-						</Button>
 					</div>
 				</div>
 			)}
@@ -2140,16 +2086,6 @@ export function BarisPagiDashboard({
 								</SelectContent>
 							</Select>
 						</div>
-
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={handleExportSummaryCSV}
-							className="rounded-xl text-xs font-semibold gap-2 border-slate-200 shadow-2xs"
-						>
-							<Download className="w-3.5 h-3.5 text-slate-600" />
-							Ekspor Rekap CSV
-						</Button>
 					</div>
 
 					{/* Rekap Table */}

@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { API_URL, api, getToken } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 import { useAuthStore } from "@/store";
 
 type CourseDetail = {
@@ -77,6 +76,10 @@ export default function RekapMataKuliahDetailPage() {
 	const [isLoading, setIsLoading] = useState(true);
 
 	// Filter
+	// Nilai resmi dari server (course_grades) — satu-satunya sumber nilai akhir
+	const [officialGrades, setOfficialGrades] = useState<
+		Record<number, { finalScore: number | null; grade: string | null }>
+	>({});
 	const [searchQuery, setSearchQuery] = useState("");
 
 	const fetchApi = (endpoint: string, options: RequestInit = {}) => {
@@ -107,6 +110,27 @@ export default function RekapMataKuliahDetailPage() {
 			}
 			const courseInfo = cData?.data as any;
 			setCourse(courseInfo);
+
+			// Nilai akhir & grade diambil dari server, tidak dihitung ulang di browser
+			try {
+				const gRes = await fetchApi(`/courses/${courseId}/grades`);
+				if (gRes.ok) {
+					const gJson = await gRes.json();
+					const map: Record<
+						number,
+						{ finalScore: number | null; grade: string | null }
+					> = {};
+					for (const row of gJson.data || []) {
+						map[row.studentId] = {
+							finalScore: row.finalScore ?? null,
+							grade: row.grade ?? null,
+						};
+					}
+					setOfficialGrades(map);
+				}
+			} catch (e) {
+				console.error("Gagal memuat nilai resmi mata kuliah", e);
+			}
 
 			// 2. Get meetings with attendances strictly 1..16
 			const { data: mData, error: mErr } =
@@ -331,44 +355,16 @@ export default function RekapMataKuliahDetailPage() {
 			const avgTheory = Math.round(sumTheory / totalMeetings);
 			const avgPractical = Math.round(sumPractical / totalMeetings);
 
-			const isPracticalCourse = course.type === "praktik";
-
-			// Perhitungan Nilai Akhir murni dinamis tanpa data statis/fallback dummy
-			let finalScore = 0;
-			if (isPracticalCourse) {
-				if (sumPractical > 0 && sumTheory > 0) {
-					// Standar praktik: 80% praktik + 20% teori
-					finalScore = Math.round(avgPractical * 0.8 + avgTheory * 0.2);
-				} else if (sumPractical > 0) {
-					finalScore = avgPractical;
-				} else if (sumTheory > 0) {
-					finalScore = avgTheory;
-				} else {
-					finalScore = 0;
-				}
-			} else {
-				// Standar teori: 80% teori + 20% praktik (atau 100% teori jika tidak ada praktik)
-				if (sumTheory > 0 && sumPractical > 0) {
-					finalScore = Math.round(avgTheory * 0.8 + avgPractical * 0.2);
-				} else if (sumTheory > 0) {
-					finalScore = avgTheory;
-				} else if (sumPractical > 0) {
-					finalScore = avgPractical;
-				} else {
-					finalScore = 0;
-				}
-			}
-
-			let grade = "-";
+			// Nilai akhir & grade diambil apa adanya dari server (bobot AKD-06),
+			// agar angka di halaman ini sama dengan profil mahasiswa dan KHS.
+			const official = officialGrades[student.id];
+			const finalScore = official?.finalScore ?? 0;
+			const grade =
+				official?.grade && official.grade !== "" ? official.grade : "-";
+			const isGraded = grade !== "-";
 			let statusKelulusan = "BELUM DINILAI";
 
-			if (hasAnyScore) {
-				if (finalScore >= 85) grade = "A";
-				else if (finalScore >= 75) grade = "B";
-				else if (finalScore >= 65) grade = "C";
-				else if (finalScore >= 50) grade = "D";
-				else grade = "E";
-
+			if (isGraded) {
 				if (attendanceRate < 75 && totalMeetings - unassignedCount > 10) {
 					statusKelulusan = "TIDAK MEMENUHI PRESENSI";
 				} else if (grade === "A") {
@@ -408,7 +404,7 @@ export default function RekapMataKuliahDetailPage() {
 				hasAnyScore,
 			};
 		});
-	}, [course, students, meetings]);
+	}, [course, students, meetings, officialGrades]);
 
 	// Filtered list
 	const filteredRecaps = useMemo(() => {
@@ -424,110 +420,6 @@ export default function RekapMataKuliahDetailPage() {
 	}, [studentRecaps, searchQuery]);
 
 	// Export Handlers
-	const handleExportMatrix = () => {
-		if (filteredRecaps.length === 0 || !course) return;
-
-		const exportRows = filteredRecaps.map((item, idx) => {
-			const row: Record<string, any> = {
-				No: idx + 1,
-				NIM: item.student.nim,
-				"Nama Mahasiswa": item.student.name,
-				Peminatan: item.student.peminatan || "-",
-			};
-
-			meetings.forEach((m) => {
-				const mRes = item.meetingResults[m.id];
-				const label =
-					m.meetingNumber === 8
-						? "UTS (P8)"
-						: m.meetingNumber === 16
-							? "UAS (P16)"
-							: `P${m.meetingNumber}`;
-
-				const statusText = mRes?.status ? mRes.status.toUpperCase() : "-";
-				const tScore = mRes?.theoryScore !== null ? mRes?.theoryScore : "-";
-				const pScore =
-					mRes?.practicalScore !== null ? mRes?.practicalScore : "-";
-
-				const isExam = m.meetingNumber === 8 || m.meetingNumber === 16;
-
-				row[`${label} (Presensi)`] = statusText;
-				if (isExam) {
-					row[`${label} (Nilai Ujian)`] = tScore;
-				} else {
-					if (m.sessionType === "teori" || m.sessionType === "keduanya") {
-						row[`${label} (Teori)`] = tScore;
-					}
-					if (m.sessionType === "praktik" || m.sessionType === "keduanya") {
-						row[`${label} (Praktik)`] = pScore;
-					}
-				}
-			});
-
-			row["Total Hadir"] = `${item.presentCount}/${item.totalMeetings}`;
-			row["Kehadiran (%)"] = `${item.attendanceRate}%`;
-			row["Rata-rata Teori"] = item.avgTheory;
-			row["Rata-rata Praktik"] = item.avgPractical;
-			row["Nilai Akhir"] = item.finalScore;
-			row.Grade = item.grade;
-			row["Status Evaluasi"] = item.status;
-			row["Status Kelulusan"] = item.statusKelulusan;
-
-			return row;
-		});
-
-		exportToCSV(
-			exportRows,
-			`Rekap_Matriks_${course.code}_${course.name.replace(/\s+/g, "_")}`,
-		);
-	};
-
-	const handleExportTranscript = () => {
-		if (filteredRecaps.length === 0 || !course) return;
-
-		const exportRows = filteredRecaps.map((item, idx) => ({
-			No: idx + 1,
-			NIM: item.student.nim,
-			"Nama Mahasiswa": item.student.name,
-			Angkatan: course.cohort,
-			Peminatan: item.student.peminatan || "-",
-			"Kehadiran (Hadir/Total)": `${item.presentCount}/${item.totalMeetings}`,
-			"Persentase Kehadiran": `${item.attendanceRate}%`,
-			"Rata-rata Teori (20%)": item.avgTheory,
-			"Rata-rata Praktik (80%)": item.avgPractical,
-			"Nilai Akhir": item.finalScore,
-			"Grade / Indeks": item.grade,
-			"Status Hasil Belajar": item.statusKelulusan,
-		}));
-
-		exportToCSV(
-			exportRows,
-			`Transkrip_Nilai_${course.code}_${course.name.replace(/\s+/g, "_")}`,
-		);
-	};
-
-	const handleExportAttendance = () => {
-		if (filteredRecaps.length === 0 || !course) return;
-
-		const exportRows = filteredRecaps.map((item, idx) => ({
-			No: idx + 1,
-			NIM: item.student.nim,
-			"Nama Mahasiswa": item.student.name,
-			"Hadir (H)": item.presentCount,
-			"Izin (I)": item.permitCount,
-			"Sakit (S)": item.sickCount,
-			"Alpha (A)": item.alphaCount,
-			"Belum Diisi (-)": item.unassignedCount,
-			"Total Sesi": item.totalMeetings,
-			"Tingkat Kehadiran": `${item.attendanceRate}%`,
-			"Status Evaluasi": item.status,
-		}));
-
-		exportToCSV(
-			exportRows,
-			`Rekap_Absensi_${course.code}_${course.name.replace(/\s+/g, "_")}`,
-		);
-	};
 
 	if (!hasHydrated || isLoading) {
 		return (
@@ -607,16 +499,7 @@ export default function RekapMataKuliahDetailPage() {
 					</div>
 				</div>
 
-				<div className="flex items-center gap-2 flex-wrap self-stretch sm:self-auto">
-					<Button
-						variant="outline"
-						onClick={handleExportMatrix}
-						disabled={filteredRecaps.length === 0}
-						className="border-slate-300 text-slate-700 hover:bg-slate-50 h-9"
-					>
-						<Download className="mr-2 h-4 w-4 text-emerald-600" /> Export Excel
-					</Button>
-				</div>
+				<div className="flex items-center gap-2 flex-wrap self-stretch sm:self-auto"></div>
 			</div>
 
 			{/* Filter Bar */}
@@ -927,14 +810,6 @@ export default function RekapMataKuliahDetailPage() {
 										Format rekapitulasi nilai akhir perkuliahan / arsip akademik
 									</CardDescription>
 								</div>
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={handleExportTranscript}
-									className="h-8 text-xs border-slate-300"
-								>
-									<Download className="h-3.5 w-3.5 mr-1" /> Unduh Laporan Nilai
-								</Button>
 							</div>
 						</CardHeader>
 						<CardContent className="p-0">
@@ -1089,14 +964,6 @@ export default function RekapMataKuliahDetailPage() {
 										mahasiswa di 16 sesi perkuliahan
 									</CardDescription>
 								</div>
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={handleExportAttendance}
-									className="h-8 text-xs border-slate-300"
-								>
-									<Download className="h-3.5 w-3.5 mr-1" /> Unduh Data Absensi
-								</Button>
 							</div>
 						</CardHeader>
 						<CardContent className="p-0">

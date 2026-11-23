@@ -239,119 +239,123 @@ export const documentsRoutes = new Elysia()
 				uploadedBy: user.id,
 			});
 
-			// Jika panel finance, update status field terkait secara otomatis & invalidate cache
+			// Jika panel finance: simpan bukti bayar, dan tandai LUNAS hanya bila
+			// nominal tagihannya > 0. Dulu unggah bukti selalu menandai "Lunas"
+			// walau nominal Rp 0, sehingga pos tanpa tagihan ikut terhitung lunas.
 			if (panel === "finance") {
-				if (documentKey === "registrasi") {
+				const financeDocMap: Record<
+					string,
+					{
+						status: string;
+						url: string;
+						paidDate?: string;
+						nominal: string;
+					}
+				> = {
+					registrasi: {
+						status: "registrasiStatus",
+						url: "registrasiBuktiBayarUrl",
+						paidDate: "registrasiPaidDate",
+						nominal: "registrasiNominal",
+					},
+					mandiri_interview: {
+						status: "mandiriInterviewStatus",
+						url: "mandiriInterviewBuktiBayarUrl",
+						paidDate: "mandiriInterviewPaidDate",
+						nominal: "mandiriInterviewNominal",
+					},
+					mandiri_kontrak_magang: {
+						status: "kontrakMagangStatus",
+						url: "kontrakMagangBuktiBayarUrl",
+						paidDate: "kontrakMagangPaidDate",
+						nominal: "mandiriInterviewNominal",
+					},
+					kontrak_magang: {
+						status: "kontrakMagangStatus",
+						url: "kontrakMagangBuktiBayarUrl",
+						paidDate: "kontrakMagangPaidDate",
+						nominal: "mandiriInterviewNominal",
+					},
+					mandiri_suhan: {
+						status: "suhanStatus",
+						url: "suhanBuktiBayarUrl",
+						paidDate: "suhanPaidDate",
+						nominal: "mandiriInterviewNominal",
+					},
+					suhan: {
+						status: "suhanStatus",
+						url: "suhanBuktiBayarUrl",
+						paidDate: "suhanPaidDate",
+						nominal: "mandiriInterviewNominal",
+					},
+					t1_interview: {
+						status: "t1InterviewStatus",
+						url: "t1InterviewBuktiBayarUrl",
+						paidDate: "t1InterviewPaidDate",
+						nominal: "t1InterviewNominal",
+					},
+					mandiri_keberangkatan: {
+						status: "mandiriKeberangkatanStatus",
+						url: "mandiriKeberangkatanBuktiBayarUrl",
+						paidDate: "mandiriKeberangkatanPaidDate",
+						nominal: "mandiriKeberangkatanNominal",
+					},
+					penempatan_keberangkatan: {
+						status: "mandiriKeberangkatanStatus",
+						url: "mandiriKeberangkatanBuktiBayarUrl",
+						paidDate: "mandiriKeberangkatanPaidDate",
+						nominal: "mandiriKeberangkatanNominal",
+					},
+					t2_keberangkatan: {
+						status: "t2KeberangkatanStatus",
+						url: "t2KeberangkatanBuktiBayarUrl",
+						paidDate: "t2KeberangkatanPaidDate",
+						nominal: "t2KeberangkatanNominal",
+					},
+					admin_talangan: {
+						status: "adminTalaganStatus",
+						url: "adminTalaganBuktiBayarUrl",
+						nominal: "adminTalaganNominal",
+					},
+					toeic: {
+						status: "toeicStatus",
+						url: "toeicBuktiBayarUrl",
+						nominal: "toeicNominal",
+					},
+					paspor: {
+						status: "pasporStatus",
+						url: "pasporBuktiBayarUrl",
+						nominal: "pasporNominal",
+					},
+					rumah_juang: {
+						status: "rumahJuangStatus",
+						url: "rumahJuangBuktiBayarUrl",
+						nominal: "rumahJuangNominal",
+					},
+				};
+
+				const mapping = financeDocMap[documentKey];
+				if (mapping) {
+					const finRow = await db.query.financeData.findFirst({
+						where: eq(financeData.studentId, studentId),
+					});
+					const nominal = Number(
+						(finRow as Record<string, unknown> | undefined)?.[
+							mapping.nominal
+						] ?? 0,
+					);
+					const isBilled = nominal > 0;
+					const update: Record<string, unknown> = {
+						[mapping.url]: fileUrl,
+						updatedAt: new Date(),
+					};
+					if (isBilled) {
+						update[mapping.status] = true;
+						if (mapping.paidDate) update[mapping.paidDate] = new Date();
+					}
 					await db
 						.update(financeData)
-						.set({
-							registrasiStatus: true,
-							registrasiPaidDate: new Date(),
-							registrasiBuktiBayarUrl: fileUrl,
-							updatedAt: new Date(),
-						})
-						.where(eq(financeData.studentId, studentId));
-				} else if (documentKey === "mandiri_interview") {
-					await db
-						.update(financeData)
-						.set({
-							mandiriInterviewStatus: true,
-							mandiriInterviewBuktiBayarUrl: fileUrl,
-							mandiriInterviewPaidDate: new Date(),
-							updatedAt: new Date(),
-						})
-						.where(eq(financeData.studentId, studentId));
-				} else if (
-					documentKey === "mandiri_kontrak_magang" ||
-					documentKey === "kontrak_magang"
-				) {
-					await db
-						.update(financeData)
-						.set({
-							kontrakMagangStatus: true,
-							kontrakMagangBuktiBayarUrl: fileUrl,
-							kontrakMagangPaidDate: new Date(),
-							updatedAt: new Date(),
-						})
-						.where(eq(financeData.studentId, studentId));
-				} else if (documentKey === "mandiri_suhan" || documentKey === "suhan") {
-					await db
-						.update(financeData)
-						.set({
-							suhanStatus: true,
-							suhanBuktiBayarUrl: fileUrl,
-							suhanPaidDate: new Date(),
-							updatedAt: new Date(),
-						})
-						.where(eq(financeData.studentId, studentId));
-				} else if (documentKey === "t1_interview") {
-					await db
-						.update(financeData)
-						.set({
-							t1InterviewStatus: true,
-							t1InterviewBuktiBayarUrl: fileUrl,
-							t1InterviewPaidDate: new Date(),
-							updatedAt: new Date(),
-						})
-						.where(eq(financeData.studentId, studentId));
-				} else if (
-					documentKey === "mandiri_keberangkatan" ||
-					documentKey === "penempatan_keberangkatan"
-				) {
-					await db
-						.update(financeData)
-						.set({
-							mandiriKeberangkatanStatus: true,
-							mandiriKeberangkatanBuktiBayarUrl: fileUrl,
-							mandiriKeberangkatanPaidDate: new Date(),
-							updatedAt: new Date(),
-						})
-						.where(eq(financeData.studentId, studentId));
-				} else if (documentKey === "t2_keberangkatan") {
-					await db
-						.update(financeData)
-						.set({
-							t2KeberangkatanStatus: true,
-							t2KeberangkatanBuktiBayarUrl: fileUrl,
-							t2KeberangkatanPaidDate: new Date(),
-							updatedAt: new Date(),
-						})
-						.where(eq(financeData.studentId, studentId));
-				} else if (documentKey === "admin_talangan") {
-					await db
-						.update(financeData)
-						.set({
-							adminTalaganStatus: true,
-							adminTalaganBuktiBayarUrl: fileUrl,
-							updatedAt: new Date(),
-						})
-						.where(eq(financeData.studentId, studentId));
-				} else if (documentKey === "toeic") {
-					await db
-						.update(financeData)
-						.set({
-							toeicStatus: true,
-							toeicBuktiBayarUrl: fileUrl,
-							updatedAt: new Date(),
-						})
-						.where(eq(financeData.studentId, studentId));
-				} else if (documentKey === "paspor") {
-					await db
-						.update(financeData)
-						.set({
-							pasporStatus: true,
-							pasporBuktiBayarUrl: fileUrl,
-							updatedAt: new Date(),
-						})
-						.where(eq(financeData.studentId, studentId));
-				} else if (documentKey === "rumah_juang") {
-					await db
-						.update(financeData)
-						.set({
-							rumahJuangStatus: true,
-							rumahJuangBuktiBayarUrl: fileUrl,
-							updatedAt: new Date(),
-						})
+						.set(update)
 						.where(eq(financeData.studentId, studentId));
 				}
 
@@ -376,24 +380,10 @@ export const documentsRoutes = new Elysia()
 					ods_5: 4,
 				};
 
-				if (
-					documentKey === "ods_1_report" ||
-					documentKey === "ods_1" ||
-					documentKey === "ods_report"
-				) {
-					crmUpdate.isOds1Report = true;
-				} else if (documentKey === "ods_2_report" || documentKey === "ods_2") {
-					crmUpdate.isOds2Report = true;
-				} else if (documentKey === "ods_3_report" || documentKey === "ods_3") {
-					crmUpdate.isOds3Report = true;
-				} else if (documentKey === "ods_4_report" || documentKey === "ods_4") {
-					crmUpdate.isOds4Report = true;
-				} else if (documentKey === "ods_5_report" || documentKey === "ods_5") {
-					crmUpdate.isOds5Report = true;
-				} else if (
-					documentKey === "pramagang_report" ||
-					documentKey === "pramagang"
-				) {
+				// Unggah laporan ODS TIDAK lagi langsung menandai sesi selesai:
+				// sesi baru selesai bila tanggal & nama industri juga terisi
+				// (divalidasi saat simpan odsDetails di routes/student/crm.ts).
+				if (documentKey === "pramagang_report" || documentKey === "pramagang") {
 					crmUpdate.isPrammagangReport = true;
 				} else if (documentKey.startsWith("tri_dharma")) {
 					crmUpdate.isTriDharma = true;
@@ -421,11 +411,13 @@ export const documentsRoutes = new Elysia()
 
 				if (odsIndexMap[documentKey] !== undefined) {
 					const idx = odsIndexMap[documentKey];
-					odsList[idx] = {
-						...odsList[idx],
-						isDone: true,
-					};
+					const row = odsList[idx] || {};
+					// Selesai hanya bila tanggal & nama industri sudah terisi
+					const isDone =
+						Boolean(row.date) && String(row.industry ?? "").trim() !== "";
+					odsList[idx] = { ...row, hasReport: true, isDone };
 					crmUpdate.odsDetails = odsList;
+					crmUpdate[`isOds${idx + 1}Report`] = isDone;
 				}
 
 				if (currentCrm) {

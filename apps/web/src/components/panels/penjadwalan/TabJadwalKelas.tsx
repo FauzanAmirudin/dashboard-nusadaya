@@ -5,7 +5,6 @@ import {
 	Building2,
 	CalendarDays,
 	Clock,
-	Download,
 	GraduationCap,
 	Loader2,
 	Pencil,
@@ -59,7 +58,6 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { DEFAULT_ROMBEL_OPTIONS, STANDARDIZED_ROOMS } from "@/constants/rooms";
 import { api } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 import { PrintableScheduleView } from "./PrintableScheduleView";
 
 const DAYS_OF_WEEK = [
@@ -278,51 +276,6 @@ export function TabJadwalKelas({ canEdit }: { canEdit: boolean }) {
 		setPeminatanFilter("all");
 	};
 
-	const handleExportCSV = () => {
-		if (filteredSchedules.length === 0) {
-			toast.error("Tidak ada data jadwal kelas untuk diekspor");
-			return;
-		}
-
-		const exportData = filteredSchedules.map((s, idx) => {
-			const dosenUtama = s.dosen?.fullName || s.dosen?.name || "-";
-			const dosenPendamping =
-				s.dosenPendamping?.fullName || s.dosenPendamping?.name || "-";
-			return {
-				No: idx + 1,
-				Hari: s.dayOfWeek || "-",
-				"Jam Mulai": s.startTime || "-",
-				"Jam Selesai": s.endTime || "-",
-				"Mata Kuliah": s.subject || "-",
-				"Dosen Pengampu": dosenUtama,
-				"Dosen Pendamping": dosenPendamping,
-				Ruangan: s.room || "-",
-				"Rombongan Belajar": s.rombel || "-",
-				Angkatan: s.cohort ? `Angkatan ${s.cohort}` : "-",
-				Catatan: s.notes || "-",
-			};
-		});
-
-		// Format penamaan file sesuai instruksi:
-		// "Jadwal Kuliah NusadayaAcademy" + (Angkatan jika bukan all) + (Minat jika difilter) + (Rombel jika bukan all)
-		const nameParts: string[] = ["Jadwal Kuliah NusadayaAcademy"];
-		if (cohortFilter !== "all") {
-			nameParts.push(`Angkatan ${cohortFilter}`);
-		}
-		if (peminatanFilter !== "all") {
-			nameParts.push(`Minat ${peminatanFilter}`);
-		}
-		if (rombelFilter !== "all") {
-			nameParts.push(rombelFilter);
-		}
-		const filename = nameParts.join(" ");
-
-		exportToCSV(exportData, filename);
-		toast.success(
-			`Berhasil mengekspor ${filteredSchedules.length} data jadwal kelas`,
-		);
-	};
-
 	const handlePrint = () => {
 		const originalTitle = document.title;
 		const nameParts: string[] = ["Jadwal Kuliah NusadayaAcademy"];
@@ -370,16 +323,6 @@ export function TabJadwalKelas({ canEdit }: { canEdit: boolean }) {
 							</div>
 
 							<div className="flex items-center gap-2 w-full sm:w-auto">
-								<Button
-									variant="outline"
-									onClick={handleExportCSV}
-									disabled={filteredSchedules.length === 0}
-									className="border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold px-3 py-2 h-9"
-								>
-									<Download className="w-4 h-4 mr-1.5 text-emerald-600" />
-									Export CSV
-								</Button>
-
 								<Button
 									variant="outline"
 									onClick={handlePrint}

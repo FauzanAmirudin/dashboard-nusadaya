@@ -218,15 +218,6 @@ export function TabCheckpointConfig() {
 
 				<div className="flex items-center gap-2 shrink-0">
 					<Button
-						variant="outline"
-						size="sm"
-						onClick={fetchCheckpoints}
-						className="h-9 rounded-xl text-xs font-semibold gap-1.5 border-slate-200"
-					>
-						<RefreshCw className="w-3.5 h-3.5" />
-						<span>Refresh</span>
-					</Button>
-					<Button
 						size="sm"
 						onClick={handleOpenCreate}
 						className="h-9 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-sm"

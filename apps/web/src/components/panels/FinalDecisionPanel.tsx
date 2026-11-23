@@ -183,15 +183,14 @@ export function FinalDecisionPanel({
 	const [isUploadingSK, setIsUploadingSK] = useState(false);
 	const [isDirectorModalOpen, setIsDirectorModalOpen] = useState(false);
 
+	// Dosen & PA berada di bawah Akademik: keduanya tidak lagi memberi ACC terpisah.
 	const isAllPanelsAcc = data
 		? Boolean(
 				data.pmbAcc?.isAcc &&
 					data.crmAcc?.isAcc &&
 					data.financeAcc?.isAcc &&
 					data.academicAcc?.isAcc &&
-					data.paAcc?.isAcc &&
-					data.internshipAcc?.isAcc &&
-					data.dosenAcc?.isAcc,
+					data.internshipAcc?.isAcc,
 			)
 		: false;
 
@@ -546,14 +545,12 @@ export function FinalDecisionPanel({
 					</CardTitle>
 				</CardHeader>
 				<CardContent className="p-6">
-					<div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+					<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
 						{[
 							{ id: "PMB", acc: data.pmbAcc },
 							{ id: "CRM", acc: data.crmAcc },
 							{ id: "Finance", acc: data.financeAcc },
 							{ id: "Akademik", acc: data.academicAcc },
-							{ id: "Dosen", acc: data.dosenAcc },
-							{ id: "PA", acc: data.paAcc },
 							{ id: "Magang", acc: data.internshipAcc },
 						].map((mod) => (
 							<div

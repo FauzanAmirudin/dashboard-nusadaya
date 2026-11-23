@@ -121,15 +121,17 @@ export function TabManajemenMahasiswa({
 		},
 		{
 			id: "utsPassed",
+			auto: true,
 			label: "Nilai UTS",
-			desc: "Status kelulusan ujian tengah semester",
+			desc: "Otomatis dari nilai UTS tiap mata kuliah (standar minimal 60)",
 			docKey: "uts_passed",
 			docLabel: "Dokumen Nilai UTS",
 		},
 		{
 			id: "uasPassed",
+			auto: true,
 			label: "Nilai UAS",
-			desc: "Status kelulusan ujian akhir semester",
+			desc: "Otomatis dari nilai UAS tiap mata kuliah (standar minimal 60)",
 			docKey: "uas_passed",
 			docLabel: "Dokumen Nilai UAS",
 		},
@@ -195,7 +197,12 @@ export function TabManajemenMahasiswa({
 											onCheckedChange={(c) =>
 												handleCheckboxChange(item.id, c as boolean)
 											}
-											disabled={!canEdit || loadingItem === item.id}
+											// Item otomatis (UTS/UAS) mengikuti nilai sebenarnya, tidak bisa dicentang manual
+											disabled={
+												!canEdit ||
+												(item as { auto?: boolean }).auto === true ||
+												loadingItem === item.id
+											}
 											className={`w-6 h-6 rounded-md transition-all ${
 												isChecked
 													? "data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"

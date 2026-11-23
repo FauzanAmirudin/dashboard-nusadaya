@@ -7,14 +7,12 @@ import {
 	Calculator,
 	CheckCircle,
 	CheckCircle2,
-	Download,
 	ExternalLink,
 	FileText,
 	GraduationCap,
 	Layers,
 	Loader2,
 	Printer,
-	RefreshCw,
 	Send,
 	ShieldCheck,
 	Sparkles,
@@ -53,7 +51,6 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { getToken } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 
 interface TabNilaiKhsProps {
 	studentId: number;
@@ -225,49 +222,6 @@ export function TabNilaiKhs({
 	const isKhsPublished = summaryData?.khsPublished ?? false;
 	const isSyncedMagang = summaryData?.syncedToMagang ?? false;
 
-	const handleExportKhsCsv = () => {
-		if (!grades || grades.length === 0) {
-			toast.error("Tidak ada data nilai untuk diexport");
-			return;
-		}
-		const exportRows = grades.map((item: any, idx: number) => ({
-			No: idx + 1,
-			"Kode MK": item.code || "-",
-			"Mata Kuliah": item.name || "-",
-			SKS: item.sks || 0,
-			"Presensi (%)": `${item.attendanceRate || 0}%`,
-			"Nilai Teori":
-				item.theoryScore !== null && item.theoryScore !== undefined
-					? item.theoryScore
-					: "-",
-			"Nilai Praktik":
-				item.practicalScore !== null && item.practicalScore !== undefined
-					? item.practicalScore
-					: "-",
-			UTS:
-				item.utsScore !== null && item.utsScore !== undefined
-					? item.utsScore
-					: "-",
-			UAS:
-				item.uasScore !== null && item.uasScore !== undefined
-					? item.uasScore
-					: "-",
-			"Nilai Akhir": item.finalScore ?? "-",
-			Grade: item.grade || "-",
-			Status: item.isPassed ? "Lulus" : "Tidak Lulus",
-		}));
-		const studentNameSlug = (
-			studentData?.name ||
-			summaryData?.studentName ||
-			`Mahasiswa_${studentId}`
-		).replace(/[^a-zA-Z0-9]/g, "_");
-		exportToCSV(
-			exportRows,
-			`KHS_${studentNameSlug}_Semester_${selectedSemester}`,
-		);
-		toast.success("Data KHS semester berhasil diexport ke CSV");
-	};
-
 	return (
 		<div className="space-y-6">
 			{/* Top Action Bar & Control Header */}
@@ -335,17 +289,6 @@ export function TabNilaiKhs({
 							Cetak KRS
 						</Button>
 					</Link>
-
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={handleExportKhsCsv}
-						className="h-9 text-xs gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold"
-						title="Export data nilai KHS semester ini ke format file CSV / Excel"
-					>
-						<Download className="w-3.5 h-3.5 text-emerald-600" />
-						Export KHS
-					</Button>
 
 					<Link
 						href={`/dashboard/students/${studentId}/transkrip?from=akademik`}

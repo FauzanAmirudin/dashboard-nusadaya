@@ -135,6 +135,10 @@ export const financeData = pgTable(
 		rumahJuangAktif: boolean("rumah_juang_aktif").default(false),
 		rumahJuangNominal: integer("rumah_juang_nominal").default(0),
 		rumahJuangStatus: boolean("rumah_juang_status").default(false),
+
+		// Pos tagihan yang tidak berlaku bagi mahasiswa ini (mis. Paspor/TOEIC untuk
+		// peminatan Indonesia). Bentuk: [{ key, note }]. Pos ini dilewati saat ACC.
+		tidakBerlakuItems: jsonb("tidak_berlaku_items").default([]),
 		rumahJuangBuktiBayarUrl: text("rumah_juang_bukti_bayar_url"),
 
 		// Kontrol

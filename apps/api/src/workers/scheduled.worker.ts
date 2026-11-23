@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { users } from "../db/schema";
+import { archiveOverdueWaitingStudents } from "../lib/waiting-list";
 import { backupService } from "../modules/backup/service/backup.service";
 import { retentionService } from "../modules/backup/service/retention.service";
 import { runFileCleanup } from "./file.worker";
@@ -109,6 +110,19 @@ export function startScheduledWorker(): void {
 		},
 		7 * 24 * 60 * 60 * 1000,
 	);
+
+	// 3b. Arsip otomatis mahasiswa menunggu pembayaran yang lewat 7 hari
+	const runOverdueArchive = async () => {
+		try {
+			const n = await archiveOverdueWaitingStudents();
+			if (n > 0)
+				console.log(`[ScheduledWorker] ${n} mahasiswa terlambat diarsipkan`);
+		} catch (err) {
+			console.error("[ScheduledWorker] Overdue archive failed:", err);
+		}
+	};
+	setTimeout(runOverdueArchive, 45 * 1000);
+	setInterval(runOverdueArchive, 6 * 60 * 60 * 1000);
 
 	// 4. Initial Retention Cleanup — jalan 30 detik setelah server nyala
 	setTimeout(() => {

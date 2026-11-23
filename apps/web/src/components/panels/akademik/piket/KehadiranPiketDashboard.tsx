@@ -9,7 +9,6 @@ import {
 	CheckCircle2,
 	ClipboardCheck,
 	Clock,
-	Download,
 	Edit,
 	Eye,
 	HelpCircle,
@@ -71,7 +70,6 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { API_URL, api, getToken } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 import { cn } from "@/lib/utils";
 import { hasRole, useAuthStore } from "@/store";
 
@@ -560,111 +558,6 @@ export function KehadiranPiketDashboard({
 	};
 
 	// Export Handlers
-	const handleExportBoard = () => {
-		if (!boardData || boardData.groups.length === 0) {
-			toast.error("Tidak ada data presensi untuk diekspor");
-			return;
-		}
-
-		const exportRows: any[] = [];
-		boardData.groups.forEach((g) => {
-			const draft = groupDrafts[g.schedule.id];
-			const members = draft ? draft.members : g.members;
-			members.forEach((m) => {
-				exportRows.push({
-					Tanggal: boardData.date,
-					Hari: boardData.dayName,
-					"Kelompok Piket": g.schedule.groupName,
-					Ruangan: g.schedule.room,
-					"Jam Piket":
-						g.schedule.startTime && g.schedule.endTime
-							? `${g.schedule.startTime} - ${g.schedule.endTime}`
-							: "-",
-					Angkatan: g.schedule.cohort,
-					NIM: m.nim,
-					"Nama Mahasiswa": m.name,
-					"Status Kehadiran":
-						m.status === "hadir"
-							? "Hadir"
-							: m.status === "izin"
-								? "Izin"
-								: m.status === "sakit"
-									? "Sakit"
-									: m.status === "alpha"
-										? "Alpha"
-										: "Belum Diisi",
-					Keterangan: m.notes || "-",
-					"Catatan Kelompok": draft?.sessionNotes || g.sessionNotes || "-",
-				});
-			});
-		});
-
-		exportToCSV(exportRows, `Presensi_Piket_${boardData.date}`);
-	};
-
-	const handleExportHistory = () => {
-		if (historyData.length === 0) {
-			toast.error("Tidak ada data riwayat untuk diekspor");
-			return;
-		}
-
-		const exportRows: any[] = [];
-		historyData.forEach((s) => {
-			s.records.forEach((r: any) => {
-				exportRows.push({
-					"Tanggal Piket": s.sessionDate,
-					"Nama Kelompok": s.groupName,
-					Ruangan: s.room,
-					Angkatan: s.cohort,
-					NIM: r.student?.nim || "-",
-					"Nama Mahasiswa": r.student?.name || "-",
-					Status:
-						r.status === "hadir"
-							? "Hadir"
-							: r.status === "izin"
-								? "Izin"
-								: r.status === "sakit"
-									? "Sakit"
-									: "Alpha",
-					Catatan: r.notes || "-",
-					"Dicatat Oleh": s.recordedBy,
-				});
-			});
-		});
-
-		exportToCSV(
-			exportRows,
-			`Rekap_Riwayat_Piket_${new Date().toISOString().split("T")[0]}`,
-		);
-	};
-
-	const handleExportStudentSummary = () => {
-		if (studentSummaryData.length === 0) {
-			toast.error("Tidak ada data rekap mahasiswa untuk diekspor");
-			return;
-		}
-
-		const exportRows = studentSummaryData.map((s) => ({
-			NIM: s.nim || "-",
-			"Nama Mahasiswa": s.name,
-			Angkatan: s.cohort,
-			Program: s.program || "-",
-			"Total Jadwal Piket": s.totalJadwal,
-			"Total Hadir": s.totalHadir,
-			"Persentase Kehadiran": `${s.attendanceRate}%`,
-			"Status Kepatuhan":
-				s.complianceStatus === "AMAN"
-					? "Aman (≥85%)"
-					: s.complianceStatus === "PERLU_PERHATIAN"
-						? "Perlu Perhatian (70-84%)"
-						: "Tidak Aman (<70%)",
-		}));
-
-		exportToCSV(
-			exportRows,
-			`Rekap_Kepatuhan_Piket_Mahasiswa_${new Date().toISOString().split("T")[0]}`,
-		);
-	};
 
 	// Paginated Data
 	const paginatedHistory = useMemo(() => {
@@ -710,42 +603,6 @@ export function KehadiranPiketDashboard({
 							<Clock className="w-3.5 h-3.5 text-slate-500" />
 							Atur Jadwal Kelompok Piket
 						</Link>
-
-						{activeTab === "board" && (
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={handleExportBoard}
-								className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
-							>
-								<Download className="w-3.5 h-3.5" />
-								Export Presensi Hari Ini
-							</Button>
-						)}
-
-						{activeTab === "history" && (
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={handleExportHistory}
-								className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
-							>
-								<Download className="w-3.5 h-3.5" />
-								Export Riwayat CSV
-							</Button>
-						)}
-
-						{activeTab === "students" && (
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={handleExportStudentSummary}
-								className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
-							>
-								<Download className="w-3.5 h-3.5" />
-								Export Rekap Mahasiswa
-							</Button>
-						)}
 					</div>
 				</div>
 			) : (
@@ -760,42 +617,6 @@ export function KehadiranPiketDashboard({
 						<Clock className="w-3.5 h-3.5 text-slate-500" />
 						Atur Jadwal Kelompok Piket
 					</Link>
-
-					{activeTab === "board" && (
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={handleExportBoard}
-							className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
-						>
-							<Download className="w-3.5 h-3.5" />
-							Export Presensi Hari Ini
-						</Button>
-					)}
-
-					{activeTab === "history" && (
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={handleExportHistory}
-							className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
-						>
-							<Download className="w-3.5 h-3.5" />
-							Export Riwayat CSV
-						</Button>
-					)}
-
-					{activeTab === "students" && (
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={handleExportStudentSummary}
-							className="border-slate-200 text-slate-700 hover:bg-slate-50 text-xs gap-1.5 h-9"
-						>
-							<Download className="w-3.5 h-3.5" />
-							Export Rekap Mahasiswa
-						</Button>
-					)}
 				</div>
 			)}
 
@@ -953,21 +774,6 @@ export function KehadiranPiketDashboard({
 									className="pl-8 h-9 text-xs border-slate-200 bg-white"
 								/>
 							</div>
-
-							<Button
-								variant="outline"
-								size="icon"
-								onClick={fetchDailyBoard}
-								className="h-9 w-9 border-slate-200 text-slate-600 hover:bg-slate-50"
-								title="Muat Ulang"
-							>
-								<RefreshCw
-									className={cn(
-										"h-4 w-4",
-										isBoardLoading && "animate-spin text-[#0517B0]",
-									)}
-								/>
-							</Button>
 						</div>
 					</div>
 

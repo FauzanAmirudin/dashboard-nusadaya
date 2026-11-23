@@ -97,6 +97,7 @@ export function AkademikPanel({
 	const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 	const [acadState, setAcadState] = useState<any>(null);
+	const [paState, setPaState] = useState<any>(null);
 	const [documents, setDocuments] = useState<Record<string, DocFile[]>>({});
 	const [isLoading, setIsLoading] = useState(true);
 	const [activeTab, setActiveTab] = useState(() => {
@@ -159,6 +160,20 @@ export function AkademikPanel({
 		}
 	};
 
+	// PA berada di bawah Akademik: dipakai untuk butir "Pendampingan Akademik (PA)"
+	const fetchPaData = async () => {
+		try {
+			const res = await fetch(`${API_URL}/students/${studentId}/pa`, {
+				headers: { Authorization: `Bearer ${getToken()}` },
+			});
+			if (res.ok) {
+				const json = await res.json();
+				// Respons GET /:id/pa bersarang: { data: { data: paData, ...logs } }
+				setPaState(json.data?.data ?? null);
+			}
+		} catch (_) {}
+	};
+
 	const fetchDocuments = useCallback(async () => {
 		try {
 			const { data, error } =
@@ -175,6 +190,7 @@ export function AkademikPanel({
 		fetchAcademicData();
 		fetchDocuments();
 		fetchAssessment();
+		fetchPaData();
 
 		const handleAcademicSync = (e: any) => {
 			if (!e?.detail?.studentId || e.detail.studentId === studentId) {
@@ -206,6 +222,11 @@ export function AkademikPanel({
 
 	// Status perhitungan sekarang berdasarkan acadState langsung
 
+	// PA tuntas = ketiga indikatornya terpenuhi; menyalakan satu butir progres Akademik
+	const isPaAllDone = Boolean(
+		paState?.counselingDone && paState?.mentalStable && paState?.disciplineGood,
+	);
+
 	const baseChecklist = [
 		{
 			id: "pddiktiInput",
@@ -218,17 +239,17 @@ export function AkademikPanel({
 		{
 			id: "utsPassed",
 			label: "Nilai UTS Lulus",
-			desc: "Semua mata kuliah UTS memenuhi standar minimal",
+			desc: "Otomatis dari nilai UTS tiap mata kuliah (standar minimal 60)",
 			checked: !!acadState?.utsPassed,
-			auto: false,
+			auto: true,
 			documentKey: "uts_passed",
 		},
 		{
 			id: "uasPassed",
 			label: "Nilai UAS Lulus",
-			desc: "Semua mata kuliah UAS memenuhi standar minimal",
+			desc: "Otomatis dari nilai UAS tiap mata kuliah (standar minimal 60)",
 			checked: !!acadState?.uasPassed,
-			auto: false,
+			auto: true,
 			documentKey: "uas_passed",
 		},
 		{
@@ -262,6 +283,14 @@ export function AkademikPanel({
 			checked: !!acadState?.assessmentCompleted,
 			auto: false,
 			documentKey: "pre_departure_assessment",
+		},
+		{
+			id: "paCompleted",
+			label: "Pendampingan Akademik (PA)",
+			desc: "Otomatis saat Konseling, Mental Stabil & Disiplin Baik tuntas di Panel PA",
+			checked: isPaAllDone,
+			auto: true,
+			documentKey: "pa_completed",
 		},
 	];
 

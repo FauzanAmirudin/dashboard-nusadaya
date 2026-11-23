@@ -1,29 +1,10 @@
 "use client";
 
-import {
-	Building2,
-	Calendar,
-	CheckCircle,
-	CheckCircle2,
-	Clock,
-	FileCheck,
-	FileText,
-	Globe,
-	Loader2,
-	MapPin,
-	Plane,
-	ShieldCheck,
-	Sparkles,
-	UserCheck,
-} from "lucide-react";
-import React, { useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { Loader2 } from "lucide-react";
+import type React from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -32,10 +13,24 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+	getAgencyPaymentReminders,
+	isTaiwanDestination,
+} from "@/utils/panel-logic";
+import {
+	ChecklistGroup,
+	ChecklistRow,
+	OptionalGroup,
+	RowField,
+	rowInputClass,
+	toDateInput,
+} from "./ChecklistRow";
+import { InterviewList } from "./InterviewList";
 
 interface TabDokumenProps {
 	studentId: number;
 	data: any;
+	destinationCountry?: string | null;
 	canEdit: boolean;
 	loadingItem?: string | null;
 	handleToggleField: (field: string, value: any) => Promise<void> | void;
@@ -51,6 +46,7 @@ interface TabDokumenProps {
 export function TabDokumen({
 	studentId,
 	data,
+	destinationCountry,
 	canEdit,
 	loadingItem = null,
 	handleToggleField,
@@ -62,23 +58,7 @@ export function TabDokumen({
 	handleSaveNotes,
 	isSaving,
 }: TabDokumenProps) {
-	// Hitung kelengkapan dokumen kesiapan keberangkatan (Standarisasi 6 Dokumen Taiwan & Dokumen Keberangkatan)
-	const checklistKeys = [
-		"passportReady",
-		"interviewReady",
-		"mouReady",
-		"loaConfirmed",
-		"contractReady",
-		"suhanReady",
-		"mcuReady",
-		"visaReady",
-		"ticketReady",
-		"asesmenReady",
-		"dokumentasiReady",
-		"agenReady",
-		"languageCertReady",
-	];
-
+	// Sama dengan aturan ACC (calculateInternshipDokumenChecklist / server): MOU↔MOA, Asesmen↔PDT
 	const isChecklistDone = (key: string) => {
 		if (key === "mouReady") return Boolean(data?.mouReady ?? data?.moaReady);
 		if (key === "asesmenReady")
@@ -86,1485 +66,521 @@ export function TabDokumen({
 		return Boolean(data?.[key]);
 	};
 
-	const completedCount = checklistKeys.filter((k) => isChecklistDone(k)).length;
-	const isAllCompleted = completedCount === checklistKeys.length;
+	// --- Field detail (perilaku simpan sama seperti sebelumnya: ubah lokal, simpan saat blur) ---
+	const textField = (field: string, label: string, placeholder: string) => (
+		<RowField label={label} htmlFor={`f-${field}`}>
+			<Input
+				id={`f-${field}`}
+				placeholder={placeholder}
+				className={rowInputClass}
+				value={data?.[field] || ""}
+				disabled={!canEdit}
+				onChange={(e) => handleLocalChange(field, e.target.value)}
+				onBlur={() => handleBlurField(field)}
+			/>
+		</RowField>
+	);
+
+	const dateField = (field: string, label: string) => (
+		<RowField label={label} htmlFor={`f-${field}`}>
+			<Input
+				id={`f-${field}`}
+				type="date"
+				className={rowInputClass}
+				value={toDateInput(data?.[field])}
+				disabled={!canEdit}
+				onChange={(e) => handleLocalChange(field, e.target.value)}
+				onBlur={() => handleBlurField(field)}
+			/>
+		</RowField>
+	);
+
+	// Pilihan langsung tersimpan saat diganti
+	const selectField = (
+		field: string,
+		label: string,
+		fallback: string,
+		options: [string, string][],
+	) => (
+		<RowField label={label}>
+			<Select
+				value={data?.[field] || fallback}
+				disabled={!canEdit}
+				onValueChange={(val) => {
+					handleLocalChange(field, val);
+					handleToggleField(field, val);
+				}}
+			>
+				<SelectTrigger className={`w-full ${rowInputClass}`}>
+					<SelectValue placeholder={`Pilih ${label}`} />
+				</SelectTrigger>
+				<SelectContent>
+					{options.map(([value, text]) => (
+						<SelectItem key={value} value={value}>
+							{text}
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
+		</RowField>
+	);
+
+	const upload = (documentKey: string) => (
+		<DocumentUpload
+			studentId={studentId}
+			panel="magang"
+			documentKey={documentKey}
+			canEdit={canEdit}
+			onUploadSuccess={fetchInternshipData}
+		/>
+	);
+
+	const grid = (cols: 2 | 3, children: React.ReactNode) => (
+		<div
+			className={`grid grid-cols-1 gap-3 ${cols === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+		>
+			{children}
+		</div>
+	);
+
+	// Baris checklist standar (satu field boolean)
+	const row = (
+		key: string,
+		label: string,
+		desc: string,
+		fields: React.ReactNode,
+		uploadNode: React.ReactNode,
+		warning?: string,
+	) => (
+		<ChecklistRow
+			key={key}
+			id={key}
+			label={label}
+			step={stepOf(key)}
+			desc={desc}
+			warning={warning}
+			checked={isChecklistDone(key)}
+			loading={loadingItem === key}
+			disabled={!canEdit}
+			onCheckedChange={(checked) => handleToggleField(key, checked)}
+			upload={uploadNode}
+		>
+			{fields}
+		</ChecklistRow>
+	);
+
+	// --- Grup 1: Seleksi ---
+	const seleksiKeys = ["passportReady", "interviewReady"];
+	// --- Grup 2: Alur Dokumen Taiwan (urutan baku) ---
+	// Suhan (izin Biro Pariwisata Taiwan) hanya berlaku untuk tujuan Taiwan
+	const isTaiwan = isTaiwanDestination(destinationCountry);
+	const TAIWAN_STEPS: [string, string][] = [
+		["mouReady", "MOU"],
+		["loaConfirmed", "LOA"],
+		["contractReady", "Kontrak"],
+		...(isTaiwan ? ([["suhanReady", "Suhan"]] as [string, string][]) : []),
+		["mcuReady", "MCU Full"],
+		["visaReady", "Visa"],
+		["ticketReady", "Tiket"],
+	];
+	const taiwanKeys = TAIWAN_STEPS.map(([k]) => k);
+	// --- Grup 3: Keberangkatan ---
+	const keberangkatanKeys = ["asesmenReady", "dokumentasiReady", "agenReady"];
+	const countDone = (keys: string[]) =>
+		keys.filter((k) => isChecklistDone(k)).length;
+
+	// Nomor langkah mengikuti daftar aktif, supaya tetap urut saat Suhan
+	// tidak ditampilkan (tujuan non-Taiwan).
+	const stepOf = (key: string) => {
+		const idx = taiwanKeys.indexOf(key);
+		return idx >= 0 ? idx + 1 : undefined;
+	};
+
+	// Peringatan (tidak mengunci): langkah dicentang padahal langkah sebelumnya belum
+	const seqWarning = (key: string) => {
+		const idx = taiwanKeys.indexOf(key);
+		if (idx <= 0 || !isChecklistDone(key)) return undefined;
+		const pending = TAIWAN_STEPS.slice(0, idx)
+			.filter(([k]) => !isChecklistDone(k))
+			.map(([, label]) => label);
+		return pending.length
+			? `Langkah sebelumnya belum selesai: ${pending.join(", ")}`
+			: undefined;
+	};
+
+	// Pengingat termin pembayaran kampus ke agensi, tampil di antara langkah terkait
+	const reminders = getAgencyPaymentReminders(data, destinationCountry);
+	// Satu ringkasan tenang di atas daftar, tidak lagi menyela ritme langkah
+	const reminderSummary = reminders.length ? (
+		<section
+			role="status"
+			className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 sm:px-6"
+		>
+			<p className="text-sm font-semibold text-amber-900">
+				Pengingat pembayaran agensi
+			</p>
+			<ul className="mt-1 space-y-0.5 text-sm text-amber-900">
+				{reminders.map((r) => (
+					<li key={r.key}>{r.text}</li>
+				))}
+			</ul>
+			<p className="mt-1 text-xs text-amber-800">
+				Catat di tab Pembayaran Lanjutan.
+			</p>
+		</section>
+	) : null;
+
 	return (
 		<div className="space-y-6">
-			{/* Main Card */}
-			<Card className="border border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
-				<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-					<div>
-						<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-							<Plane className="w-4 h-4 text-[#0517B0]" />
-							Status Dokumen & Kesiapan Keberangkatan ({checklistKeys.length})
-						</CardTitle>
-						<p className="text-[11px] text-slate-500 mt-0.5">
-							Monitoring legalitas dokumen paspor, visa, kontrak kerja, tiket,
-							dan pembekalan magang
-						</p>
-					</div>
-					<div className="flex items-center gap-2">
-						<Badge
-							className={`text-xs font-bold px-2.5 py-0.5 ${
-								isAllCompleted
-									? "bg-emerald-50 text-emerald-700 border-emerald-200"
-									: "bg-blue-50 text-[#0517B0] border-blue-200"
-							}`}
-						>
-							{completedCount}/{checklistKeys.length} Selesai
-						</Badge>
-					</div>
-				</CardHeader>
+			{reminderSummary}
 
-				<CardContent className="p-4 sm:p-5 space-y-4">
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-						{/* 1. Paspor */}
-						<div
-							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								data?.passportReady
-									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-									: "border-slate-200 bg-white shadow-xs"
-							}`}
-						>
-							<div className="flex items-start justify-between gap-3">
-								<div className="flex items-start gap-3">
-									<Checkbox
-										id="chk-passportReady"
-										checked={!!data?.passportReady}
-										disabled={!canEdit || loadingItem === "passportReady"}
-										onCheckedChange={(checked) =>
-											handleToggleField("passportReady", !!checked)
-										}
-										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-									/>
-									<div>
-										<label
-											htmlFor="chk-passportReady"
-											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-										>
-											1. Paspor Resmi
-										</label>
-										<p className="text-[11px] text-slate-500 mt-0.5">
-											Scan paspor asli dengan masa berlaku minimal 18 bulan
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "passportReady" ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : data?.passportReady ? (
-										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-											✓ Selesai
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="text-slate-400 border-slate-200 text-[10px]"
-										>
-											Belum
-										</Badge>
-									)}
-								</div>
-							</div>
+			<ChecklistGroup
+				title="Seleksi"
+				done={countDone(seleksiKeys)}
+				total={seleksiKeys.length}
+			>
+				{row(
+					"passportReady",
+					"Paspor Resmi",
+					"Scan paspor asli dengan masa berlaku minimal 18 bulan",
+					grid(
+						2,
+						<>
+							{textField("passportNo", "Nomor Paspor", "Contoh: A12345678")}
+							{dateField("passportExp", "Masa Berlaku")}
+						</>,
+					),
+					upload("passport"),
+				)}
 
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Nomor Paspor
-									</Label>
-									<Input
-										placeholder="Contoh: A12345678"
-										className="h-8 text-xs bg-white"
-										value={data?.passportNo || ""}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("passportNo", e.target.value)
-										}
-										onBlur={() => handleBlurField("passportNo")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Masa Berlaku Exp
-									</Label>
-									<Input
-										type="date"
-										className="h-8 text-xs bg-white"
-										value={
-											data?.passportExp
-												? new Date(data.passportExp).toISOString().split("T")[0]
-												: ""
-										}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("passportExp", e.target.value)
-										}
-										onBlur={() => handleBlurField("passportExp")}
-									/>
-								</div>
-							</div>
+				{row(
+					"interviewReady",
+					"Wawancara User (Interview)",
+					"Wawancara dengan hotel atau agent, bisa lebih dari satu kali. Centang bila sudah lolos.",
+					<InterviewList studentId={studentId} canEdit={canEdit} />,
+					upload("interview"),
+				)}
+			</ChecklistGroup>
 
-							<div className="pt-2 border-t border-slate-100">
-								<DocumentUpload
-									studentId={studentId}
-									panel="magang"
-									documentKey="passport"
-									canEdit={canEdit}
-									onUploadSuccess={fetchInternshipData}
-								/>
-							</div>
-						</div>
-
-						{/* 2. Wawancara User (Interview) */}
-						<div
-							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								data?.interviewReady
-									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-									: "border-slate-200 bg-white shadow-xs"
-							}`}
-						>
-							<div className="flex items-start justify-between gap-3">
-								<div className="flex items-start gap-3">
-									<Checkbox
-										id="chk-interviewReady"
-										checked={!!data?.interviewReady}
-										disabled={!canEdit || loadingItem === "interviewReady"}
-										onCheckedChange={(checked) =>
-											handleToggleField("interviewReady", !!checked)
-										}
-										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-									/>
-									<div>
-										<label
-											htmlFor="chk-interviewReady"
-											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-										>
-											2. Wawancara User (Interview)
-										</label>
-										<p className="text-[11px] text-slate-500 mt-0.5">
-											Hasil seleksi interview dengan mitra pengguna
-											hotel/perusahaan
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "interviewReady" ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : data?.interviewReady ? (
-										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-											✓ Selesai
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="text-slate-400 border-slate-200 text-[10px]"
-										>
-											Belum
-										</Badge>
-									)}
-								</div>
-							</div>
-
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Tanggal Wawancara
-									</Label>
-									<Input
-										type="date"
-										className="h-8 text-xs bg-white"
-										value={
-											data?.interviewDate
-												? new Date(data.interviewDate)
-														.toISOString()
-														.split("T")[0]
-												: ""
-										}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("interviewDate", e.target.value)
-										}
-										onBlur={() => handleBlurField("interviewDate")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Hasil Wawancara
-									</Label>
-									<Select
-										value={data?.interviewResult || "menunggu"}
-										disabled={!canEdit}
-										onValueChange={(val) => {
-											handleLocalChange("interviewResult", val);
-											handleToggleField("interviewResult", val);
-										}}
-									>
-										<SelectTrigger className="h-8 text-xs bg-white">
-											<SelectValue placeholder="Pilih Hasil" />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="lulus">Lulus</SelectItem>
-											<SelectItem value="menunggu">Menunggu</SelectItem>
-											<SelectItem value="tidak_lulus">Tidak Lulus</SelectItem>
-										</SelectContent>
-									</Select>
-								</div>
-							</div>
-
-							<div className="pt-2 border-t border-slate-100">
-								<DocumentUpload
-									studentId={studentId}
-									panel="magang"
-									documentKey="interview"
-									canEdit={canEdit}
-									onUploadSuccess={fetchInternshipData}
-								/>
-							</div>
-						</div>
-
-						{/* 3. MOU Kampus & Hotel Mitra (Urutan 1 Dokumen Taiwan) */}
-						<div
-							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								isChecklistDone("mouReady")
-									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-									: "border-slate-200 bg-white shadow-xs"
-							}`}
-						>
-							<div className="flex items-start justify-between gap-3">
-								<div className="flex items-start gap-3">
-									<Checkbox
-										id="chk-mouReady"
-										checked={isChecklistDone("mouReady")}
-										disabled={
-											!canEdit ||
-											loadingItem === "mouReady" ||
-											loadingItem === "moaReady"
-										}
-										onCheckedChange={(checked) => {
-											handleToggleField("mouReady", !!checked);
-											handleToggleField("moaReady", !!checked);
-										}}
-										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-									/>
-									<div>
-										<label
-											htmlFor="chk-mouReady"
-											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-										>
-											3. MOU Kampus & Hotel Mitra
-										</label>
-										<p className="text-[11px] text-slate-500 mt-0.5">
-											Nota kesepahaman kerjasama penempatan magang antara
-											institusi kampus dan hotel mitra
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "mouReady" || loadingItem === "moaReady" ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : isChecklistDone("mouReady") ? (
-										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-											✓ Selesai
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="text-slate-400 border-slate-200 text-[10px]"
-										>
-											Belum
-										</Badge>
-									)}
-								</div>
-							</div>
-
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Tanggal Terbit MOU
-									</Label>
-									<Input
-										type="date"
-										className="h-8 text-xs bg-white"
-										value={
-											data?.mouDate
-												? new Date(data.mouDate).toISOString().split("T")[0]
-												: data?.moaDate
-													? new Date(data.moaDate).toISOString().split("T")[0]
-													: ""
-										}
-										disabled={!canEdit}
-										onChange={(e) => {
-											handleLocalChange("mouDate", e.target.value);
-											handleLocalChange("moaDate", e.target.value);
-										}}
-										onBlur={() => {
-											handleBlurField("mouDate");
-											handleBlurField("moaDate");
-										}}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Catatan MOU Kerjasama
-									</Label>
-									<Input
-										placeholder="Catatan nomor / klausul MOU"
-										className="h-8 text-xs bg-white"
-										value={data?.mouNotes || data?.moaNotes || ""}
-										disabled={!canEdit}
-										onChange={(e) => {
-											handleLocalChange("mouNotes", e.target.value);
-											handleLocalChange("moaNotes", e.target.value);
-										}}
-										onBlur={() => {
-											handleBlurField("mouNotes");
-											handleBlurField("moaNotes");
-										}}
-									/>
-								</div>
-							</div>
-
-							<div className="pt-2 border-t border-slate-100">
-								<DocumentUpload
-									studentId={studentId}
-									panel="magang"
-									documentKey="mou"
-									canEdit={canEdit}
-									onUploadSuccess={fetchInternshipData}
-								/>
-							</div>
-						</div>
-
-						{/* 4. Letter of Acceptance (LOA) (Urutan 2 Dokumen Taiwan) */}
-						<div
-							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								data?.loaConfirmed
-									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-									: "border-slate-200 bg-white shadow-xs"
-							}`}
-						>
-							<div className="flex items-start justify-between gap-3">
-								<div className="flex items-start gap-3">
-									<Checkbox
-										id="chk-loaConfirmed"
-										checked={!!data?.loaConfirmed}
-										disabled={!canEdit || loadingItem === "loaConfirmed"}
-										onCheckedChange={(checked) =>
-											handleToggleField("loaConfirmed", !!checked)
-										}
-										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-									/>
-									<div>
-										<label
-											htmlFor="chk-loaConfirmed"
-											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-										>
-											4. Letter of Acceptance (LOA)
-										</label>
-										<p className="text-[11px] text-slate-500 mt-0.5">
-											Surat penerimaan dan konfirmasi penempatan resmi dari
-											mitra industri / hotel
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "loaConfirmed" ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : data?.loaConfirmed ? (
-										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-											✓ Selesai
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="text-slate-400 border-slate-200 text-[10px]"
-										>
-											Belum
-										</Badge>
-									)}
-								</div>
-							</div>
-
-							<div className="space-y-1 pt-1">
-								<Label className="text-[11px] font-semibold text-slate-600">
-									Tanggal Konfirmasi LOA
-								</Label>
+			<ChecklistGroup
+				title={isTaiwan ? "Alur Dokumen Taiwan" : "Alur Dokumen Keberangkatan"}
+				done={countDone(taiwanKeys)}
+				total={taiwanKeys.length}
+			>
+				{/* MOU disimpan ganda ke field lama MOA (kompatibilitas data) */}
+				<ChecklistRow
+					id="mouReady"
+					label="MOU Kampus & Hotel Mitra"
+					step={stepOf("mouReady")}
+					desc="Nota kesepahaman kerja sama kampus dan hotel mitra."
+					checked={isChecklistDone("mouReady")}
+					loading={loadingItem === "mouReady" || loadingItem === "moaReady"}
+					disabled={!canEdit}
+					onCheckedChange={(checked) => {
+						handleToggleField("mouReady", checked);
+						handleToggleField("moaReady", checked);
+					}}
+					upload={upload("mou")}
+				>
+					{grid(
+						2,
+						<>
+							<RowField label="Tanggal Terbit MOU" htmlFor="f-mouDate">
 								<Input
+									id="f-mouDate"
 									type="date"
-									className="h-8 text-xs bg-white"
-									value={
-										data?.loaDate
-											? new Date(data.loaDate).toISOString().split("T")[0]
-											: ""
-									}
+									className={rowInputClass}
+									value={toDateInput(data?.mouDate || data?.moaDate)}
 									disabled={!canEdit}
-									onChange={(e) => handleLocalChange("loaDate", e.target.value)}
-									onBlur={() => handleBlurField("loaDate")}
+									onChange={(e) => {
+										handleLocalChange("mouDate", e.target.value);
+										handleLocalChange("moaDate", e.target.value);
+									}}
+									onBlur={() => {
+										handleBlurField("mouDate");
+										handleBlurField("moaDate");
+									}}
 								/>
-							</div>
-
-							<div className="pt-2 border-t border-slate-100">
-								<DocumentUpload
-									studentId={studentId}
-									panel="magang"
-									documentKey="loa"
-									canEdit={canEdit}
-									onUploadSuccess={fetchInternshipData}
-								/>
-							</div>
-						</div>
-
-						{/* 5. Kontrak Kerja Magang (Urutan 3 Dokumen Taiwan) */}
-						<div
-							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								data?.contractReady
-									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-									: "border-slate-200 bg-white shadow-xs"
-							}`}
-						>
-							<div className="flex items-start justify-between gap-3">
-								<div className="flex items-start gap-3">
-									<Checkbox
-										id="chk-contractReady"
-										checked={!!data?.contractReady}
-										disabled={!canEdit || loadingItem === "contractReady"}
-										onCheckedChange={(checked) =>
-											handleToggleField("contractReady", !!checked)
-										}
-										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-									/>
-									<div>
-										<label
-											htmlFor="chk-contractReady"
-											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-										>
-											5. Kontrak Kerja Magang
-										</label>
-										<p className="text-[11px] text-slate-500 mt-0.5">
-											Kontrak magang yang ditandatangani mahasiswa dan mitra
-											kerja industri luar negeri
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "contractReady" ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : data?.contractReady ? (
-										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-											✓ Selesai
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="text-slate-400 border-slate-200 text-[10px]"
-										>
-											Belum
-										</Badge>
-									)}
-								</div>
-							</div>
-
-							<div className="space-y-1 pt-1">
-								<Label className="text-[11px] font-semibold text-slate-600">
-									Tanggal Penandatanganan Kontrak
-								</Label>
+							</RowField>
+							<RowField label="Catatan MOU" htmlFor="f-mouNotes">
 								<Input
-									type="date"
-									className="h-8 text-xs bg-white"
-									value={
-										data?.contractDate
-											? new Date(data.contractDate).toISOString().split("T")[0]
-											: ""
-									}
+									id="f-mouNotes"
+									placeholder="Catatan nomor / klausul MOU"
+									className={rowInputClass}
+									value={data?.mouNotes || data?.moaNotes || ""}
 									disabled={!canEdit}
-									onChange={(e) =>
-										handleLocalChange("contractDate", e.target.value)
-									}
-									onBlur={() => handleBlurField("contractDate")}
+									onChange={(e) => {
+										handleLocalChange("mouNotes", e.target.value);
+										handleLocalChange("moaNotes", e.target.value);
+									}}
+									onBlur={() => {
+										handleBlurField("mouNotes");
+										handleBlurField("moaNotes");
+									}}
 								/>
-							</div>
+							</RowField>
+						</>,
+					)}
+				</ChecklistRow>
 
-							<div className="pt-2 border-t border-slate-100">
-								<DocumentUpload
-									studentId={studentId}
-									panel="magang"
-									documentKey="contract"
-									canEdit={canEdit}
-									onUploadSuccess={fetchInternshipData}
-								/>
-							</div>
-						</div>
+				{row(
+					"loaConfirmed",
+					"Letter of Acceptance (LOA)",
+					"Surat penerimaan dan konfirmasi penempatan resmi dari mitra industri / hotel",
+					grid(2, dateField("loaDate", "Tanggal Konfirmasi LOA")),
+					upload("loa"),
+					seqWarning("loaConfirmed"),
+				)}
 
-						{/* 6. Suhan — Surat Persetujuan Magang Taiwan (Urutan 4 Dokumen Taiwan) */}
-						<div
-							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								data?.suhanReady
-									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-									: "border-slate-200 bg-white shadow-xs"
-							}`}
-						>
-							<div className="flex items-start justify-between gap-3">
-								<div className="flex items-start gap-3">
-									<Checkbox
-										id="chk-suhanReady"
-										checked={!!data?.suhanReady}
-										disabled={!canEdit || loadingItem === "suhanReady"}
-										onCheckedChange={(checked) =>
-											handleToggleField("suhanReady", !!checked)
-										}
-										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-									/>
-									<div>
-										<label
-											htmlFor="chk-suhanReady"
-											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-										>
-											6. Suhan — Izin Magang Taiwan
-										</label>
-										<p className="text-[11px] text-slate-500 mt-0.5">
-											Suhan: Surat Persetujuan Magang Mahasiswa WNI di Taiwan
-											dari Biro Kepariwisataan / Otoritas Taiwan
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "suhanReady" ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : data?.suhanReady ? (
-										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-											✓ Selesai
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="text-slate-400 border-slate-200 text-[10px]"
-										>
-											Belum
-										</Badge>
-									)}
-								</div>
-							</div>
+				{row(
+					"contractReady",
+					"Kontrak Kerja Magang",
+					"",
+					grid(2, dateField("contractDate", "Tanggal Tanda Tangan Kontrak")),
+					upload("contract"),
+					seqWarning("contractReady"),
+				)}
 
-							<div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Nomor Izin Suhan
-									</Label>
-									<Input
-										placeholder="Nomor izin Suhan Taiwan"
-										className="h-8 text-xs bg-white"
-										value={data?.suhanNo || ""}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("suhanNo", e.target.value)
-										}
-										onBlur={() => handleBlurField("suhanNo")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Tanggal Terbit Suhan
-									</Label>
-									<Input
-										type="date"
-										className="h-8 text-xs bg-white"
-										value={
-											data?.suhanDate
-												? new Date(data.suhanDate).toISOString().split("T")[0]
-												: ""
-										}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("suhanDate", e.target.value)
-										}
-										onBlur={() => handleBlurField("suhanDate")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Catatan Izin Suhan
-									</Label>
-									<Input
-										placeholder="Keterangan perizinan"
-										className="h-8 text-xs bg-white"
-										value={data?.suhanNotes || ""}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("suhanNotes", e.target.value)
-										}
-										onBlur={() => handleBlurField("suhanNotes")}
-									/>
-								</div>
-							</div>
+				{/* Suhan hanya untuk tujuan Taiwan */}
+				{isTaiwan &&
+					row(
+						"suhanReady",
+						"Suhan (Izin Magang Taiwan)",
+						"Surat persetujuan magang dari Biro Pariwisata Taiwan",
+						grid(
+							3,
+							<>
+								{textField("suhanNo", "Nomor Izin Suhan", "Nomor izin Suhan")}
+								{dateField("suhanDate", "Tanggal Terbit")}
+								{textField("suhanNotes", "Catatan", "Keterangan perizinan")}
+							</>,
+						),
+						upload("suhan"),
+						seqWarning("suhanReady"),
+					)}
 
-							<div className="pt-2 border-t border-slate-100">
-								<DocumentUpload
-									studentId={studentId}
-									panel="magang"
-									documentKey="suhan"
-									canEdit={canEdit}
-									onUploadSuccess={fetchInternshipData}
-								/>
-							</div>
-						</div>
+				{row(
+					"mcuReady",
+					"Medical Check Up (MCU) Full",
+					"Pemeriksaan kesehatan menyeluruh standar penempatan di RS/klinik rujukan",
+					grid(
+						3,
+						<>
+							{textField("mcuPlace", "Tempat / RS", "RS / Lab Klinik")}
+							{dateField("mcuDate", "Tanggal MCU")}
+							{selectField("mcuResult", "Hasil MCU", "fit", [
+								["fit", "FIT (Layak)"],
+								["unfit", "UNFIT (Tidak Layak)"],
+							])}
+						</>,
+					),
+					upload("mcu"),
+					seqWarning("mcuReady"),
+				)}
 
-						{/* 7. Medical Check Up (MCU) Full (Urutan 5 Dokumen Taiwan) */}
-						<div
-							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								data?.mcuReady
-									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-									: "border-slate-200 bg-white shadow-xs"
-							}`}
-						>
-							<div className="flex items-start justify-between gap-3">
-								<div className="flex items-start gap-3">
-									<Checkbox
-										id="chk-mcuReady"
-										checked={!!data?.mcuReady}
-										disabled={!canEdit || loadingItem === "mcuReady"}
-										onCheckedChange={(checked) =>
-											handleToggleField("mcuReady", !!checked)
-										}
-										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-									/>
-									<div>
-										<label
-											htmlFor="chk-mcuReady"
-											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-										>
-											7. Medical Check Up (MCU) Full
-										</label>
-										<p className="text-[11px] text-slate-500 mt-0.5">
-											Pemeriksaan kesehatan menyeluruh standar penempatan
-											penerbangan di RS/Klinik rujukan
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "mcuReady" ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : data?.mcuReady ? (
-										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-											✓ Selesai
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="text-slate-400 border-slate-200 text-[10px]"
-										>
-											Belum
-										</Badge>
-									)}
-								</div>
-							</div>
+				{row(
+					"visaReady",
+					"Visa Kerja / Magang",
+					"",
+					grid(
+						3,
+						<>
+							{textField("visaType", "Tipe Visa", "Internship / Work")}
+							{textField("visaNo", "Nomor Visa", "No. Visa")}
+							{selectField("visaStatus", "Status Visa", "process", [
+								["approved", "Disetujui (Approved)"],
+								["process", "Proses (Under Review)"],
+								["reject", "Ditolak (Rejected)"],
+							])}
+						</>,
+					),
+					upload("visa"),
+					seqWarning("visaReady"),
+				)}
 
-							<div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Tempat / RS MCU Full
-									</Label>
-									<Input
-										placeholder="RS / Lab Klinik"
-										className="h-8 text-xs bg-white"
-										value={data?.mcuPlace || ""}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("mcuPlace", e.target.value)
-										}
-										onBlur={() => handleBlurField("mcuPlace")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Tanggal MCU Full
-									</Label>
-									<Input
-										type="date"
-										className="h-8 text-xs bg-white"
-										value={
-											data?.mcuDate
-												? new Date(data.mcuDate).toISOString().split("T")[0]
-												: ""
-										}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("mcuDate", e.target.value)
-										}
-										onBlur={() => handleBlurField("mcuDate")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Hasil MCU
-									</Label>
-									<Select
-										value={data?.mcuResult || "fit"}
-										disabled={!canEdit}
-										onValueChange={(val) => {
-											handleLocalChange("mcuResult", val);
-											handleToggleField("mcuResult", val);
-										}}
-									>
-										<SelectTrigger className="h-8 text-xs bg-white">
-											<SelectValue placeholder="Pilih Hasil" />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="fit">FIT (Layak)</SelectItem>
-											<SelectItem value="unfit">UNFIT (Tidak Layak)</SelectItem>
-										</SelectContent>
-									</Select>
-								</div>
-							</div>
+				{row(
+					"ticketReady",
+					"Tiket Keberangkatan",
+					"",
+					grid(
+						3,
+						<>
+							{textField("ticketAirline", "Maskapai", "Garuda / AirAsia / dll")}
+							{textField("ticketFlight", "No. Flight", "GA-880")}
+							{dateField("ticketDate", "Tanggal Terbang")}
+						</>,
+					),
+					upload("ticket"),
+					seqWarning("ticketReady"),
+				)}
+			</ChecklistGroup>
 
-							<div className="pt-2 border-t border-slate-100">
-								<DocumentUpload
-									studentId={studentId}
-									panel="magang"
-									documentKey="mcu"
-									canEdit={canEdit}
-									onUploadSuccess={fetchInternshipData}
-								/>
+			<ChecklistGroup
+				title="Keberangkatan"
+				done={countDone(keberangkatanKeys)}
+				total={keberangkatanKeys.length}
+			>
+				{/* Asesmen disimpan ganda ke field lama PDT (kompatibilitas data) */}
+				<ChecklistRow
+					id="asesmenReady"
+					label="Asesmen & Pengarahan Keberangkatan"
+					desc="Evaluasi kesiapan akhir, pembekalan budaya & SOP kerja, serta surat pernyataan keberangkatan (2 berkas)"
+					checked={isChecklistDone("asesmenReady")}
+					loading={loadingItem === "asesmenReady" || loadingItem === "pdtReady"}
+					disabled={!canEdit}
+					onCheckedChange={(checked) => {
+						handleToggleField("asesmenReady", checked);
+						handleToggleField("pdtReady", checked);
+					}}
+					upload={
+						<>
+							<div className="space-y-1">
+								<p className="text-xs font-medium text-slate-600">
+									Berkas 1: Hasil Asesmen & Pengarahan
+								</p>
+								{upload("asesmen_kompetensi")}
 							</div>
-						</div>
-
-						{/* 8. Visa Kerja / Magang */}
-						<div
-							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								data?.visaReady
-									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-									: "border-slate-200 bg-white shadow-xs"
-							}`}
-						>
-							<div className="flex items-start justify-between gap-3">
-								<div className="flex items-start gap-3">
-									<Checkbox
-										id="chk-visaReady"
-										checked={!!data?.visaReady}
-										disabled={!canEdit || loadingItem === "visaReady"}
-										onCheckedChange={(checked) =>
-											handleToggleField("visaReady", !!checked)
-										}
-										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-									/>
-									<div>
-										<label
-											htmlFor="chk-visaReady"
-											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-										>
-											8. Visa Kerja / Magang
-										</label>
-										<p className="text-[11px] text-slate-500 mt-0.5">
-											Penerbitan visa resmi sesuai regulasi negara penempatan
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "visaReady" ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : data?.visaReady ? (
-										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-											✓ Selesai
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="text-slate-400 border-slate-200 text-[10px]"
-										>
-											Belum
-										</Badge>
-									)}
-								</div>
+							<div className="space-y-1">
+								<p className="text-xs font-medium text-slate-600">
+									Berkas 2: Surat Pernyataan Keberangkatan
+								</p>
+								{upload("surat_pernyataan_keberangkatan")}
 							</div>
-
-							<div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Tipe Visa
-									</Label>
-									<Input
-										placeholder="Internship / Work"
-										className="h-8 text-xs bg-white"
-										value={data?.visaType || ""}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("visaType", e.target.value)
-										}
-										onBlur={() => handleBlurField("visaType")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Nomor Visa
-									</Label>
-									<Input
-										placeholder="No. Visa"
-										className="h-8 text-xs bg-white"
-										value={data?.visaNo || ""}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("visaNo", e.target.value)
-										}
-										onBlur={() => handleBlurField("visaNo")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Status Visa
-									</Label>
-									<Select
-										value={data?.visaStatus || "process"}
-										disabled={!canEdit}
-										onValueChange={(val) => {
-											handleLocalChange("visaStatus", val);
-											handleToggleField("visaStatus", val);
-										}}
-									>
-										<SelectTrigger className="h-8 text-xs bg-white">
-											<SelectValue placeholder="Pilih Status" />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="approved">
-												Disetujui (Approved)
-											</SelectItem>
-											<SelectItem value="process">
-												Proses (Under Review)
-											</SelectItem>
-											<SelectItem value="reject">Ditolak (Rejected)</SelectItem>
-										</SelectContent>
-									</Select>
-								</div>
-							</div>
-
-							<div className="pt-2 border-t border-slate-100">
-								<DocumentUpload
-									studentId={studentId}
-									panel="magang"
-									documentKey="visa"
-									canEdit={canEdit}
-									onUploadSuccess={fetchInternshipData}
-								/>
-							</div>
-						</div>
-
-						{/* 9. Tiket Keberangkatan */}
-						<div
-							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								data?.ticketReady
-									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-									: "border-slate-200 bg-white shadow-xs"
-							}`}
-						>
-							<div className="flex items-start justify-between gap-3">
-								<div className="flex items-start gap-3">
-									<Checkbox
-										id="chk-ticketReady"
-										checked={!!data?.ticketReady}
-										disabled={!canEdit || loadingItem === "ticketReady"}
-										onCheckedChange={(checked) =>
-											handleToggleField("ticketReady", !!checked)
-										}
-										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-									/>
-									<div>
-										<label
-											htmlFor="chk-ticketReady"
-											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-										>
-											9. Tiket Keberangkatan
-										</label>
-										<p className="text-[11px] text-slate-500 mt-0.5">
-											Tiket pesawat resmi & konfirmasi rute penerbangan
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "ticketReady" ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : data?.ticketReady ? (
-										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-											✓ Selesai
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="text-slate-400 border-slate-200 text-[10px]"
-										>
-											Belum
-										</Badge>
-									)}
-								</div>
-							</div>
-
-							<div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Maskapai
-									</Label>
-									<Input
-										placeholder="Garuda / AirAsia / dll"
-										className="h-8 text-xs bg-white"
-										value={data?.ticketAirline || ""}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("ticketAirline", e.target.value)
-										}
-										onBlur={() => handleBlurField("ticketAirline")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										No. Flight
-									</Label>
-									<Input
-										placeholder="GA-880"
-										className="h-8 text-xs bg-white"
-										value={data?.ticketFlight || ""}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("ticketFlight", e.target.value)
-										}
-										onBlur={() => handleBlurField("ticketFlight")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Tanggal Terbang
-									</Label>
-									<Input
-										type="date"
-										className="h-8 text-xs bg-white"
-										value={
-											data?.ticketDate
-												? new Date(data.ticketDate).toISOString().split("T")[0]
-												: ""
-										}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("ticketDate", e.target.value)
-										}
-										onBlur={() => handleBlurField("ticketDate")}
-									/>
-								</div>
-							</div>
-
-							<div className="pt-2 border-t border-slate-100">
-								<DocumentUpload
-									studentId={studentId}
-									panel="magang"
-									documentKey="ticket"
-									canEdit={canEdit}
-									onUploadSuccess={fetchInternshipData}
-								/>
-							</div>
-						</div>
-
-						{/* 10. Asesmen dan Pengarahan Keberangkatan (Restrukturisasi PDT ke format 2 berkas) */}
-						<div
-							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								isChecklistDone("asesmenReady")
-									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-									: "border-slate-200 bg-white shadow-xs"
-							}`}
-						>
-							<div className="flex items-start justify-between gap-3">
-								<div className="flex items-start gap-3">
-									<Checkbox
-										id="chk-asesmenReady"
-										checked={isChecklistDone("asesmenReady")}
-										disabled={
-											!canEdit ||
-											loadingItem === "asesmenReady" ||
-											loadingItem === "pdtReady"
-										}
-										onCheckedChange={(checked) => {
-											handleToggleField("asesmenReady", !!checked);
-											handleToggleField("pdtReady", !!checked);
-										}}
-										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-									/>
-									<div>
-										<label
-											htmlFor="chk-asesmenReady"
-											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-										>
-											10. Asesmen dan Pengarahan Keberangkatan
-										</label>
-										<p className="text-[11px] text-slate-500 mt-0.5">
-											Evaluasi kesiapan akhir, pembekalan budaya & SOP kerja,
-											serta surat pernyataan keberangkatan (2 Berkas Wajib)
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "asesmenReady" ||
-									loadingItem === "pdtReady" ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : isChecklistDone("asesmenReady") ? (
-										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-											✓ Selesai
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="text-slate-400 border-slate-200 text-[10px]"
-										>
-											Belum
-										</Badge>
-									)}
-								</div>
-							</div>
-
-							<div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Tempat Asesmen
-									</Label>
-									<Input
-										placeholder="Kampus / Balai Latihan"
-										className="h-8 text-xs bg-white"
-										value={data?.pdtPlace || ""}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("pdtPlace", e.target.value)
-										}
-										onBlur={() => handleBlurField("pdtPlace")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Tanggal Asesmen / Mulai
-									</Label>
-									<Input
-										type="date"
-										className="h-8 text-xs bg-white"
-										value={
-											data?.asesmenDate
-												? new Date(data.asesmenDate).toISOString().split("T")[0]
-												: data?.pdtDate
-													? new Date(data.pdtDate).toISOString().split("T")[0]
-													: ""
-										}
-										disabled={!canEdit}
-										onChange={(e) => {
-											handleLocalChange("asesmenDate", e.target.value);
-											handleLocalChange("pdtDate", e.target.value);
-										}}
-										onBlur={() => {
-											handleBlurField("asesmenDate");
-											handleBlurField("pdtDate");
-										}}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Tanggal Pengarahan / Selesai
-									</Label>
-									<Input
-										type="date"
-										className="h-8 text-xs bg-white"
-										value={
-											data?.pdtEndDate
-												? new Date(data.pdtEndDate).toISOString().split("T")[0]
-												: ""
-										}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("pdtEndDate", e.target.value)
-										}
-										onBlur={() => handleBlurField("pdtEndDate")}
-									/>
-								</div>
-							</div>
-
-							{/* 2 Slot Dokumen: Hasil Asesmen & Surat Pernyataan Keberangkatan */}
-							<div className="pt-2 border-t border-slate-100 space-y-3">
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
-										<FileText className="w-3.5 h-3.5 text-blue-600" />
-										Berkas 1: Hasil Asesmen Kompetensi & Pengarahan
-									</Label>
-									<DocumentUpload
-										studentId={studentId}
-										panel="magang"
-										documentKey="asesmen_kompetensi"
-										canEdit={canEdit}
-										onUploadSuccess={fetchInternshipData}
-									/>
-								</div>
-								<div className="space-y-1 pt-1 border-t border-slate-100/70">
-									<Label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
-										<FileCheck className="w-3.5 h-3.5 text-emerald-600" />
-										Berkas 2: Surat Pernyataan Keberangkatan Mahasiswa
-									</Label>
-									<DocumentUpload
-										studentId={studentId}
-										panel="magang"
-										documentKey="surat_pernyataan_keberangkatan"
-										canEdit={canEdit}
-										onUploadSuccess={fetchInternshipData}
-									/>
-								</div>
-							</div>
-						</div>
-						{/* 11. Dokumentasi Keberangkatan */}
-						<div
-							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								data?.dokumentasiReady
-									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-									: "border-slate-200 bg-white shadow-xs"
-							}`}
-						>
-							<div className="flex items-start justify-between gap-3">
-								<div className="flex items-start gap-3">
-									<Checkbox
-										id="chk-dokumentasiReady"
-										checked={!!data?.dokumentasiReady}
-										disabled={!canEdit || loadingItem === "dokumentasiReady"}
-										onCheckedChange={(checked) =>
-											handleToggleField("dokumentasiReady", !!checked)
-										}
-										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-									/>
-									<div>
-										<label
-											htmlFor="chk-dokumentasiReady"
-											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-										>
-											11. Dokumentasi Pelepasan & Bandara
-										</label>
-										<p className="text-[11px] text-slate-500 mt-0.5">
-											Link dokumentasi foto & video pelepasan / airport
-											departure
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "dokumentasiReady" ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : data?.dokumentasiReady ? (
-										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-											✓ Selesai
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="text-slate-400 border-slate-200 text-[10px]"
-										>
-											Belum
-										</Badge>
-									)}
-								</div>
-							</div>
-
-							<div className="space-y-1 pt-1">
-								<Label className="text-[11px] font-semibold text-slate-600">
-									Link Dokumentasi (Google Drive / Cloud)
-								</Label>
-								<Input
-									placeholder="https://drive.google.com/..."
-									className="h-8 text-xs bg-white"
-									value={data?.dokumentasiKeberangkatanLink || ""}
-									disabled={!canEdit}
-									onChange={(e) =>
-										handleLocalChange(
-											"dokumentasiKeberangkatanLink",
-											e.target.value,
-										)
-									}
-									onBlur={() => handleBlurField("dokumentasiKeberangkatanLink")}
-								/>
-							</div>
-
-							<div className="pt-2 border-t border-slate-100">
-								<DocumentUpload
-									studentId={studentId}
-									panel="magang"
-									documentKey="dokumentasi_keberangkatan"
-									canEdit={canEdit}
-									onUploadSuccess={fetchInternshipData}
-								/>
-							</div>
-						</div>
-
-						{/* 12. Mitra Penempatan & Sponsor */}
-						<div
-							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								data?.agenReady
-									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-									: "border-slate-200 bg-white shadow-xs"
-							}`}
-						>
-							<div className="flex items-start justify-between gap-3">
-								<div className="flex items-start gap-3">
-									<Checkbox
-										id="chk-agenReady"
-										checked={!!data?.agenReady}
-										disabled={!canEdit || loadingItem === "agenReady"}
-										onCheckedChange={(checked) =>
-											handleToggleField("agenReady", !!checked)
-										}
-										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-									/>
-									<div>
-										<label
-											htmlFor="chk-agenReady"
-											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-										>
-											12. Mitra Penempatan & Dokumen Tambahan
-										</label>
-										<p className="text-[11px] text-slate-500 mt-0.5">
-											Detail mitra penempatan, peminatan departemen, dan dokumen
-											tambahan agensi
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "agenReady" ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : data?.agenReady ? (
-										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-											✓ Selesai
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="text-slate-400 border-slate-200 text-[10px]"
-										>
-											Belum
-										</Badge>
-									)}
-								</div>
-							</div>
-
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Perusahaan Magang
-									</Label>
-									<Input
-										placeholder="Nama Hotel / Resto"
-										className="h-8 text-xs bg-white"
-										value={data?.internshipCompany || ""}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("internshipCompany", e.target.value)
-										}
-										onBlur={() => handleBlurField("internshipCompany")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Kota Tujuan
-									</Label>
-									<Input
-										placeholder="Kuala Lumpur / Taipei / dll"
-										className="h-8 text-xs bg-white"
-										value={data?.destinationCity || ""}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("destinationCity", e.target.value)
-										}
-										onBlur={() => handleBlurField("destinationCity")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Durasi Magang
-									</Label>
-									<Input
-										placeholder="6 Bulan / 1 Tahun"
-										className="h-8 text-xs bg-white"
-										value={data?.internshipDuration || ""}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("internshipDuration", e.target.value)
-										}
-										onBlur={() => handleBlurField("internshipDuration")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Peminatan / Posisi
-									</Label>
-									<Input
-										placeholder="Hospitality / Barista"
-										className="h-8 text-xs bg-white"
-										value={data?.agenPeminatan || ""}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("agenPeminatan", e.target.value)
-										}
-										onBlur={() => handleBlurField("agenPeminatan")}
-									/>
-								</div>
-							</div>
-
-							<div className="pt-2 border-t border-slate-100">
-								<DocumentUpload
-									studentId={studentId}
-									panel="magang"
-									documentKey="mitra_agen"
-									canEdit={canEdit}
-									onUploadSuccess={fetchInternshipData}
-								/>
-							</div>
-						</div>
-
-						{/* 13. Sertifikasi Bahasa Asing (Poin 12) */}
-						<div
-							className={`p-4 rounded-xl border transition-colors space-y-3 ${
-								data?.languageCertReady
-									? "border-emerald-200 bg-emerald-50/20 shadow-xs"
-									: "border-slate-200 bg-white shadow-xs"
-							}`}
-						>
-							<div className="flex items-start justify-between gap-3">
-								<div className="flex items-start gap-3">
-									<Checkbox
-										id="chk-languageCertReady"
-										checked={!!data?.languageCertReady}
-										disabled={!canEdit || loadingItem === "languageCertReady"}
-										onCheckedChange={(checked) =>
-											handleToggleField("languageCertReady", !!checked)
-										}
-										className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 cursor-pointer"
-									/>
-									<div>
-										<label
-											htmlFor="chk-languageCertReady"
-											className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block hover:text-[#0517B0] transition-colors"
-										>
-											13. Sertifikasi Bahasa Asing
-										</label>
-										<p className="text-[11px] text-slate-500 mt-0.5">
-											Kesiapan sertifikasi bahasa kerja (TOEIC / JLPT / Topik)
-											menjelang keberangkatan
-										</p>
-									</div>
-								</div>
-								<div className="flex items-center gap-2 shrink-0">
-									{loadingItem === "languageCertReady" ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-									) : data?.languageCertReady ? (
-										<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-											✓ Selesai
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="text-slate-400 border-slate-200 text-[10px]"
-										>
-											Belum
-										</Badge>
-									)}
-								</div>
-							</div>
-
-							<div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Jenis Sertifikasi
-									</Label>
-									<Select
-										value={data?.languageCertName || "TOEIC"}
-										disabled={!canEdit}
-										onValueChange={(val) => {
-											handleLocalChange("languageCertName", val);
-											handleToggleField("languageCertName", val);
-										}}
-									>
-										<SelectTrigger className="h-8 text-xs bg-white">
-											<SelectValue placeholder="Pilih Jenis" />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="TOEIC">TOEIC (English)</SelectItem>
-											<SelectItem value="JLPT">JLPT (Jepang)</SelectItem>
-											<SelectItem value="Topik">TOPIK (Korea)</SelectItem>
-											<SelectItem value="TOCFL">TOCFL (Mandarin)</SelectItem>
-											<SelectItem value="Lainnya">Lainnya</SelectItem>
-										</SelectContent>
-									</Select>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Tanggal Tes / Kelulusan
-									</Label>
-									<Input
-										type="date"
-										className="h-8 text-xs bg-white"
-										value={
-											data?.languageCertDate
-												? new Date(data.languageCertDate)
-														.toISOString()
-														.split("T")[0]
-												: ""
-										}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("languageCertDate", e.target.value)
-										}
-										onBlur={() => handleBlurField("languageCertDate")}
-									/>
-								</div>
-								<div className="space-y-1">
-									<Label className="text-[11px] font-semibold text-slate-600">
-										Skor / Hasil Kelulusan
-									</Label>
-									<Input
-										placeholder="Contoh: 650 / N3 / Level 2"
-										className="h-8 text-xs bg-white"
-										value={data?.languageCertScore || ""}
-										disabled={!canEdit}
-										onChange={(e) =>
-											handleLocalChange("languageCertScore", e.target.value)
-										}
-										onBlur={() => handleBlurField("languageCertScore")}
-									/>
-								</div>
-							</div>
-
-							<div className="pt-2 border-t border-slate-100">
-								<DocumentUpload
-									studentId={studentId}
-									panel="magang"
-									documentKey="sertifikasi_bahasa"
-									canEdit={canEdit}
-									onUploadSuccess={fetchInternshipData}
-								/>
-							</div>
-						</div>
-					</div>
-
-					{/* Catatan Internal Magang */}
-					<div className="mt-6 pt-4 border-t border-slate-200">
-						<div className="flex items-center justify-between mb-2">
-							<Label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-								Catatan & Arahan Divisi Magang
-							</Label>
-							{canEdit && (
-								<Button
-									size="sm"
-									onClick={handleSaveNotes}
-									disabled={isSaving}
-									className="h-7 text-xs bg-[#0517B0] hover:bg-blue-800 text-white font-semibold"
-								>
-									{isSaving ? (
-										<Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-									) : null}
-									Simpan Catatan
-								</Button>
+						</>
+					}
+				>
+					{grid(
+						3,
+						<>
+							{textField(
+								"pdtPlace",
+								"Tempat Asesmen",
+								"Kampus / Balai Latihan",
 							)}
-						</div>
-						<Textarea
-							value={notes}
-							disabled={!canEdit}
-							onChange={(e) => setNotes(e.target.value)}
-							placeholder="Tambahkan catatan koordinasi, kendala visa, atau catatan khusus keberangkatan mahasiswa..."
-							className="min-h-[80px] text-xs bg-white resize-none"
-						/>
-					</div>
-				</CardContent>
-			</Card>
+							<RowField label="Tanggal Mulai" htmlFor="f-asesmenDate">
+								<Input
+									id="f-asesmenDate"
+									type="date"
+									className={rowInputClass}
+									value={toDateInput(data?.asesmenDate || data?.pdtDate)}
+									disabled={!canEdit}
+									onChange={(e) => {
+										handleLocalChange("asesmenDate", e.target.value);
+										handleLocalChange("pdtDate", e.target.value);
+									}}
+									onBlur={() => {
+										handleBlurField("asesmenDate");
+										handleBlurField("pdtDate");
+									}}
+								/>
+							</RowField>
+							{dateField("pdtEndDate", "Tanggal Selesai")}
+						</>,
+					)}
+				</ChecklistRow>
+
+				{row(
+					"dokumentasiReady",
+					"Dokumentasi Pelepasan & Bandara",
+					"",
+					textField(
+						"dokumentasiKeberangkatanLink",
+						"Link Dokumentasi (Google Drive / Cloud)",
+						"https://drive.google.com/...",
+					),
+					upload("dokumentasi_keberangkatan"),
+				)}
+
+				{row(
+					"agenReady",
+					"Mitra Penempatan & Dokumen Tambahan",
+					"",
+					grid(
+						2,
+						<>
+							{textField(
+								"internshipCompany",
+								"Perusahaan Magang",
+								"Nama Hotel / Resto",
+							)}
+							{textField(
+								"destinationCity",
+								"Kota Tujuan",
+								"Kuala Lumpur / Taipei / dll",
+							)}
+							{textField(
+								"internshipDuration",
+								"Durasi Magang",
+								"6 Bulan / 1 Tahun",
+							)}
+							{textField(
+								"agenPeminatan",
+								"Peminatan / Posisi",
+								"Hospitality / Barista",
+							)}
+						</>,
+					),
+					upload("mitra_agen"),
+				)}
+			</ChecklistGroup>
+
+			<OptionalGroup title="Sertifikasi Bahasa Asing">
+				{row(
+					"languageCertReady",
+					"Sertifikasi Bahasa Asing",
+					"Sertifikasi bahasa kerja (TOEIC / JLPT / TOPIK / TOCFL) menjelang keberangkatan",
+					grid(
+						3,
+						<>
+							{selectField("languageCertName", "Jenis Sertifikasi", "TOEIC", [
+								["TOEIC", "TOEIC (English)"],
+								["JLPT", "JLPT (Jepang)"],
+								["Topik", "TOPIK (Korea)"],
+								["TOCFL", "TOCFL (Mandarin)"],
+								["Lainnya", "Lainnya"],
+							])}
+							{dateField("languageCertDate", "Tanggal Tes / Lulus")}
+							{textField(
+								"languageCertScore",
+								"Skor / Hasil",
+								"Contoh: 650 / N3 / Level 2",
+							)}
+						</>,
+					),
+					upload("sertifikasi_bahasa"),
+				)}
+			</OptionalGroup>
+
+			{/* Catatan internal divisi */}
+			<section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6 space-y-3">
+				<div className="flex items-center justify-between gap-3">
+					<label
+						htmlFor="magang-notes"
+						className="text-sm sm:text-base font-bold text-slate-900"
+					>
+						Catatan Divisi Magang
+					</label>
+					{canEdit && (
+						<Button
+							size="sm"
+							onClick={handleSaveNotes}
+							disabled={isSaving}
+							className="h-9 bg-[#0517B0] hover:bg-blue-800 text-white text-sm font-semibold"
+						>
+							{isSaving && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
+							Simpan Catatan
+						</Button>
+					)}
+				</div>
+				<Textarea
+					id="magang-notes"
+					value={notes}
+					disabled={!canEdit}
+					onChange={(e) => setNotes(e.target.value)}
+					placeholder="Catatan koordinasi, kendala visa, atau catatan khusus keberangkatan mahasiswa..."
+					className="min-h-[96px] text-sm bg-white resize-none"
+				/>
+			</section>
 		</div>
 	);
 }

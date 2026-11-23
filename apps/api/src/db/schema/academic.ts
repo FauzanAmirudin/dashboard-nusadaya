@@ -7,6 +7,7 @@ import {
 	serial,
 	text,
 	timestamp,
+	uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { courseEnrollments, courses } from "./courses";
 import { academicTerms } from "./curriculum";
@@ -178,6 +179,12 @@ export const courseGrades = pgTable(
 		index("idx_course_grades_course_id").on(t.courseId),
 		index("idx_course_grades_term_id").on(t.termId),
 		index("idx_course_grades_enrollment_id").on(t.enrollmentId),
+		// Satu baris nilai per (mahasiswa, mata kuliah, percobaan) — cegah nilai ganda
+		uniqueIndex("uq_course_grades_student_code_attempt").on(
+			t.studentId,
+			t.courseCode,
+			t.attempt,
+		),
 	],
 );
 

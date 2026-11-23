@@ -105,6 +105,17 @@ export async function ensureDatabaseSchema() {
 
 		// PMB upgrade schema assertions
 		await client.unsafe(`
+			-- health_extra (sementara) diganti nama menjadi extra_data (isian tambahan umum)
+			DO $$
+			BEGIN
+			  IF EXISTS (SELECT 1 FROM information_schema.columns
+			             WHERE table_name = 'pmb_form_responses' AND column_name = 'health_extra')
+			     AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+			             WHERE table_name = 'pmb_form_responses' AND column_name = 'extra_data') THEN
+			    ALTER TABLE pmb_form_responses RENAME COLUMN health_extra TO extra_data;
+			  END IF;
+			END $$;
+
 			ALTER TABLE pmb_form_responses
 			  ADD COLUMN IF NOT EXISTS referral_category TEXT,
 			  ADD COLUMN IF NOT EXISTS referral_institution_name TEXT,
@@ -113,6 +124,8 @@ export async function ensureDatabaseSchema() {
 			  ADD COLUMN IF NOT EXISTS emergency_contact_name TEXT,
 			  ADD COLUMN IF NOT EXISTS emergency_contact_phone TEXT,
 			  ADD COLUMN IF NOT EXISTS emergency_contact_relation TEXT,
+			  ADD COLUMN IF NOT EXISTS emergency_contacts JSONB DEFAULT '[]'::jsonb,
+			  ADD COLUMN IF NOT EXISTS extra_data JSONB DEFAULT '{"hasBoneFracture": false, "hasSurgery": false}'::jsonb,
 			  ADD COLUMN IF NOT EXISTS recommended_by TEXT,
 			  ADD COLUMN IF NOT EXISTS recommender_name TEXT,
 			  ADD COLUMN IF NOT EXISTS friend_contacts JSONB DEFAULT '[]'::jsonb,
@@ -125,17 +138,99 @@ export async function ensureDatabaseSchema() {
 			  ADD COLUMN IF NOT EXISTS has_chronic_disease BOOLEAN DEFAULT false,
 			  ADD COLUMN IF NOT EXISTS mcu_consent_agreed BOOLEAN DEFAULT false;
 
+			-- Urutan tab form tautan berubah (Ayah/Ibu/Wali -> Wali/Ayah/Ibu, Kontak digabung ke tab 7).
+			-- Petakan nomor tab pada penolakan yang tersimpan, sekali saja.
+			CREATE TABLE IF NOT EXISTS app_migrations (
+			  name TEXT PRIMARY KEY,
+			  applied_at TIMESTAMP NOT NULL DEFAULT now()
+			);
+			DO $$
+			BEGIN
+			  IF NOT EXISTS (SELECT 1 FROM app_migrations WHERE name = 'pmb_form_tab_order_v2') THEN
+			    UPDATE pmb_form_responses
+			      SET rejected_tabs = COALESCE((
+			        SELECT jsonb_agg(DISTINCT CASE e::int WHEN 3 THEN 4 WHEN 4 THEN 5 WHEN 5 THEN 3 WHEN 7 THEN 6 ELSE e::int END)
+			        FROM jsonb_array_elements_text(rejected_tabs) AS e
+			      ), '[]'::jsonb)
+			      WHERE jsonb_typeof(rejected_tabs) = 'array' AND jsonb_array_length(rejected_tabs) > 0;
+			    UPDATE pmb_form_responses
+			      SET rejected_fields = COALESCE((
+			        SELECT jsonb_agg(jsonb_set(f, '{tabIndex}', to_jsonb(
+			          CASE (f->>'tabIndex')::int WHEN 3 THEN 4 WHEN 4 THEN 5 WHEN 5 THEN 3 WHEN 7 THEN 6 ELSE (f->>'tabIndex')::int END)))
+			        FROM jsonb_array_elements(rejected_fields) AS f
+			      ), '[]'::jsonb)
+			      WHERE jsonb_typeof(rejected_fields) = 'array' AND jsonb_array_length(rejected_fields) > 0;
+			    INSERT INTO app_migrations(name) VALUES ('pmb_form_tab_order_v2');
+			  END IF;
+			END $$;
+
+			-- Patokan angkatan diubah: Angkatan 17 = tahun ajaran 2026/2027 (tahun awal - 2009).
+			-- Sebelumnya ada dua rumus (basis 2008 dan 2010). Jalankan sekali.
+			DO $$
+			DECLARE t text;
+			BEGIN
+			  IF NOT EXISTS (SELECT 1 FROM app_migrations WHERE name = 'cohort_base_2009_v1') THEN
+			    -- Mahasiswa: isi tahun ajaran dari rumus lama (angkatan + 2010) bila kosong,
+			    -- lalu hitung ulang angkatan dari tahun ajaran dengan rumus baru.
+			    UPDATE students
+			      SET academic_year = (cohort + 2010)::text || '/' || (cohort + 2011)::text
+			      WHERE academic_year IS NULL AND cohort IS NOT NULL;
+			    UPDATE students
+			      SET cohort = split_part(academic_year, '/', 1)::int - 2009
+			      WHERE academic_year ~ '^[0-9]{4}/[0-9]{4}$';
+			    UPDATE students SET batch = cohort WHERE batch IS NOT NULL AND cohort IS NOT NULL;
+			    UPDATE pmb_form_responses
+			      SET batch = split_part(academic_year, '/', 1)::int - 2009
+			      WHERE academic_year ~ '^[0-9]{4}/[0-9]{4}$';
+
+			    -- Tabel lain yang memakai nomor angkatan (semua mengikuti rumus lama 2010):
+			    -- geser +1 dalam dua langkah agar aman dari batas unik. Nilai 0 / NULL = semua angkatan.
+			    FOREACH t IN ARRAY ARRAY['courses','class_schedules','practicum_schedules','duty_schedules',
+			      'attendance_sessions','morning_assembly_sessions','morning_assembly_schedule_config',
+			      'attendance_checkpoint_config','academic_calendars','finance_projection_targets'] LOOP
+			      IF to_regclass('public.' || t) IS NOT NULL THEN
+			        EXECUTE format('UPDATE %I SET cohort = -(cohort + 1) WHERE cohort > 0', t);
+			        EXECUTE format('UPDATE %I SET cohort = -cohort WHERE cohort < 0', t);
+			      END IF;
+			    END LOOP;
+			    IF to_regclass('public.announcements') IS NOT NULL THEN
+			      UPDATE announcements SET target_cohort = target_cohort + 1 WHERE target_cohort > 0;
+			    END IF;
+			    IF to_regclass('public.curricula') IS NOT NULL THEN
+			      UPDATE curricula SET start_cohort = start_cohort + 1, end_cohort = end_cohort + 1;
+			    END IF;
+
+			    INSERT INTO app_migrations(name) VALUES ('cohort_base_2009_v1');
+			  END IF;
+			END $$;
+
+			UPDATE pmb_form_responses
+			  SET emergency_contacts = jsonb_build_array(jsonb_build_object(
+			    'name', COALESCE(emergency_contact_name, ''),
+			    'phone', COALESCE(emergency_contact_phone, ''),
+			    'relation', COALESCE(emergency_contact_relation, '')))
+			  WHERE (emergency_contacts IS NULL OR emergency_contacts = '[]'::jsonb)
+			    AND (emergency_contact_name IS NOT NULL OR emergency_contact_phone IS NOT NULL);
+
 			ALTER TABLE pmb_data
 			  ADD COLUMN IF NOT EXISTS referral_category TEXT,
 			  ADD COLUMN IF NOT EXISTS referral_institution_name TEXT,
 			  ADD COLUMN IF NOT EXISTS referral_contact_name TEXT,
 			  ADD COLUMN IF NOT EXISTS referral_contact_phone TEXT,
+			  ADD COLUMN IF NOT EXISTS recommended_by TEXT,
+			  ADD COLUMN IF NOT EXISTS recommender_name TEXT,
 			  ADD COLUMN IF NOT EXISTS pas_foto BOOLEAN DEFAULT FALSE;
 
 			ALTER TABLE students
 			  ADD COLUMN IF NOT EXISTS emergency_contact_name TEXT,
 			  ADD COLUMN IF NOT EXISTS emergency_contact_phone TEXT,
-			  ADD COLUMN IF NOT EXISTS emergency_contact_relation TEXT;
+			  ADD COLUMN IF NOT EXISTS emergency_contact_relation TEXT,
+			  ADD COLUMN IF NOT EXISTS emergency_contacts JSONB DEFAULT '[]'::jsonb,
+			  ADD COLUMN IF NOT EXISTS last_education TEXT,
+			  ADD COLUMN IF NOT EXISTS prior_college TEXT;
+
+			ALTER TABLE student_parents
+			  ADD COLUMN IF NOT EXISTS income TEXT;
 
 			ALTER TABLE student_health
 			  ADD COLUMN IF NOT EXISTS has_bone_fracture BOOLEAN DEFAULT false,
@@ -741,7 +836,7 @@ export async function ensureDatabaseSchema() {
 
 			INSERT INTO morning_assembly_schedule_config (cohort, day_of_week, target_time, check_in_window_start, check_in_window_end, location, rombel, is_active)
 			SELECT 16, 1, '06:22', '05:30', '07:00', 'Lapangan Utama Kampus', 'Semua', true
-			WHERE NOT EXISTS (SELECT 1 FROM morning_assembly_schedule_config WHERE cohort = 16);
+			WHERE NOT EXISTS (SELECT 1 FROM morning_assembly_schedule_config WHERE cohort = 17);
 
 			-- FIN-02: 4 Termin Baku Biaya & Pemisahan Kontrak vs Suhan
 			ALTER TABLE finance_data ADD COLUMN IF NOT EXISTS mandiri_semester_paid_date TIMESTAMP;
@@ -771,6 +866,79 @@ export async function ensureDatabaseSchema() {
 			ALTER TABLE crm_data ADD COLUMN IF NOT EXISTS monthly_videos JSONB DEFAULT '[]'::jsonb;
 			ALTER TABLE crm_data ADD COLUMN IF NOT EXISTS is_tri_dharma BOOLEAN DEFAULT false;
 			ALTER TABLE crm_data ADD COLUMN IF NOT EXISTS tri_dharma_details JSONB DEFAULT '[]'::jsonb;
+
+			-- MAGANG: Wawancara user lebih dari satu (tanggal + hotel/agent + hasil)
+			CREATE TABLE IF NOT EXISTS internship_interviews (
+			  id SERIAL PRIMARY KEY,
+			  student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+			  interview_date TIMESTAMP,
+			  partner_name TEXT,
+			  result TEXT NOT NULL DEFAULT 'menunggu',
+			  created_at TIMESTAMP NOT NULL DEFAULT now(),
+			  updated_at TIMESTAMP NOT NULL DEFAULT now()
+			);
+			CREATE INDEX IF NOT EXISTS idx_internship_interviews_student_id ON internship_interviews(student_id);
+			-- Salin wawancara lama (satu per mahasiswa) menjadi baris pertama, sekali saja.
+			-- Kolom lama interview_date/interview_result tidak dihapus (expand-contract).
+			DO $$
+			BEGIN
+			  IF NOT EXISTS (SELECT 1 FROM app_migrations WHERE name = 'internship_interviews_backfill_v1') THEN
+			    INSERT INTO internship_interviews (student_id, interview_date, result)
+			    SELECT student_id, interview_date, COALESCE(NULLIF(interview_result, ''), 'menunggu')
+			    FROM internship_data
+			    WHERE interview_date IS NOT NULL OR NULLIF(interview_result, '') IS NOT NULL;
+			    INSERT INTO app_migrations(name) VALUES ('internship_interviews_backfill_v1');
+			  END IF;
+			END $$;
+
+			-- FINANCE: Pos tagihan yang tidak berlaku bagi mahasiswa tertentu
+			ALTER TABLE finance_data
+			  ADD COLUMN IF NOT EXISTS tidak_berlaku_items JSONB DEFAULT '[]'::jsonb;
+
+			-- AKADEMIK: Hapus nilai mata kuliah ganda, lalu cegah duplikat baru.
+			-- Baris yang dipertahankan: updated_at terbaru (seri: id terbesar).
+			-- Baris anak (dokumen, catatan sikap, kewirausahaan) dipindah ke baris yang bertahan
+			-- lebih dulu agar tidak ada data yang hilang. Dijalankan sekali.
+			DO $$
+			BEGIN
+			  IF NOT EXISTS (SELECT 1 FROM app_migrations WHERE name = 'course_grades_dedupe_unique_v1') THEN
+			    CREATE TEMP TABLE cg_dedupe_map AS
+			      SELECT id AS loser_id,
+			             first_value(id) OVER (
+			               PARTITION BY student_id, course_code, attempt
+			               ORDER BY updated_at DESC, id DESC
+			             ) AS keeper_id
+			      FROM course_grades;
+
+			    UPDATE course_grade_documents d SET course_grade_id = m.keeper_id
+			      FROM cg_dedupe_map m
+			      WHERE d.course_grade_id = m.loser_id AND m.loser_id <> m.keeper_id;
+			    UPDATE academic_attitude_logs a SET course_grade_id = m.keeper_id
+			      FROM cg_dedupe_map m
+			      WHERE a.course_grade_id = m.loser_id AND m.loser_id <> m.keeper_id;
+			    UPDATE entrepreneurship_records e SET course_grade_id = m.keeper_id
+			      FROM cg_dedupe_map m
+			      WHERE e.course_grade_id = m.loser_id AND m.loser_id <> m.keeper_id;
+
+			    DELETE FROM course_grades cg
+			      USING cg_dedupe_map m
+			      WHERE cg.id = m.loser_id AND m.loser_id <> m.keeper_id;
+
+			    DROP TABLE cg_dedupe_map;
+			    INSERT INTO app_migrations(name) VALUES ('course_grades_dedupe_unique_v1');
+			  END IF;
+			END $$;
+			CREATE UNIQUE INDEX IF NOT EXISTS uq_course_grades_student_code_attempt
+			  ON course_grades(student_id, course_code, attempt);
+
+			-- MAGANG: Termin pembayaran kampus ke agensi (DP saat Suhan, pelunasan saat Visa)
+			ALTER TABLE internship_data
+			  ADD COLUMN IF NOT EXISTS agen_dp_paid BOOLEAN DEFAULT false,
+			  ADD COLUMN IF NOT EXISTS agen_dp_date TIMESTAMP,
+			  ADD COLUMN IF NOT EXISTS agen_dp_nominal INTEGER,
+			  ADD COLUMN IF NOT EXISTS agen_pelunasan_paid BOOLEAN DEFAULT false,
+			  ADD COLUMN IF NOT EXISTS agen_pelunasan_date TIMESTAMP,
+			  ADD COLUMN IF NOT EXISTS agen_pelunasan_nominal INTEGER;
 		`);
 	} catch (err) {
 		console.warn("[Database] Schema check warning:", err);
