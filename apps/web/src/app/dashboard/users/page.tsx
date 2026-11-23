@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { AvatarPersonFallback } from "@/components/ui/AvatarPersonFallback";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -27,7 +28,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -543,9 +544,7 @@ export default function UsersManagementPage() {
 											<TableCell className="text-center align-middle">
 												<Avatar className="h-10 w-10 mx-auto border border-slate-200">
 													<AvatarImage src={u.profilePhotoUrl || undefined} />
-													<AvatarFallback className="bg-indigo-50 text-indigo-600 font-medium">
-														{u.fullName.substring(0, 2).toUpperCase()}
-													</AvatarFallback>
+													<AvatarPersonFallback />
 												</Avatar>
 											</TableCell>
 											<TableCell>
@@ -659,11 +658,7 @@ export default function UsersManagementPage() {
 						<div className="flex flex-col items-center gap-3 p-4 border border-slate-200 border-dashed rounded-xl bg-slate-50/50">
 							<Avatar className="w-20 h-20 border-2 border-white shadow-sm">
 								<AvatarImage src={formData.profilePhotoUrl || undefined} />
-								<AvatarFallback className="bg-indigo-100 text-indigo-600 text-xl font-medium">
-									{formData.fullName
-										? formData.fullName.substring(0, 2).toUpperCase()
-										: "UD"}
-								</AvatarFallback>
+								<AvatarPersonFallback />
 							</Avatar>
 							<input
 								type="file"

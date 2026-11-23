@@ -30,7 +30,15 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { api } from "@/lib/eden";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { api, authFetch } from "@/lib/eden";
 import { cn } from "@/lib/utils";
 import { getUserRoles, hasRole, useAuthStore } from "@/store";
 
@@ -39,7 +47,10 @@ interface SidebarSubItem {
 	href: string;
 	roles: string[];
 	icon?: React.ElementType;
+	badge?: "pmbPendingForms";
 }
+
+type SidebarBadges = Partial<Record<"pmbPendingForms", number>>;
 
 interface SidebarItem {
 	icon: React.ElementType;
@@ -84,8 +95,20 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 	{
 		icon: ClipboardList,
 		label: "Panel PMB",
-		href: "/dashboard/pmb",
 		roles: ["superadmin", "pmb"],
+		subItems: [
+			{
+				label: "Daftar Mahasiswa",
+				href: "/dashboard/pmb",
+				roles: ["superadmin", "pmb"],
+			},
+			{
+				label: "Formulir Registrasi",
+				href: "/dashboard/pmb/formulir",
+				roles: ["superadmin", "pmb"],
+				badge: "pmbPendingForms",
+			},
+		],
 	},
 	{
 		icon: PhoneCall,
@@ -255,7 +278,26 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 
 	const userRoles = getUserRoles(user);
 	const isSuperadmin = hasRole(user, "superadmin");
+	const canSeePmb = hasRole(user, "superadmin", "pmb");
 	const visibleItems: SidebarItem[] = [];
+
+	// Jumlah antrean formulir registrasi online untuk badge submenu PMB
+	const [badges, setBadges] = useState<SidebarBadges>({});
+	useEffect(() => {
+		if (!mounted || !canSeePmb) return;
+		let cancelled = false;
+		authFetch("/pmb/form-responses")
+			.then((res) => res.json())
+			.then((data) => {
+				if (!cancelled && data.success && Array.isArray(data.data)) {
+					setBadges({ pmbPendingForms: data.data.length });
+				}
+			})
+			.catch(() => {});
+		return () => {
+			cancelled = true;
+		};
+	}, [mounted, canSeePmb, pathname]);
 
 	if (mounted && user) {
 		SIDEBAR_ITEMS.forEach((item) => {
@@ -289,9 +331,11 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 		(item) =>
 			!["Dashboard", "Semua Mahasiswa", "Pengaturan"].includes(item.label),
 	);
-	const mainItems = visibleItems.filter((item) =>
-		["Dashboard", "Semua Mahasiswa"].includes(item.label),
-	);
+	const mainItems = isSuperadmin
+		? visibleItems.filter((item) =>
+				["Dashboard", "Semua Mahasiswa"].includes(item.label),
+			)
+		: [];
 	const settingsItem = visibleItems.find((item) => item.label === "Pengaturan");
 
 	return (
@@ -309,7 +353,7 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 			<aside
 				className={cn(
 					"fixed lg:relative z-50 flex flex-col h-screen bg-white border-r border-slate-200 transition-all duration-300 ease-in-out",
-					collapsed ? "w-16" : "w-60",
+					collapsed ? "w-16" : "w-72 lg:w-64",
 					// Mobile: slide in from left
 					mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
 				)}
@@ -324,16 +368,16 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 						title="Menuju ke Halaman Dashboard"
 					>
 						<Image
-							src="/logonusadaya.png"
-							alt="Logo Nusadaya"
+							src="/icon.svg"
+							alt="Logo OneData Nusadaya"
 							width={28}
 							height={28}
 							className="object-contain shrink-0 group-hover:scale-105 transition-transform"
 						/>
 						{!collapsed && (
 							<span className="font-bold text-lg text-slate-900 tracking-tight flex items-center">
-								Nusadaya
-								<span className="font-light text-[#0517B0]">Academy</span>
+								OneData
+								<span className="font-light text-[#0517B0] ml-1">Nusadaya</span>
 							</span>
 						)}
 					</Link>
@@ -342,7 +386,11 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 						<button
 							type="button"
 							onClick={onClose}
-							className="lg:hidden text-slate-500 hover:text-slate-900 cursor-pointer"
+							aria-label="Tutup menu"
+							className={cn(
+								"lg:hidden inline-flex size-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 cursor-pointer",
+								FOCUS_RING,
+							)}
 						>
 							<X className="h-5 w-5" />
 						</button>
@@ -350,12 +398,15 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 				</div>
 
 				{/* Nav Items */}
-				<div className="flex-1 overflow-y-auto py-4 space-y-1 px-2 flex flex-col">
+				<nav
+					aria-label="Menu utama"
+					className="flex flex-1 flex-col space-y-1 overflow-y-auto px-3 py-4"
+				>
 					{/* Main items */}
 					{mainItems.length > 0 && (
 						<>
 							{!collapsed && (
-								<p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 px-2 mb-2">
+								<p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
 									Utama
 								</p>
 							)}
@@ -366,6 +417,8 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 									pathname={pathname}
 									context={context}
 									collapsed={collapsed}
+									badges={badges}
+									onNavigate={mobileOpen ? onClose : undefined}
 								/>
 							))}
 						</>
@@ -375,7 +428,7 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 					{moduleItems.length > 0 && (
 						<>
 							{!collapsed && (
-								<p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 px-2 mb-2 mt-4">
+								<p className="mb-1.5 mt-5 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
 									Modul
 								</p>
 							)}
@@ -387,32 +440,39 @@ export function Sidebar({ collapsed, mobileOpen, onClose }: SidebarProps) {
 									pathname={pathname}
 									context={context}
 									collapsed={collapsed}
+									badges={badges}
+									onNavigate={mobileOpen ? onClose : undefined}
 								/>
 							))}
 						</>
 					)}
-				</div>
+				</nav>
 
 				{/* Footer Nav */}
-				<div className="border-t border-slate-200 py-3 px-2 space-y-1 shrink-0">
+				<div className="shrink-0 space-y-1 border-t border-slate-200 px-3 py-3">
 					{settingsItem && (
 						<NavItem
 							item={settingsItem}
 							pathname={pathname}
 							context={context}
 							collapsed={collapsed}
+							badges={badges}
+							onNavigate={mobileOpen ? onClose : undefined}
 						/>
 					)}
 					<button
 						type="button"
 						className={cn(
-							"w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-all duration-150",
-							collapsed && "justify-center",
+							"flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-rose-50 hover:text-rose-600",
+							FOCUS_RING,
+							collapsed && "justify-center px-0",
 						)}
+						aria-label={collapsed ? "Keluar" : undefined}
+						title={collapsed ? "Keluar" : undefined}
 						onClick={handleLogout}
 					>
 						<LogOut className="h-5 w-5 shrink-0" />
-						{!collapsed && <span className="text-sm font-medium">Keluar</span>}
+						{!collapsed && <span>Keluar</span>}
 					</button>
 				</div>
 			</aside>
@@ -461,6 +521,17 @@ function checkItemActive(
 
 	if (href === "/dashboard") {
 		return pathname === "/dashboard";
+	}
+
+	if (href === "/dashboard/pmb") {
+		return pathname === "/dashboard/pmb";
+	}
+
+	if (href === "/dashboard/pmb/formulir") {
+		return (
+			pathname.startsWith("/dashboard/pmb/formulir") ||
+			pathname.startsWith("/dashboard/pmb/responses/")
+		);
 	}
 
 	if (href === "/dashboard/finance") {
@@ -571,19 +642,28 @@ function checkItemActive(
 	return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+const FOCUS_RING =
+	"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0517B0]/40";
+
 function NavItem({
 	item,
 	pathname,
 	context,
 	collapsed,
+	badges,
+	onNavigate,
 }: {
 	item: SidebarItem;
 	pathname: string;
 	context: string | null;
 	collapsed: boolean;
+	badges?: SidebarBadges;
+	onNavigate?: () => void;
 }) {
 	const { user } = useAuthStore();
-	const [isOpen, setIsOpen] = useState(false);
+	const router = useRouter();
+	// Non-superadmin: dropdown terbuka secara default; superadmin: tertutup.
+	const [isOpen, setIsOpen] = useState(() => !hasRole(user, "superadmin"));
 
 	const isSubActive = item.subItems?.some((sub) =>
 		checkItemActive(sub.href, pathname, context),
@@ -607,64 +687,122 @@ function NavItem({
 		);
 		if (visibleSubItems.length === 0) return null;
 
+		const badgeOf = (sub: SidebarSubItem) =>
+			sub.badge && (badges?.[sub.badge] ?? 0) > 0 ? badges?.[sub.badge] : null;
+
+		// Sidebar diciutkan: ikon grup membuka menu kecil di samping
+		if (collapsed) {
+			return (
+				<DropdownMenu>
+					<DropdownMenuTrigger
+						aria-label={item.label}
+						title={item.label}
+						className={cn(
+							"flex min-h-11 w-full items-center justify-center rounded-lg transition-colors",
+							FOCUS_RING,
+							isSubActive
+								? "bg-blue-50 text-[#0517B0]"
+								: "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+						)}
+					>
+						<Icon className="h-5 w-5 shrink-0" />
+					</DropdownMenuTrigger>
+					<DropdownMenuContent side="right" align="start" className="min-w-56">
+						<DropdownMenuGroup>
+							<DropdownMenuLabel className="text-xs font-semibold text-slate-500">
+								{item.label}
+							</DropdownMenuLabel>
+							{visibleSubItems.map((sub) => {
+								const active = checkItemActive(sub.href, pathname, context);
+								const count = badgeOf(sub);
+								return (
+									<DropdownMenuItem
+										key={sub.href}
+										onClick={() => {
+											router.push(sub.href);
+											onNavigate?.();
+										}}
+										className={cn(
+											"min-h-10 justify-between gap-2 text-sm",
+											active && "font-semibold text-[#0517B0]",
+										)}
+									>
+										<span>{sub.label}</span>
+										{count ? (
+											<span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-800">
+												{count}
+											</span>
+										) : null}
+									</DropdownMenuItem>
+								);
+							})}
+						</DropdownMenuGroup>
+					</DropdownMenuContent>
+				</DropdownMenu>
+			);
+		}
+
 		return (
-			<div className="flex flex-col space-y-1">
+			<div>
 				<button
 					type="button"
 					onClick={() => setIsOpen(!isOpen)}
+					aria-expanded={isOpen}
 					className={cn(
-						"flex items-center justify-between w-full px-3 py-2.5 rounded-lg transition-all duration-150 group",
+						"flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm transition-colors",
+						FOCUS_RING,
 						isSubActive
-							? "bg-blue-50/50 text-[#0517B0] font-medium"
-							: "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-						collapsed && "justify-center px-0",
+							? "font-semibold text-slate-900"
+							: "font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900",
 					)}
 				>
-					<div className="flex items-center gap-3">
-						<Icon
-							className={cn(
-								"h-5 w-5 shrink-0",
-								isSubActive ? "text-[#0517B0]" : "",
-							)}
-						/>
-						{!collapsed && (
-							<span className="text-sm font-medium">{item.label}</span>
+					<Icon
+						className={cn("h-5 w-5 shrink-0", isSubActive && "text-[#0517B0]")}
+					/>
+					<span className="flex-1 truncate text-left">{item.label}</span>
+					<ChevronDown
+						className={cn(
+							"h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200",
+							isOpen && "rotate-180",
 						)}
-					</div>
-					{!collapsed && (
-						<ChevronDown
-							className={cn(
-								"w-4 h-4 transition-transform duration-200 text-slate-400",
-								isOpen ? "rotate-180" : "",
-							)}
-						/>
-					)}
+					/>
 				</button>
 
-				{!collapsed && isOpen && (
-					<div className="pl-9 pr-2 space-y-1 mt-1">
+				{isOpen && (
+					<ul className="mt-1 space-y-1">
 						{visibleSubItems.map((sub) => {
 							const isSubItemActive = checkItemActive(
 								sub.href,
 								pathname,
 								context,
 							);
+							const count = badgeOf(sub);
 							return (
-								<Link
-									key={sub.href}
-									href={sub.href}
-									className={cn(
-										"block w-full text-sm px-3 py-2 rounded-md transition-all duration-150",
-										isSubItemActive
-											? "bg-blue-50 text-[#0517B0] font-medium border-l-[3px] border-[#0517B0] pl-[9px]"
-											: "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
-									)}
-								>
-									{sub.label}
-								</Link>
+								<li key={sub.href}>
+									<Link
+										href={sub.href}
+										onClick={onNavigate}
+										aria-current={isSubItemActive ? "page" : undefined}
+										className={cn(
+											// pl-11 = padding 12px + ikon 20px + jarak 12px → teks sejajar label grup
+											"flex min-h-11 items-center justify-between gap-2 rounded-lg pl-11 pr-3 text-sm transition-colors",
+											FOCUS_RING,
+											isSubItemActive
+												? "bg-blue-50 font-semibold text-[#0517B0]"
+												: "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+										)}
+									>
+										<span className="truncate">{sub.label}</span>
+										{count ? (
+											<span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-800">
+												{count}
+											</span>
+										) : null}
+									</Link>
+								</li>
 							);
 						})}
-					</div>
+					</ul>
 				)}
 			</div>
 		);
@@ -673,16 +811,21 @@ function NavItem({
 	return (
 		<Link
 			href={item.href!}
+			onClick={onNavigate}
+			aria-current={isActive ? "page" : undefined}
+			aria-label={collapsed ? item.label : undefined}
+			title={collapsed ? item.label : undefined}
 			className={cn(
-				"flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 group",
+				"flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm transition-colors",
+				FOCUS_RING,
 				isActive
-					? "bg-blue-50 text-[#0517B0] border-l-[3px] border-[#0517B0] pl-[9px]"
-					: "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-				collapsed && "justify-center",
+					? "bg-blue-50 font-semibold text-[#0517B0]"
+					: "font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+				collapsed && "justify-center px-0",
 			)}
 		>
 			<Icon className="h-5 w-5 shrink-0" />
-			{!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+			{!collapsed && <span className="truncate">{item.label}</span>}
 		</Link>
 	);
 }

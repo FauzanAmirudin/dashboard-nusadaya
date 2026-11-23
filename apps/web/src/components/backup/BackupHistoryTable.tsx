@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
-import { Eye, History, RefreshCw } from "lucide-react";
+import { Eye, History } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/eden";
 import { BackupJobDetailPanel } from "./BackupJobDetailPanel";
@@ -153,14 +153,6 @@ export function BackupHistoryTable() {
 							Manual
 						</button>
 					</div>
-					<button
-						onClick={fetchJobs}
-						disabled={loading}
-						className="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-lg transition-colors"
-						title="Refresh data"
-					>
-						<RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-					</button>
 				</div>
 			</div>
 

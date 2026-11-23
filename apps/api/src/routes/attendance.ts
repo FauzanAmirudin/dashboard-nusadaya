@@ -445,6 +445,15 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 							isAcc: false,
 							status: "AMAN",
 						})
+						.onConflictDoUpdate({
+							// Baris bisa sudah dibuat paralel; ambil yang ada daripada menduplikasi
+							target: [
+								courseGrades.studentId,
+								courseGrades.courseCode,
+								courseGrades.attempt,
+							],
+							set: { courseId: c.id, updatedAt: new Date() },
+						})
 						.returning();
 					if (inserted[0]) {
 						gradeMap.set(c.id, { ...inserted[0], course: c, dosen: c.dosen });
@@ -567,19 +576,8 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 						)
 					: null;
 
-			const isPractical = c.type === "praktik";
-			let calculatedGrade: string | null = null;
-			if (avgTheory !== null || avgPractical !== null) {
-				const p = avgPractical ?? avgTheory ?? 0;
-				const t = avgTheory ?? avgPractical ?? 0;
-				const finalScore = isPractical ? Math.round(p * 0.8 + t * 0.2) : t;
-				if (finalScore >= 85) calculatedGrade = "A";
-				else if (finalScore >= 75) calculatedGrade = "B";
-				else if (finalScore >= 65) calculatedGrade = "C";
-				else if (finalScore >= 50) calculatedGrade = "D";
-				else calculatedGrade = "E";
-			}
-
+			// Grade TIDAK dihitung di sini. Satu-satunya sumber nilai akhir adalah
+			// GradeCalculationService (bobot AKD-06) yang tersimpan di course_grades.
 			// Real data precedence: Nilai resmi berasal dari hasil kalkulasi standar AKD-06 di tabel course_grades
 			const finalPresent =
 				cMeetings.length > 0 ? presentCount : g.attendancePresent || 0;
@@ -593,12 +591,7 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				g.practicalScore !== null && g.practicalScore !== undefined
 					? g.practicalScore
 					: avgPractical;
-			const finalGrade =
-				g.grade && g.grade.trim() !== ""
-					? g.grade
-					: calculatedGrade !== null
-						? calculatedGrade
-						: "-";
+			const finalGrade = g.grade && g.grade.trim() !== "" ? g.grade : "-";
 			const finalScore =
 				g.finalScore !== null && g.finalScore !== undefined
 					? g.finalScore
@@ -711,33 +704,10 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				updateData.attendanceRate = rate;
 			}
 
-			// Auto calculate grade if scores provided
-			const existing = await db.query.courseGrades.findFirst({
-				where: eq(courseGrades.id, courseGradeId),
-			});
-
-			const pScore =
-				payload.practicalScore !== undefined
-					? payload.practicalScore
-					: existing?.practicalScore || 0;
-			const tScore =
-				payload.theoryScore !== undefined
-					? payload.theoryScore
-					: existing?.theoryScore || 0;
-
+			// Grade & nilai akhir tidak dihitung di sini: GradeCalculationService
+			// di bawah yang menghitung ulang dengan bobot resmi AKD-06.
 			if (payload.grade !== undefined) {
 				updateData.grade = payload.grade;
-			} else if (pScore > 0 || tScore > 0) {
-				const finalScore =
-					pScore > 0 && tScore > 0
-						? Math.round(pScore * 0.8 + tScore * 0.2)
-						: pScore || tScore;
-				let displayGrade = "E";
-				if (finalScore >= 85) displayGrade = "A";
-				else if (finalScore >= 75) displayGrade = "B";
-				else if (finalScore >= 65) displayGrade = "C";
-				else if (finalScore >= 50) displayGrade = "D";
-				updateData.grade = displayGrade;
 			}
 
 			const result = await db
@@ -783,6 +753,25 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 				return { success: false, message: "Pertemuan tidak ditemukan" };
 			}
 
+			// Sesi yang tanggalnya masih di masa depan tidak boleh diisi presensi.
+			// Sesi tanpa tanggal tetap diizinkan (pembuatan sesi belum mengisi
+			// tanggal, sehingga memblokirnya akan mematikan seluruh input presensi),
+			// tetapi responsnya memberi peringatan agar jadwal dilengkapi.
+			const today = new Date();
+			today.setHours(23, 59, 59, 999);
+			if (meeting.meetingDate && new Date(meeting.meetingDate) > today) {
+				set.status = 400;
+				return {
+					success: false,
+					code: "MEETING_IN_FUTURE",
+					message:
+						"Sesi ini belum berlangsung. Presensi hanya dapat diisi pada atau setelah tanggal pertemuan.",
+				};
+			}
+			const scheduleWarning = meeting.meetingDate
+				? undefined
+				: "Tanggal sesi ini belum diatur di Manajemen Mata Kuliah.";
+
 			// Check existing attendance
 			const existing = await db.query.courseMeetingAttendances.findFirst({
 				where: and(
@@ -827,6 +816,7 @@ export const attendanceRoutes = new Elysia({ prefix: "/attendance" })
 			return {
 				success: true,
 				message: "Presensi sesi kuliah berhasil diperbarui",
+				warning: scheduleWarning,
 			};
 		},
 	)

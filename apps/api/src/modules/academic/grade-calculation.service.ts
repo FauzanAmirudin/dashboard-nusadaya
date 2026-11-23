@@ -447,8 +447,10 @@ export class GradeCalculationService {
 			// Batas sanitasi skor 0 - 100
 			finalScore = Math.max(0, Math.min(100, finalScore));
 
-			// Jika belum ada nilai akademik sama sekali dan presensi 0, status belum dinilai
-			const isEvaluated = hasAcademicScore || attendanceRate > 0;
+			// Nilai baru terbit jika ADA komponen akademik (teori/praktik/UTS/UAS).
+			// Presensi saja tidak menghasilkan nilai akhir — dulu hal ini membuat
+			// mahasiswa tanpa nilai tampil 100/A hanya karena hadir 16 sesi.
+			const isEvaluated = hasAcademicScore;
 			const { grade, gradePoint, isPassed } = isEvaluated
 				? convertScoreToGrade(finalScore)
 				: { grade: "-", gradePoint: 0, isPassed: false };
@@ -535,28 +537,57 @@ export class GradeCalculationService {
 					})
 					.where(eq(courseGrades.id, existingGrade.id));
 			} else {
-				await db.insert(courseGrades).values({
-					studentId,
-					courseId: course.id,
-					courseCode: course.code,
-					courseName: course.name,
-					dosenId: course.dosenId,
-					sks,
-					attendancePresent: presentCount,
-					totalMeetings: 16,
-					attendanceRate,
-					theoryScore: avgTheory ?? 0,
-					practicalScore: avgPractical ?? 0,
-					utsScore: utsScore,
-					uasScore: uasScore,
-					finalScore,
-					grade,
-					gradePoint,
-					semester: targetSemester,
-					status: courseStatus,
-					isAcc: false,
-					updatedAt: new Date(),
-				});
+				// Upsert: baris bisa dibuat paralel oleh route lain (unique index menjaga)
+				await db
+					.insert(courseGrades)
+					.values({
+						studentId,
+						courseId: course.id,
+						courseCode: course.code,
+						courseName: course.name,
+						dosenId: course.dosenId,
+						sks,
+						attendancePresent: presentCount,
+						totalMeetings: 16,
+						attendanceRate,
+						theoryScore: avgTheory ?? 0,
+						practicalScore: avgPractical ?? 0,
+						utsScore: utsScore,
+						uasScore: uasScore,
+						finalScore,
+						grade,
+						gradePoint,
+						semester: targetSemester,
+						status: courseStatus,
+						isAcc: false,
+						updatedAt: new Date(),
+					})
+					.onConflictDoUpdate({
+						target: [
+							courseGrades.studentId,
+							courseGrades.courseCode,
+							courseGrades.attempt,
+						],
+						set: {
+							courseId: course.id,
+							courseName: course.name,
+							dosenId: course.dosenId,
+							sks,
+							attendancePresent: presentCount,
+							totalMeetings: 16,
+							attendanceRate,
+							theoryScore: avgTheory ?? 0,
+							practicalScore: avgPractical ?? 0,
+							utsScore: utsScore,
+							uasScore: uasScore,
+							finalScore,
+							grade,
+							gradePoint,
+							semester: targetSemester,
+							status: courseStatus,
+							updatedAt: new Date(),
+						},
+					});
 			}
 		}
 

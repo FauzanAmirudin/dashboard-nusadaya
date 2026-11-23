@@ -10,7 +10,6 @@ import {
 	Filter,
 	Loader2,
 	MapPin,
-	RefreshCw,
 	ShieldAlert,
 	ShieldCheck,
 	User,
@@ -228,16 +227,6 @@ export function TabSelfieLiveFeed() {
 						/>
 						<span>Polling Live 20s</span>
 					</div>
-
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => fetchRecords(false)}
-						className="h-9 rounded-xl text-xs font-bold gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50"
-					>
-						<RefreshCw className="w-3.5 h-3.5" />
-						<span>Refresh</span>
-					</Button>
 				</div>
 			</div>
 

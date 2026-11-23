@@ -68,6 +68,12 @@ const STATUS_OPTIONS = [
 		dot: "bg-orange-500",
 	},
 	{
+		value: "menunggu_pembayaran",
+		label: "Menunggu Pembayaran",
+		color: "bg-slate-50 text-slate-700 border-slate-200",
+		dot: "bg-slate-500",
+	},
+	{
 		value: "lulus",
 		label: "Lulus",
 		color: "bg-blue-50 text-blue-700 border-blue-200",

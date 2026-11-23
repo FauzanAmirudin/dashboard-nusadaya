@@ -26,7 +26,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { AvatarPersonFallback } from "../ui/AvatarPersonFallback";
+import { Avatar, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
 
 export function MahasiswaHeader() {
@@ -77,13 +78,13 @@ export function MahasiswaHeader() {
 							className="flex items-center gap-2"
 						>
 							<Image
-								src="/logonusadaya.png"
-								alt="Nusadaya Logo"
+								src="/icon.svg"
+								alt="Logo OneData Nusadaya"
 								width={32}
 								height={32}
 							/>
 							<span className="font-bold text-slate-800 hidden sm:inline-block">
-								Nusadaya Portal
+								OneData Nusadaya
 							</span>
 						</Link>
 					</div>
@@ -106,9 +107,7 @@ export function MahasiswaHeader() {
 													: ""
 											}
 										/>
-										<AvatarFallback className="bg-blue-50 text-[#0517B0]">
-											<User className="h-4 w-4" />
-										</AvatarFallback>
+										<AvatarPersonFallback />
 									</Avatar>
 								</DropdownMenuTrigger>
 								<DropdownMenuContent align="end" className="w-56">

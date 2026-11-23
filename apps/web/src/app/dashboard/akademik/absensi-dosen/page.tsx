@@ -7,7 +7,6 @@ import {
 	ChevronDown,
 	ChevronUp,
 	Clock,
-	Download,
 	Eye,
 	FileSpreadsheet,
 	Filter,
@@ -57,7 +56,6 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { API_URL, getToken } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store";
 
@@ -266,61 +264,6 @@ export default function MonitoringAbsensiDosenPage() {
 	}, [rekapData, searchQuery]);
 
 	// Ekspor CSV honorarium & presensi
-	const handleExportCSV = () => {
-		if (
-			!rekapData ||
-			!rekapData.dosenList ||
-			rekapData.dosenList.length === 0
-		) {
-			toast.error("Tidak ada data rekapitulasi untuk diekspor");
-			return;
-		}
-
-		const exportRows: any[] = [];
-
-		rekapData.dosenList.forEach((dosen) => {
-			dosen.mataKuliah.forEach((mk) => {
-				mk.sesiDetail.forEach((sesi) => {
-					exportRows.push({
-						"Nama Dosen": dosen.fullName,
-						Username: dosen.username,
-						Periode: rekapData.period.label,
-						"Kode MK": mk.courseCode,
-						"Mata Kuliah": mk.courseName,
-						Rombel: mk.rombel,
-						Angkatan: mk.cohort,
-						SKS: mk.sks,
-						"Peran Dosen": mk.roleDiMatkul,
-						"Sesi Ke": sesi.meetingNumber,
-						"Label Sesi": sesi.meetingLabel,
-						"Tanggal Sesi": sesi.meetingDate || "-",
-						"Jenis Sesi": sesi.sessionType
-							? sesi.sessionType.toUpperCase()
-							: "TEORI",
-						"Format Mengajar": sesi.isTeamTeaching
-							? "TEAM TEACHING"
-							: "TUNGGAL",
-						"Partner Mengajar": sesi.partnerDosenName || "-",
-						"Status Sesi": sesi.teachingStatus
-							? sesi.teachingStatus.toUpperCase()
-							: "TERLAKSANA",
-						"Catatan Jurnal": sesi.teachingNotes || "-",
-					});
-				});
-			});
-		});
-
-		if (exportRows.length === 0) {
-			toast.error("Tidak ada sesi perkuliahan pada periode ini");
-			return;
-		}
-
-		const cleanFilename = `Rekap_Presensi_Dosen_${rekapData.period.label.replace(/\s+/g, "_")}`;
-		exportToCSV(exportRows, cleanFilename);
-		toast.success(
-			`Berhasil mengekspor ${exportRows.length} baris data presensi dosen`,
-		);
-	};
 
 	return (
 		<div className="space-y-6 max-w-7xl mx-auto pb-12">
@@ -350,15 +293,7 @@ export default function MonitoringAbsensiDosenPage() {
 					</p>
 				</div>
 
-				<div className="flex items-center gap-2.5 flex-wrap">
-					<Button
-						onClick={handleExportCSV}
-						disabled={isLoading || !rekapData || filteredDosenList.length === 0}
-						className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs font-semibold"
-					>
-						<Download className="w-4 h-4 mr-1.5" /> Ekspor Honorarium (CSV)
-					</Button>
-				</div>
+				<div className="flex items-center gap-2.5 flex-wrap"></div>
 			</div>
 
 			{/* Filter Section */}

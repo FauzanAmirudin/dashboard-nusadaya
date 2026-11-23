@@ -21,7 +21,8 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarPersonFallback } from "@/components/ui/AvatarPersonFallback";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -373,18 +374,6 @@ export default function ProfilePage() {
 	};
 
 	const userRoles = getUserRoles(user);
-	const userInitials = (
-		profileForm.fullName ||
-		user?.fullName ||
-		user?.username ||
-		"U"
-	)
-		.split(" ")
-		.map((n) => n[0])
-		.join("")
-		.slice(0, 2)
-		.toUpperCase();
-
 	if (isLoading) {
 		return (
 			<div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
@@ -432,9 +421,7 @@ export default function ProfilePage() {
 										alt={profileForm.fullName}
 										className="object-cover"
 									/>
-									<AvatarFallback className="bg-gradient-to-tr from-[#0517B0] to-blue-600 text-white font-bold text-2xl">
-										{userInitials}
-									</AvatarFallback>
+									<AvatarPersonFallback />
 								</Avatar>
 
 								{/* Quick Change Avatar Button */}

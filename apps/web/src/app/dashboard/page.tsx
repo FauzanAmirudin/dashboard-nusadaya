@@ -11,7 +11,6 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Clock,
-	Download,
 	Eye,
 	FileCheck,
 	FileText,
@@ -137,7 +136,6 @@ import {
 import { useDashboardSummary } from "@/hooks/useDashboardSummary";
 import { type StudentListItem, useStudentsList } from "@/hooks/useStudentsList";
 import { api } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 import { getUserRoles, useAuthStore } from "@/store";
 
 const PIE_COLORS = ["#10b981", "#f59e0b", "#ef4444"];
@@ -302,55 +300,6 @@ export default function DashboardPage() {
 	};
 
 	// On-Demand Fast Export to CSV (fetches full list only on click)
-	const handleExport = async () => {
-		try {
-			setIsExporting(true);
-			const res = await api.students.get({
-				$query: {
-					all: "true",
-					cohort: selectedCohort !== "all" ? selectedCohort : undefined,
-					status: selectedStatus !== "all" ? selectedStatus : undefined,
-					search: searchQuery.trim() || undefined,
-				},
-			});
-
-			const fullData = (res.data?.data as unknown as StudentListItem[]) || [];
-			if (fullData.length > 0) {
-				const exportData = fullData.map((s) => {
-					const { accCount } = getStudentAccDetails(s);
-					return {
-						NIM: s.student.nim || "-",
-						"Nama Mahasiswa": s.student.name,
-						"Program Studi": s.student.program,
-						Angkatan: s.student.cohort,
-						"Progress ACC": `${accCount}/6 Modul`,
-						"Status PMB": s.pmb?.status || "-",
-						"Status CRM": s.crm?.status || "-",
-						"Status Finance": s.finance?.status || "-",
-						"Status Akademik": s.academic?.status || "-",
-						"Status PA": s.pa?.status || "-",
-						"Status Magang": s.internship?.status || "-",
-						"Status Keseluruhan": getRealtimeOverallStatus(s),
-						"Keputusan Evaluator": s.decision?.evaluatorDecision || "menunggu",
-						"Disetujui Direktur": s.decision?.isApprovedByDirector
-							? "Ya"
-							: "Belum",
-						"Tgl Keberangkatan": s.decision?.departureDate
-							? new Date(s.decision.departureDate).toLocaleDateString("id-ID")
-							: "-",
-					};
-				});
-				exportToCSV(
-					exportData,
-					`Dashboard_Nusadaya_${new Date().toISOString().split("T")[0]}`,
-				);
-			}
-		} catch (err) {
-			console.error("Export failed:", err);
-		} finally {
-			setIsExporting(false);
-		}
-	};
 
 	if (!isAuthenticated || !user) {
 		return null;
@@ -507,22 +456,6 @@ export default function DashboardPage() {
 							</p>
 						</div>
 					</div>
-				</div>
-
-				<div className="flex flex-wrap items-center gap-2.5">
-					<Button
-						size="sm"
-						onClick={handleExport}
-						disabled={isExporting}
-						className="bg-[#0517B0] hover:bg-blue-800 text-white text-xs gap-1.5 h-9"
-					>
-						{isExporting ? (
-							<RefreshCw className="w-3.5 h-3.5 animate-spin" />
-						) : (
-							<Download className="w-3.5 h-3.5" />
-						)}
-						{isExporting ? "Mengekspor..." : "Export Data"}
-					</Button>
 				</div>
 			</div>
 

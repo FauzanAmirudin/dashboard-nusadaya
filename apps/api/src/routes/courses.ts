@@ -954,6 +954,29 @@ export const coursesRoutes = new Elysia({ prefix: "/courses" })
 		});
 		return { success: true, data };
 	})
+	// Nilai resmi per mata kuliah (satu-satunya sumber: course_grades hasil
+	// GradeCalculationService). Dipakai halaman Rekap agar tidak menghitung sendiri.
+	.get("/:id/grades", async ({ params, set }) => {
+		const courseId = parseInt(params.id, 10);
+		if (!courseId) {
+			set.status = 400;
+			return { success: false, message: "ID mata kuliah tidak valid" };
+		}
+		const rows = await db
+			.select({
+				studentId: courseGrades.studentId,
+				finalScore: courseGrades.finalScore,
+				grade: courseGrades.grade,
+				gradePoint: courseGrades.gradePoint,
+				attendanceRate: courseGrades.attendanceRate,
+				attendancePresent: courseGrades.attendancePresent,
+				totalMeetings: courseGrades.totalMeetings,
+				status: courseGrades.status,
+			})
+			.from(courseGrades)
+			.where(eq(courseGrades.courseId, courseId));
+		return { success: true, data: rows };
+	})
 	.get("/:id/enrollments/search", async ({ params, query, set }) => {
 		const courseId = parseInt(params.id, 10);
 		const q = ((query?.q as string) || "").trim().toLowerCase();

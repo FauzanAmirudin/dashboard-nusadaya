@@ -10,7 +10,6 @@ import {
 	CheckSquare,
 	ChevronDown,
 	ClipboardCheck,
-	Download,
 	Edit,
 	FileText,
 	GraduationCap,
@@ -91,7 +90,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { API_URL, api, getToken } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 import { useAuthStore } from "@/store";
 import { TabAnggaranPraktik } from "./TabAnggaranPraktik";
 
@@ -773,70 +771,6 @@ export default function MataKuliahDetailPage() {
 		}
 	};
 
-	const handleExportDetail = () => {
-		if (!course) return;
-
-		const exportData: any[] = [];
-
-		meetings.forEach((m) => {
-			const baseRow = {
-				Pertemuan: m.meetingLabel,
-				"Jenis Sesi":
-					m.sessionType === "teori"
-						? "Teori"
-						: m.sessionType === "praktik"
-							? "Praktik"
-							: m.sessionType === "keduanya"
-								? "Teori & Praktik"
-								: "-",
-				Tanggal: m.meetingDate || "-",
-				Deskripsi: m.description || "-",
-			};
-
-			const isUts = m.meetingNumber === 8;
-			const isUas = m.meetingNumber === 16;
-			const isExam = isUts || isUas;
-
-			if (students.length === 0) {
-				exportData.push(baseRow);
-			} else {
-				students.forEach((s) => {
-					const att = m.attendances?.find((a) => a.studentId === s.id);
-					exportData.push({
-						...baseRow,
-						NIM: s.nim,
-						Mahasiswa: s.name,
-						Kehadiran: att?.status ? att.status.toUpperCase() : "BELUM DIISI",
-						...(isExam
-							? {
-									[isUts ? "Nilai UTS" : "Nilai UAS"]:
-										att?.theoryScore !== null && att?.theoryScore !== undefined
-											? att.theoryScore
-											: "-",
-								}
-							: {
-									"Nilai Teori":
-										att?.theoryScore !== null && att?.theoryScore !== undefined
-											? att.theoryScore
-											: "-",
-									"Nilai Praktik":
-										att?.practicalScore !== null &&
-										att?.practicalScore !== undefined
-											? att.practicalScore
-											: "-",
-								}),
-						"Catatan Kehadiran": att?.notes || "-",
-					});
-				});
-			}
-		});
-
-		exportToCSV(
-			exportData,
-			`Rekap_Nilai_Presensi_${course.code}_${course.name.replace(/\s+/g, "_")}`,
-		);
-	};
-
 	const getSessionTypeBadge = (type: string | null | undefined) => {
 		switch (type) {
 			case "teori":
@@ -951,14 +885,6 @@ export default function MataKuliahDetailPage() {
 					>
 						<Calendar className="mr-2 h-4 w-4 text-blue-600" />
 						Generate Tanggal Sesi
-					</Button>
-					<Button
-						variant="outline"
-						onClick={handleExportDetail}
-						className="border-slate-300 text-slate-700 hover:bg-slate-50 shadow-sm"
-					>
-						<Download className="mr-2 h-4 w-4 text-blue-600" /> Export Rekap &
-						Nilai
 					</Button>
 				</div>
 			</div>

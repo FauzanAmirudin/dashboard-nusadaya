@@ -9,7 +9,6 @@ import {
 	Filter,
 	Loader2,
 	MapPin,
-	RefreshCw,
 	ShieldAlert,
 	User,
 	XCircle,
@@ -162,16 +161,6 @@ export function TabFraudFlagsReview() {
 						</p>
 					</div>
 				</div>
-
-				<Button
-					variant="outline"
-					size="sm"
-					onClick={fetchFlags}
-					className="h-9 rounded-xl text-xs font-semibold gap-1.5 border-slate-300 text-slate-700 hover:bg-white shrink-0"
-				>
-					<RefreshCw className="w-3.5 h-3.5" />
-					<span>Segarkan Data</span>
-				</Button>
 			</div>
 
 			{/* Filters */}
