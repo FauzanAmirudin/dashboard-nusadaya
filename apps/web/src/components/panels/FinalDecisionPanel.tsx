@@ -685,18 +685,23 @@ export function FinalDecisionPanel({
 					<CardHeader className="bg-slate-50/50 border-b border-slate-200 pb-4">
 						<CardTitle className="text-slate-800 text-base flex items-center gap-2">
 							<ShieldCheck className="w-5 h-5 text-[#0517B0]" />
-							Cross-check Dokumen Kontrak (LoL, LoA, Suhhan)
+							Cross-check Dokumen Resmi Taiwan (LOA & Suhan)
 						</CardTitle>
 					</CardHeader>
 					<CardContent className="p-6">
-						<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 							{[
-								{ key: "taiwan_lol", label: "Letter of Offer (LoL)" },
-								{ key: "taiwan_loa", label: "Letter of Acceptance (LoA)" },
-								{ key: "taiwan_suhhan", label: "Dokumen Suhhan" },
+								{ key: "taiwan_loa", label: "Letter of Acceptance (LOA)" },
+								{
+									key: "taiwan_suhan",
+									legacyKey: "taiwan_suhhan",
+									label: "Suhan (Izin Magang Taiwan)",
+								},
 							].map((docType) => {
 								const doc = data.academicDocs?.find(
-									(d) => d.documentKey === docType.key,
+									(d) =>
+										d.documentKey === docType.key ||
+										(docType.legacyKey && d.documentKey === docType.legacyKey),
 								);
 								return (
 									<div

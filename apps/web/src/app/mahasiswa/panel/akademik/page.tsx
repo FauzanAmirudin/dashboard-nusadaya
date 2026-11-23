@@ -595,10 +595,9 @@ export default function AcademicPanelMahasiswa() {
 									"Screenshot PDDIKTI Aktif",
 									data?.taiwanPddiktiChecked,
 								)}
-								{renderChecklistItem("Surat LoL", data?.taiwanLolChecked)}
-								{renderChecklistItem("Surat LoA Resmi", data?.taiwanLoaChecked)}
+								{renderChecklistItem("Surat LOA Resmi", data?.taiwanLoaChecked)}
 								{renderChecklistItem(
-									"Surat Kuasa Suhhan",
+									"Surat Izin Suhan (Taiwan)",
 									data?.taiwanSuhhanChecked,
 								)}
 							</div>

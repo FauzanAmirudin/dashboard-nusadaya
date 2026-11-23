@@ -38,84 +38,72 @@ const ADDITIONAL_DOCS = [
 		key: "ktp",
 		propKey: "docKtp",
 		label: "KTP (Kartu Tanda Penduduk)",
-		desc: "Scan / Foto KTP asli yang masih berlaku dan terbaca jelas",
 		isOptional: false,
 	},
 	{
 		key: "kk",
 		propKey: "docKk",
 		label: "Kartu Keluarga (KK)",
-		desc: "Scan Kartu Keluarga terbaru sesuai data pendaftaran",
 		isOptional: false,
 	},
 	{
 		key: "cv",
 		propKey: "docCv",
 		label: "Curriculum Vitae (CV)",
-		desc: "Berkas riwayat hidup resmi mahasiswa dalam format PDF",
 		isOptional: false,
 	},
 	{
 		key: "ijazah",
 		propKey: "docIjazah",
 		label: "Ijazah Pendidikan Terakhir",
-		desc: "Scan legalisir Ijazah SMA/SMK/Diploma/S1 asli",
 		isOptional: false,
 	},
 	{
 		key: "transkrip",
 		propKey: "docTranskrip",
 		label: "Transkrip Nilai / SKL",
-		desc: "Scan Transkrip Nilai atau Surat Keterangan Lulus resmi",
 		isOptional: false,
 	},
 	{
 		key: "passport_depan",
 		propKey: "docPassportDepan",
 		label: "Paspor Halaman Depan (Identitas)",
-		desc: "Halaman identitas paspor berstandar internasional",
 		isOptional: false,
 	},
 	{
 		key: "passport_visa",
 		propKey: "docPassportVisa",
 		label: "Paspor Halaman Visa / Tambahan (Opsional)",
-		desc: "Halaman catatan visa atau lembar pengesahan paspor (Opsional di awal, tidak mengunci ACC PMB)",
 		isOptional: true,
 	},
 	{
 		key: "skbm",
 		propKey: "docSkbm",
 		label: "Surat Keterangan Bebas Masalah (SKBM / SKCK)",
-		desc: "Surat berkelakuan baik resmi dari kepolisian / instansi berwenang",
 		isOptional: false,
 	},
 	{
 		key: "pre_mcu",
 		propKey: "docPreMcu",
 		label: "Pre-Medical Check Up (Pra-MCU Skrining Awal)",
-		desc: "Skrining awal: Tes buta warna Ishihara, bebas tato/tindik, riwayat fisik & operasi",
 		isOptional: false,
 	},
 	{
 		key: "sla",
 		propKey: "docSla",
 		label: "Service Level Agreement (SLA)",
-		desc: "Dokumen kesepakatan tingkat layanan (SLA) yang telah disetujui",
 		isOptional: false,
 	},
 	{
 		key: "sertifikasi_bahasa",
 		propKey: "docSertifikasiBahasa",
 		label: "Sertifikasi Bahasa (TOEIC / JLPT / Topik - Opsional PMB)",
-		desc: "Sertifikat kompetensi bahasa sesuai negara tujuan (Dikelola di Panel Magang, tidak mengunci ACC PMB)",
 		isOptional: true,
 	},
 	{
 		key: "bpjs",
 		propKey: "docBpjs",
 		label: "BPJS / Asuransi Kesehatan",
-		desc: "Scan Kartu BPJS / KIS / Asuransi Kesehatan aktif (Opsional, tidak membatalkan ACC)",
 		isOptional: true,
 	},
 ];
@@ -180,28 +168,24 @@ export function TabChecklist({
 			id: "formReceived",
 			documentKey: "form_received",
 			label: "Formulir Masuk",
-			desc: "Formulir pendaftaran telah diterima dan diverifikasi",
 			checked: localChecks.formReceived,
 		},
 		{
 			id: "dataInputted",
 			documentKey: "data_inputted",
 			label: "Input Data Awal",
-			desc: "Data mahasiswa telah diinput ke sistem dashboard",
 			checked: localChecks.dataInputted,
 		},
 		{
 			id: "initialFollowUp",
 			documentKey: "initial_follow_up",
 			label: "Follow Up Awal",
-			desc: "Kontak awal dan konfirmasi orang tua/wali selesai",
 			checked: localChecks.initialFollowUp,
 		},
 		{
 			id: "pasFoto",
 			documentKey: "pas_foto",
 			label: "Pas Foto (Standar Visa / Formal)",
-			desc: "Pas foto formal terbaru calon mahasiswa (standar paspor/visa)",
 			checked: localChecks.pasFoto,
 		},
 	];
@@ -316,23 +300,23 @@ export function TabChecklist({
 			.replace(/\s*\(Opsional\)/g, "")
 			.trim();
 
-	// Satu baris dokumen: checkbox + label + deskripsi singkat + unggah berkas
+	// Satu baris dokumen: checkbox + label (+ action) + unggah berkas
 	const renderRow = (row: {
 		key: string;
 		checkboxId: string;
 		propKey: string;
 		label: string;
-		desc: string;
 		checked: boolean;
 		documentKey: string;
 		action?: React.ReactNode;
 	}) => (
 		<li
 			key={row.key}
-			className={`px-4 py-4 sm:px-6 transition-colors ${row.checked ? "bg-emerald-50/60" : "bg-white"}`}
+			className={`px-4 py-3 sm:px-6 transition-colors ${row.checked ? "bg-emerald-50/50" : "bg-white"}`}
 		>
-			<div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)] md:items-start md:gap-6">
-				<div className="flex min-w-0 items-start gap-3">
+			<div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+				{/* Kiri: Checkbox + Judul Dokumen */}
+				<div className="flex min-w-0 items-center gap-3 flex-1">
 					<Checkbox
 						id={row.checkboxId}
 						checked={row.checked}
@@ -340,34 +324,29 @@ export function TabChecklist({
 						onCheckedChange={(checked) =>
 							handleCheckboxChange(row.propKey, !!checked)
 						}
-						className="mt-0.5 size-5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+						className="size-5 shrink-0 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
 					/>
-					<div className="min-w-0 flex-1">
-						<div className="flex items-center gap-2">
-							<label
-								htmlFor={row.checkboxId}
-								className="text-sm font-semibold text-slate-900 cursor-pointer [overflow-wrap:anywhere]"
-							>
-								{cleanLabel(row.label)}
-							</label>
-							{loadingItem === row.propKey && (
-								<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400 shrink-0" />
-							)}
-						</div>
-						<p
-							className="mt-0.5 text-xs text-slate-500 line-clamp-2"
-							title={row.desc}
+					<div className="min-w-0 flex flex-wrap items-center gap-x-3 gap-y-1">
+						<label
+							htmlFor={row.checkboxId}
+							className="text-sm font-semibold text-slate-900 cursor-pointer [overflow-wrap:anywhere]"
 						>
-							{row.desc}
-						</p>
+							{cleanLabel(row.label)}
+						</label>
 						{row.action}
+						{loadingItem === row.propKey && (
+							<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400 shrink-0" />
+						)}
 					</div>
 				</div>
-				<div className="min-w-0 pl-8 md:pl-0">
+
+				{/* Kanan: Tombol / Status Unggah Dokumen dengan layout & lebar yang seragam */}
+				<div className="w-full sm:w-64 lg:w-72 shrink-0 pl-8 sm:pl-0">
 					<DocumentUpload
 						studentId={studentId}
 						panel="pmb"
 						documentKey={row.documentKey}
+						className="mt-0"
 						onUploadSuccess={() => {
 							fetchDocuments();
 							if (!row.checked) {
@@ -387,7 +366,6 @@ export function TabChecklist({
 			checkboxId: `doc-${doc.key}`,
 			propKey: doc.propKey,
 			label: doc.label,
-			desc: doc.desc,
 			checked: !!localChecks[doc.propKey],
 			documentKey: doc.key,
 		});
@@ -419,7 +397,6 @@ export function TabChecklist({
 							checkboxId: item.id,
 							propKey: item.id,
 							label: item.label,
-							desc: item.desc,
 							checked: item.checked,
 							documentKey: item.documentKey,
 							// Formulir Masuk: cetak → tanda tangan ortu → unggah di baris ini
@@ -429,9 +406,10 @@ export function TabChecklist({
 										href={`/dashboard/students/${studentId}/formulir`}
 										target="_blank"
 										rel="noopener noreferrer"
-										className="mt-1.5 inline-flex min-h-9 items-center text-xs font-semibold text-[#0517B0] hover:underline"
+										className="inline-flex items-center gap-1 text-xs font-semibold text-[#0517B0] hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-0.5 rounded-md border border-blue-100 transition-colors"
 									>
-										Cetak formulir untuk tanda tangan orang tua →
+										<span>Cetak Formulir Ortu</span>
+										<span aria-hidden="true">→</span>
 									</a>
 								) : undefined,
 						}),

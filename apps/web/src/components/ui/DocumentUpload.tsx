@@ -47,6 +47,7 @@ interface DocumentUploadProps {
 	hideLabel?: boolean;
 	viewUrlBase?: string;
 	layout?: "horizontal" | "stacked";
+	className?: string;
 }
 
 export function DocumentUpload({
@@ -63,6 +64,7 @@ export function DocumentUpload({
 	hideLabel = false,
 	viewUrlBase,
 	layout = "horizontal",
+	className,
 }: DocumentUploadProps) {
 	const { token } = useAuthStore();
 	const [isUploading, setIsUploading] = useState(false);
@@ -224,7 +226,9 @@ export function DocumentUpload({
 	}
 
 	return (
-		<div className="w-full mt-2 space-y-3">
+		<div
+			className={`w-full ${className !== undefined ? className : "mt-2"} space-y-2`}
+		>
 			{documents.map((doc, index) =>
 				layout === "stacked" ? (
 					<div
@@ -316,33 +320,35 @@ export function DocumentUpload({
 				) : (
 					<div
 						key={doc.id}
-						className="flex items-center justify-between bg-slate-50 p-2.5 rounded-md border border-slate-200 w-full"
+						className="flex items-center justify-between bg-slate-50/80 px-3 py-1.5 rounded-lg border border-slate-200 w-full"
 					>
-						<div className="flex items-center gap-3 overflow-hidden">
-							<div className="w-8 h-8 rounded bg-white flex items-center justify-center border border-slate-200 shrink-0">
-								<FileText className="w-4 h-4 text-[#0517B0]" />
+						<div className="flex items-center gap-2 overflow-hidden min-w-0">
+							<div className="w-7 h-7 rounded-md bg-white flex items-center justify-center border border-slate-200 shrink-0">
+								<FileText className="w-3.5 h-3.5 text-[#0517B0]" />
 							</div>
 							<div className="min-w-0 flex flex-col items-start">
-								<p className="text-sm font-medium text-slate-700 truncate max-w-[150px] sm:max-w-[200px]">
+								<p
+									className="text-xs font-semibold text-slate-800 truncate max-w-[120px] sm:max-w-[160px]"
+									title={doc.fileName}
+								>
 									{doc.fileName}
 								</p>
 								<span className="text-[10px] text-slate-400">
-									Diunggah{" "}
 									{doc.uploadedAt ? formatDeviceDateTime(doc.uploadedAt) : "-"}
 									{index === 0 && (
-										<span className="ml-2 text-emerald-600 font-medium">
+										<span className="ml-1.5 text-emerald-600 font-semibold">
 											(Terbaru)
 										</span>
 									)}
 								</span>
 							</div>
 						</div>
-						<div className="flex items-center gap-1.5 ml-4 shrink-0">
+						<div className="flex items-center gap-1 ml-2 shrink-0">
 							<Button
 								type="button"
 								variant="outline"
 								size="sm"
-								className="h-8 text-xs font-medium text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 gap-1.5 cursor-pointer"
+								className="h-7 px-2 text-xs font-medium text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 gap-1 cursor-pointer"
 								title="Review Dokumen"
 								onClick={() =>
 									openDocumentReview(
@@ -353,7 +359,7 @@ export function DocumentUpload({
 									)
 								}
 							>
-								<Eye className="w-3.5 h-3.5" />
+								<Eye className="w-3 h-3" />
 								<span className="hidden sm:inline">Review</span>
 							</Button>
 							{canEdit && canDelete && (
@@ -363,10 +369,10 @@ export function DocumentUpload({
 											<Button
 												variant="ghost"
 												size="sm"
-												className="h-8 w-8 p-0 text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+												className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
 												title="Hapus Dokumen"
 											>
-												<Trash2 className="w-4 h-4" />
+												<Trash2 className="w-3.5 h-3.5" />
 											</Button>
 										}
 									/>
@@ -397,7 +403,7 @@ export function DocumentUpload({
 			)}
 
 			{documents.length === 0 && !canEdit && (
-				<div className="flex items-center justify-center p-3 rounded-lg border border-dashed border-slate-200 bg-slate-50/50 text-slate-400 text-xs font-medium">
+				<div className="flex items-center justify-center h-9 px-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-400 text-xs font-medium">
 					Belum ada dokumen yang diunggah
 				</div>
 			)}
@@ -407,20 +413,24 @@ export function DocumentUpload({
 					{!hideLabel && (
 						<label
 							htmlFor={`file-upload-${documentKey}`}
-							className="flex items-center justify-center gap-2 w-full h-10 rounded border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-500 cursor-pointer transition-colors"
+							className={`flex items-center justify-center gap-2 w-full rounded-lg cursor-pointer transition-all ${
+								documents.length > 0
+									? "h-8 border border-dashed border-slate-200 hover:border-slate-300 bg-slate-50/60 hover:bg-slate-100 text-slate-500 text-xs font-medium"
+									: "h-9 border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 shadow-2xs text-xs font-medium"
+							}`}
 							title="Upload PDF (Maks 5MB)"
 						>
 							{isUploading ? (
 								<>
-									<Loader2 className="w-4 h-4 animate-spin" />
-									<span className="text-xs font-medium">Mengunggah...</span>
+									<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+									<span>Mengunggah...</span>
 								</>
 							) : (
 								<>
-									<UploadCloud className="w-4 h-4" />
-									<span className="text-xs font-medium">
+									<UploadCloud className="w-3.5 h-3.5 text-slate-500" />
+									<span>
 										{documents.length > 0
-											? "Unggah File Tambahan (Versi Baru)"
+											? "Unggah Versi Baru"
 											: "Unggah Berkas PDF"}
 									</span>
 								</>

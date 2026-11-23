@@ -540,24 +540,14 @@ describe("Tahap 3 — Panel Business Logic", () => {
 				expect(checklist.some((i) => i.id === "paCompleted")).toBe(true);
 			});
 
-			it("should return 20 items (8 base + 12 Taiwan) when taiwanCohort is true", () => {
+			it("should return 19 items (8 base + 11 Taiwan) when taiwanCohort is true", () => {
 				const checklist = buildAkademikChecklist({ taiwanCohort: true });
-				expect(checklist).toHaveLength(20);
+				expect(checklist).toHaveLength(19);
 			});
 
-			it("should force-disable taiwanLoaChecked if taiwanLolChecked is false", () => {
+			it("should allow taiwanLoaChecked without LOL dependency", () => {
 				const checklist = buildAkademikChecklist({
 					taiwanCohort: true,
-					taiwanLolChecked: false,
-				});
-				const loaItem = checklist.find((i) => i.id === "taiwanLoaChecked");
-				expect(loaItem?.forceDisabled).toBe(true);
-			});
-
-			it("should enable taiwanLoaChecked once taiwanLolChecked is true", () => {
-				const checklist = buildAkademikChecklist({
-					taiwanCohort: true,
-					taiwanLolChecked: true,
 				});
 				const loaItem = checklist.find((i) => i.id === "taiwanLoaChecked");
 				expect(loaItem?.forceDisabled).toBe(false);
@@ -566,13 +556,23 @@ describe("Tahap 3 — Panel Business Logic", () => {
 			it("should force-disable taiwanSuhhanChecked if taiwanLoaChecked is false", () => {
 				const checklist = buildAkademikChecklist({
 					taiwanCohort: true,
-					taiwanLolChecked: true,
 					taiwanLoaChecked: false,
 				});
 				const suhhanItem = checklist.find(
 					(i) => i.id === "taiwanSuhhanChecked",
 				);
 				expect(suhhanItem?.forceDisabled).toBe(true);
+			});
+
+			it("should enable taiwanSuhhanChecked once taiwanLoaChecked is true", () => {
+				const checklist = buildAkademikChecklist({
+					taiwanCohort: true,
+					taiwanLoaChecked: true,
+				});
+				const suhhanItem = checklist.find(
+					(i) => i.id === "taiwanSuhhanChecked",
+				);
+				expect(suhhanItem?.forceDisabled).toBe(false);
 			});
 		});
 

@@ -139,7 +139,12 @@ export const finalDecisionRoutes = new Elysia()
 				student,
 				academicData: academic,
 				academicDocs: academicDocs.filter((d) =>
-					["taiwan_lol", "taiwan_loa", "taiwan_suhhan"].includes(d.documentKey),
+					[
+						"taiwan_lol",
+						"taiwan_loa",
+						"taiwan_suhhan",
+						"taiwan_suhan",
+					].includes(d.documentKey),
 				),
 				pmbAcc: { isAcc: pmb?.isAcc, accAt: pmb?.accAt, accBy: pmb?.accBy },
 				crmAcc: { isAcc: crm?.isAcc, accAt: crm?.accAt, accBy: crm?.accBy },

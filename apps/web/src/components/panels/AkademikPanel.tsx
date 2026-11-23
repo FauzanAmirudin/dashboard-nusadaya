@@ -325,19 +325,14 @@ export function AkademikPanel({
 			key: "taiwan_pribadi",
 		},
 		{
-			id: "taiwanLolChecked",
-			label: "Letter of Offer (LoL)",
-			key: "taiwan_lol",
-		},
-		{
 			id: "taiwanLoaChecked",
-			label: "Letter of Acceptance (LoA)",
+			label: "Letter of Acceptance (LOA)",
 			key: "taiwan_loa",
 		},
 		{
 			id: "taiwanSuhhanChecked",
-			label: "Dokumen Suhhan",
-			key: "taiwan_suhhan",
+			label: "Suhan (Izin Magang Taiwan)",
+			key: "taiwan_suhan",
 		},
 	];
 
@@ -345,8 +340,6 @@ export function AkademikPanel({
 	if (acadState?.taiwanCohort) {
 		taiwanDocs.forEach((doc) => {
 			let forceDisabled = false;
-			if (doc.id === "taiwanLoaChecked")
-				forceDisabled = !acadState?.taiwanLolChecked;
 			if (doc.id === "taiwanSuhhanChecked")
 				forceDisabled = !acadState?.taiwanLoaChecked;
 

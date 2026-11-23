@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, ClipboardList, Clock } from "lucide-react";
+import { CheckCircle, ClipboardList, Clock, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -243,15 +243,58 @@ export function PmbPanel({
 					? "Tambah penerima fee"
 					: "Menunggu pembayaran fee oleh Finance";
 
-	const accButton = (extraClass = "") => (
-		<Button
-			onClick={handleAcc}
-			disabled={!reqOk || isAccSaving}
-			className={`h-11 bg-[#0517B0] hover:bg-blue-800 text-white text-sm font-semibold ${extraClass}`}
-		>
-			{isAccSaving ? "Memproses..." : reqOk ? "Beri ACC PMB" : nextStep}
-		</Button>
-	);
+	const handleNextStepClick = () => {
+		if (reqOk) {
+			handleAcc();
+			return;
+		}
+		if (!accReq?.dokumen.ok) {
+			setActiveTab("checklist");
+		} else if (!accReq?.keuangan.ok) {
+			setActiveTab("finance");
+		} else if (!accReq?.feeSharing.ok) {
+			setActiveTab("fee-sharing");
+		}
+	};
+
+	const accButton = (extraClass = "") => {
+		if (reqOk) {
+			return (
+				<Button
+					onClick={handleAcc}
+					disabled={isAccSaving}
+					className={`bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold cursor-pointer shadow-2xs transition-all ${extraClass}`}
+				>
+					{isAccSaving ? (
+						<>
+							<Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+							Memproses...
+						</>
+					) : (
+						"✓ Beri ACC PMB"
+					)}
+				</Button>
+			);
+		}
+
+		return (
+			<Button
+				onClick={handleNextStepClick}
+				disabled={isAccSaving}
+				className={`bg-[#0517B0] hover:bg-blue-800 text-white text-sm font-semibold cursor-pointer shadow-2xs transition-all ${extraClass}`}
+				title="Klik untuk membuka tab yang belum lengkap"
+			>
+				{isAccSaving ? (
+					<>
+						<Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+						Memproses...
+					</>
+				) : (
+					<span className="truncate">{nextStep} →</span>
+				)}
+			</Button>
+		);
+	};
 
 	const requirementRows = [
 		{
@@ -300,10 +343,10 @@ export function PmbPanel({
 
 	return (
 		<div className="space-y-6">
-			{/* Ringkasan: satu angka, satu progress, satu aksi utama */}
-			<section className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 sm:p-6">
-				<div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-					<div className="min-w-0 flex-1">
+			{/* Ringkasan: syarat ACC PMB dan tombol aksi dengan layout grid sejajar & proporsional */}
+			<section className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 sm:p-5">
+				<div className="space-y-3.5">
+					<div>
 						<h2 className="text-base font-bold text-slate-900">
 							Syarat ACC PMB
 						</h2>
@@ -319,75 +362,95 @@ export function PmbPanel({
 										: ""}
 								</>
 							) : reqOk ? (
-								"Semua syarat terpenuhi. Siap diberi ACC."
+								<span className="font-medium text-emerald-700">
+									Semua syarat terpenuhi. Siap diberi ACC.
+								</span>
 							) : (
 								"ACC bisa diberikan setelah ketiga tab di bawah lengkap."
 							)}
 						</p>
-						<ul className="mt-3 grid gap-2 sm:grid-cols-3">
-							{requirementRows.map((r) => (
-								<li
-									key={r.key}
-									className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 ${r.ok ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-white"}`}
-								>
-									<span
-										aria-hidden="true"
-										className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${r.ok ? "bg-emerald-500 text-white" : "bg-amber-100 text-amber-700"}`}
-									>
-										{r.ok ? "✓" : "!"}
-									</span>
-									<span className="min-w-0">
-										<span className="block text-sm font-semibold text-slate-900">
-											{r.label}
-											<span className="sr-only">
-												{r.ok ? " (lengkap)" : " (belum lengkap)"}
-											</span>
-										</span>
-										<span className="block text-xs text-slate-600">
-											{r.detail}
-										</span>
-									</span>
-								</li>
-							))}
-						</ul>
 					</div>
 
-					{canEdit &&
-						(isAcc ? (
-							<AlertDialog>
-								<AlertDialogTrigger
-									render={
-										<Button
-											variant="outline"
-											disabled={isAccSaving}
-											className="h-11 border-slate-200 text-slate-700 text-sm font-semibold"
-										/>
-									}
+					<div
+						className={`grid gap-3 ${
+							canEdit
+								? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+								: "grid-cols-1 sm:grid-cols-3"
+						} items-stretch`}
+					>
+						{requirementRows.map((r) => (
+							<div
+								key={r.key}
+								className={`flex items-center gap-3 rounded-xl border px-3.5 py-3 shadow-2xs transition-all ${
+									r.ok
+										? "border-emerald-200 bg-emerald-50/70"
+										: "border-amber-200 bg-white"
+								}`}
+							>
+								<span
+									aria-hidden="true"
+									className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+										r.ok
+											? "bg-emerald-500 text-white"
+											: "bg-amber-100 text-amber-700"
+									}`}
 								>
-									Batalkan ACC
-								</AlertDialogTrigger>
-								<AlertDialogContent>
-									<AlertDialogHeader>
-										<AlertDialogTitle>
-											Konfirmasi Pembatalan ACC PMB
-										</AlertDialogTitle>
-										<AlertDialogDescription>
-											Apakah Anda yakin ingin membatalkan status ACC untuk panel
-											PMB mahasiswa ini? Status PMB akan kembali ke tahap
-											berproses.
-										</AlertDialogDescription>
-									</AlertDialogHeader>
-									<div className="flex justify-end gap-2">
-										<AlertDialogCancel>Batal</AlertDialogCancel>
-										<AlertDialogAction onClick={handleCancelAcc}>
-											Ya, batalkan ACC
-										</AlertDialogAction>
-									</div>
-								</AlertDialogContent>
-							</AlertDialog>
-						) : (
-							<div className="hidden sm:block shrink-0">{accButton()}</div>
+									{r.ok ? "✓" : "!"}
+								</span>
+								<div className="min-w-0 flex-1">
+									<span className="block text-sm font-semibold text-slate-900 leading-tight">
+										{r.label}
+										<span className="sr-only">
+											{r.ok ? " (lengkap)" : " (belum lengkap)"}
+										</span>
+									</span>
+									<span className="block text-xs text-slate-600 mt-1 leading-tight truncate">
+										{r.detail}
+									</span>
+								</div>
+							</div>
 						))}
+
+						{canEdit && (
+							<div className="flex">
+								{isAcc ? (
+									<AlertDialog>
+										<AlertDialogTrigger
+											render={
+												<Button
+													variant="outline"
+													disabled={isAccSaving}
+													className="w-full h-full min-h-[58px] rounded-xl border-rose-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-rose-700 text-sm font-semibold shadow-2xs transition-all"
+												/>
+											}
+										>
+											Batalkan ACC
+										</AlertDialogTrigger>
+										<AlertDialogContent>
+											<AlertDialogHeader>
+												<AlertDialogTitle>
+													Konfirmasi Pembatalan ACC PMB
+												</AlertDialogTitle>
+												<AlertDialogDescription>
+													Apakah Anda yakin ingin membatalkan status ACC untuk
+													panel PMB mahasiswa ini? Status PMB akan kembali ke
+													tahap berproses.
+												</AlertDialogDescription>
+											</AlertDialogHeader>
+											<div className="flex justify-end gap-2">
+												<AlertDialogCancel>Batal</AlertDialogCancel>
+												<AlertDialogAction onClick={handleCancelAcc}>
+													Ya, batalkan ACC
+												</AlertDialogAction>
+											</div>
+										</AlertDialogContent>
+									</AlertDialog>
+								) : (
+									accButton("w-full h-full min-h-[58px] rounded-xl")
+								)}
+							</div>
+						)}
+					</div>
 				</div>
 			</section>
 
