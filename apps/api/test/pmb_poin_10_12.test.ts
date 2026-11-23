@@ -7,6 +7,7 @@ import {
 	academicData,
 	auditLogs,
 	crmData,
+	feeShareRecipients,
 	finalDecision,
 	financeData,
 	financeSemesters,
@@ -55,6 +56,9 @@ describe("Pembaruan Skema Keuangan & Penataan Dokumen PMB vs Magang (Poin 10 - 1
 		studentUserId?: number | null,
 	) {
 		await db.delete(auditLogs).where(eq(auditLogs.entityId, studentId));
+		await db
+			.delete(feeShareRecipients)
+			.where(eq(feeShareRecipients.studentId, studentId));
 		await db.delete(academicData).where(eq(academicData.studentId, studentId));
 		await db.delete(crmData).where(eq(crmData.studentId, studentId));
 		await db
@@ -217,6 +221,19 @@ describe("Pembaruan Skema Keuangan & Penataan Dokumen PMB vs Magang (Poin 10 - 1
 			})
 			.where(eq(pmbData.studentId, student.id));
 
+		// Syarat ACC terbaru: Skema Keuangan terisi & semua penerima fee sudah dibayarkan Finance
+		await db
+			.update(pmbPaymentPlan)
+			.set({ totalBiaya: 25_000_000, pendaftaranDp: 3_000_000 })
+			.where(eq(pmbPaymentPlan.studentId, student.id));
+		await db.insert(feeShareRecipients).values({
+			studentId: student.id,
+			namaReferral: "Referral Uji",
+			kategori: "Mitra",
+			nominalFee: 500_000,
+			statusPencairan: "sudah_dibayarkan",
+		});
+
 		const testApp = new Elysia({ prefix: "/students" })
 			.use(jwt({ name: "jwt", secret: JWT_SECRET }))
 			.derive(async () => ({
@@ -268,7 +285,7 @@ describe("Pembaruan Skema Keuangan & Penataan Dokumen PMB vs Magang (Poin 10 - 1
 		expect(failedAccRes.status).toBe(400);
 		const failedJson = await failedAccRes.json();
 		expect(failedJson.success).toBe(false);
-		expect(failedJson.message).toContain("dokumen wajib PMB (9)");
+		expect(failedJson.message).toContain("Dokumen (12/13 berkas wajib)");
 
 		await cleanupTestStudent(student.id, student.studentUserId);
 	});

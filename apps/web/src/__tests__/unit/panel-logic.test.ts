@@ -10,11 +10,19 @@ import {
 	canEditPa,
 	canGivePmbAcc,
 	canMakeFinalDecision,
+	checkPembiasaanEligible,
+	getAgencyPaymentReminders,
+	getAgencyPaymentTermsSummary,
 	getAkademikStatus,
 	getFinancePaymentStatus,
 	getGpaGrade,
+	getInternshipAccRequirements,
 	getKeputusanConfig,
+	getMagangDashboardChecklist,
+	getMagangDashboardStatus,
+	getMagangPrerequisites,
 	getPenempatanLabel,
+	isTaiwanDestination,
 	updateCrmField,
 } from "../../utils/panel-logic";
 import { calculateOverallStatus } from "../../utils/status";
@@ -143,7 +151,7 @@ describe("Tahap 3 — Panel Business Logic", () => {
 	// ============================================================
 	describe("Panel PMB (PmbPanel)", () => {
 		describe("Task 3.3 — PMB Checklist Completion Count (14 Item Wajib Pendaftaran)", () => {
-			it("should count mainCompletedCount = 5 when all 5 main items are true", () => {
+			it("should count mainCompletedCount = 4 (Berkas Lengkap tidak dihitung lagi)", () => {
 				const pmbData = {
 					formReceived: true,
 					documentsComplete: true,
@@ -152,9 +160,9 @@ describe("Tahap 3 — Panel Business Logic", () => {
 					pasFoto: true,
 				};
 				const result = calculatePmbChecklist(pmbData);
-				expect(result.mainCompletedCount).toBe(5);
+				expect(result.mainCompletedCount).toBe(4);
 				expect(result.requiredDocsCompletedCount).toBe(0);
-				expect(result.totalRequiredCompleted).toBe(5);
+				expect(result.totalRequiredCompleted).toBe(4);
 				expect(result.isAllChecklistDone).toBe(false);
 			});
 
@@ -181,7 +189,7 @@ describe("Tahap 3 — Panel Business Logic", () => {
 				expect(result.isAllChecklistDone).toBe(false);
 			});
 
-			it("should return 14/14 and isAllChecklistDone = true when all 14 mandatory items are complete without passport visa, MCU full, or language cert", () => {
+			it("should return 13/13 and isAllChecklistDone = true when all 13 mandatory items are complete without passport visa, MCU full, or language cert", () => {
 				const completePmb = {
 					formReceived: true,
 					documentsComplete: true,
@@ -204,11 +212,11 @@ describe("Tahap 3 — Panel Business Logic", () => {
 					docBpjs: false,
 				};
 				const result = calculatePmbChecklist(completePmb);
-				expect(result.totalRequiredCompleted).toBe(14);
+				expect(result.totalRequiredCompleted).toBe(13);
 				expect(result.isAllChecklistDone).toBe(true);
 			});
 
-			it("should return isAllChecklistDone = false when only 13 of 14 are done", () => {
+			it("should return isAllChecklistDone = false when only 12 of 13 are done", () => {
 				const almostCompletePmb = {
 					formReceived: true,
 					documentsComplete: true,
@@ -226,7 +234,7 @@ describe("Tahap 3 — Panel Business Logic", () => {
 					docSla: false, // 1 wajib kurang
 				};
 				const result = calculatePmbChecklist(almostCompletePmb);
-				expect(result.totalRequiredCompleted).toBe(13);
+				expect(result.totalRequiredCompleted).toBe(12);
 				expect(result.isAllChecklistDone).toBe(false);
 			});
 
@@ -522,14 +530,19 @@ describe("Tahap 3 — Panel Business Logic", () => {
 	// ============================================================
 	describe("Panel Akademik (AkademikPanel)", () => {
 		describe("Task 3.7 — Akademik Checklist Base vs Taiwan Cohort", () => {
-			it("should return 7 base items when taiwanCohort is false", () => {
+			it("should return 8 base items when taiwanCohort is false", () => {
 				const checklist = buildAkademikChecklist({ taiwanCohort: false });
-				expect(checklist).toHaveLength(7);
+				expect(checklist).toHaveLength(8);
 			});
 
-			it("should return 19 items (7 base + 12 Taiwan) when taiwanCohort is true", () => {
+			it("should include the PA item as part of Akademik progress", () => {
+				const checklist = buildAkademikChecklist({ taiwanCohort: false });
+				expect(checklist.some((i) => i.id === "paCompleted")).toBe(true);
+			});
+
+			it("should return 20 items (8 base + 12 Taiwan) when taiwanCohort is true", () => {
 				const checklist = buildAkademikChecklist({ taiwanCohort: true });
-				expect(checklist).toHaveLength(19);
+				expect(checklist).toHaveLength(20);
 			});
 
 			it("should force-disable taiwanLoaChecked if taiwanLolChecked is false", () => {
@@ -770,7 +783,10 @@ describe("Tahap 3 — Panel Business Logic", () => {
 			});
 
 			it("should count suhanReady when true", () => {
-				const res = calculateInternshipDokumenChecklist({ suhanReady: true });
+				const res = calculateInternshipDokumenChecklist(
+					{ suhanReady: true },
+					"Taiwan",
+				);
 				expect(res.completedCount).toBe(1);
 			});
 
@@ -809,10 +825,334 @@ describe("Tahap 3 — Panel Business Logic", () => {
 					dokumentasiReady: true,
 					agenReady: true,
 				};
-				const res = calculateInternshipDokumenChecklist(allReady);
+				const res = calculateInternshipDokumenChecklist(allReady, "Taiwan");
 				expect(res.isInternshipReady).toBe(true);
 				expect(res.completedCount).toBe(12);
+
+				// Non-Taiwan: Suhan tidak dihitung (11 item)
+				const nonTaiwan = calculateInternshipDokumenChecklist(
+					{ ...allReady, suhanReady: false },
+					"Indonesia",
+				);
+				expect(nonTaiwan.totalCount).toBe(11);
+				expect(nonTaiwan.isInternshipReady).toBe(true);
 			});
+		});
+	});
+
+	describe("Panel Magang — syarat ACC (cermin server)", () => {
+		const allDone = (gap = false) => ({
+			praPasporPasFoto: true,
+			praPasporKtm: true,
+			praPasporKtp: true,
+			praPasporKk: true,
+			praPasporAktaKelahiran: true,
+			praPasporSuratIzinOrtu: true,
+			praPasporSl21: true,
+			praPasporLos: true,
+			praPasporRekomendasiDisdik: true,
+			praPasporKhs: true,
+			praPasporKrs: true,
+			praPasporTranskrip: true,
+			praPasporIjazah: true,
+			...(gap ? { praPasporGapYear: true } : {}),
+			passportReady: true,
+			interviewReady: true,
+			moaReady: true,
+			loaConfirmed: true,
+			contractReady: true,
+			suhanReady: true,
+			mcuReady: true,
+			visaReady: true,
+			ticketReady: true,
+			pdtReady: true,
+			dokumentasiReady: true,
+			agenReady: true,
+			logbookReady: true,
+			laporanAkhirReady: true,
+			videoDokumentasiReady: true,
+		});
+
+		it("counts 13 + 12 + 3 = 28 and accepts LOS in place of SKMA", () => {
+			const r = getInternshipAccRequirements(allDone(), false, "Taiwan");
+			expect(r.praPaspor).toEqual({ done: 13, total: 13, ok: true });
+			expect(r.dokumen.total).toBe(12);
+			expect(r.syaratAkhir.total).toBe(3);
+			expect(r.total).toBe(28);
+			expect(r.ok).toBe(true);
+		});
+
+		it("adds Gap Year item only for gap-year students", () => {
+			const r = getInternshipAccRequirements(allDone(), true, "Taiwan");
+			expect(r.praPaspor.total).toBe(14);
+			expect(r.ok).toBe(false);
+			expect(
+				getInternshipAccRequirements(allDone(true), true, "Taiwan").ok,
+			).toBe(true);
+		});
+
+		it("tidak mewajibkan Suhan untuk tujuan non-Taiwan", () => {
+			const data = { ...allDone(), suhanReady: false };
+			expect(getInternshipAccRequirements(data, false, "Taiwan").ok).toBe(
+				false,
+			);
+			const nonTaiwan = getInternshipAccRequirements(data, false, "Indonesia");
+			expect(nonTaiwan.dokumen.total).toBe(11);
+			expect(nonTaiwan.ok).toBe(true);
+		});
+
+		it("ignores languageCertReady (not an ACC requirement)", () => {
+			const r = getInternshipAccRequirements({ languageCertReady: true });
+			expect(r.completed).toBe(0);
+			expect(r.ok).toBe(false);
+		});
+	});
+
+	describe("Perbaikan uji E2E (T-02, T-04, T-11, T-16)", () => {
+		it("T-16: pembiasaan 0/0 sesi atau di bawah 80% tidak boleh disetujui", () => {
+			const zero = checkPembiasaanEligible([
+				{ label: "Piket", total: 0, rate: 0 },
+				{ label: "ODS", total: 5, rate: 100 },
+			]);
+			expect(zero.ok).toBe(false);
+			expect(zero.blockers[0]).toContain("Piket");
+
+			const low = checkPembiasaanEligible([
+				{ label: "Baris Pagi", total: 10, rate: 70 },
+			]);
+			expect(low.ok).toBe(false);
+			expect(low.blockers[0]).toContain("70%");
+
+			expect(
+				checkPembiasaanEligible([{ label: "ODS", total: 5, rate: 80 }]).ok,
+			).toBe(true);
+		});
+
+		it("T-02: pos 'Tidak berlaku' tidak dihitung sebagai syarat ACC", () => {
+			const fin = {
+				metodePembayaran: "mandiri",
+				registrasiStatus: true,
+				mandiriSemesterStatus: true,
+				mandiriInterviewStatus: true,
+				mandiriKeberangkatanStatus: true,
+				toeicStatus: false,
+				pasporStatus: false,
+			};
+			const before = calculateFinanceChecklist(fin);
+			expect(before.totalChecks).toBe(6);
+			expect(before.isFinanceReady).toBe(false);
+
+			const after = calculateFinanceChecklist({
+				...fin,
+				tidakBerlakuItems: [
+					{ key: "toeic", note: "Peminatan Indonesia" },
+					{ key: "paspor", note: "Tanpa paspor" },
+				],
+			});
+			expect(after.totalChecks).toBe(4);
+			expect(after.isFinanceReady).toBe(true);
+			expect(after.items.find((i) => i.key === "toeic")?.notApplicable).toBe(
+				true,
+			);
+		});
+
+		it("T-04: label penempatan mengikuti negara tujuan", () => {
+			expect(getPenempatanLabel("Taiwan")).toContain("Taiwan");
+			expect(getPenempatanLabel("Malaysia")).toContain("Malaysia");
+			expect(getPenempatanLabel("Indonesia")).toContain("Indonesia");
+			expect(getPenempatanLabel("Timur Tengah")).toContain("Timur Tengah");
+			// Tanpa negara dikenali: tidak lagi otomatis "Taiwan"
+			expect(getPenempatanLabel(null)).not.toContain("Taiwan");
+			expect(isTaiwanDestination("taiwan batch 1")).toBe(true);
+			expect(isTaiwanDestination("Indonesia")).toBe(false);
+		});
+
+		it("T-11: progres CRM satu sumber, 12 indikator", () => {
+			const r = calculateCrmChecklist({
+				isMonitoringParent: true,
+				odsDetails: JSON.stringify([{ isDone: true }]),
+			});
+			expect(r.totalChecks).toBe(12);
+			expect(r.items).toHaveLength(12);
+			expect(r.completedCount).toBe(2);
+			expect(r.items.map((i) => i.name)).toContain("Video Konten Bulanan");
+		});
+	});
+
+	describe("Prasyarat Panel Magang (cermin server)", () => {
+		const accAll = {
+			pmb: { isAcc: true },
+			crm: { isAcc: true },
+			academic: { isAcc: true },
+		};
+
+		it("lolos bila ACC PMB/CRM/Akademik + registrasi & SPP Sem 1 (mandiri) lunas", () => {
+			const r = getMagangPrerequisites({
+				...accAll,
+				finance: {
+					metodePembayaran: "mandiri",
+					registrasiStatus: true,
+					mandiriSemesterStatus: true,
+				},
+			});
+			expect(r.ok).toBe(true);
+			expect(r.missing).toEqual([]);
+		});
+
+		it("tidak mewajibkan termin keberangkatan / ACC Finance", () => {
+			const r = getMagangPrerequisites({
+				...accAll,
+				finance: {
+					isAcc: false,
+					registrasiStatus: true,
+					mandiriSemesterStatus: true,
+					mandiriKeberangkatanStatus: false,
+				},
+			});
+			expect(r.ok).toBe(true);
+		});
+
+		it("talangan 1 tahap: SPP Sem 1 dianggap tercakup talangan", () => {
+			const r = getMagangPrerequisites({
+				...accAll,
+				finance: {
+					metodePembayaran: "dana_talangan",
+					talanganTipe: "1_tahap",
+					registrasiStatus: true,
+				},
+			});
+			expect(r.ok).toBe(true);
+		});
+
+		it("menyebut syarat yang belum terpenuhi", () => {
+			const r = getMagangPrerequisites({
+				pmb: { isAcc: true },
+				crm: { isAcc: false },
+				academic: null,
+				finance: { metodePembayaran: "dana_talangan", talanganTipe: "2_tahap" },
+			});
+			expect(r.ok).toBe(false);
+			expect(r.missing).toEqual([
+				"ACC CRM",
+				"ACC Akademik",
+				"Registrasi lunas",
+				"SPP Semester 1 lunas",
+			]);
+		});
+	});
+
+	describe("Pengingat termin agensi", () => {
+		it("tidak ada pengingat sebelum Suhan/Visa terbit", () => {
+			expect(getAgencyPaymentReminders({})).toEqual([]);
+		});
+		it("DP diingatkan setelah Suhan (Taiwan), hilang setelah dibayar", () => {
+			expect(
+				getAgencyPaymentReminders({ suhanReady: true }, "Taiwan").map(
+					(r) => r.key,
+				),
+			).toEqual(["dp"]);
+			expect(
+				getAgencyPaymentReminders(
+					{ suhanReady: true, agenDpPaid: true },
+					"Taiwan",
+				),
+			).toEqual([]);
+		});
+
+		it("non-Taiwan: DP memakai acuan kontrak magang, bukan Suhan", () => {
+			expect(
+				getAgencyPaymentReminders({ suhanReady: true }, "Indonesia"),
+			).toEqual([]);
+			expect(
+				getAgencyPaymentReminders({ contractReady: true }, "Indonesia").map(
+					(r) => r.key,
+				),
+			).toEqual(["dp"]);
+		});
+		it("pelunasan diingatkan setelah Visa terbit", () => {
+			expect(
+				getAgencyPaymentReminders(
+					{ suhanReady: true, agenDpPaid: true, visaReady: true },
+					"Taiwan",
+				).map((r) => r.key),
+			).toEqual(["pelunasan"]);
+		});
+
+		it("getAgencyPaymentTermsSummary mengembalikan ringkasan DP & Pelunasan beserta nominal dan tanggal", () => {
+			const terms = getAgencyPaymentTermsSummary(
+				{
+					suhanReady: true,
+					agenDpPaid: true,
+					agenDpNominal: 5000000,
+					agenDpDate: "2026-11-10T00:00:00.000Z",
+					visaReady: true,
+					agenPelunasanPaid: false,
+					agenPelunasanNominal: 12000000,
+				},
+				"Taiwan",
+			);
+			expect(terms).toHaveLength(2);
+			expect(terms[0]).toMatchObject({
+				key: "dp",
+				triggerLabel: "Suhan terbit",
+				triggerReady: true,
+				paid: true,
+				isOverdue: false,
+				nominal: 5000000,
+			});
+			expect(terms[1]).toMatchObject({
+				key: "pelunasan",
+				triggerLabel: "Visa terbit",
+				triggerReady: true,
+				paid: false,
+				isOverdue: true,
+				nominal: 12000000,
+				paidDate: null,
+			});
+		});
+
+		it("getAgencyPaymentTermsSummary memakai pemicu kontrak magang untuk non-Taiwan dan mengabaikan nominal <= 0", () => {
+			const terms = getAgencyPaymentTermsSummary(
+				{
+					contractReady: true,
+					agenDpNominal: 0,
+				},
+				"Jepang",
+			);
+			expect(terms[0]).toMatchObject({
+				key: "dp",
+				triggerLabel: "Kontrak magang selesai",
+				triggerReady: true,
+				isOverdue: true,
+				nominal: null,
+			});
+		});
+	});
+
+	describe("Dashboard Magang — status tunggal", () => {
+		it("returns BUTUH_PERHATIAN for empty internship", () => {
+			expect(getMagangDashboardChecklist(null).completed).toBe(0);
+			expect(getMagangDashboardStatus(null)).toBe("BUTUH_PERHATIAN");
+		});
+
+		it("returns PROSES above 30% and AMAN when all 6 done", () => {
+			expect(
+				getMagangDashboardStatus({ passportReady: true, mcuReady: true }),
+			).toBe("PROSES");
+			const all = {
+				passportReady: true,
+				loaConfirmed: true,
+				suhanReady: true,
+				mcuReady: true,
+				visaReady: true,
+				pdtReady: true,
+			};
+			expect(getMagangDashboardChecklist(all, "Taiwan").completed).toBe(6);
+			expect(getMagangDashboardStatus(all, "Taiwan")).toBe("AMAN");
+		});
+
+		it("returns ACC when isAcc regardless of checklist", () => {
+			expect(getMagangDashboardStatus({ isAcc: true })).toBe("ACC");
 		});
 	});
 
@@ -905,7 +1245,6 @@ describe("Tahap 3 — Panel Business Logic", () => {
 					crmAcc: { isAcc: true },
 					financeAcc: { isAcc: true },
 					academicAcc: { isAcc: true },
-					paAcc: { isAcc: true },
 					internshipAcc: { isAcc: true },
 				};
 				expect(canMakeFinalDecision(panels)).toBe(true);
@@ -917,24 +1256,20 @@ describe("Tahap 3 — Panel Business Logic", () => {
 					crmAcc: { isAcc: true },
 					financeAcc: { isAcc: false }, // not ACC
 					academicAcc: { isAcc: true },
-					paAcc: { isAcc: true },
 					internshipAcc: { isAcc: true },
 				};
 				expect(canMakeFinalDecision(panels)).toBe(false);
 			});
 
-			it("should block final decision if dosenAcc is required and not ACC", () => {
+			it("should ignore Dosen & PA: both sit under Akademik", () => {
 				const panels = {
 					pmbAcc: { isAcc: true },
 					crmAcc: { isAcc: true },
 					financeAcc: { isAcc: true },
 					academicAcc: { isAcc: true },
-					paAcc: { isAcc: true },
 					internshipAcc: { isAcc: true },
-					dosenAcc: { isAcc: false },
 				};
-				expect(canMakeFinalDecision(panels, true)).toBe(false);
-				expect(canMakeFinalDecision(panels, false)).toBe(true);
+				expect(canMakeFinalDecision(panels)).toBe(true);
 			});
 		});
 	});
