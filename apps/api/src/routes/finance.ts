@@ -18,8 +18,9 @@ import {
 	students,
 } from "../db/schema";
 import { cacheDel, cacheInvalidatePattern } from "../lib/cache";
-import { autoIssueStudentNim } from "../lib/nim-helper";
 import { getValidUserId, hasRole } from "../lib/permissions";
+import { applyDpVerification } from "../lib/student-activation";
+import { computeBillingDueDate, overdueCondition } from "../lib/waiting-list";
 import { requireRole } from "../middleware/rbac";
 import { fileService } from "../modules/file/service/file.service";
 
@@ -75,6 +76,173 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 
 		return { success: true, data: { kpi, students: mappedStudents } };
 	})
+
+	// Waiting list: antrean tagihan DP mahasiswa baru (belum aktif)
+	.get(
+		"/waiting-list",
+		async (context) => {
+			const { query, set } = context;
+			const user = (context as any).user;
+			if (!hasRole(user, "finance")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			const archived = query.archived === "true";
+			const rows = await db
+				.select({
+					id: students.id,
+					name: students.name,
+					program: students.program,
+					subProgram: students.subProgram,
+					cohort: students.cohort,
+					phone: students.phone,
+					createdAt: students.createdAt,
+					isArchived: students.isArchived,
+					pendaftaranDp: pmbPaymentPlan.pendaftaranDp,
+					totalBiaya: pmbPaymentPlan.totalBiaya,
+					statusDp: pmbPaymentPlan.statusDp,
+					billingType: pmbPaymentPlan.billingType,
+					billingNumber: pmbPaymentPlan.billingNumber,
+					billingBankName: pmbPaymentPlan.billingBankName,
+					billingAccountHolder: pmbPaymentPlan.billingAccountHolder,
+					billingIssuedAt: pmbPaymentPlan.billingIssuedAt,
+					billingDueDate: pmbPaymentPlan.billingDueDate,
+					isOverdue: sql<boolean>`${overdueCondition}`,
+				})
+				.from(students)
+				.leftJoin(pmbPaymentPlan, eq(pmbPaymentPlan.studentId, students.id))
+				.where(
+					and(
+						eq(students.studentStatus, "menunggu_pembayaran"),
+						eq(students.isArchived, archived),
+					),
+				)
+				.orderBy(desc(students.createdAt));
+
+			const now = Date.now();
+			const data = rows.map((r) => {
+				// Belum ditagih: timer belum berjalan (tidak terlambat, tidak diarsip)
+				const due = r.billingDueDate;
+				return {
+					...r,
+					dueDate: due,
+					daysLeft: due ? Math.ceil((due.getTime() - now) / 86_400_000) : null,
+				};
+			});
+			return { success: true, data };
+		},
+		{ query: t.Object({ archived: t.Optional(t.String()) }) },
+	)
+
+	// Waiting list: Finance menerbitkan tagihan DP (VA default / rekening) secara manual
+	.patch(
+		"/waiting-list/:studentId/billing",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as any).user;
+			if (!hasRole(user, "finance")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+			const sId = parseInt(params.studentId, 10);
+			const student = await db.query.students.findFirst({
+				where: eq(students.id, sId),
+				columns: { id: true, name: true, studentStatus: true },
+			});
+			if (!student) {
+				set.status = 404;
+				return { success: false, message: "Mahasiswa tidak ditemukan" };
+			}
+			if (student.studentStatus !== "menunggu_pembayaran") {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Tagihan hanya dapat diterbitkan untuk mahasiswa waiting list.",
+				};
+			}
+			const billingType = body.billingType ?? "va";
+			// VA: cukup nomor VA (nominal sudah ditetapkan saat VA dibuat / dari PMB).
+			// Rekening: bank, atas nama, dan nominal wajib.
+			if (
+				billingType === "rekening" &&
+				(!body.billingBankName?.trim() ||
+					!body.billingAccountHolder?.trim() ||
+					!body.nominal)
+			) {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Tagihan via rekening wajib mengisi nama bank, atas nama, dan nominal.",
+				};
+			}
+			const nominalPatch =
+				billingType === "rekening" && body.nominal
+					? {
+							pendaftaranDp: body.nominal,
+							totalDp: body.nominal,
+							pembayaranAwalDp: body.nominal,
+						}
+					: {};
+
+			const now = new Date();
+			const planValues = {
+				billingType,
+				billingNumber: body.billingNumber.trim(),
+				billingBankName:
+					billingType === "rekening"
+						? (body.billingBankName?.trim() ?? null)
+						: null,
+				billingAccountHolder:
+					billingType === "rekening"
+						? (body.billingAccountHolder?.trim() ?? null)
+						: null,
+				billingIssuedAt: now,
+				billingDueDate: computeBillingDueDate(now),
+				billingIssuedBy: (await getValidUserId(user)) ?? null,
+				...nominalPatch,
+				updatedAt: now,
+			};
+			await db
+				.insert(pmbPaymentPlan)
+				.values({ studentId: sId, ...planValues })
+				.onConflictDoUpdate({
+					target: pmbPaymentPlan.studentId,
+					set: planValues,
+				});
+			if (nominalPatch.pendaftaranDp) {
+				await db
+					.update(financeData)
+					.set({
+						registrasiNominal: nominalPatch.pendaftaranDp,
+						updatedAt: now,
+					})
+					.where(eq(financeData.studentId, sId));
+			}
+
+			// Tagihan baru memberi tenggat baru: keluarkan dari arsip bila sempat terarsip
+			await db
+				.update(students)
+				.set({ isArchived: false, updatedAt: now })
+				.where(eq(students.id, sId));
+
+			await invalidateFinanceCache(sId);
+			return { success: true, data: { dueDate: planValues.billingDueDate } };
+		},
+		{
+			body: t.Object({
+				billingType: t.Optional(
+					t.Union([t.Literal("va"), t.Literal("rekening")]),
+				),
+				billingNumber: t.String({ minLength: 1, maxLength: 64 }),
+				billingBankName: t.Optional(t.String({ maxLength: 100 })),
+				billingAccountHolder: t.Optional(t.String({ maxLength: 150 })),
+				nominal: t.Optional(t.Integer({ minimum: 0, maximum: 999_999_999 })),
+			}),
+		},
+	)
 
 	// FIN-01: Executive Financial Dashboard Proyeksi Target & Realisasi
 	.get("/projections", async ({ query, set, user }: any) => {
@@ -687,6 +855,8 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 			] = await Promise.all([
 				db.query.financeData.findFirst({
 					where: eq(financeData.studentId, sId),
+					// Nama pemberi ACC: tanpa ini UI memakai teks cadangan "Admin Finance"
+					with: { accBy: { columns: { fullName: true } } },
 				}),
 				db.query.pmbData.findFirst({
 					where: eq(pmbData.studentId, sId),
@@ -947,6 +1117,17 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 				return { success: false, message: "Forbidden" };
 
 			const sId = parseInt(studentId);
+			const [prevFin, prevPlan] = await Promise.all([
+				db.query.financeData.findFirst({
+					where: eq(financeData.studentId, sId),
+					columns: { registrasiStatus: true },
+				}),
+				db.query.pmbPaymentPlan.findFirst({
+					where: eq(pmbPaymentPlan.studentId, sId),
+					columns: { statusDp: true },
+				}),
+			]);
+			const wasPaid = Boolean(prevFin?.registrasiStatus || prevPlan?.statusDp);
 			await db
 				.insert(financeData)
 				.values({
@@ -969,20 +1150,22 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 
 			await invalidateFinanceCache(sId);
 
-			// Trigger penerbitan NIM otomatis jika registrasi awal tervalidasi Finance (Segmen 5 & 12)
+			// Aktivasi mahasiswa + penerbitan NIM saat DP diverifikasi lunas (Segmen 5 & 12)
 			let nimIssued: string | undefined;
-			if (body.registrasiStatus === true) {
+			let studentStatus: string | undefined;
+			if (body.registrasiStatus !== undefined) {
 				const validUploaderId = await getValidUserId(user);
-				const issueRes = await autoIssueStudentNim(
-					sId,
-					validUploaderId ?? undefined,
-				);
-				if (issueRes.success && !issueRes.alreadyIssued && issueRes.nim) {
-					nimIssued = issueRes.nim;
-				}
+				const res = await applyDpVerification({
+					studentId: sId,
+					paid: body.registrasiStatus,
+					wasPaid,
+					userId: validUploaderId ?? undefined,
+				});
+				nimIssued = res.nimIssued;
+				studentStatus = res.statusChanged ?? undefined;
 			}
 
-			return { success: true, nimIssued };
+			return { success: true, nimIssued, studentStatus };
 		},
 		{
 			body: t.Object({

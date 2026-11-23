@@ -24,7 +24,7 @@ import {
 	UploadCloud,
 	Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { FilePreviewDialog } from "@/components/panels/finance/FilePreviewDialog";
 import {
@@ -150,12 +150,24 @@ export function TabFeeSharing({ studentId, canEdit }: TabFeeSharingProps) {
 	const [previewFileName, setPreviewFileName] = useState<string>("");
 	const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
+	// Nominal fee yang sedang diketik tapi belum tersimpan (belum blur).
+	// Tanpa ini, refetch setelah unggah bukti menimpa isian jadi 0.
+	const dirtyNominals = useRef<Record<number, number>>({});
+
 	const fetchRecipients = async () => {
 		try {
 			const { data, error } =
 				await api.finance["fee-sharing"][studentId.toString()].get();
 			if (!error && data?.success) {
-				setRecipients(data.data?.recipients || []);
+				const fresh = (data.data?.recipients || []) as any[];
+				const pending = dirtyNominals.current;
+				setRecipients(
+					Object.keys(pending).length > 0
+						? fresh.map((r: any) =>
+								r.id in pending ? { ...r, nominalFee: pending[r.id] } : r,
+							)
+						: fresh,
+				);
 				setTotalBiayaPromosi(data.data?.totalBiayaPromosi ?? 0);
 			}
 		} catch (e) {
@@ -435,6 +447,7 @@ export function TabFeeSharing({ studentId, canEdit }: TabFeeSharingProps) {
 
 	const handleLocalNominalChange = (id: number, rawVal: string) => {
 		const val = rawVal === "" ? 0 : Math.max(0, Number(rawVal) || 0);
+		dirtyNominals.current[id] = val;
 		setRecipients((prev) =>
 			prev.map((r) => (r.id === id ? { ...r, nominalFee: val } : r)),
 		);
@@ -458,6 +471,7 @@ export function TabFeeSharing({ studentId, canEdit }: TabFeeSharingProps) {
 			);
 			const json = await res.json();
 			if (res.ok && !json.error) {
+				delete dirtyNominals.current[id];
 				toast.success("Nominal fee berhasil diperbarui");
 				fetchRecipients();
 			} else {

@@ -33,10 +33,14 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useStudentDetail } from "@/hooks/useStudentsList";
 import { api } from "@/lib/eden";
 import { hasRole, useAuthStore } from "@/store";
 import { formatDeviceDateTime } from "@/utils/format";
-import { calculateFinanceChecklist } from "@/utils/panel-logic";
+import {
+	calculateFinanceChecklist,
+	type FinanceCheckKey,
+} from "@/utils/panel-logic";
 import { TabFeeSharing } from "./finance/TabFeeSharing";
 import { TabKeuangan } from "./finance/TabKeuangan";
 
@@ -48,6 +52,7 @@ interface FinancePanelProps {
 export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 	const queryClient = useQueryClient();
 	const { user } = useAuthStore();
+	const { data: studentDetail } = useStudentDetail(studentId);
 	const isFinanceAdmin = hasRole(user, "finance", "superadmin");
 	const canEdit = isFinanceAdmin;
 
@@ -101,6 +106,47 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 		isFinanceReady,
 		items: financeChecklistItems,
 	} = calculateFinanceChecklist(finState);
+
+	// Tandai pos tagihan yang tidak berlaku bagi mahasiswa ini (dilewati saat ACC)
+	const [naSavingKey, setNaSavingKey] = useState<string | null>(null);
+	const handleToggleNotApplicable = async (
+		key: FinanceCheckKey,
+		notApplicable: boolean,
+	) => {
+		if (notApplicable) {
+			const note = window.prompt(
+				"Alasan pos ini tidak berlaku bagi mahasiswa ini:",
+				"",
+			);
+			if (note === null) return;
+			if (!note.trim()) {
+				toast.error("Alasan wajib diisi");
+				return;
+			}
+			setNaSavingKey(key);
+			const { error } = await api.students[studentId.toString()].finance[
+				"tidak-berlaku"
+			].put({ key, notApplicable: true, note: note.trim() });
+			setNaSavingKey(null);
+			if (error) {
+				toast.error("Gagal menandai pos tidak berlaku");
+				return;
+			}
+			toast.success("Pos ditandai tidak berlaku");
+		} else {
+			setNaSavingKey(key);
+			const { error } = await api.students[studentId.toString()].finance[
+				"tidak-berlaku"
+			].put({ key, notApplicable: false });
+			setNaSavingKey(null);
+			if (error) {
+				toast.error("Gagal membatalkan penandaan");
+				return;
+			}
+			toast.success("Pos kembali dihitung sebagai tagihan");
+		}
+		refreshData();
+	};
 
 	const handleAcc = async () => {
 		setIsAccSaving(true);
@@ -178,6 +224,70 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 					}
 				/>
 
+				{/* Syarat ACC Keuangan: pos yang tidak berlaku bisa ditandai agar
+				    tidak perlu diisi nominal dummy lalu "dilunasi". */}
+				<section className="rounded-xl border border-slate-200 bg-white">
+					<div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
+						<h3 className="text-sm sm:text-base font-bold text-slate-900">
+							Syarat ACC Keuangan
+						</h3>
+						<span
+							className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums ${
+								isFinanceReady
+									? "bg-emerald-100 text-emerald-800"
+									: "bg-amber-100 text-amber-800"
+							}`}
+						>
+							{completedCount} / {totalChecks} lunas
+						</span>
+					</div>
+					<ul className="divide-y divide-slate-100">
+						{financeChecklistItems.map((item) => (
+							<li
+								key={item.key ?? item.name}
+								className={`flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 ${
+									item.notApplicable
+										? "bg-slate-50"
+										: item.done
+											? "bg-emerald-50/50"
+											: "bg-white"
+								}`}
+							>
+								<div className="min-w-0">
+									<p className="text-sm font-semibold text-slate-900">
+										{item.name}
+									</p>
+									<p className="mt-0.5 text-xs text-slate-600">
+										{item.notApplicable
+											? `Tidak berlaku${item.note ? ` — ${item.note}` : ""}`
+											: item.done
+												? "Lunas"
+												: "Belum lunas"}
+									</p>
+								</div>
+								{canEdit && item.key && (
+									<Button
+										variant="outline"
+										size="sm"
+										disabled={naSavingKey === item.key}
+										onClick={() =>
+											handleToggleNotApplicable(
+												item.key as FinanceCheckKey,
+												!item.notApplicable,
+											)
+										}
+										className="h-9 shrink-0 self-start px-3 text-xs font-semibold border-slate-200 text-slate-700 sm:self-auto"
+									>
+										{item.notApplicable
+											? "Jadikan tagihan"
+											: "Tandai tidak berlaku"}
+									</Button>
+								)}
+							</li>
+						))}
+					</ul>
+				</section>
+
 				<Tabs defaultValue="keuangan" className="w-full space-y-4">
 					<TabsList className="w-full grid grid-cols-2 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 h-10">
 						<TabsTrigger
@@ -199,6 +309,7 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 							studentId={studentId}
 							finState={finState}
 							pmbState={pmbState}
+							internshipState={studentDetail?.internship ?? null}
 							customFields={customFields}
 							canEdit={canEdit}
 							destinationCountry={student?.destinationCountry}
@@ -214,24 +325,24 @@ export function FinancePanel({ studentId, onUpdate }: FinancePanelProps) {
 				{/* Status ACC Panel Finance Card (Persistent across all tabs) */}
 				<AccPanelStatusCard
 					isAcc={Boolean(finState?.isAcc)}
-					accByUser={finState?.accBy?.fullName || "Admin Finance"}
+					accByUser={finState?.accBy?.fullName || "Tim Keuangan"}
 					accAt={finState?.accAt}
 					isReadyForAcc={isFinanceReady}
 					title="ACC Panel Keuangan"
 					pendingTitle={
 						!isFinanceReady
-							? "Menunggu Pelunasan Tagihan Wajib (6 Item)"
+							? `Menunggu Pelunasan Tagihan Wajib (${completedCount}/${totalChecks} lunas)`
 							: "ACC Panel Keuangan (Finance)"
 					}
-					pendingDescription="Seluruh tagihan pokok (Registrasi, Semester, Interview, Keberangkatan, TOEIC, Paspor) harus lunas atau tidak ada tunggakan sebelum ACC."
-					readyDescription="Seluruh tagihan pokok (6 item) mahasiswa telah lunas dan diverifikasi. Anda dapat memberikan persetujuan ACC resmi sekarang."
+					pendingDescription="Seluruh tagihan pokok harus lunas sebelum ACC. Pos yang tidak berlaku bagi mahasiswa ini dapat ditandai pada daftar Syarat ACC Keuangan di atas."
+					readyDescription="Seluruh tagihan yang berlaku telah lunas dan diverifikasi. Anda dapat memberikan persetujuan ACC resmi sekarang."
 					canEdit={canEdit}
 					isSaving={isAccSaving}
 					onAcc={handleAcc}
 					onCancelAcc={handleCancelAcc}
 					cancelDialogTitle="Konfirmasi Pembatalan ACC Keuangan"
 					cancelDialogDescription="Apakah Anda yakin ingin membatalkan status ACC untuk panel Keuangan mahasiswa ini? Status Keuangan akan kembali ke tahap berproses."
-					disabledReason="Semua tagihan (Registrasi, Semester, Interview, Keberangkatan, TOEIC, dan Paspor) harus lunas sebelum ACC"
+					disabledReason="Semua tagihan yang berlaku harus lunas sebelum ACC"
 				/>
 			</div>
 		</TooltipProvider>
