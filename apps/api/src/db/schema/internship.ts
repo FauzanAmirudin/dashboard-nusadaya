@@ -103,9 +103,7 @@ export const internshipData = pgTable(
 		suhanNotes: text("suhan_notes"),
 
 		// Legacy fields (retained for backward compatibility)
-		lolReady: boolean("lol_ready").default(false),
-		lolDate: timestamp("lol_date"),
-		lolNotes: text("lol_notes"),
+		// LOL dihapus dari aplikasi (kolom lol_* di DB tidak lagi dipakai).
 		moaReady: boolean("moa_ready").default(false),
 		moaDate: timestamp("moa_date"),
 		moaNotes: text("moa_notes"),
@@ -120,6 +118,15 @@ export const internshipData = pgTable(
 		agenNegaraTujuan: text("agen_negara_tujuan"),
 		agenPeminatan: text("agen_peminatan"),
 		mitraPenempatanNama: text("mitra_penempatan_nama"),
+
+		// Pembayaran kampus ke agensi mitra (dicatat Divisi Magang)
+		// DP saat Suhan terbit (sebelum MCU); pelunasan saat visa terbit (sebelum tiket)
+		agenDpPaid: boolean("agen_dp_paid").default(false),
+		agenDpDate: timestamp("agen_dp_date"),
+		agenDpNominal: integer("agen_dp_nominal"),
+		agenPelunasanPaid: boolean("agen_pelunasan_paid").default(false),
+		agenPelunasanDate: timestamp("agen_pelunasan_date"),
+		agenPelunasanNominal: integer("agen_pelunasan_nominal"),
 
 		// Dana Talangan - Tahap 1
 		danaTahap1Amount: integer("dana_tahap1_amount").default(0),
@@ -154,6 +161,23 @@ export const internshipData = pgTable(
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
 	(t) => [index("idx_internship_data_student_id").on(t.studentId)],
+);
+
+// Wawancara user bisa lebih dari satu (tanggal + hotel/agent + hasil)
+export const internshipInterviews = pgTable(
+	"internship_interviews",
+	{
+		id: serial("id").primaryKey(),
+		studentId: integer("student_id")
+			.references(() => students.id, { onDelete: "cascade" })
+			.notNull(),
+		interviewDate: timestamp("interview_date"),
+		partnerName: text("partner_name"), // Hotel atau nama agent
+		result: text("result").default("menunggu").notNull(), // lulus | menunggu | tidak_lulus
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(t) => [index("idx_internship_interviews_student_id").on(t.studentId)],
 );
 
 export const internshipDocuments = pgTable(

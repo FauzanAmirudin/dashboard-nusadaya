@@ -82,6 +82,18 @@ export const students = pgTable(
 		emergencyContactName: text("emergency_contact_name"),
 		emergencyContactPhone: text("emergency_contact_phone"),
 		emergencyContactRelation: text("emergency_contact_relation"),
+		lastEducation: text("last_education"),
+		priorCollege: text("prior_college"),
+		emergencyContacts: jsonb("emergency_contacts")
+			.$type<
+				Array<{
+					name: string;
+					phone: string;
+					relation: string;
+					note?: string;
+				}>
+			>()
+			.default([]),
 
 		overallStatus: statusEnum("overall_status").default("AMAN"),
 		isArchived: boolean("is_archived").default(false),
@@ -148,6 +160,7 @@ export const studentParents = pgTable(
 		phone: text("phone"),
 		email: text("email"),
 		status: text("status"), // "Hidup" | "Meninggal" (Untuk Ayah/Ibu)
+		income: text("income"), // Rentang pendapatan (mis. "3 - 5 juta")
 		guardianRelation: text("guardian_relation"), // Hubungan dengan mahasiswa (Khusus Wali)
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
