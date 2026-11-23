@@ -97,6 +97,8 @@ export function SharedDashboardLoader({
 		refetch,
 	} = useStudentsList({
 		all: true,
+		// CRM ikut melihat calon mahasiswa yang menunggu pembayaran DP
+		includeWaiting: module === "crm",
 	});
 
 	const data = (studentsResult?.data || []) as any[];

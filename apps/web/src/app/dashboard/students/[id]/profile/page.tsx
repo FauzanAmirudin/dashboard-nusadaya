@@ -29,7 +29,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarPersonFallback } from "@/components/ui/AvatarPersonFallback";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +46,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { API_URL, api, getToken } from "@/lib/eden";
+import {
+	type EmergencyContactItem,
+	parseEmergencyContacts,
+} from "@/lib/emergency-contacts";
 import { getPeminatanOption, PEMINATAN_OPTIONS } from "@/lib/peminatan";
 import { hasRole, useAuthStore } from "@/store";
 import { filterNumeric, preventNonNumericKey } from "@/utils/form-validators";
@@ -192,9 +197,7 @@ export default function StudentProfilePage() {
 		referralInstitutionName: "",
 		referralContactName: "",
 		referralContactPhone: "",
-		emergencyContactName: "",
-		emergencyContactPhone: "",
-		emergencyContactRelation: "",
+		emergencyContacts: [] as EmergencyContactItem[],
 	});
 
 	// RBAC Guard: Semua staf dan admin diperbolehkan melihat detail profil mahasiswa
@@ -398,9 +401,7 @@ export default function StudentProfilePage() {
 					referralInstitutionName: pmbDataObj?.referralInstitutionName || "",
 					referralContactName: pmbDataObj?.referralContactName || "",
 					referralContactPhone: pmbDataObj?.referralContactPhone || "",
-					emergencyContactName: std.emergencyContactName || "",
-					emergencyContactPhone: std.emergencyContactPhone || "",
-					emergencyContactRelation: std.emergencyContactRelation || "",
+					emergencyContacts: parseEmergencyContacts(std),
 				});
 			} else {
 				toast.error("Gagal memuat profil mahasiswa");
@@ -644,10 +645,9 @@ export default function StudentProfilePage() {
 				referralInstitutionName: formData.referralInstitutionName || undefined,
 				referralContactName: formData.referralContactName || undefined,
 				referralContactPhone: formData.referralContactPhone || undefined,
-				emergencyContactName: formData.emergencyContactName || undefined,
-				emergencyContactPhone: formData.emergencyContactPhone || undefined,
-				emergencyContactRelation:
-					formData.emergencyContactRelation || undefined,
+				emergencyContacts: formData.emergencyContacts.filter(
+					(c) => c.name.trim() && c.phone.trim(),
+				),
 			};
 
 			// 1. Upload foto profil jika ada file baru yang dipilih
@@ -898,9 +898,7 @@ export default function StudentProfilePage() {
 								alt={student.name}
 								className="object-cover"
 							/>
-							<AvatarFallback className="bg-linear-to-br from-[#0517B0] to-blue-600 text-white font-black text-2xl rounded-2xl flex items-center justify-center">
-								{student.name ? student.name.charAt(0).toUpperCase() : "M"}
-							</AvatarFallback>
+							<AvatarPersonFallback className="rounded-2xl" />
 						</Avatar>
 
 						{isEditMode && (
@@ -1224,7 +1222,7 @@ export default function StudentProfilePage() {
 								label="Negara Tujuan"
 								value={student.destinationCountry}
 							/>
-							<DataRow label="Periode Keberangkatan" value={student.period} />
+							<DataRow label="Batch Pendaftaran" value={student.period} />
 							<DataRow label="Rekomendasi" value={pmb?.rekomendasi} />
 							<DataRow
 								label="Kategori Referral"
@@ -1514,7 +1512,7 @@ export default function StudentProfilePage() {
 						<CardHeader className="py-3.5 px-5 bg-slate-50/80 border-b border-slate-100 flex flex-row items-center justify-between">
 							<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
 								<Phone className="w-4 h-4 text-[#0517B0]" />
-								Kontak Darurat & Rekan Kawan (Prospek)
+								Kontak Darurat & Teman / Rekan (Prospek)
 							</CardTitle>
 							<Badge
 								variant="outline"
@@ -1530,31 +1528,39 @@ export default function StudentProfilePage() {
 									<HeartPulse className="w-3.5 h-3.5 text-rose-500" /> Kontak
 									Darurat Mahasiswa
 								</h4>
-								<div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 border border-slate-200/80 rounded-xl text-xs">
-									<div>
-										<span className="text-slate-400 block text-[10px]">
-											Nama Lengkap
-										</span>
-										<span className="font-semibold text-slate-800">
-											{student.emergencyContactName || "-"}
-										</span>
-									</div>
-									<div>
-										<span className="text-slate-400 block text-[10px]">
-											Nomor WhatsApp
-										</span>
-										<span className="font-mono font-semibold text-slate-800">
-											{student.emergencyContactPhone || "-"}
-										</span>
-									</div>
-									<div>
-										<span className="text-slate-400 block text-[10px]">
-											Hubungan
-										</span>
-										<span className="font-semibold text-slate-800">
-											{student.emergencyContactRelation || "-"}
-										</span>
-									</div>
+								<div className="space-y-3">
+									{parseEmergencyContacts(student).map((c, idx) => (
+										<div
+											key={idx}
+											className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 border border-slate-200/80 rounded-xl text-xs"
+										>
+											<div className="min-w-0">
+												<span className="text-slate-400 block text-[10px]">
+													Nama Lengkap{idx > 0 ? ` (Kontak ${idx + 1})` : ""}
+												</span>
+												<span className="font-semibold text-slate-800 [overflow-wrap:anywhere]">
+													{c.name || "-"}
+												</span>
+											</div>
+											<div>
+												<span className="text-slate-400 block text-[10px]">
+													Nomor WhatsApp
+												</span>
+												<span className="font-mono font-semibold text-slate-800">
+													{c.phone || "-"}
+												</span>
+											</div>
+											<div className="min-w-0">
+												<span className="text-slate-400 block text-[10px]">
+													Hubungan
+												</span>
+												<span className="font-semibold text-slate-800 [overflow-wrap:anywhere]">
+													{c.relation || "-"}
+													{c.note ? ` — ${c.note}` : ""}
+												</span>
+											</div>
+										</div>
+									))}
 								</div>
 							</div>
 
@@ -1562,7 +1568,7 @@ export default function StudentProfilePage() {
 							<div>
 								<h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3 flex items-center gap-1.5">
 									<Users className="w-3.5 h-3.5 text-[#0517B0]" /> Daftar Nomor
-									Kawan (5 Kontak Prospek)
+									Teman / Rekan (5 Kontak Prospek)
 								</h4>
 								{friendContacts.length > 0 ? (
 									<div className="border border-slate-200/80 rounded-xl overflow-hidden">
@@ -1604,7 +1610,7 @@ export default function StudentProfilePage() {
 									</div>
 								) : (
 									<p className="text-xs text-slate-400 italic bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-center">
-										Belum ada daftar kontak kawan yang tercatat.
+										Belum ada daftar kontak teman yang tercatat.
 									</p>
 								)}
 							</div>
@@ -2669,6 +2675,9 @@ export default function StudentProfilePage() {
 														<SelectValue placeholder="Pilih Status" />
 													</SelectTrigger>
 													<SelectContent>
+														<SelectItem value="menunggu_pembayaran">
+															Menunggu Pembayaran
+														</SelectItem>
 														<SelectItem value="aktif">Aktif</SelectItem>
 														<SelectItem value="cuti">Cuti</SelectItem>
 														<SelectItem value="lulus">Lulus</SelectItem>
@@ -2737,13 +2746,13 @@ export default function StudentProfilePage() {
 
 								<div>
 									<Label className="text-xs font-semibold">
-										Periode Keberangkatan
+										Batch Pendaftaran
 									</Label>
 									<Input
 										value={formData.period}
 										onChange={(e) => updateData("period", e.target.value)}
 										className="h-9 text-xs mt-1"
-										placeholder="Contoh: Ganjil 2025"
+										placeholder="Contoh: Batch 1 atau 2026/2027"
 									/>
 								</div>
 							</div>

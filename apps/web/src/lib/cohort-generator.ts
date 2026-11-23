@@ -5,11 +5,11 @@ export interface DynamicCohortOption {
 	isCurrent?: boolean;
 }
 
-const COHORT_BASE_YEAR = 2008; // 2025 - 17 = 2008
+const COHORT_BASE_YEAR = 2009; // Angkatan 17 = tahun ajaran 2026/2027 (2026 - 17 = 2009)
 
 /**
  * Menghitung nomor angkatan dari tahun awal ajaran
- * Contoh: 2025 -> 17, 2026 -> 18
+ * Contoh: 2026 -> 17, 2027 -> 18
  */
 export function calculateCohortFromYear(startYear: number): number {
 	return startYear - COHORT_BASE_YEAR;
@@ -17,7 +17,7 @@ export function calculateCohortFromYear(startYear: number): number {
 
 /**
  * Menghitung tahun awal ajaran dari nomor angkatan
- * Contoh: 17 -> 2025, 18 -> 2026
+ * Contoh: 17 -> 2026, 18 -> 2027
  */
 export function calculateYearFromCohort(cohort: number): number {
 	return cohort + COHORT_BASE_YEAR;
@@ -25,7 +25,7 @@ export function calculateYearFromCohort(cohort: number): number {
 
 /**
  * Menghitung rentang tahun ajaran dari nomor angkatan
- * Contoh: 17 -> "2025/2026", 18 -> "2026/2027"
+ * Contoh: 17 -> "2026/2027", 18 -> "2027/2028"
  */
 export function getAcademicYearFromCohort(cohort: number): string {
 	const startYear = calculateYearFromCohort(cohort);

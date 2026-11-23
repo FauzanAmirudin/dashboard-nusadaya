@@ -2,36 +2,30 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import {
-	Activity,
 	AlertCircle,
 	Building,
 	CheckCircle2,
-	Clock,
-	CreditCard,
-	DollarSign,
-	Edit2,
+	ChevronDown,
 	Eye,
 	FileText,
-	Globe,
 	GraduationCap,
 	HeartPulse,
 	Home,
-	Info,
 	Languages,
 	Loader2,
-	Lock,
 	Plane,
-	RefreshCw,
-	Save,
 	ShieldCheck,
-	XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { FilePreviewDialog } from "@/components/panels/finance/FilePreviewDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { API_URL, getToken } from "@/lib/eden";
@@ -79,7 +73,6 @@ export function TabSkemaKeuangan({
 	const [dpWarning, setDpWarning] = useState<string | null>(null);
 	const [financeDetail, setFinanceDetail] = useState<any>(null);
 	const [programDefaults, setProgramDefaults] = useState<any[]>([]);
-	const [isRefreshingFinance, setIsRefreshingFinance] = useState(false);
 	const [previewModal, setPreviewModal] = useState<{
 		open: boolean;
 		fileUrl: string | null;
@@ -100,8 +93,7 @@ export function TabSkemaKeuangan({
 		}
 	};
 
-	const fetchFinanceData = async (showToast = false) => {
-		setIsRefreshingFinance(true);
+	const fetchFinanceData = async () => {
 		try {
 			const res = await fetch(`${API_URL}/finance/student/${studentId}`, {
 				headers: { Authorization: `Bearer ${getToken()}` },
@@ -126,18 +118,10 @@ export function TabSkemaKeuangan({
 							prev === 0 ? Number(incomingDp) || 0 : prev,
 						);
 					}
-					if (showToast) {
-						toast.success("Data pembayaran Finance berhasil diperbarui");
-					}
 				}
 			}
 		} catch (error) {
 			console.error("Failed to fetch finance tracking data", error);
-			if (showToast) {
-				toast.error("Gagal memperbarui data dari Finance");
-			}
-		} finally {
-			setIsRefreshingFinance(false);
 		}
 	};
 
@@ -359,42 +343,41 @@ export function TabSkemaKeuangan({
 		const isLunas = status === "LUNAS" || status === true;
 		const isSebagian = status === "SEBAGIAN";
 
+		const pill = isLunas
+			? {
+					cls: "bg-emerald-100 text-emerald-800",
+					text: statusBadgeLabel || "Lunas",
+				}
+			: isSebagian
+				? {
+						cls: "bg-amber-100 text-amber-800",
+						text:
+							statusBadgeLabel || `Sebagian (${progress?.percentage ?? 0}%)`,
+					}
+				: {
+						cls: "bg-slate-100 text-slate-700",
+						text: statusBadgeLabel || "Belum lunas",
+					};
+
 		return (
-			<div className="p-3.5 border border-slate-200 rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-all space-y-2.5">
-				<div className="flex items-start justify-between gap-3">
+			<div
+				className={`rounded-lg border p-4 space-y-3 ${isLunas ? "border-emerald-200 bg-emerald-50/50" : "border-slate-200 bg-white"}`}
+			>
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 					<div className="min-w-0 flex-1">
-						<div className="flex items-center gap-1.5 flex-wrap">
-							<h4 className="text-xs font-bold text-slate-800">{title}</h4>
-						</div>
-						<p className="text-[10px] text-slate-500 mt-0.5">{desc}</p>
-						<div className="mt-1 font-mono text-xs font-semibold text-slate-700">
+						<h4 className="text-sm font-semibold text-slate-900">{title}</h4>
+						<p className="text-xs text-slate-500 mt-0.5">{desc}</p>
+						<p className="mt-1.5 font-mono text-base font-bold text-slate-900">
 							{formatRupiah(nominal)}
-						</div>
+						</p>
 					</div>
-
-					<div className="text-right flex flex-col items-end gap-1.5 shrink-0">
-						{isLunas ? (
-							<Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100 text-[10px] font-bold">
-								<CheckCircle2 className="w-3 h-3 mr-1" />
-								{statusBadgeLabel || "Lunas"}
-							</Badge>
-						) : isSebagian ? (
-							<Badge className="bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-100 text-[10px] font-bold">
-								<Clock className="w-3 h-3 mr-1" />
-								{statusBadgeLabel || `Sebagian (${progress?.percentage ?? 0}%)`}
-							</Badge>
-						) : (
-							<Badge
-								variant="outline"
-								className="text-slate-500 border-slate-300 text-[10px] font-bold bg-white"
-							>
-								<XCircle className="w-3 h-3 mr-1" />
-								{statusBadgeLabel || "Belum Lunas"}
-							</Badge>
-						)}
-
-						{/* Tombol Bukti Pembayaran */}
-						<div className="flex flex-wrap items-center justify-end gap-1 mt-0.5">
+					<div className="flex flex-wrap items-center gap-2 sm:flex-col sm:items-end">
+						<span
+							className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${pill.cls}`}
+						>
+							{pill.text}
+						</span>
+						<div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
 							{buktiBayarUrl && (
 								<Button
 									type="button"
@@ -407,7 +390,7 @@ export function TabSkemaKeuangan({
 											`Bukti Pembayaran — ${title}.pdf`,
 										)
 									}
-									className="h-6 px-2 text-[10px] font-semibold text-[#0517B0] border-[#0517B0]/30 hover:bg-blue-50/80 gap-1 shadow-2xs cursor-pointer"
+									className="h-9 px-3 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1.5 cursor-pointer"
 								>
 									<Eye className="w-3 h-3" />
 									Lihat Bukti
@@ -426,7 +409,7 @@ export function TabSkemaKeuangan({
 											`Bukti ${secondaryBuktiLabel || "Dokumen"} — ${title}.pdf`,
 										)
 									}
-									className="h-6 px-2 text-[10px] font-semibold text-[#0517B0] border-[#0517B0]/30 hover:bg-blue-50/80 gap-1 shadow-2xs cursor-pointer"
+									className="h-9 px-3 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1.5 cursor-pointer"
 								>
 									<Eye className="w-3 h-3" />
 									{secondaryBuktiLabel || "Bukti Dokumen"}
@@ -438,8 +421,8 @@ export function TabSkemaKeuangan({
 
 				{/* Progress bar realisasi cicilan */}
 				{progress && (isSebagian || (progress.paid > 0 && !isLunas)) && (
-					<div className="pt-1 border-t border-slate-200/60">
-						<div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+					<div>
+						<div className="flex items-center justify-between text-xs text-slate-600 mb-1">
 							<span>
 								Realisasi:{" "}
 								<strong className="text-amber-700 font-mono">
@@ -451,7 +434,7 @@ export function TabSkemaKeuangan({
 								{progress.percentage}%
 							</span>
 						</div>
-						<div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+						<div className="w-full bg-amber-100 h-2 rounded-full overflow-hidden">
 							<div
 								className="bg-amber-500 h-full rounded-full transition-all duration-300"
 								style={{
@@ -462,674 +445,581 @@ export function TabSkemaKeuangan({
 					</div>
 				)}
 
-				{/* Subdetails: Daftar cicilan bulanan yang sudah terbayar */}
+				{/* Riwayat cicilan: tertutup secara default */}
 				{subDetails && subDetails.length > 0 && (
-					<div className="pt-2 border-t border-slate-200/60 space-y-1.5">
-						<span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-							Cicilan Terbayar ({subDetails.length}):
-						</span>
-						<div className="grid gap-1">
-							{subDetails.map((sub, idx) => (
-								<div
-									key={idx}
-									className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200 text-[11px]"
-								>
-									<div className="flex items-center gap-2 min-w-0">
-										<CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-										<div className="min-w-0 truncate">
-											<span className="font-semibold text-slate-800">
-												{sub.label}
-											</span>
-											<span className="text-slate-400 mx-1">•</span>
-											<span className="font-mono font-bold text-emerald-700">
-												{formatRupiah(sub.nominal)}
-											</span>
-											{sub.paidDate && (
-												<span className="text-[10px] text-slate-400 block sm:inline sm:ml-1">
-													(
-													{new Date(sub.paidDate).toLocaleDateString("id-ID", {
-														day: "numeric",
-														month: "short",
-														year: "numeric",
-													})}
-													)
+					<Collapsible>
+						<CollapsibleTrigger className="group inline-flex min-h-9 items-center gap-1.5 rounded-md text-xs font-semibold text-[#0517B0] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0517B0]/40">
+							Lihat riwayat cicilan ({subDetails.length})
+							<ChevronDown className="w-3.5 h-3.5 transition-transform group-data-[panel-open]:rotate-180" />
+						</CollapsibleTrigger>
+						<CollapsibleContent>
+							<div className="mt-2 grid gap-1.5">
+								{subDetails.map((sub, idx) => (
+									<div
+										key={idx}
+										className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200 text-[11px]"
+									>
+										<div className="flex items-center gap-2 min-w-0">
+											<CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+											<div className="min-w-0 truncate">
+												<span className="font-semibold text-slate-800">
+													{sub.label}
 												</span>
-											)}
+												<span className="text-slate-400 mx-1">•</span>
+												<span className="font-mono font-bold text-emerald-700">
+													{formatRupiah(sub.nominal)}
+												</span>
+												{sub.paidDate && (
+													<span className="text-[10px] text-slate-400 block sm:inline sm:ml-1">
+														(
+														{new Date(sub.paidDate).toLocaleDateString(
+															"id-ID",
+															{
+																day: "numeric",
+																month: "short",
+																year: "numeric",
+															},
+														)}
+														)
+													</span>
+												)}
+											</div>
 										</div>
-									</div>
 
-									{sub.buktiBayarUrl && (
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											onClick={() =>
-												openDocumentReview(
-													studentId,
-													sub.buktiBayarUrl!,
-													`Bukti Pembayaran — ${sub.label}.pdf`,
-												)
-											}
-											className="h-5 px-1.5 text-[10px] font-semibold text-[#0517B0] hover:bg-blue-50 gap-1 shrink-0 cursor-pointer"
-										>
-											<Eye className="w-3 h-3" />
-											Bukti
-										</Button>
-									)}
-								</div>
-							))}
-						</div>
-					</div>
+										{sub.buktiBayarUrl && (
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												onClick={() =>
+													openDocumentReview(
+														studentId,
+														sub.buktiBayarUrl!,
+														`Bukti Pembayaran — ${sub.label}.pdf`,
+													)
+												}
+												className="h-5 px-1.5 text-[10px] font-semibold text-[#0517B0] hover:bg-blue-50 gap-1 shrink-0 cursor-pointer"
+											>
+												<Eye className="w-3 h-3" />
+												Bukti
+											</Button>
+										)}
+									</div>
+								))}
+							</div>
+						</CollapsibleContent>
+					</Collapsible>
 				)}
 			</div>
 		);
 	};
 
 	const renderTambahan = (
-		icon: React.ReactNode,
+		_icon: React.ReactNode,
 		title: string,
 		nominal: number,
 		isPaid: boolean,
 	) => (
-		<div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 border border-slate-200 rounded-lg bg-white shadow-sm gap-4">
-			<div className="flex items-start gap-3.5">
-				<div className="p-2.5 rounded-lg bg-indigo-50/50 border border-indigo-100 text-indigo-600">
-					{icon}
-				</div>
-				<div>
-					<h4 className="text-sm font-bold text-slate-800">{title}</h4>
-					<div className="mt-1 font-mono text-[13px] font-semibold text-slate-600">
-						{formatRupiah(nominal)}
-					</div>
-				</div>
+		<div
+			className={`flex items-center justify-between gap-3 rounded-lg border p-4 ${isPaid ? "border-emerald-200 bg-emerald-50/50" : "border-slate-200 bg-white"}`}
+		>
+			<div className="min-w-0">
+				<h4 className="text-sm font-semibold text-slate-900">{title}</h4>
+				<p className="mt-0.5 font-mono text-sm font-bold text-slate-700">
+					{formatRupiah(nominal)}
+				</p>
 			</div>
-			<div>
-				{isPaid ? (
-					<Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100 text-xs font-bold w-full sm:w-auto justify-center px-3 py-1">
-						<CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-						Lunas
-					</Badge>
-				) : (
-					<Badge
-						variant="outline"
-						className="text-slate-500 border-slate-300 text-xs font-bold bg-slate-50 w-full sm:w-auto justify-center px-3 py-1"
-					>
-						<XCircle className="w-3.5 h-3.5 mr-1.5" />
-						Belum Lunas
-					</Badge>
-				)}
-			</div>
+			<span
+				className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${isPaid ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}
+			>
+				{isPaid ? "Lunas" : "Belum lunas"}
+			</span>
 		</div>
 	);
 
 	return (
-		<div className="space-y-6">
-			{/* Section 1: Input Total Biaya Pendidikan Global */}
-			<Card className="border border-slate-200 shadow-sm">
-				<CardHeader className="bg-slate-50 border-b border-slate-100 py-3.5 px-4 flex flex-row items-center justify-between">
-					<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-						<Globe className="w-4 h-4 text-indigo-600" />
-						Input Total Biaya Pendidikan
-					</CardTitle>
+		<div className="w-full space-y-6">
+			{/* 1. Biaya & DP pendaftaran (diisi PMB) */}
+			<section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
+					<div className="min-w-0">
+						<h3 className="text-sm sm:text-base font-bold text-slate-900">
+							Biaya pendidikan & DP pendaftaran
+						</h3>
+						<p className="text-xs text-slate-500 mt-0.5">
+							Diisi PMB, otomatis tersambung ke Panel Finance.
+						</p>
+					</div>
 					{canEdit && (
 						<div className="flex items-center gap-2">
 							{!isEditing ? (
 								<Button
 									onClick={() => setIsEditing(true)}
-									size="sm"
-									className="bg-[#0517B0] hover:bg-[#04128d] text-white text-xs gap-1.5 h-8"
+									variant="outline"
+									className="h-10 border-blue-200 text-[#0517B0] hover:bg-blue-50 text-sm font-semibold"
 								>
-									<Edit2 className="w-3.5 h-3.5" />
-									Edit Biaya
+									Edit biaya
 								</Button>
 							) : (
 								<>
 									<Button
 										variant="outline"
-										size="sm"
 										onClick={handleCancelEdit}
 										disabled={isSaving}
-										className="text-xs h-8"
+										className="h-10 text-sm"
 									>
 										Batal
 									</Button>
 									<Button
 										onClick={handleSaveTotalBiaya}
 										disabled={isSaving}
-										size="sm"
-										className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5 h-8"
+										className="h-10 bg-[#0517B0] hover:bg-blue-800 text-white text-sm font-semibold gap-1.5"
 									>
-										{isSaving ? (
-											<Loader2 className="w-3.5 h-3.5 animate-spin" />
-										) : (
-											<Save className="w-3.5 h-3.5" />
-										)}
-										Simpan Biaya Pendidikan
+										{isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+										Simpan
 									</Button>
 								</>
 							)}
 						</div>
 					)}
-				</CardHeader>
-				<CardContent className="p-5 space-y-4">
-					<div className="max-w-xl p-4 bg-indigo-50/40 rounded-xl border border-indigo-100 space-y-3">
-						<div>
-							{(() => {
-								const currentSubProgram = pmbData?.subProgram || "";
-								const defaultFeeObj = programDefaults.find(
-									(p) =>
-										p.subProgram?.toLowerCase() ===
-										currentSubProgram.toLowerCase(),
-								);
-								const defaultTotalBiaya = defaultFeeObj?.defaultTotalBiaya ?? 0;
-								const hasMismatch =
-									totalBiaya > 0 &&
-									defaultTotalBiaya > 0 &&
-									totalBiaya !== defaultTotalBiaya;
+				</div>
+				<div className="grid gap-6 p-4 sm:p-6 md:grid-cols-2">
+					{/* Total biaya */}
+					<div className="space-y-2">
+						{(() => {
+							const currentSubProgram = pmbData?.subProgram || "";
+							const defaultFeeObj = programDefaults.find(
+								(p) =>
+									p.subProgram?.toLowerCase() ===
+									currentSubProgram.toLowerCase(),
+							);
+							const defaultTotalBiaya = defaultFeeObj?.defaultTotalBiaya ?? 0;
+							const hasMismatch =
+								totalBiaya > 0 &&
+								defaultTotalBiaya > 0 &&
+								totalBiaya !== defaultTotalBiaya;
 
-								return (
-									<>
-										<div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
-											<Label className="text-xs font-bold text-indigo-950 block">
-												Total Biaya Pendidikan Keseluruhan (Rp) *
-											</Label>
-											{defaultTotalBiaya > 0 && (
-												<Badge
-													variant="outline"
-													className="text-[10px] bg-blue-50 text-blue-700 border-blue-200"
+							return (
+								<>
+									<div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
+										<Label className="text-xs font-bold text-slate-800 block">
+											Total Biaya Pendidikan Keseluruhan (Rp) *
+										</Label>
+										{defaultTotalBiaya > 0 && (
+											<Badge
+												variant="outline"
+												className="text-[10px] bg-blue-50 text-blue-700 border-blue-200"
+											>
+												Pagu Default: {formatRupiah(defaultTotalBiaya)}
+											</Badge>
+										)}
+									</div>
+
+									<div className="relative">
+										<span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+											Rp
+										</span>
+										<Input
+											type="text"
+											inputMode="numeric"
+											pattern="[0-9]*"
+											maxLength={9}
+											disabled={!isEditing || !canEdit}
+											value={totalBiaya === 0 || !totalBiaya ? "" : totalBiaya}
+											onKeyDown={handleKeyDown}
+											onChange={handleTotalBiayaChange}
+											className={`pl-9 font-bold text-base bg-white h-11 border-slate-300 focus:border-[#0517B0] disabled:bg-slate-100 disabled:text-slate-700 ${
+												inputWarning
+													? "border-amber-400 ring-1 ring-amber-300"
+													: ""
+											}`}
+											placeholder="Belum diinputkan (Contoh: 25000000)"
+										/>
+									</div>
+
+									{hasMismatch && (
+										<div className="flex items-center justify-between text-xs font-medium text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200 mt-2">
+											<div className="flex items-center gap-1.5">
+												<AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+												<span>
+													Nilai berbeda dari pagu standar program (
+													{formatRupiah(defaultTotalBiaya)})
+												</span>
+											</div>
+											{isEditing && (
+												<Button
+													type="button"
+													variant="ghost"
+													size="sm"
+													onClick={() => setTotalBiaya(defaultTotalBiaya)}
+													className="h-6 text-[11px] text-amber-900 underline hover:bg-amber-100 font-semibold"
 												>
-													Pagu Default: {formatRupiah(defaultTotalBiaya)}
-												</Badge>
+													Gunakan Standar
+												</Button>
 											)}
 										</div>
-
-										<div className="relative">
-											<span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
-												Rp
-											</span>
-											<Input
-												type="text"
-												inputMode="numeric"
-												pattern="[0-9]*"
-												maxLength={9}
-												disabled={!isEditing || !canEdit}
-												value={
-													totalBiaya === 0 || !totalBiaya ? "" : totalBiaya
-												}
-												onKeyDown={handleKeyDown}
-												onChange={handleTotalBiayaChange}
-												className={`pl-9 font-bold text-base bg-white h-10 border-indigo-200 focus:border-indigo-500 disabled:bg-slate-100 disabled:text-slate-700 ${
-													inputWarning
-														? "border-amber-400 ring-1 ring-amber-300"
-														: ""
-												}`}
-												placeholder="Belum diinputkan (Contoh: 25000000)"
-											/>
-										</div>
-
-										{hasMismatch && (
-											<div className="flex items-center justify-between text-xs font-medium text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200 mt-2">
-												<div className="flex items-center gap-1.5">
-													<AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
-													<span>
-														Nilai berbeda dari pagu standar program (
-														{formatRupiah(defaultTotalBiaya)})
-													</span>
-												</div>
-												{isEditing && (
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														onClick={() => setTotalBiaya(defaultTotalBiaya)}
-														className="h-6 text-[11px] text-amber-900 underline hover:bg-amber-100 font-semibold"
-													>
-														Gunakan Standar
-													</Button>
-												)}
-											</div>
-										)}
-									</>
-								);
-							})()}
-
-							{inputWarning && (
-								<div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200 mt-1.5 animate-in fade-in">
-									<AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
-									<span>{inputWarning}</span>
-								</div>
-							)}
-
-							<span className="text-xs font-semibold text-indigo-700 mt-1.5 block">
-								Terbilang:{" "}
-								{totalBiaya > 0
-									? formatRupiah(totalBiaya)
-									: "Belum ada biaya terinput"}
-							</span>
-							{/* Input Nominal DP Pendaftaran (Poin 10) */}
-							<div className="pt-3 border-t border-indigo-100">
-								<div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
-									<Label className="text-xs font-bold text-indigo-950 flex items-center gap-2">
-										<span>Nominal Uang Muka / DP Pendaftaran (Rp)</span>
-										<span className="text-muted-foreground text-[10px] font-normal">
-											(Disepakati PMB)
-										</span>
-									</Label>
-									{financeState?.registrasiStatus ||
-									pmbData?.paymentPlan?.statusDp ? (
-										<Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-100 text-[10px] font-bold gap-1">
-											<CheckCircle2 className="w-3 h-3 text-emerald-600" />
-											Lunas DP
-										</Badge>
-									) : (
-										<Badge
-											variant="outline"
-											className="text-amber-800 border-amber-300 bg-amber-50 text-[10px] font-bold gap-1"
-										>
-											<AlertCircle className="w-3 h-3 text-amber-600" />
-											Belum Lunas
-										</Badge>
 									)}
-								</div>
+								</>
+							);
+						})()}
+						{inputWarning && (
+							<div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200 mt-1.5 animate-in fade-in">
+								<AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+								<span>{inputWarning}</span>
+							</div>
+						)}
+						<p className="text-xs text-slate-500">
+							Terbilang:{" "}
+							{totalBiaya > 0
+								? formatRupiah(totalBiaya)
+								: "Belum ada biaya terinput"}
+						</p>
+					</div>
 
-								<div className="relative">
-									<span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
-										Rp
-									</span>
-									<Input
-										type="text"
-										inputMode="numeric"
-										pattern="[0-9]*"
-										maxLength={9}
-										disabled={!isEditing || !canEdit}
-										value={
-											pendaftaranDp === 0 || !pendaftaranDp ? "" : pendaftaranDp
-										}
-										onKeyDown={handleKeyDown}
-										onChange={handleDpChange}
-										className={`pl-9 font-bold text-base bg-white h-10 border-indigo-200 focus:border-indigo-500 disabled:bg-slate-100 disabled:text-slate-700 ${
-											dpWarning ? "border-amber-400 ring-1 ring-amber-300" : ""
-										}`}
-										placeholder="Nominal DP (Contoh: 3000000)"
-									/>
-								</div>
+					{/* DP pendaftaran */}
+					<div className="space-y-2">
+						<div className="flex flex-wrap items-center justify-between gap-2">
+							<Label className="text-xs font-bold text-slate-800">
+								Nominal DP pendaftaran (Rp)
+							</Label>
+							{financeState?.registrasiStatus ||
+							pmbData?.paymentPlan?.statusDp ? (
+								<span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+									Lunas
+								</span>
+							) : (
+								<span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+									Menunggu verifikasi Finance
+								</span>
+							)}
+						</div>
+						<div className="relative">
+							<span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+								Rp
+							</span>
+							<Input
+								type="text"
+								inputMode="numeric"
+								pattern="[0-9]*"
+								maxLength={9}
+								disabled={!isEditing || !canEdit}
+								value={
+									pendaftaranDp === 0 || !pendaftaranDp ? "" : pendaftaranDp
+								}
+								onKeyDown={handleKeyDown}
+								onChange={handleDpChange}
+								className={`pl-9 font-bold text-base bg-white h-11 border-slate-300 focus:border-[#0517B0] disabled:bg-slate-100 disabled:text-slate-700 ${
+									dpWarning ? "border-amber-400 ring-1 ring-amber-300" : ""
+								}`}
+								placeholder="Nominal DP (Contoh: 3000000)"
+							/>
+						</div>
 
-								{dpWarning && (
-									<div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200 mt-1.5 animate-in fade-in">
-										<AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
-										<span>{dpWarning}</span>
-									</div>
-								)}
+						{dpWarning && (
+							<div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200 mt-1.5 animate-in fade-in">
+								<AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+								<span>{dpWarning}</span>
+							</div>
+						)}
 
-								{totalBiaya > 0 && pendaftaranDp > totalBiaya && (
-									<div className="flex items-center gap-1.5 text-xs font-semibold text-rose-700 bg-rose-50 p-2 rounded-lg border border-rose-200 mt-1.5 animate-in fade-in">
-										<AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-										<span>
-											Peringatan: DP Pendaftaran ({formatRupiah(pendaftaranDp)})
-											melebihi Total Biaya ({formatRupiah(totalBiaya)})
-										</span>
-									</div>
-								)}
-
-								<span className="text-xs font-semibold text-indigo-700 mt-1.5 block">
-									Terbilang:{" "}
-									{pendaftaranDp > 0
-										? formatRupiah(pendaftaranDp)
-										: "Belum ada DP ditentukan"}
+						{totalBiaya > 0 && pendaftaranDp > totalBiaya && (
+							<div className="flex items-center gap-1.5 text-xs font-semibold text-rose-700 bg-rose-50 p-2 rounded-lg border border-rose-200 mt-1.5 animate-in fade-in">
+								<AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+								<span>
+									Peringatan: DP Pendaftaran ({formatRupiah(pendaftaranDp)})
+									melebihi Total Biaya ({formatRupiah(totalBiaya)})
 								</span>
 							</div>
-						</div>
+						)}
+						<p className="text-xs text-slate-500">
+							Terbilang:{" "}
+							{pendaftaranDp > 0
+								? formatRupiah(pendaftaranDp)
+								: "Belum ada DP ditentukan"}
+						</p>
+					</div>
+				</div>
+			</section>
 
-						<div className="flex items-start gap-2 pt-1 text-xs text-indigo-900/80">
-							<Info className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-							<p className="text-[11px] leading-relaxed">
-								Tim PMB hanya menginput{" "}
-								<strong>satu nilai total keseluruhan</strong> di awal. Sistem
-								OneData secara otomatis menghubungkan nilai ini ke{" "}
-								<strong>Panel Finance</strong> untuk pengelolaan skema cicilan &
-								pencatatan transaksi lebih lanjut.
-							</p>
-						</div>
+			{/* 2. Rincian pembayaran (hanya baca, dari Finance) */}
+			<section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
+					<div className="min-w-0">
+						<h3 className="text-sm sm:text-base font-bold text-slate-900">
+							Rincian pembayaran
+						</h3>
+						<p className="text-xs text-slate-500 mt-0.5">
+							Data dari Panel Finance (hanya baca).
+						</p>
 					</div>
-				</CardContent>
-			</Card>
+				</div>
+				<div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-2">
+					<div className="space-y-3">
+						<h4 className="text-sm font-bold text-slate-700">
+							Registrasi awal
+						</h4>
+						{renderStage({
+							title: "1. Registrasi Awal (DP Masuk)",
+							nominal:
+								financeState?.termin1?.nominal ??
+								(financeState?.registrasiNominal || 0),
+							desc: "Pendaftaran masuk awal & syarat clearance NIM",
+							status: Boolean(
+								financeState?.termin1?.status ?? financeState?.registrasiStatus,
+							),
+							paidDate:
+								financeState?.termin1?.paidDate ??
+								financeState?.registrasiPaidDate,
+							buktiBayarUrl:
+								financeState?.termin1?.buktiBayarUrl ??
+								financeState?.registrasiBuktiBayarUrl,
+						})}
+					</div>
 
-			{/* Section 2: Rincian Alokasi Biaya Pendidikan */}
-			<Card className="border border-slate-200 shadow-sm overflow-hidden">
-				<CardHeader className="bg-slate-50 border-b border-slate-100 py-3.5 px-4 flex flex-row items-center justify-between">
-					<div className="flex items-center gap-2">
-						<Activity className="w-4 h-4 text-emerald-600" />
-						<div>
-							<CardTitle className="text-sm font-bold text-slate-800">
-								Rincian Alokasi Biaya Pendidikan
-							</CardTitle>
-							<p className="text-[11px] text-slate-500">
-								Monitoring real-time dari Panel Finance
-							</p>
+					<div className="space-y-3">
+						<div className="flex flex-wrap items-center justify-between gap-2">
+							<h4 className="text-sm font-bold text-slate-700">
+								Pembayaran lanjutan
+							</h4>
+							<span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-[#0517B0]">
+								{financeState?.metodePembayaran === "mandiri"
+									? "Dana Mandiri"
+									: financeState?.metodePembayaran === "dana_talangan"
+										? financeState?.talanganTipe === "1_tahap"
+											? "Dana Talangan (1 Tahap)"
+											: "Dana Talangan (2 Tahap)"
+										: "Belum ditentukan"}
+							</span>
 						</div>
-					</div>
-					<div className="flex items-center gap-2">
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							onClick={() => fetchFinanceData(true)}
-							disabled={isRefreshingFinance}
-							className="h-7 px-2.5 text-xs text-slate-600 hover:text-slate-900 border-slate-200 bg-white shadow-2xs gap-1.5 cursor-pointer"
-							title="Segarkan data terbaru dari Finance"
-						>
-							<RefreshCw
-								className={`w-3.5 h-3.5 text-indigo-600 ${
-									isRefreshingFinance ? "animate-spin" : ""
-								}`}
-							/>
-							<span className="hidden sm:inline">Segarkan Data</span>
-						</Button>
-						<Badge
-							variant="outline"
-							className="text-slate-400 bg-white text-[10px]"
-						>
-							<Lock className="w-3 h-3 mr-1" />
-							Read Only
-						</Badge>
-					</div>
-				</CardHeader>
-				<CardContent className="p-0">
-					<div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
-						{/* Kiri: Registrasi Awal */}
-						<div className="p-5 space-y-4">
-							<div className="flex items-center gap-2 mb-2">
-								<div className="p-1.5 bg-blue-50 text-blue-600 rounded-md">
-									<FileText className="w-4 h-4" />
+						<div className="space-y-3">
+							{!financeState?.metodePembayaran ? (
+								<div className="text-sm text-slate-600 text-center py-6 rounded-lg bg-slate-50 border border-dashed border-slate-300">
+									Metode pembayaran lanjutan belum dipilih oleh Finance.
 								</div>
-								<h3 className="font-bold text-sm text-slate-800">
-									Status Registrasi Awal
-								</h3>
-							</div>
-							{renderStage({
-								title: "1. Registrasi Awal (DP Masuk)",
-								nominal:
-									financeState?.termin1?.nominal ??
-									(financeState?.registrasiNominal || 0),
-								desc: "Pendaftaran masuk awal & syarat clearance NIM",
-								status: Boolean(
-									financeState?.termin1?.status ??
-										financeState?.registrasiStatus,
-								),
-								paidDate:
-									financeState?.termin1?.paidDate ??
-									financeState?.registrasiPaidDate,
-								buktiBayarUrl:
-									financeState?.termin1?.buktiBayarUrl ??
-									financeState?.registrasiBuktiBayarUrl,
-							})}
-						</div>
+							) : isDanaMandiri ? (
+								<>
+									{/* 2. SPP Semester 1 */}
+									{(() => {
+										const t2 = financeState?.termin2;
+										const sem1Installments =
+											t2?.installments ||
+											financeDetail?.semesters?.find(
+												(s: any) => s.semesterNumber === 1,
+											)?.installments ||
+											[];
+										const sem1PaidList = sem1Installments
+											.filter(
+												(i: any) =>
+													i.status === "LUNAS" ||
+													(i.nominalPaid && i.nominalPaid > 0),
+											)
+											.map((i: any) => ({
+												label: i.installmentMonth
+													? `Cicilan ${i.installmentMonth}`
+													: `Cicilan Ke-${i.installmentNumber}`,
+												nominal: i.nominalPaid || 0,
+												paidDate: i.paymentDate,
+												buktiBayarUrl: i.buktiBayarUrl,
+											}));
 
-						{/* Kanan: Metode Pembayaran Lanjutan */}
-						<div className="p-5 space-y-4 bg-slate-50/30">
-							<div className="flex items-center justify-between mb-2">
-								<div className="flex items-center gap-2">
-									<div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-md">
-										<CreditCard className="w-4 h-4" />
-									</div>
-									<h3 className="font-bold text-sm text-slate-800">
-										Metode Pembayaran Lanjutan
-									</h3>
-								</div>
-								<Badge className="bg-[#0517B0]/10 text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/20 font-bold text-xs">
-									{financeState?.metodePembayaran === "mandiri"
-										? "Dana Mandiri"
-										: financeState?.metodePembayaran === "dana_talangan"
-											? financeState?.talanganTipe === "1_tahap"
-												? "Dana Talangan (1 Tahap)"
-												: "Dana Talangan (2 Tahap)"
-											: "Belum Ditentukan"}
-								</Badge>
-							</div>
-
-							<div className="space-y-3">
-								{!financeState?.metodePembayaran ? (
-									<div className="text-sm text-slate-500 text-center py-6 border-2 border-dashed border-slate-200 rounded-xl">
-										Metode pembayaran lanjutan belum dipilih oleh Finance.
-									</div>
-								) : isDanaMandiri ? (
-									<>
-										{/* 2. SPP Semester 1 */}
-										{(() => {
-											const t2 = financeState?.termin2;
-											const sem1Installments =
-												t2?.installments ||
-												financeDetail?.semesters?.find(
-													(s: any) => s.semesterNumber === 1,
-												)?.installments ||
-												[];
-											const sem1PaidList = sem1Installments
-												.filter(
-													(i: any) =>
-														i.status === "LUNAS" ||
-														(i.nominalPaid && i.nominalPaid > 0),
-												)
-												.map((i: any) => ({
-													label: i.installmentMonth
-														? `Cicilan ${i.installmentMonth}`
-														: `Cicilan Ke-${i.installmentNumber}`,
-													nominal: i.nominalPaid || 0,
-													paidDate: i.paymentDate,
-													buktiBayarUrl: i.buktiBayarUrl,
-												}));
-
-											const totalPaid =
-												t2?.totalPaid ??
-												sem1PaidList.reduce(
-													(sum: number, i: any) => sum + i.nominal,
-													0,
-												);
-											const nominal =
-												t2?.nominal ??
-												(financeState?.mandiriSemesterNominal || 0);
-											const percentage =
-												nominal > 0
-													? Math.round((totalPaid / nominal) * 100)
-													: 0;
-											const statusString =
-												t2?.statusString ??
-												(financeState?.mandiriSemesterStatus
-													? "LUNAS"
-													: totalPaid > 0
-														? "SEBAGIAN"
-														: "BELUM_BAYAR");
-
-											return renderStage({
-												title: "2. SPP Semester 1",
-												nominal,
-												desc: "Biaya perkuliahan berjalan (cicilan bulanan)",
-												status: statusString,
-												statusBadgeLabel:
-													statusString === "SEBAGIAN"
-														? `Sebagian (${percentage}%)`
-														: undefined,
-												buktiBayarUrl:
-													t2?.buktiBayarUrl ??
-													financeState?.mandiriSemesterBuktiBayarUrl,
-												progress: {
-													paid: totalPaid,
-													total: nominal,
-													percentage,
-												},
-												subDetails: sem1PaidList,
-											});
-										})()}
-
-										{/* 3. Kontrak Magang / Suhan */}
-										{(() => {
-											const t3 = financeState?.termin3;
-											const isKontrak = Boolean(
-												t3?.kontrakStatus ??
-													financeState?.kontrakMagangStatus ??
-													financeState?.mandiriInterviewStatus,
+										const totalPaid =
+											t2?.totalPaid ??
+											sem1PaidList.reduce(
+												(sum: number, i: any) => sum + i.nominal,
+												0,
 											);
-											const isSuhan = Boolean(
-												t3?.suhanStatus ?? financeState?.suhanStatus,
-											);
-											const isAllPaid = Boolean(
-												t3?.isLunas ?? (isKontrak && isSuhan),
-											);
+										const nominal =
+											t2?.nominal ??
+											(financeState?.mandiriSemesterNominal || 0);
+										const percentage =
+											nominal > 0 ? Math.round((totalPaid / nominal) * 100) : 0;
+										const statusString =
+											t2?.statusString ??
+											(financeState?.mandiriSemesterStatus
+												? "LUNAS"
+												: totalPaid > 0
+													? "SEBAGIAN"
+													: "BELUM_BAYAR");
 
-											let statusStr: "LUNAS" | "SEBAGIAN" | "BELUM_BAYAR" =
-												"BELUM_BAYAR";
-											let badgeLabel: string | undefined;
-											if (isAllPaid) {
-												statusStr = "LUNAS";
-											} else if (isKontrak && !isSuhan) {
-												statusStr = "SEBAGIAN";
-												badgeLabel = "Kontrak Siap";
-											} else if (isSuhan && !isKontrak) {
-												statusStr = "SEBAGIAN";
-												badgeLabel = "Suhan Siap";
-											}
+										return renderStage({
+											title: "2. SPP Semester 1",
+											nominal,
+											desc: "Biaya perkuliahan berjalan (cicilan bulanan)",
+											status: statusString,
+											statusBadgeLabel:
+												statusString === "SEBAGIAN"
+													? `Sebagian (${percentage}%)`
+													: undefined,
+											buktiBayarUrl:
+												t2?.buktiBayarUrl ??
+												financeState?.mandiriSemesterBuktiBayarUrl,
+											progress: {
+												paid: totalPaid,
+												total: nominal,
+												percentage,
+											},
+											subDetails: sem1PaidList,
+										});
+									})()}
 
-											return renderStage({
-												title: "3. Kontrak Magang / Suhan",
-												nominal:
-													t3?.nominal ??
-													(financeState?.mandiriInterviewNominal || 0),
-												desc: "Biaya turun kontrak kerja & izin Suhan",
-												status: statusStr,
-												statusBadgeLabel: badgeLabel,
-												buktiBayarUrl:
-													t3?.kontrakBuktiBayarUrl ??
-													t3?.buktiBayarUrl ??
-													financeState?.kontrakMagangBuktiBayarUrl ??
-													financeState?.mandiriInterviewBuktiBayarUrl,
-												secondaryBuktiUrl:
-													t3?.suhanBuktiBayarUrl ??
-													financeState?.suhanBuktiBayarUrl,
-												secondaryBuktiLabel: "Bukti Suhan",
-											});
-										})()}
+									{/* 3. Kontrak Magang / Suhan */}
+									{(() => {
+										const t3 = financeState?.termin3;
+										const isKontrak = Boolean(
+											t3?.kontrakStatus ??
+												financeState?.kontrakMagangStatus ??
+												financeState?.mandiriInterviewStatus,
+										);
+										const isSuhan = Boolean(
+											t3?.suhanStatus ?? financeState?.suhanStatus,
+										);
+										const isAllPaid = Boolean(
+											t3?.isLunas ?? (isKontrak && isSuhan),
+										);
 
-										{/* 4. Penempatan Magang / Keberangkatan */}
-										{(() => {
-											const t4 = financeState?.termin4;
-											const isPaid = Boolean(
-												t4?.status ?? financeState?.mandiriKeberangkatanStatus,
-											);
-											return renderStage({
-												title: "4. Penempatan Magang / Keberangkatan",
-												nominal:
-													t4?.nominal ??
-													(financeState?.mandiriKeberangkatanNominal || 0),
-												desc: "Tahap akhir penempatan & visa magang",
-												status: isPaid ? "LUNAS" : "BELUM_BAYAR",
-												buktiBayarUrl:
-													t4?.buktiBayarUrl ??
-													financeState?.mandiriKeberangkatanBuktiBayarUrl,
-												paidDate:
-													t4?.paidDate ??
-													financeState?.mandiriKeberangkatanPaidDate,
-											});
-										})()}
-									</>
-								) : isDanaTalangan ? (
-									<>
-										{(() => {
-											const isTalanganSatuTahap =
-												financeState?.talanganTipe === "1_tahap";
-											if (isTalanganSatuTahap) {
-												const t2Status = Boolean(
-													financeState?.t2KeberangkatanStatus,
-												);
-												const t2Nominal =
-													financeState?.talanganTotalPengajuan ||
-													financeState?.t2KeberangkatanNominal ||
-													0;
-												return renderStage({
-													title:
-														"Tahap Akad Tunggal — Penempatan Magang / Keberangkatan",
-													nominal: t2Nominal,
-													desc: "Talangan penuh visa & penempatan keberangkatan magang (100% plafon)",
-													status: t2Status ? "LUNAS" : "BELUM_BAYAR",
-													buktiBayarUrl:
-														financeState?.t2KeberangkatanBuktiBayarUrl,
-												});
-											}
+										let statusStr: "LUNAS" | "SEBAGIAN" | "BELUM_BAYAR" =
+											"BELUM_BAYAR";
+										let badgeLabel: string | undefined;
+										if (isAllPaid) {
+											statusStr = "LUNAS";
+										} else if (isKontrak && !isSuhan) {
+											statusStr = "SEBAGIAN";
+											badgeLabel = "Kontrak Siap";
+										} else if (isSuhan && !isKontrak) {
+											statusStr = "SEBAGIAN";
+											badgeLabel = "Suhan Siap";
+										}
 
-											const t1Status = Boolean(
-												financeState?.t1SemesterStatus &&
-													financeState?.t1InterviewStatus,
-											);
-											const t1Partial = Boolean(
-												financeState?.t1SemesterStatus ||
-													financeState?.t1InterviewStatus,
-											);
+										return renderStage({
+											title: "3. Kontrak Magang / Suhan",
+											nominal:
+												t3?.nominal ??
+												(financeState?.mandiriInterviewNominal || 0),
+											desc: "Biaya turun kontrak kerja & izin Suhan",
+											status: statusStr,
+											statusBadgeLabel: badgeLabel,
+											buktiBayarUrl:
+												t3?.kontrakBuktiBayarUrl ??
+												t3?.buktiBayarUrl ??
+												financeState?.kontrakMagangBuktiBayarUrl ??
+												financeState?.mandiriInterviewBuktiBayarUrl,
+											secondaryBuktiUrl:
+												t3?.suhanBuktiBayarUrl ??
+												financeState?.suhanBuktiBayarUrl,
+											secondaryBuktiLabel: "Bukti Suhan",
+										});
+									})()}
+
+									{/* 4. Penempatan Magang / Keberangkatan */}
+									{(() => {
+										const t4 = financeState?.termin4;
+										const isPaid = Boolean(
+											t4?.status ?? financeState?.mandiriKeberangkatanStatus,
+										);
+										return renderStage({
+											title: "4. Penempatan Magang / Keberangkatan",
+											nominal:
+												t4?.nominal ??
+												(financeState?.mandiriKeberangkatanNominal || 0),
+											desc: "Tahap akhir penempatan & visa magang",
+											status: isPaid ? "LUNAS" : "BELUM_BAYAR",
+											buktiBayarUrl:
+												t4?.buktiBayarUrl ??
+												financeState?.mandiriKeberangkatanBuktiBayarUrl,
+											paidDate:
+												t4?.paidDate ??
+												financeState?.mandiriKeberangkatanPaidDate,
+										});
+									})()}
+								</>
+							) : isDanaTalangan ? (
+								<>
+									{(() => {
+										const isTalanganSatuTahap =
+											financeState?.talanganTipe === "1_tahap";
+										if (isTalanganSatuTahap) {
 											const t2Status = Boolean(
 												financeState?.t2KeberangkatanStatus,
 											);
+											const t2Nominal =
+												financeState?.talanganTotalPengajuan ||
+												financeState?.t2KeberangkatanNominal ||
+												0;
+											return renderStage({
+												title:
+													"Tahap Akad Tunggal — Penempatan Magang / Keberangkatan",
+												nominal: t2Nominal,
+												desc: "Talangan penuh visa & penempatan keberangkatan magang (100% plafon)",
+												status: t2Status ? "LUNAS" : "BELUM_BAYAR",
+												buktiBayarUrl:
+													financeState?.t2KeberangkatanBuktiBayarUrl,
+											});
+										}
 
-											return (
-												<>
-													{renderStage({
-														title: "Tahap 1 — SPP Semester & Kontrak/Suhan",
-														nominal:
-															financeState.t1SemesterNominalTotal ||
-															financeState.t1InterviewNominal ||
-															0,
-														desc: "Talangan perkuliahan & kontrak kerja magang",
-														status: t1Status
-															? "LUNAS"
-															: t1Partial
-																? "SEBAGIAN"
-																: "BELUM_BAYAR",
-														statusBadgeLabel:
-															t1Partial && !t1Status ? "Sebagian" : undefined,
-														buktiBayarUrl:
-															financeState?.t1SemesterBuktiBayarUrl ??
-															financeState?.t1InterviewBuktiBayarUrl,
-													})}
-													{renderStage({
-														title:
-															"Tahap 2 — Penempatan Magang / Keberangkatan",
-														nominal: financeState.t2KeberangkatanNominal || 0,
-														desc: "Talangan visa & tiket keberangkatan magang",
-														status: t2Status ? "LUNAS" : "BELUM_BAYAR",
-														buktiBayarUrl:
-															financeState?.t2KeberangkatanBuktiBayarUrl,
-													})}
-												</>
-											);
-										})()}
-									</>
-								) : null}
-							</div>
+										const t1Status = Boolean(
+											financeState?.t1SemesterStatus &&
+												financeState?.t1InterviewStatus,
+										);
+										const t1Partial = Boolean(
+											financeState?.t1SemesterStatus ||
+												financeState?.t1InterviewStatus,
+										);
+										const t2Status = Boolean(
+											financeState?.t2KeberangkatanStatus,
+										);
+
+										return (
+											<>
+												{renderStage({
+													title: "Tahap 1 — SPP Semester & Kontrak/Suhan",
+													nominal:
+														financeState.t1SemesterNominalTotal ||
+														financeState.t1InterviewNominal ||
+														0,
+													desc: "Talangan perkuliahan & kontrak kerja magang",
+													status: t1Status
+														? "LUNAS"
+														: t1Partial
+															? "SEBAGIAN"
+															: "BELUM_BAYAR",
+													statusBadgeLabel:
+														t1Partial && !t1Status ? "Sebagian" : undefined,
+													buktiBayarUrl:
+														financeState?.t1SemesterBuktiBayarUrl ??
+														financeState?.t1InterviewBuktiBayarUrl,
+												})}
+												{renderStage({
+													title: "Tahap 2 — Penempatan Magang / Keberangkatan",
+													nominal: financeState.t2KeberangkatanNominal || 0,
+													desc: "Talangan visa & tiket keberangkatan magang",
+													status: t2Status ? "LUNAS" : "BELUM_BAYAR",
+													buktiBayarUrl:
+														financeState?.t2KeberangkatanBuktiBayarUrl,
+												})}
+											</>
+										);
+									})()}
+								</>
+							) : null}
 						</div>
 					</div>
-				</CardContent>
-			</Card>
+				</div>
+			</section>
 
-			{/* Section 3: Rincian Biaya Tambahan */}
-			<Card className="border border-slate-200 shadow-sm">
-				<CardHeader className="bg-slate-50 border-b border-slate-100 py-3.5 px-4 flex flex-row items-center justify-between">
-					<div className="flex items-center gap-2">
-						<DollarSign className="w-4 h-4 text-emerald-600" />
-						<div>
-							<CardTitle className="text-sm font-bold text-slate-800">
-								Rincian Biaya Tambahan
-							</CardTitle>
-							<p className="text-[11px] text-slate-500">
-								Monitoring read-only dari Panel Finance
-							</p>
-						</div>
+			{/* 3. Biaya tambahan (hanya baca) */}
+			<section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
+					<div className="min-w-0">
+						<h3 className="text-sm sm:text-base font-bold text-slate-900">
+							Biaya tambahan
+						</h3>
+						<p className="text-xs text-slate-500 mt-0.5">
+							Data dari Panel Finance (hanya baca).
+						</p>
 					</div>
-					<Badge
-						variant="outline"
-						className="text-slate-400 bg-white text-[10px]"
-					>
-						<Lock className="w-3 h-3 mr-1" />
-						Read Only
-					</Badge>
-				</CardHeader>
-				<CardContent className="p-5">
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+				</div>
+				<div className="p-4 sm:p-6">
+					<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
 						{/* Biaya Tambahan Tetap */}
 						{isDanaTalangan &&
 							renderTambahan(
@@ -1176,12 +1066,12 @@ export function TabSkemaKeuangan({
 							))}
 					</div>
 					{!isDanaTalangan && !rumahJuangAktif && customFields.length === 0 && (
-						<p className="text-xs text-slate-500 text-center py-4 bg-slate-50 rounded-lg border border-dashed border-slate-200 mt-4">
+						<p className="text-xs text-slate-500 mt-3">
 							Hanya biaya Sertifikasi Bahasa dan Passport yang aktif.
 						</p>
 					)}
-				</CardContent>
-			</Card>
+				</div>
+			</section>
 
 			{/* Modal Pratinjau Bukti Pembayaran */}
 			<FilePreviewDialog

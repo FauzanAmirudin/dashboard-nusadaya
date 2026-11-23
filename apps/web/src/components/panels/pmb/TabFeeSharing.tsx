@@ -1,18 +1,6 @@
 "use client";
 
-import {
-	CheckCircle,
-	Clock,
-	CreditCard,
-	Edit2,
-	Eye,
-	Loader2,
-	Megaphone,
-	Plus,
-	RefreshCw,
-	Trash2,
-	Users,
-} from "lucide-react";
+import { Eye, Loader2, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -25,9 +13,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	Dialog,
 	DialogContent,
@@ -295,500 +281,516 @@ export function TabFeeSharing({
 	);
 	const totalBelumDibayar = Math.max(0, totalBiayaIklan - totalSudahDibayar);
 
+	type FeeRecipient = (typeof feeShareRecipients)[number];
+
+	const renderFee = (rec: FeeRecipient) => (
+		<div className="text-sm">
+			<div className="font-mono font-bold text-slate-900">
+				{formatRupiah(rec.nominalFee || 0)}
+			</div>
+			{rec.disbursementLogs && rec.disbursementLogs.length > 0 && (
+				<div className="mt-1 space-y-0.5">
+					<div className="text-[11px] font-bold text-emerald-700">
+						Cair: {formatRupiah(getRecipientDisbursed(rec))}
+					</div>
+					<div className="text-[10px] text-slate-500 font-medium">
+						{rec.disbursementLogs.length} Termin tercatat
+					</div>
+					{rec.nominalFee > getRecipientDisbursed(rec) ? (
+						<div className="text-[10px] font-semibold text-rose-600">
+							Sisa: {formatRupiah(rec.nominalFee - getRecipientDisbursed(rec))}
+						</div>
+					) : (
+						<div className="text-[10px] font-bold text-emerald-600">
+							✓ Lunas Terpenuhi
+						</div>
+					)}
+				</div>
+			)}
+		</div>
+	);
+
+	const renderBukti = (rec: FeeRecipient) => (
+		<>
+			{rec.disbursementLogs && rec.disbursementLogs.length > 0 ? (
+				<div className="flex flex-col gap-1.5 items-start">
+					{rec.disbursementLogs.map((log) => (
+						<div
+							key={log.id}
+							className="p-2 rounded-lg bg-slate-50 border border-slate-200 w-full max-w-[260px]"
+						>
+							<div className="flex items-center justify-between gap-1.5">
+								<span className="text-[11px] font-bold text-slate-800">
+									T{log.terminNumber}: {formatRupiah(log.amount)}
+								</span>
+								{log.transferProofUrl ? (
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										className="h-9 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1.5 cursor-pointer px-3 shrink-0"
+										title={`Review Bukti Termin ${log.terminNumber}`}
+										onClick={() => {
+											openDocumentReview(
+												studentId,
+												log.transferProofUrl,
+												log.transferProofFileName ||
+													`Bukti_Termin_${log.terminNumber}_${rec.namaReferral}.pdf`,
+												`fee-termin-${log.id}`,
+											);
+										}}
+									>
+										<Eye className="w-3 h-3 text-[#0517B0]" />
+										<span>Review Bukti</span>
+									</Button>
+								) : (
+									<span className="text-[10px] text-slate-400 italic">
+										Tanpa berkas
+									</span>
+								)}
+							</div>
+							{log.notes && (
+								<p
+									className="text-[10px] text-slate-500 truncate"
+									title={log.notes}
+								>
+									{log.notes}
+								</p>
+							)}
+						</div>
+					))}
+				</div>
+			) : rec.invoiceFileUrl ? (
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					className="h-9 px-3 text-xs font-semibold text-[#0517B0] border-blue-200 hover:bg-blue-50 gap-1.5 cursor-pointer"
+					title="Review Bukti Transfer"
+					onClick={() => {
+						const invoiceUrl = `/students/${studentId}/pmb/fee-share-recipients/${rec.id}/invoice`;
+						const invoiceName = `Bukti Transfer - ${rec.namaReferral} (${rec.kategori}).pdf`;
+						openDocumentReview(studentId, invoiceUrl, invoiceName, rec.id);
+					}}
+				>
+					<Eye className="w-3.5 h-3.5 text-[#0517B0]" />
+					<span>Review Bukti</span>
+				</Button>
+			) : (
+				<span className="text-[11px] text-slate-400 italic">
+					Belum diunggah Finance
+				</span>
+			)}
+		</>
+	);
+
+	const renderStatus = (rec: FeeRecipient) => {
+		const st =
+			rec.statusPencairan === "sudah_dibayarkan"
+				? { cls: "bg-emerald-100 text-emerald-800", text: "Lunas" }
+				: rec.statusPencairan === "cair_sebagian"
+					? { cls: "bg-amber-100 text-amber-800", text: "Cair sebagian" }
+					: { cls: "bg-rose-100 text-rose-700", text: "Belum dibayarkan" };
+		return (
+			<span
+				className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ${st.cls}`}
+			>
+				{st.text}
+			</span>
+		);
+	};
+
+	const renderActions = (rec: FeeRecipient, full = false) => (
+		<div className={`flex items-center gap-2 ${full ? "" : "justify-end"}`}>
+			<Button
+				variant="outline"
+				onClick={() => handleOpenEditModal(rec)}
+				disabled={rec.statusPencairan === "sudah_dibayarkan"}
+				className={`h-10 md:h-9 px-3 text-sm text-slate-700 border-slate-200 ${full ? "flex-1" : ""}`}
+			>
+				Edit
+			</Button>
+			<Button
+				variant="outline"
+				onClick={() => setDeletingFeeId(rec.id)}
+				disabled={rec.statusPencairan === "sudah_dibayarkan"}
+				className={`h-10 md:h-9 px-3 text-sm text-rose-700 border-rose-200 hover:bg-rose-50 ${full ? "flex-1" : ""}`}
+			>
+				Hapus
+			</Button>
+		</div>
+	);
+
+	const recipientName = (rec: FeeRecipient) => (
+		<div className="min-w-0">
+			<p className="text-xs font-medium text-slate-500">{rec.kategori}</p>
+			<p className="text-sm font-semibold text-slate-900 [overflow-wrap:anywhere]">
+				{rec.namaReferral}
+			</p>
+			{rec.namaInstitusi && (
+				<p className="text-xs text-slate-600 mt-0.5">{rec.namaInstitusi}</p>
+			)}
+			{(rec.namaBank || rec.noRekening) && (
+				<p className="text-xs text-slate-500 mt-0.5 font-mono">
+					{rec.namaBank || "Bank"} · {rec.noRekening || "-"}
+				</p>
+			)}
+		</div>
+	);
+
 	return (
-		<div className="space-y-6">
-			{/* Summary Cards */}
-			<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-				<Card className="border border-slate-200 shadow-sm bg-gradient-to-br from-amber-50 to-amber-100/50">
-					<CardContent className="p-4 flex items-center gap-4">
-						<div className="p-3 bg-amber-500/10 rounded-xl">
-							<Megaphone className="w-6 h-6 text-amber-600" />
-						</div>
-						<div>
-							<p className="text-xs font-semibold text-slate-500 mb-1">
-								Total Biaya Iklan & Promosi
-							</p>
-							<h3 className="text-lg font-bold text-slate-800">
-								{formatRupiah(totalBiayaIklan)}
-							</h3>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card className="border border-slate-200 shadow-sm bg-gradient-to-br from-emerald-50 to-emerald-100/50">
-					<CardContent className="p-4 flex items-center gap-4">
-						<div className="p-3 bg-emerald-500/10 rounded-xl">
-							<CheckCircle className="w-6 h-6 text-emerald-600" />
-						</div>
-						<div>
-							<p className="text-xs font-semibold text-slate-500 mb-1">
-								Total Sudah Dibayarkan
-							</p>
-							<h3 className="text-lg font-bold text-emerald-700">
-								{formatRupiah(totalSudahDibayar)}
-							</h3>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card className="border border-slate-200 shadow-sm bg-gradient-to-br from-rose-50 to-rose-100/50">
-					<CardContent className="p-4 flex items-center gap-4">
-						<div className="p-3 bg-rose-500/10 rounded-xl">
-							<Clock className="w-6 h-6 text-rose-600" />
-						</div>
-						<div>
-							<p className="text-xs font-semibold text-slate-500 mb-1">
-								Total Belum Dibayarkan
-							</p>
-							<h3 className="text-lg font-bold text-rose-700">
-								{formatRupiah(totalBelumDibayar)}
-							</h3>
-						</div>
-					</CardContent>
-				</Card>
+		<div className="w-full space-y-6">
+			{/* Ringkasan: 3 angka, warna lembut tanpa gradien */}
+			<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+				<div className="rounded-xl border border-amber-100 bg-amber-50/70 p-4">
+					<p className="text-xs sm:text-sm font-medium text-slate-700">
+						Total biaya iklan & promosi
+					</p>
+					<p className="mt-1 font-mono text-lg sm:text-xl font-bold text-amber-800">
+						{formatRupiah(totalBiayaIklan)}
+					</p>
+				</div>
+				<div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
+					<p className="text-xs sm:text-sm font-medium text-slate-700">
+						Sudah dibayarkan
+					</p>
+					<p className="mt-1 font-mono text-lg sm:text-xl font-bold text-emerald-700">
+						{formatRupiah(totalSudahDibayar)}
+					</p>
+				</div>
+				<div className="rounded-xl border border-rose-100 bg-rose-50/70 p-4">
+					<p className="text-xs sm:text-sm font-medium text-slate-700">
+						Belum dibayarkan
+					</p>
+					<p className="mt-1 font-mono text-lg sm:text-xl font-bold text-rose-700">
+						{formatRupiah(totalBelumDibayar)}
+					</p>
+				</div>
 			</div>
 
-			<Card className="border border-slate-200 shadow-sm">
-				<CardHeader className="bg-slate-50 border-b border-slate-100 py-3.5 px-4 flex flex-row items-center justify-between">
-					<div>
-						<CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-							<Users className="w-4 h-4 text-amber-600" />
-							Daftar Penerima Fee Sharing
-						</CardTitle>
+			<section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
+					<div className="min-w-0">
+						<h3 className="text-sm sm:text-base font-bold text-slate-900">
+							Penerima fee sharing
+						</h3>
 						<p className="text-xs text-slate-500 mt-0.5">
-							Input data penerima fee yang nantinya akan disinkronkan ke Panel
-							Finance
+							Disinkronkan ke Panel Finance untuk pencairan.
 						</p>
 					</div>
-					<div className="flex items-center gap-2">
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={fetchFeeShareRecipients}
-							className="h-8 text-xs font-semibold text-slate-600 border-slate-200 hover:bg-slate-100 gap-1.5 cursor-pointer shadow-2xs"
-							title="Segarkan data dari Finance secara realtime"
-						>
-							<RefreshCw className="w-3.5 h-3.5" />
-							<span>Segarkan</span>
-						</Button>
+					<div className="flex w-full items-center gap-2 sm:w-auto">
 						{canEdit && (
 							<Button
 								onClick={handleOpenAddModal}
-								size="sm"
-								className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1.5 shadow-2xs"
+								className="h-10 flex-1 sm:flex-none bg-[#0517B0] hover:bg-blue-800 text-white text-sm font-semibold gap-1.5"
 							>
 								<Plus className="w-4 h-4" />
-								Tambah Penerima Fee
+								Tambah penerima fee
 							</Button>
 						)}
 					</div>
-				</CardHeader>
-				<CardContent className="p-0">
-					<Table>
-						<TableHeader className="bg-slate-50/50">
-							<TableRow>
-								<TableHead className="text-xs font-bold text-slate-700">
-									Penerima
-								</TableHead>
-								<TableHead className="text-xs font-bold text-slate-700">
-									Nama
-								</TableHead>
-								<TableHead className="text-xs font-bold text-slate-700">
-									No. HP
-								</TableHead>
-								<TableHead className="text-xs font-bold text-slate-700">
-									Fee (Nominal)
-								</TableHead>
-								<TableHead className="text-xs font-bold text-slate-700">
-									Bukti Transfer / Dokumen
-								</TableHead>
-								<TableHead className="text-xs font-bold text-slate-700">
-									Status
-								</TableHead>
-								{canEdit && (
-									<TableHead className="text-xs font-bold text-slate-700 text-right">
-										Aksi
-									</TableHead>
-								)}
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{feeShareRecipients.length === 0 ? (
-								<TableRow>
-									<TableCell
-										colSpan={canEdit ? 7 : 6}
-										className="text-center py-8 text-xs text-slate-400"
-									>
-										Belum ada penerima fee sharing yang terdaftar.
-									</TableCell>
-								</TableRow>
-							) : (
-								feeShareRecipients.map((rec) => (
-									<TableRow key={rec.id} className="hover:bg-slate-50/60">
-										<TableCell>
-											<Badge
-												variant="outline"
-												className="bg-slate-100 text-slate-700 border-slate-200 text-[11px] font-semibold"
-											>
-												{rec.kategori}
-											</Badge>
-										</TableCell>
-										<TableCell>
-											<div className="font-semibold text-slate-800 text-xs">
-												{rec.namaReferral}
-											</div>
-											{rec.namaInstitusi && (
-												<div className="text-[10px] text-blue-700 font-medium mt-0.5">
-													Institusi: {rec.namaInstitusi}
-												</div>
-											)}
-											{(rec.namaBank || rec.noRekening) && (
-												<div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-													<CreditCard className="w-3 h-3" />
-													{rec.namaBank || "Bank"} - {rec.noRekening || "-"}
-												</div>
-											)}
-										</TableCell>
-										<TableCell className="text-xs text-slate-600 font-medium">
-											{rec.noHp}
-										</TableCell>
-										<TableCell className="text-xs">
-											<div className="font-black text-slate-900">
-												{formatRupiah(rec.nominalFee || 0)}
-											</div>
-											{rec.disbursementLogs &&
-												rec.disbursementLogs.length > 0 && (
-													<div className="mt-1 space-y-0.5">
-														<div className="text-[11px] font-bold text-emerald-700">
-															Cair: {formatRupiah(getRecipientDisbursed(rec))}
-														</div>
-														<div className="text-[10px] text-slate-500 font-medium">
-															{rec.disbursementLogs.length} Termin tercatat
-														</div>
-														{rec.nominalFee > getRecipientDisbursed(rec) ? (
-															<div className="text-[10px] font-semibold text-rose-600">
-																Sisa:{" "}
-																{formatRupiah(
-																	rec.nominalFee - getRecipientDisbursed(rec),
-																)}
-															</div>
-														) : (
-															<div className="text-[10px] font-bold text-emerald-600">
-																✓ Lunas Terpenuhi
-															</div>
-														)}
-													</div>
-												)}
-										</TableCell>
-										<TableCell>
-											{rec.disbursementLogs &&
-											rec.disbursementLogs.length > 0 ? (
-												<div className="flex flex-col gap-1.5 items-start">
-													{rec.disbursementLogs.map((log) => (
-														<div
-															key={log.id}
-															className="p-1.5 rounded-lg bg-slate-50 border border-slate-200/90 w-full max-w-[220px] shadow-2xs"
-														>
-															<div className="flex items-center justify-between gap-1.5">
-																<span className="text-[11px] font-bold text-slate-800">
-																	T{log.terminNumber}:{" "}
-																	{formatRupiah(log.amount)}
-																</span>
-																{log.transferProofUrl ? (
-																	<Button
-																		type="button"
-																		variant="outline"
-																		size="sm"
-																		className="h-6 text-[10px] font-semibold text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 gap-1 cursor-pointer shadow-2xs px-2 shrink-0"
-																		title={`Review Bukti Termin ${log.terminNumber}`}
-																		onClick={() => {
-																			openDocumentReview(
-																				studentId,
-																				log.transferProofUrl,
-																				log.transferProofFileName ||
-																					`Bukti_Termin_${log.terminNumber}_${rec.namaReferral}.pdf`,
-																				`fee-termin-${log.id}`,
-																			);
-																		}}
-																	>
-																		<Eye className="w-3 h-3 text-[#0517B0]" />
-																		<span>Review Bukti</span>
-																	</Button>
-																) : (
-																	<span className="text-[10px] text-slate-400 italic">
-																		Tanpa berkas
-																	</span>
-																)}
-															</div>
-															{log.notes && (
-																<p
-																	className="text-[10px] text-slate-500 truncate"
-																	title={log.notes}
-																>
-																	{log.notes}
-																</p>
-															)}
-														</div>
-													))}
-												</div>
-											) : rec.invoiceFileUrl ? (
-												<Button
-													type="button"
-													variant="outline"
-													size="sm"
-													className="h-7 text-xs font-semibold text-[#0517B0] border-[#0517B0]/20 hover:bg-[#0517B0]/10 gap-1.5 cursor-pointer shadow-2xs"
-													title="Review Bukti Transfer"
-													onClick={() => {
-														const invoiceUrl = `/students/${studentId}/pmb/fee-share-recipients/${rec.id}/invoice`;
-														const invoiceName = `Bukti Transfer - ${rec.namaReferral} (${rec.kategori}).pdf`;
-														openDocumentReview(
-															studentId,
-															invoiceUrl,
-															invoiceName,
-															rec.id,
-														);
-													}}
-												>
-													<Eye className="w-3.5 h-3.5 text-[#0517B0]" />
-													<span>Review Bukti</span>
-												</Button>
-											) : (
-												<span className="text-[11px] text-slate-400 italic">
-													Belum diunggah Finance
-												</span>
-											)}
-										</TableCell>
-										<TableCell>
-											{rec.statusPencairan === "sudah_dibayarkan" ? (
-												<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-													✓ Lunas (100%)
-												</Badge>
-											) : rec.statusPencairan === "cair_sebagian" ? (
-												<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-bold">
-													⏳ Cair Sebagian
-												</Badge>
-											) : (
-												<Badge className="bg-rose-50 text-rose-600 border-rose-200 text-[10px] font-medium">
-													Belum Dibayarkan
-												</Badge>
-											)}
-										</TableCell>
+				</div>
+
+				{feeShareRecipients.length === 0 ? (
+					<p className="px-4 py-10 text-center text-sm text-slate-500">
+						Belum ada penerima fee sharing yang terdaftar.
+					</p>
+				) : (
+					<>
+						{/* Desktop: tabel */}
+						<div className="hidden md:block overflow-x-auto">
+							<Table>
+								<TableHeader className="bg-slate-100/80">
+									<TableRow className="hover:bg-transparent">
+										<TableHead className="pl-6 text-xs font-semibold text-slate-600">
+											Penerima
+										</TableHead>
+										<TableHead className="text-xs font-semibold text-slate-600">
+											No. HP
+										</TableHead>
+										<TableHead className="text-xs font-semibold text-slate-600">
+											Fee
+										</TableHead>
+										<TableHead className="text-xs font-semibold text-slate-600">
+											Bukti transfer
+										</TableHead>
+										<TableHead className="text-xs font-semibold text-slate-600">
+											Status
+										</TableHead>
 										{canEdit && (
-											<TableCell className="text-right">
-												<div className="flex items-center justify-end gap-1">
-													<Button
-														variant="ghost"
-														size="sm"
-														onClick={() => handleOpenEditModal(rec)}
-														disabled={
-															rec.statusPencairan === "sudah_dibayarkan"
-														}
-														className="h-7 w-7 p-0 text-slate-500 hover:text-[#0517B0] disabled:opacity-30"
-													>
-														<Edit2 className="w-3.5 h-3.5" />
-													</Button>
-													<Button
-														variant="ghost"
-														size="sm"
-														onClick={() => setDeletingFeeId(rec.id)}
-														disabled={
-															rec.statusPencairan === "sudah_dibayarkan"
-														}
-														className="h-7 w-7 p-0 text-slate-500 hover:text-rose-600 disabled:opacity-30"
-													>
-														<Trash2 className="w-3.5 h-3.5" />
-													</Button>
-												</div>
-											</TableCell>
+											<TableHead className="pr-6 text-right">
+												<span className="sr-only">Aksi</span>
+											</TableHead>
 										)}
 									</TableRow>
-								))
-							)}
-						</TableBody>
-					</Table>
-				</CardContent>
-			</Card>
+								</TableHeader>
+								<TableBody>
+									{feeShareRecipients.map((rec) => (
+										<TableRow
+											key={rec.id}
+											className="align-top hover:bg-blue-50/40"
+										>
+											<TableCell className="pl-6 py-4 whitespace-normal">
+												{recipientName(rec)}
+											</TableCell>
+											<TableCell className="py-4 text-sm font-mono text-slate-700">
+												{rec.noHp}
+											</TableCell>
+											<TableCell className="py-4">{renderFee(rec)}</TableCell>
+											<TableCell className="py-4">{renderBukti(rec)}</TableCell>
+											<TableCell className="py-4">
+												{renderStatus(rec)}
+											</TableCell>
+											{canEdit && (
+												<TableCell className="pr-6 py-4 text-right">
+													{renderActions(rec)}
+												</TableCell>
+											)}
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						</div>
 
-			{/* Dialog Modal Tambah / Edit Fee Share Recipient */}
+						{/* Ponsel: kartu satu kolom */}
+						<ul className="md:hidden divide-y divide-slate-100">
+							{feeShareRecipients.map((rec) => (
+								<li key={rec.id} className="space-y-3 p-4">
+									<div className="flex items-start justify-between gap-3">
+										{recipientName(rec)}
+										{renderStatus(rec)}
+									</div>
+									{rec.noHp && (
+										<p className="text-sm font-mono text-slate-700">
+											{rec.noHp}
+										</p>
+									)}
+									{renderFee(rec)}
+									<div>{renderBukti(rec)}</div>
+									{canEdit && renderActions(rec, true)}
+								</li>
+							))}
+						</ul>
+					</>
+				)}
+			</section>
+
+			{/* Dialog Tambah / Edit Penerima Fee: bottom sheet di ponsel, dialog di desktop */}
 			<Dialog open={isFeeModalOpen} onOpenChange={setIsFeeModalOpen}>
-				<DialogContent className="sm:max-w-md">
-					<DialogHeader>
-						<DialogTitle className="text-base font-bold text-slate-800">
+				<DialogContent className="top-auto bottom-0 left-0 flex max-h-[92dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-b-none rounded-t-2xl p-0 sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:max-h-[90dvh] sm:max-w-xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl">
+					<DialogHeader className="border-b border-slate-200 px-4 pt-5 pb-3 pr-12 sm:px-6">
+						<DialogTitle className="text-base sm:text-lg font-bold text-slate-900">
 							{editingRecipient
 								? "Edit Penerima Fee Sharing"
 								: "Tambah Penerima Fee Sharing"}
 						</DialogTitle>
-						<DialogDescription className="text-xs text-slate-500">
+						<DialogDescription className="text-sm text-slate-500">
 							Isi data penerima fee sharing untuk mahasiswa ini.
 						</DialogDescription>
 					</DialogHeader>
 
-					<div className="space-y-4 py-2">
-						<div>
-							<Label className="text-xs font-semibold text-slate-700">
-								Penerima (Kategori)
-							</Label>
-							<Select
-								value={recipientForm.kategori}
-								onValueChange={(val) => {
-									if (val)
-										setRecipientForm({ ...recipientForm, kategori: val });
-								}}
-							>
-								<SelectTrigger className="mt-1 h-9 text-xs">
-									<SelectValue placeholder="Pilih Kategori" />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="Mitra">Mitra</SelectItem>
-									<SelectItem value="Koordinator">Koordinator</SelectItem>
-									<SelectItem value="Tim Visit">Tim Visit</SelectItem>
-									<SelectItem value="Sekolah">Sekolah</SelectItem>
-									<SelectItem value="BKK/FKKS">BKK/FKKS</SelectItem>
-									<SelectItem value="Tim Nusadaya">Tim Nusadaya</SelectItem>
-								</SelectContent>
-							</Select>
-						</div>
-
-						<div>
-							<Label className="text-xs font-semibold text-slate-700">
-								Nama Institusi / Asal Referral (Opsional)
-							</Label>
-							<Input
-								value={recipientForm.namaInstitusi}
-								onChange={(e) =>
-									setRecipientForm({
-										...recipientForm,
-										namaInstitusi: e.target.value,
-									})
-								}
-								placeholder="Contoh: SMKN 1 Banyuwangi / BKK Mandiri"
-								className="mt-1 h-9 text-xs"
-							/>
-						</div>
-
-						<div>
-							<Label className="text-xs font-semibold text-slate-700">
-								Nama Penerima / Referral *
-							</Label>
-							<Input
-								value={recipientForm.namaReferral}
-								onChange={(e) =>
-									setRecipientForm({
-										...recipientForm,
-										namaReferral: e.target.value,
-									})
-								}
-								placeholder="Contoh: Bpk. Ahmad Hidayat"
-								className="mt-1 h-9 text-xs"
-							/>
-						</div>
-
-						<div>
-							<Label className="text-xs font-semibold text-slate-700">
-								No. HP *
-							</Label>
-							<Input
-								value={recipientForm.noHp}
-								onKeyDown={preventNonPhoneKey}
-								onChange={(e) =>
-									setRecipientForm({
-										...recipientForm,
-										noHp: filterPhone(e.target.value, 15),
-									})
-								}
-								placeholder="Contoh: 08123456789"
-								className="mt-1 h-9 text-xs"
-							/>
-						</div>
-
-						<div>
-							<Label className="text-xs font-semibold text-slate-700">
-								Nominal Fee Disepakati (Rp) *
-							</Label>
-							<div className="relative mt-1">
-								<span className="absolute left-3 top-2 text-xs font-bold text-slate-400">
-									Rp
-								</span>
-								<Input
-									type="text"
-									inputMode="numeric"
-									value={
-										recipientForm.nominalFee === 0 || !recipientForm.nominalFee
-											? ""
-											: recipientForm.nominalFee
-									}
-									onKeyDown={preventNonNumericKey}
-									onChange={(e) => {
-										const val = e.target.value.replace(/[^0-9]/g, "");
-										setRecipientForm({
-											...recipientForm,
-											nominalFee: val ? parseInt(val, 10) : 0,
-										});
-									}}
-									placeholder="Contoh: 2500000"
-									className="pl-9 h-9 text-xs font-semibold"
-								/>
+					<div className="flex-1 space-y-6 overflow-y-auto px-4 py-5 sm:px-6">
+						<fieldset className="space-y-4">
+							<legend className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+								Penerima
+							</legend>
+							<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+								<div className="space-y-1.5">
+									<Label
+										htmlFor="fee-kategori"
+										className="text-sm font-semibold text-slate-800"
+									>
+										Kategori
+									</Label>
+									<Select
+										value={recipientForm.kategori}
+										onValueChange={(val) => {
+											if (val)
+												setRecipientForm({ ...recipientForm, kategori: val });
+										}}
+									>
+										<SelectTrigger
+											id="fee-kategori"
+											className="h-11 w-full text-base sm:text-sm"
+										>
+											<SelectValue placeholder="Pilih Kategori" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="Mitra">Mitra</SelectItem>
+											<SelectItem value="Koordinator">Koordinator</SelectItem>
+											<SelectItem value="Tim Visit">Tim Visit</SelectItem>
+											<SelectItem value="Sekolah">Sekolah</SelectItem>
+											<SelectItem value="BKK/FKKS">BKK/FKKS</SelectItem>
+											<SelectItem value="Tim Nusadaya">Tim Nusadaya</SelectItem>
+										</SelectContent>
+									</Select>
+								</div>
+								<div className="space-y-1.5">
+									<Label
+										htmlFor="fee-institusi"
+										className="text-sm font-semibold text-slate-800"
+									>
+										Nama institusi (opsional)
+									</Label>
+									<Input
+										id="fee-institusi"
+										value={recipientForm.namaInstitusi}
+										onChange={(e) =>
+											setRecipientForm({
+												...recipientForm,
+												namaInstitusi: e.target.value,
+											})
+										}
+										placeholder="Contoh: SMKN 1 Banyuwangi / BKK Mandiri"
+										className="h-11 text-base sm:text-sm"
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<Label
+										htmlFor="fee-nama"
+										className="text-sm font-semibold text-slate-800"
+									>
+										Nama penerima *
+									</Label>
+									<Input
+										id="fee-nama"
+										value={recipientForm.namaReferral}
+										onChange={(e) =>
+											setRecipientForm({
+												...recipientForm,
+												namaReferral: e.target.value,
+											})
+										}
+										placeholder="Contoh: Bpk. Ahmad Hidayat"
+										className="h-11 text-base sm:text-sm"
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<Label
+										htmlFor="fee-hp"
+										className="text-sm font-semibold text-slate-800"
+									>
+										No. HP *
+									</Label>
+									<Input
+										id="fee-hp"
+										value={recipientForm.noHp}
+										onKeyDown={preventNonPhoneKey}
+										onChange={(e) =>
+											setRecipientForm({
+												...recipientForm,
+												noHp: filterPhone(e.target.value, 15),
+											})
+										}
+										placeholder="Contoh: 08123456789"
+										className="h-11 text-base sm:text-sm"
+									/>
+								</div>
 							</div>
-							<p className="text-[10px] text-slate-500 mt-1">
-								Nominal deal/pagu komisi yang disepakati oleh tim PMB dengan
-								pihak referral (akan dicairkan oleh Finance).
-							</p>
-						</div>
+						</fieldset>
 
-						<div className="grid grid-cols-2 gap-3">
-							<div>
-								<Label className="text-xs font-semibold text-slate-700">
-									Rekening (Opsional)
+						<fieldset className="space-y-4">
+							<legend className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+								Pembayaran fee
+							</legend>
+							<div className="space-y-1.5">
+								<Label
+									htmlFor="fee-nominal"
+									className="text-sm font-semibold text-slate-800"
+								>
+									Nominal fee disepakati (Rp) *
 								</Label>
-								<Input
-									value={recipientForm.noRekening}
-									onKeyDown={preventNonNumericKey}
-									onChange={(e) =>
-										setRecipientForm({
-											...recipientForm,
-											noRekening: filterNumeric(
-												e.target.value,
-												30,
-												"No. Rekening hanya boleh berisi angka",
-											),
-										})
-									}
-									placeholder="No. Rekening"
-									className="mt-1 h-9 text-xs"
-								/>
+								<div className="relative">
+									<span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-500">
+										Rp
+									</span>
+									<Input
+										id="fee-nominal"
+										type="text"
+										inputMode="numeric"
+										value={
+											recipientForm.nominalFee === 0 ||
+											!recipientForm.nominalFee
+												? ""
+												: recipientForm.nominalFee
+										}
+										onKeyDown={preventNonNumericKey}
+										onChange={(e) => {
+											const val = e.target.value.replace(/[^0-9]/g, "");
+											setRecipientForm({
+												...recipientForm,
+												nominalFee: val ? parseInt(val, 10) : 0,
+											});
+										}}
+										placeholder="Contoh: 2500000"
+										className="pl-10 h-11 text-base sm:text-sm"
+									/>
+								</div>
+								<p className="text-xs text-slate-500">
+									Akan dicairkan oleh Finance.
+								</p>
 							</div>
-							<div>
-								<Label className="text-xs font-semibold text-slate-700">
-									Bank (Opsional)
-								</Label>
-								<Input
-									value={recipientForm.namaBank}
-									onChange={(e) =>
-										setRecipientForm({
-											...recipientForm,
-											namaBank: e.target.value,
-										})
-									}
-									placeholder="BCA, Mandiri, dll."
-									className="mt-1 h-9 text-xs"
-								/>
+							<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+								<div className="space-y-1.5">
+									<Label
+										htmlFor="fee-rekening"
+										className="text-sm font-semibold text-slate-800"
+									>
+										No. rekening (opsional)
+									</Label>
+									<Input
+										id="fee-rekening"
+										value={recipientForm.noRekening}
+										onKeyDown={preventNonNumericKey}
+										onChange={(e) =>
+											setRecipientForm({
+												...recipientForm,
+												noRekening: filterNumeric(
+													e.target.value,
+													30,
+													"No. Rekening hanya boleh berisi angka",
+												),
+											})
+										}
+										placeholder="No. Rekening"
+										className="h-11 text-base sm:text-sm"
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<Label
+										htmlFor="fee-bank"
+										className="text-sm font-semibold text-slate-800"
+									>
+										Bank (opsional)
+									</Label>
+									<Input
+										id="fee-bank"
+										value={recipientForm.namaBank}
+										onChange={(e) =>
+											setRecipientForm({
+												...recipientForm,
+												namaBank: e.target.value,
+											})
+										}
+										placeholder="BCA, Mandiri, dll."
+										className="h-11 text-base sm:text-sm"
+									/>
+								</div>
 							</div>
-						</div>
+						</fieldset>
 					</div>
 
-					<DialogFooter className="gap-2 pt-2">
+					<DialogFooter className="mx-0 mb-0 grid grid-cols-2 gap-2 rounded-b-none border-slate-200 bg-white px-4 py-3 sm:flex sm:rounded-b-xl sm:px-6">
 						<Button
 							variant="outline"
-							size="sm"
 							onClick={() => setIsFeeModalOpen(false)}
-							className="text-xs h-8"
+							className="h-11 text-sm font-semibold"
 						>
 							Batal
 						</Button>
 						<Button
-							size="sm"
 							onClick={handleSaveRecipient}
-							className="bg-amber-600 hover:bg-amber-700 text-white text-xs h-8"
+							className="h-11 bg-[#0517B0] hover:bg-blue-800 text-white text-sm font-semibold"
 						>
 							Simpan
 						</Button>

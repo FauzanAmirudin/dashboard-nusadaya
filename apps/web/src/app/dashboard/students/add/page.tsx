@@ -2,21 +2,30 @@
 
 import {
 	AlertCircle,
+	AlertTriangle,
 	ArrowLeft,
-	Award,
-	Building2,
-	CheckCircle2,
 	Copy,
 	Loader2,
 	Sparkles,
 	UploadCloud,
-	UserPlus,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
+import { EmergencyContactsFields } from "@/components/common/EmergencyContactsFields";
+import { FormNav, FormProgress } from "@/components/common/FormShell";
+import {
+	emptyFriendContacts,
+	FRIEND_CONTACTS_PROMPT,
+	FriendContactsFields,
+	validateFriendContacts,
+} from "@/components/common/FriendContactsFields";
+import { HealthQuestion } from "@/components/common/HealthQuestion";
+import { OptionalSection } from "@/components/common/OptionalSection";
+import { OptionSelect } from "@/components/common/OptionSelect";
+import { YesNoWithDetail } from "@/components/common/YesNoWithDetail";
+import { BiayaPendaftaranDialog } from "@/components/panels/pmb/BiayaPendaftaranDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +44,15 @@ import {
 } from "@/lib/cohort-generator";
 import { API_URL, api, getToken } from "@/lib/eden";
 import {
+	emptyEmergencyContact,
+	validateEmergencyContacts,
+} from "@/lib/emergency-contacts";
+import {
+	INCOME_RANGE_OPTIONS,
+	LAST_EDUCATION_OPTIONS,
+} from "@/lib/form-options";
+import { RECOMMENDED_BY_OPTIONS } from "@/lib/recommenders";
+import {
 	getCities,
 	getDistricts,
 	getProvinces,
@@ -47,6 +65,7 @@ import {
 	isValidEmail,
 	preventNonNumericKey,
 	preventNonPhoneKey,
+	validateIndonesianPhone,
 } from "@/utils/form-validators";
 
 const TABS = [
@@ -87,6 +106,7 @@ export default function AddStudentPage() {
 	const router = useRouter();
 	const { user } = useAuthStore();
 	const [isLoading, setIsLoading] = useState(false);
+	const [isBiayaOpen, setIsBiayaOpen] = useState(false);
 	const [currentTab, setCurrentTab] = useState(0);
 
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -126,6 +146,11 @@ export default function AddStudentPage() {
 
 		// Tab 2: Pendidikan
 		schoolOrigin: "",
+		lastEducation: "",
+		hasStudiedCollege: "Tidak",
+		priorCollege: "",
+		ayahIncome: "",
+		ibuIncome: "",
 		schoolAddress: "",
 		schoolMajor: "",
 		graduationYear: "",
@@ -137,7 +162,7 @@ export default function AddStudentPage() {
 
 		// Data Tambahan bawaan
 		paId: "",
-		studentStatus: "aktif",
+		studentStatus: "menunggu_pembayaran",
 		destinationCountry: "",
 		period: "",
 		rekomendasi: "",
@@ -150,9 +175,10 @@ export default function AddStudentPage() {
 		referralInstitutionName: "",
 		referralContactName: "",
 		referralContactPhone: "",
-		emergencyContactName: "",
-		emergencyContactPhone: "",
-		emergencyContactRelation: "",
+		recommendedBy: "",
+		recommenderName: "",
+		emergencyContacts: [emptyEmergencyContact()],
+		friendContacts: emptyFriendContacts(),
 
 		// Tab 3: Kesehatan
 		bloodType: "",
@@ -205,6 +231,7 @@ export default function AddStudentPage() {
 		waliNationalityOther: "",
 		waliEducation: "",
 		waliJob: "",
+		waliIncome: "",
 		waliAddress: "",
 		waliPhone: "",
 		waliEmail: "",
@@ -301,6 +328,7 @@ export default function AddStudentPage() {
 				if (key === "ayahNationalityOther") next.waliNationalityOther = value;
 				if (key === "ayahEducation") next.waliEducation = value;
 				if (key === "ayahJob") next.waliJob = value;
+				if (key === "ayahIncome") next.waliIncome = value;
 				if (key === "ayahAddress") next.waliAddress = value;
 				if (key === "ayahPhone") next.waliPhone = value;
 				if (key === "ayahEmail") next.waliEmail = value;
@@ -314,6 +342,7 @@ export default function AddStudentPage() {
 				if (key === "ibuNationalityOther") next.waliNationalityOther = value;
 				if (key === "ibuEducation") next.waliEducation = value;
 				if (key === "ibuJob") next.waliJob = value;
+				if (key === "ibuIncome") next.waliIncome = value;
 				if (key === "ibuAddress") next.waliAddress = value;
 				if (key === "ibuPhone") next.waliPhone = value;
 				if (key === "ibuEmail") next.waliEmail = value;
@@ -382,9 +411,15 @@ export default function AddStudentPage() {
 				);
 				return false;
 			}
-			if (formData.phone.length < 8) {
-				toast.error("Nomor HP / WhatsApp minimal 8 digit");
-				return false;
+			{
+				const phoneErr = validateIndonesianPhone(
+					formData.phone,
+					"Nomor HP / WhatsApp",
+				);
+				if (phoneErr) {
+					toast.error(phoneErr);
+					return false;
+				}
 			}
 		} else if (index === 1) {
 			const reqKeys: (keyof typeof formData)[] = [
@@ -399,6 +434,26 @@ export default function AddStudentPage() {
 				toast.error(
 					"Mohon lengkapi seluruh field di Keterangan Pendidikan (Jurusan Sekolah opsional)",
 				);
+				return false;
+			}
+			if (
+				formData.lastEducation &&
+				!(LAST_EDUCATION_OPTIONS as readonly string[]).includes(
+					formData.lastEducation,
+				)
+			) {
+				toast.error("Pendidikan terakhir hanya SMA, MA, SMK, atau Paket C");
+				return false;
+			}
+			if (
+				formData.hasStudiedCollege === "Ya" &&
+				!formData.priorCollege.trim()
+			) {
+				toast.error("Nama perguruan tinggi sebelumnya wajib diisi");
+				return false;
+			}
+			if (!formData.lastEducation) {
+				toast.error("Pendidikan terakhir wajib dipilih");
 				return false;
 			}
 			const grad = Number(formData.graduationYear);
@@ -498,9 +553,15 @@ export default function AddStudentPage() {
 				toast.error("Format Email Wali tidak valid");
 				return false;
 			}
-			if (formData.waliPhone && formData.waliPhone.length < 8) {
-				toast.error("Nomor HP Wali minimal 8 digit");
-				return false;
+			{
+				const phoneErr = validateIndonesianPhone(
+					formData.waliPhone,
+					"Nomor HP Wali",
+				);
+				if (phoneErr) {
+					toast.error(phoneErr);
+					return false;
+				}
 			}
 		} else if (index === 4) {
 			const reqKeys: (keyof typeof formData)[] = [
@@ -523,9 +584,15 @@ export default function AddStudentPage() {
 				toast.error("Format Email Ayah tidak valid");
 				return false;
 			}
-			if (formData.ayahPhone && formData.ayahPhone.length < 8) {
-				toast.error("Nomor HP Ayah minimal 8 digit");
-				return false;
+			{
+				const phoneErr = validateIndonesianPhone(
+					formData.ayahPhone,
+					"Nomor HP Ayah",
+				);
+				if (phoneErr) {
+					toast.error(phoneErr);
+					return false;
+				}
 			}
 		} else if (index === 5) {
 			const reqKeys: (keyof typeof formData)[] = [
@@ -548,16 +615,42 @@ export default function AddStudentPage() {
 				toast.error("Format Email Ibu tidak valid");
 				return false;
 			}
-			if (formData.ibuPhone && formData.ibuPhone.length < 8) {
-				toast.error("Nomor HP Ibu minimal 8 digit");
-				return false;
+			{
+				const phoneErr = validateIndonesianPhone(
+					formData.ibuPhone,
+					"Nomor HP Ibu",
+				);
+				if (phoneErr) {
+					toast.error(phoneErr);
+					return false;
+				}
 			}
 		} else if (index === 6) {
-			if (
-				formData.referralContactPhone &&
-				formData.referralContactPhone.length < 8
-			) {
-				toast.error("Nomor WhatsApp Kontak Referral minimal 8 digit");
+			{
+				const phoneErr = validateIndonesianPhone(
+					formData.referralContactPhone,
+					"Nomor WhatsApp Kontak Referral",
+				);
+				if (phoneErr) {
+					toast.error(phoneErr);
+					return false;
+				}
+			}
+			const minDigits = validateIndonesianPhone;
+			const emergencyErr = validateEmergencyContacts(
+				formData.emergencyContacts,
+				minDigits,
+			);
+			if (emergencyErr) {
+				toast.error(emergencyErr);
+				return false;
+			}
+			const friendErr = validateFriendContacts(
+				formData.friendContacts,
+				minDigits,
+			);
+			if (friendErr) {
+				toast.error(friendErr);
 				return false;
 			}
 		}
@@ -569,6 +662,22 @@ export default function AddStudentPage() {
 			setCurrentTab((prev) => Math.min(prev + 1, TABS.length - 1));
 			window.scrollTo(0, 0);
 		}
+	};
+
+	const handleTabClick = (targetTab: number) => {
+		if (targetTab === currentTab) return;
+		// Melompat maju: semua tab di depan posisi sekarang harus lolos validasi
+		if (targetTab > currentTab) {
+			for (let t = currentTab; t < targetTab; t++) {
+				if (!validateTab(t)) {
+					setCurrentTab(t);
+					window.scrollTo({ top: 0, behavior: "smooth" });
+					return;
+				}
+			}
+		}
+		setCurrentTab(targetTab);
+		window.scrollTo({ top: 0, behavior: "smooth" });
 	};
 
 	const handlePrev = () => {
@@ -586,6 +695,7 @@ export default function AddStudentPage() {
 			waliNationality: prev.ayahNationality,
 			waliEducation: prev.ayahEducation,
 			waliJob: prev.ayahJob,
+			waliIncome: prev.ayahIncome,
 			waliAddress: prev.ayahAddress,
 			waliPhone: prev.ayahPhone,
 			waliEmail: prev.ayahEmail,
@@ -604,6 +714,7 @@ export default function AddStudentPage() {
 			waliNationality: prev.ibuNationality,
 			waliEducation: prev.ibuEducation,
 			waliJob: prev.ibuJob,
+			waliIncome: prev.ibuIncome,
 			waliAddress: prev.ibuAddress,
 			waliPhone: prev.ibuPhone,
 			waliEmail: prev.ibuEmail,
@@ -612,7 +723,13 @@ export default function AddStudentPage() {
 		toast.success("Data wali berhasil disalin dari data Ibu");
 	};
 
-	const handleSubmit = async () => {
+	// Gerbang: form wajib valid dulu, baru modal biaya dibuka.
+	const handleOpenBiaya = () => {
+		if (!validateTab(currentTab)) return;
+		setIsBiayaOpen(true);
+	};
+
+	const handleSubmit = async (totalBiaya: number, pendaftaranDp: number) => {
 		if (!validateTab(currentTab)) return;
 
 		setIsLoading(true);
@@ -634,6 +751,7 @@ export default function AddStudentPage() {
 							: formData.ayahNationality || undefined,
 					education: formData.ayahEducation || undefined,
 					job: formData.ayahJob || undefined,
+					income: formData.ayahIncome || undefined,
 					address: formData.ayahAddress || undefined,
 					phone: formData.ayahPhone || undefined,
 					email: formData.ayahEmail || undefined,
@@ -655,6 +773,7 @@ export default function AddStudentPage() {
 							: formData.ibuNationality || undefined,
 					education: formData.ibuEducation || undefined,
 					job: formData.ibuJob || undefined,
+					income: formData.ibuIncome || undefined,
 					address: formData.ibuAddress || undefined,
 					phone: formData.ibuPhone || undefined,
 					email: formData.ibuEmail || undefined,
@@ -677,6 +796,7 @@ export default function AddStudentPage() {
 								: formData.ayahNationality || undefined,
 						education: formData.ayahEducation || undefined,
 						job: formData.ayahJob || undefined,
+						income: formData.ayahIncome || undefined,
 						address: formData.ayahAddress || undefined,
 						phone: formData.ayahPhone || undefined,
 						email: formData.ayahEmail || undefined,
@@ -700,6 +820,7 @@ export default function AddStudentPage() {
 								: formData.ibuNationality || undefined,
 						education: formData.ibuEducation || undefined,
 						job: formData.ibuJob || undefined,
+						income: formData.ibuIncome || undefined,
 						address: formData.ibuAddress || undefined,
 						phone: formData.ibuPhone || undefined,
 						email: formData.ibuEmail || undefined,
@@ -722,6 +843,7 @@ export default function AddStudentPage() {
 							: formData.waliNationality || undefined,
 					education: formData.waliEducation || undefined,
 					job: formData.waliJob || undefined,
+					income: formData.waliIncome || undefined,
 					address: formData.waliAddress || undefined,
 					phone: formData.waliPhone || undefined,
 					email: formData.waliEmail || undefined,
@@ -756,6 +878,10 @@ export default function AddStudentPage() {
 			}
 
 			const payload = {
+				// Skema keuangan awal (diisi PMB lewat modal sebelum simpan)
+				totalBiaya,
+				pendaftaranDp,
+
 				// Tab 1
 				nim: formData.nim || undefined,
 				name: formData.name,
@@ -785,6 +911,9 @@ export default function AddStudentPage() {
 
 				// Tab 2
 				schoolOrigin: formData.schoolOrigin || undefined,
+				lastEducation: formData.lastEducation || undefined,
+				priorCollege:
+					formData.hasStudiedCollege === "Ya" ? formData.priorCollege : "",
 				schoolAddress: formData.schoolAddress || undefined,
 				schoolMajor: formData.schoolMajor || undefined,
 				graduationYear: formData.graduationYear
@@ -834,7 +963,7 @@ export default function AddStudentPage() {
 					formData.paId && formData.paId !== "unassigned"
 						? parseInt(formData.paId, 10)
 						: undefined,
-				studentStatus: formData.studentStatus || "aktif",
+				studentStatus: formData.studentStatus || "menunggu_pembayaran",
 				destinationCountry: formData.destinationCountry || undefined,
 				period: formData.period || undefined,
 				rekomendasi: formData.rekomendasi || undefined,
@@ -847,10 +976,23 @@ export default function AddStudentPage() {
 				referralInstitutionName: formData.referralInstitutionName || undefined,
 				referralContactName: formData.referralContactName || undefined,
 				referralContactPhone: formData.referralContactPhone || undefined,
-				emergencyContactName: formData.emergencyContactName || undefined,
-				emergencyContactPhone: formData.emergencyContactPhone || undefined,
-				emergencyContactRelation:
-					formData.emergencyContactRelation || undefined,
+				recommendedBy: formData.recommendedBy || undefined,
+				recommenderName: formData.recommenderName || undefined,
+				emergencyContacts: formData.emergencyContacts
+					.filter((c) => c.name.trim() && c.phone.trim())
+					.map((c) => ({
+						name: c.name.trim(),
+						phone: c.phone.trim(),
+						relation: c.relation.trim(),
+						...(c.note.trim() ? { note: c.note.trim() } : {}),
+					})),
+				friendContacts: formData.friendContacts
+					.filter((f) => f.name.trim() && f.phone.trim())
+					.map((f) => ({
+						name: f.name.trim(),
+						phone: f.phone.trim(),
+						schoolOrRelation: f.schoolOrRelation.trim(),
+					})),
 			};
 
 			const { data: resData, error } = await api.students.post(payload);
@@ -897,6 +1039,7 @@ export default function AddStudentPage() {
 			}
 
 			toast.success("Mahasiswa berhasil ditambahkan!");
+			setIsBiayaOpen(false);
 			localStorage.removeItem("addStudentFormData");
 			if (user?.role === "superadmin") {
 				router.push("/dashboard/students");
@@ -912,7 +1055,7 @@ export default function AddStudentPage() {
 	};
 
 	return (
-		<div className="pb-20 max-w-5xl mx-auto">
+		<div className="mx-auto max-w-3xl pb-6">
 			{/* Top Actions */}
 			<div className="flex justify-between items-center mb-6">
 				<button
@@ -932,68 +1075,35 @@ export default function AddStudentPage() {
 			</div>
 
 			{/* Form Header */}
-			<div className="mb-8">
-				<h1 className="text-2xl font-bold text-[#0517B0]">
+			<div className="mb-6">
+				<h1 className="text-2xl font-semibold text-slate-900">
 					Tambah Mahasiswa Baru
 				</h1>
-				<p className="text-slate-500 text-sm mt-1">
-					Lengkapi form pendaftaran berikut secara bertahap.
+				<p className="mt-1 text-sm text-slate-500">
+					Isi bertahap. Isian tersimpan otomatis di perangkat ini.
 				</p>
 			</div>
 
-			{/* Stepper Tabs */}
-			<div className="flex items-center space-x-2 mb-8 overflow-x-auto pb-4 hide-scrollbar">
-				{TABS.map((tab, idx) => (
-					<div key={tab} className="flex items-center">
-						<div
-							className={`flex items-center justify-center h-8 w-8 rounded-full border-2 text-sm font-medium shrink-0 transition-colors ${
-								idx === currentTab
-									? "border-[#0517B0] bg-[#0517B0] text-white"
-									: idx < currentTab
-										? "border-emerald-500 bg-emerald-500 text-white"
-										: "border-slate-200 text-slate-400 bg-white"
-							}`}
-						>
-							{idx < currentTab ? (
-								<CheckCircle2 className="w-4 h-4" />
-							) : (
-								idx + 1
-							)}
-						</div>
-						<span
-							className={`ml-2 text-sm whitespace-nowrap hidden sm:block ${
-								idx === currentTab
-									? "font-semibold text-slate-900"
-									: "text-slate-500"
-							}`}
-						>
-							{tab}
-						</span>
-						{idx < TABS.length - 1 && (
-							<div
-								className={`h-[2px] w-8 mx-4 sm:w-12 ${
-									idx < currentTab ? "bg-emerald-500" : "bg-slate-200"
-								}`}
-							/>
-						)}
-					</div>
-				))}
-			</div>
+			<FormProgress
+				steps={TABS}
+				current={currentTab}
+				onSelect={handleTabClick}
+			/>
 
 			{/* Form Container */}
-			<div className="bg-white p-6 md:p-8 rounded-xl border border-slate-200 shadow-sm">
+			<div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-8">
 				{/* TAB 1: Keterangan Mahasiswa */}
 				{currentTab === 0 && (
-					<div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+					<div className="space-y-6 animate-in fade-in duration-200">
 						<h3 className="font-semibold text-lg border-b pb-2">
 							Keterangan Mahasiswa
 						</h3>
 
 						{/* Foto Profil */}
-						<div className="flex flex-col items-center justify-center p-6 bg-slate-50/50 rounded-xl border border-slate-100">
+						<div className="flex flex-col items-center justify-center py-2">
 							<button
 								type="button"
-								className="w-28 h-28 rounded-full border-[3px] border-dashed border-slate-300 flex items-center justify-center bg-white cursor-pointer overflow-hidden group hover:border-[#0517B0] transition-colors relative shadow-sm"
+								className="w-28 h-28 rounded-full border-[3px] border-dashed border-slate-300 flex items-center justify-center bg-white cursor-pointer overflow-hidden group hover:border-[#0517B0] transition-colors relative"
 								onClick={() => fileInputRef.current?.click()}
 							>
 								{previewUrl ? (
@@ -1030,26 +1140,16 @@ export default function AddStudentPage() {
 
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div className="space-y-2">
-								<div className="flex items-center justify-between">
-									<Label className="flex items-center gap-1.5 font-semibold text-slate-700">
-										NIM (Nomor Induk Mahasiswa)
-									</Label>
-									<Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-semibold">
-										Terkunci (Menunggu DP Finance)
-									</Badge>
-								</div>
+								<Label>NIM (Nomor Induk Mahasiswa)</Label>
 								<Input
-									placeholder="Dapat di-input/diedit atau diterbitkan sistem setelah pembayaran registrasi awal divalidasi Finance"
+									placeholder="Belum diterbitkan"
 									value={formData.nim || ""}
 									disabled={true}
 									className="bg-slate-50 text-slate-500 font-mono text-xs cursor-not-allowed"
 								/>
-								<p className="text-[11px] text-slate-500 leading-relaxed">
-									Sesuai standar operasional, NIM mahasiswa dapat di-input,
-									diedit, atau diterbitkan otomatis oleh sistem segera setelah
-									kelengkapan pembayaran Registrasi Awal / DP lunas dan
-									terverifikasi di panel Finance. Akun login awal mahasiswa
-									menggunakan Email.
+								<p className="text-xs text-slate-500">
+									Diterbitkan sistem setelah pembayaran registrasi awal
+									terverifikasi.
 								</p>
 							</div>
 							<div className="space-y-2">
@@ -1231,6 +1331,7 @@ export default function AddStudentPage() {
 								<Input
 									placeholder="001"
 									value={formData.addressRt}
+									inputMode="numeric"
 									onKeyDown={preventNonNumericKey}
 									onChange={(e) =>
 										updateData(
@@ -1251,6 +1352,7 @@ export default function AddStudentPage() {
 								<Input
 									placeholder="002"
 									value={formData.addressRw}
+									inputMode="numeric"
 									onKeyDown={preventNonNumericKey}
 									onChange={(e) =>
 										updateData(
@@ -1434,7 +1536,7 @@ export default function AddStudentPage() {
 
 				{/* TAB 2: Keterangan Pendidikan */}
 				{currentTab === 1 && (
-					<div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+					<div className="space-y-6 animate-in fade-in duration-200">
 						<h3 className="font-semibold text-lg border-b pb-2">
 							Keterangan Pendidikan
 						</h3>
@@ -1593,6 +1695,17 @@ export default function AddStudentPage() {
 								</h4>
 							</div>
 
+							<div className="md:col-span-2">
+								<OptionSelect
+									label="Pendidikan Terakhir"
+									required={true}
+									value={formData.lastEducation}
+									onChange={(v) => updateData("lastEducation", v)}
+									options={LAST_EDUCATION_OPTIONS}
+									placeholder="Pilih SMA / MA / SMK / Paket C"
+								/>
+							</div>
+
 							<div className="space-y-2">
 								<Label>
 									Nama Sekolah Asal <span className="text-red-500">*</span>
@@ -1623,6 +1736,7 @@ export default function AddStudentPage() {
 								<Input
 									placeholder="2023"
 									value={formData.graduationYear}
+									inputMode="numeric"
 									onKeyDown={preventNonNumericKey}
 									onChange={(e) =>
 										updateData(
@@ -1646,182 +1760,236 @@ export default function AddStudentPage() {
 									onChange={(e) => updateData("schoolAddress", e.target.value)}
 								/>
 							</div>
+							<div className="rounded-xl border border-slate-200 bg-white px-4 md:col-span-2">
+								<HealthQuestion
+									label="Pernah kuliah sebelumnya?"
+									noLabel="Belum pernah"
+									yesLabel="Pernah"
+									value={formData.hasStudiedCollege === "Ya" ? "ada" : "tidak"}
+									onChange={(next) =>
+										setFormData((prev) => ({
+											...prev,
+											hasStudiedCollege: next === "ada" ? "Ya" : "Tidak",
+											priorCollege: next === "ada" ? prev.priorCollege : "",
+										}))
+									}
+								>
+									<div className="space-y-2">
+										<Label>
+											Nama Perguruan Tinggi{" "}
+											<span className="text-red-500">*</span>
+										</Label>
+										<Input
+											placeholder="Contoh: Universitas Lampung"
+											value={formData.priorCollege}
+											onChange={(e) =>
+												updateData("priorCollege", e.target.value)
+											}
+										/>
+									</div>
+								</HealthQuestion>
+							</div>
 						</div>
 					</div>
 				)}
 
 				{/* TAB 3: Keterangan Kesehatan */}
 				{currentTab === 2 && (
-					<div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+					<div className="space-y-6 animate-in fade-in duration-200">
 						<h3 className="font-semibold text-lg border-b pb-2">
 							Keterangan Kesehatan
 						</h3>
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-							<div className="space-y-2">
-								<Label>
-									Golongan Darah <span className="text-red-500">*</span>
-								</Label>
-								<Select
-									value={formData.bloodType}
-									onValueChange={(v) => updateData("bloodType", v)}
-								>
-									<SelectTrigger>
-										<SelectValue placeholder="Pilih Gol. Darah" />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="Belum Diketahui">
-											Belum Diketahui
-										</SelectItem>
-										<SelectItem value="A+">A+</SelectItem>
-										<SelectItem value="A-">A-</SelectItem>
-										<SelectItem value="B+">B+</SelectItem>
-										<SelectItem value="B-">B-</SelectItem>
-										<SelectItem value="AB+">AB+</SelectItem>
-										<SelectItem value="AB-">AB-</SelectItem>
-										<SelectItem value="O+">O+</SelectItem>
-										<SelectItem value="O-">O-</SelectItem>
-										<SelectItem value="O">O</SelectItem>
-									</SelectContent>
-								</Select>
-							</div>
-							<div className="space-y-2">
-								<Label>
-									Ukuran Baju <span className="text-red-500">*</span>
-								</Label>
-								<Select
-									value={formData.clothingSize}
-									onValueChange={(v) => updateData("clothingSize", v)}
-								>
-									<SelectTrigger>
-										<SelectValue placeholder="Pilih Ukuran" />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="XS">XS</SelectItem>
-										<SelectItem value="S">S</SelectItem>
-										<SelectItem value="M">M</SelectItem>
-										<SelectItem value="L">L</SelectItem>
-										<SelectItem value="XL">XL</SelectItem>
-										<SelectItem value="XXL">XXL</SelectItem>
-										<SelectItem value="Lainnya">Lainnya</SelectItem>
-									</SelectContent>
-								</Select>
-								{formData.clothingSize === "Lainnya" && (
-									<Input
-										className="mt-2"
-										placeholder="Sebutkan ukuran lainnya"
-										value={formData.clothingSizeOther}
-										onChange={(e) =>
-											updateData("clothingSizeOther", e.target.value)
-										}
-									/>
-								)}
-							</div>
-							<div className="space-y-2">
-								<Label>
-									Tinggi Badan (cm) <span className="text-red-500">*</span>
-								</Label>
-								<Input
-									placeholder="170"
-									value={formData.height}
-									onKeyDown={preventNonNumericKey}
-									onChange={(e) =>
-										updateData(
-											"height",
-											filterNumeric(
-												e.target.value,
-												3,
-												"Tinggi badan berupa angka (cm)",
-											),
-										)
-									}
-								/>
-							</div>
-							<div className="space-y-2">
-								<Label>
-									Berat Badan (kg) <span className="text-red-500">*</span>
-								</Label>
-								<Input
-									placeholder="60"
-									value={formData.weight}
-									onKeyDown={preventNonNumericKey}
-									onChange={(e) =>
-										updateData(
-											"weight",
-											filterNumeric(
-												e.target.value,
-												3,
-												"Berat badan berupa angka (kg)",
-											),
-										)
-									}
-								/>
-							</div>
-							<div className="space-y-2">
-								<Label>
-									Riwayat Penyakit <span className="text-red-500">*</span>
-								</Label>
-								<Input
-									placeholder="Tuliskan 'Tidak ada' jika tidak ada"
-									value={formData.diseaseHistory}
-									onChange={(e) => updateData("diseaseHistory", e.target.value)}
-								/>
-							</div>
-							<div className="space-y-2">
-								<Label>
-									Penyakit Bawaan <span className="text-red-500">*</span>
-								</Label>
-								<Input
-									placeholder="Tuliskan 'Tidak ada' jika tidak ada"
-									value={formData.congenitalDisease}
-									onChange={(e) =>
-										updateData("congenitalDisease", e.target.value)
-									}
-								/>
-							</div>
-							{/* Riwayat Patah Tulang */}
-							<div className="space-y-4 md:col-span-2 p-4 border rounded-lg bg-slate-50/50">
+						<section className="space-y-3">
+							<h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+								Data Fisik
+							</h4>
+							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 								<div className="space-y-2">
-									<Label className="text-sm font-medium">
-										Pernah Mengalami Patah Tulang?{" "}
-										<span className="text-red-500">*</span>
+									<Label>
+										Golongan Darah <span className="text-red-500">*</span>
 									</Label>
-									<RadioGroup
-										value={formData.hasBoneFracture}
-										onValueChange={(val) => {
-											setFormData((prev) => ({
-												...prev,
-												hasBoneFracture: val,
-												boneFractureLocation:
-													val === "Tidak" ? "" : prev.boneFractureLocation,
-												boneFractureYear:
-													val === "Tidak" ? "" : prev.boneFractureYear,
-											}));
-										}}
-										className="flex gap-6 mt-1"
+									<Select
+										value={formData.bloodType}
+										onValueChange={(v) => updateData("bloodType", v)}
 									>
-										<div className="flex items-center space-x-2">
-											<RadioGroupItem value="Tidak" id="bone-no" />
-											<Label
-												htmlFor="bone-no"
-												className="cursor-pointer font-normal"
-											>
-												Tidak Pernah
-											</Label>
-										</div>
-										<div className="flex items-center space-x-2">
-											<RadioGroupItem value="Ya" id="bone-yes" />
-											<Label
-												htmlFor="bone-yes"
-												className="cursor-pointer font-normal"
-											>
-												Pernah
-											</Label>
-										</div>
-									</RadioGroup>
+										<SelectTrigger>
+											<SelectValue placeholder="Pilih Gol. Darah" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="Belum Diketahui">
+												Belum Diketahui
+											</SelectItem>
+											<SelectItem value="A+">A+</SelectItem>
+											<SelectItem value="A-">A-</SelectItem>
+											<SelectItem value="B+">B+</SelectItem>
+											<SelectItem value="B-">B-</SelectItem>
+											<SelectItem value="AB+">AB+</SelectItem>
+											<SelectItem value="AB-">AB-</SelectItem>
+											<SelectItem value="O+">O+</SelectItem>
+											<SelectItem value="O-">O-</SelectItem>
+											<SelectItem value="O">O</SelectItem>
+										</SelectContent>
+									</Select>
 								</div>
+								<div className="space-y-2">
+									<Label>
+										Ukuran Baju <span className="text-red-500">*</span>
+									</Label>
+									<Select
+										value={formData.clothingSize}
+										onValueChange={(v) => updateData("clothingSize", v)}
+									>
+										<SelectTrigger>
+											<SelectValue placeholder="Pilih Ukuran" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="XS">XS</SelectItem>
+											<SelectItem value="S">S</SelectItem>
+											<SelectItem value="M">M</SelectItem>
+											<SelectItem value="L">L</SelectItem>
+											<SelectItem value="XL">XL</SelectItem>
+											<SelectItem value="XXL">XXL</SelectItem>
+											<SelectItem value="Lainnya">Lainnya</SelectItem>
+										</SelectContent>
+									</Select>
+									{formData.clothingSize === "Lainnya" && (
+										<Input
+											className="mt-2"
+											placeholder="Sebutkan ukuran lainnya"
+											value={formData.clothingSizeOther}
+											onChange={(e) =>
+												updateData("clothingSizeOther", e.target.value)
+											}
+										/>
+									)}
+								</div>
+								<div className="space-y-2">
+									<Label>
+										Tinggi Badan <span className="text-red-500">*</span>
+									</Label>
+									<div className="relative">
+										<Input
+											className="pr-10"
+											placeholder="170"
+											value={formData.height}
+											inputMode="numeric"
+											onKeyDown={preventNonNumericKey}
+											onChange={(e) =>
+												updateData(
+													"height",
+													filterNumeric(
+														e.target.value,
+														3,
+														"Tinggi badan berupa angka (cm)",
+													),
+												)
+											}
+										/>
+										<span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+											cm
+										</span>
+									</div>
+									{formData.height &&
+										(Number(formData.height) < 150 ||
+											Number(formData.height) > 220) && (
+											<p className="flex items-center gap-1 text-xs font-medium text-amber-600">
+												<AlertTriangle className="h-3.5 w-3.5" />
+												Tinggi badan di luar rentang umum (150–220 cm)
+											</p>
+										)}
+								</div>
+								<div className="space-y-2">
+									<Label>
+										Berat Badan <span className="text-red-500">*</span>
+									</Label>
+									<div className="relative">
+										<Input
+											className="pr-10"
+											placeholder="60"
+											value={formData.weight}
+											inputMode="numeric"
+											onKeyDown={preventNonNumericKey}
+											onChange={(e) =>
+												updateData(
+													"weight",
+													filterNumeric(
+														e.target.value,
+														3,
+														"Berat badan berupa angka (kg)",
+													),
+												)
+											}
+										/>
+										<span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+											kg
+										</span>
+									</div>
+									{formData.weight &&
+										(Number(formData.weight) < 35 ||
+											Number(formData.weight) > 160) && (
+											<p className="flex items-center gap-1 text-xs font-medium text-amber-600">
+												<AlertTriangle className="h-3.5 w-3.5" />
+												Berat badan di luar rentang umum (35–160 kg)
+											</p>
+										)}
+								</div>
+							</div>
+						</section>
 
-								{formData.hasBoneFracture === "Ya" && (
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t mt-3">
+						<section className="space-y-1">
+							<h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+								Riwayat Kesehatan
+							</h4>
+							<div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white px-4">
+								<YesNoWithDetail
+									rowLabel={
+										<>
+											Riwayat Penyakit <span className="text-red-500">*</span>
+										</>
+									}
+									value={formData.diseaseHistory}
+									onChange={(v) => updateData("diseaseHistory", v)}
+									placeholder="Jelaskan riwayat penyakit (jenis, tahun, kondisi saat ini)"
+								/>
+								<YesNoWithDetail
+									rowLabel={
+										<>
+											Penyakit Bawaan <span className="text-red-500">*</span>
+										</>
+									}
+									value={formData.congenitalDisease}
+									onChange={(v) => updateData("congenitalDisease", v)}
+									placeholder="Jelaskan penyakit bawaan (jenis, sejak kapan, kondisi saat ini)"
+								/>
+								<HealthQuestion
+									label={
+										<>
+											Pernah Mengalami Patah Tulang?{" "}
+											<span className="text-red-500">*</span>
+										</>
+									}
+									noLabel="Tidak pernah"
+									yesLabel="Pernah"
+									value={
+										formData.hasBoneFracture === "Ya"
+											? "ada"
+											: formData.hasBoneFracture === "Tidak"
+												? "tidak"
+												: ""
+									}
+									onChange={(next) => {
+										const val = next === "ada" ? "Ya" : "Tidak";
+										setFormData((prev) => ({
+											...prev,
+											hasBoneFracture: val,
+											boneFractureLocation:
+												val === "Tidak" ? "" : prev.boneFractureLocation,
+											boneFractureYear:
+												val === "Tidak" ? "" : prev.boneFractureYear,
+										}));
+									}}
+								>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 										<div className="space-y-2">
 											<Label>
 												Bagian Tubuh yang Patah{" "}
@@ -1843,6 +2011,7 @@ export default function AddStudentPage() {
 												placeholder="Contoh: 2021"
 												maxLength={4}
 												value={formData.boneFractureYear}
+												inputMode="numeric"
 												onKeyDown={preventNonNumericKey}
 												onChange={(e) =>
 													updateData(
@@ -1857,51 +2026,34 @@ export default function AddStudentPage() {
 											/>
 										</div>
 									</div>
-								)}
-							</div>
-
-							{/* Riwayat Operasi */}
-							<div className="space-y-4 md:col-span-2 p-4 border rounded-lg bg-slate-50/50">
-								<div className="space-y-2">
-									<Label className="text-sm font-medium">
-										Pernah Menjalani Operasi?{" "}
-										<span className="text-red-500">*</span>
-									</Label>
-									<RadioGroup
-										value={formData.hasSurgery}
-										onValueChange={(val) => {
-											setFormData((prev) => ({
-												...prev,
-												hasSurgery: val,
-												surgeryType: val === "Tidak" ? "" : prev.surgeryType,
-												surgeryYear: val === "Tidak" ? "" : prev.surgeryYear,
-											}));
-										}}
-										className="flex gap-6 mt-1"
-									>
-										<div className="flex items-center space-x-2">
-											<RadioGroupItem value="Tidak" id="surgery-no" />
-											<Label
-												htmlFor="surgery-no"
-												className="cursor-pointer font-normal"
-											>
-												Tidak Pernah
-											</Label>
-										</div>
-										<div className="flex items-center space-x-2">
-											<RadioGroupItem value="Ya" id="surgery-yes" />
-											<Label
-												htmlFor="surgery-yes"
-												className="cursor-pointer font-normal"
-											>
-												Pernah
-											</Label>
-										</div>
-									</RadioGroup>
-								</div>
-
-								{formData.hasSurgery === "Ya" && (
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t mt-3">
+								</HealthQuestion>
+								<HealthQuestion
+									label={
+										<>
+											Pernah Menjalani Operasi?{" "}
+											<span className="text-red-500">*</span>
+										</>
+									}
+									noLabel="Tidak pernah"
+									yesLabel="Pernah"
+									value={
+										formData.hasSurgery === "Ya"
+											? "ada"
+											: formData.hasSurgery === "Tidak"
+												? "tidak"
+												: ""
+									}
+									onChange={(next) => {
+										const val = next === "ada" ? "Ya" : "Tidak";
+										setFormData((prev) => ({
+											...prev,
+											hasSurgery: val,
+											surgeryType: val === "Tidak" ? "" : prev.surgeryType,
+											surgeryYear: val === "Tidak" ? "" : prev.surgeryYear,
+										}));
+									}}
+								>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 										<div className="space-y-2">
 											<Label>
 												Jenis / Rincian Operasi{" "}
@@ -1923,6 +2075,7 @@ export default function AddStudentPage() {
 												placeholder="Contoh: 2022"
 												maxLength={4}
 												value={formData.surgeryYear}
+												inputMode="numeric"
 												onKeyDown={preventNonNumericKey}
 												onChange={(e) =>
 													updateData(
@@ -1937,21 +2090,21 @@ export default function AddStudentPage() {
 											/>
 										</div>
 									</div>
-								)}
+								</HealthQuestion>
 							</div>
-						</div>
+						</section>
 					</div>
 				)}
 
 				{/* TAB 4: Wali */}
 				{currentTab === 3 && (
-					<div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+					<div className="space-y-6 animate-in fade-in duration-200">
 						<h3 className="font-semibold text-lg border-b pb-2">
 							Keterangan Wali
 						</h3>
 
 						{/* Pertanyaan Penentu Peran Wali */}
-						<div className="space-y-3 p-4 border rounded-lg bg-slate-50/70">
+						<div className="space-y-3">
 							<Label className="text-sm font-medium">
 								Siapa yang Bertindak Sebagai Wali Mahasiswa?{" "}
 								<span className="text-red-500">*</span>
@@ -1976,6 +2129,7 @@ export default function AddStudentPage() {
 													waliReligion: prev.ayahReligion,
 													waliEducation: prev.ayahEducation,
 													waliJob: prev.ayahJob,
+													waliIncome: prev.ayahIncome,
 												}
 											: val === "ibu"
 												? {
@@ -1991,6 +2145,7 @@ export default function AddStudentPage() {
 														waliReligion: prev.ibuReligion,
 														waliEducation: prev.ibuEducation,
 														waliJob: prev.ibuJob,
+														waliIncome: prev.ibuIncome,
 													}
 												: {
 														waliName: "",
@@ -2005,12 +2160,13 @@ export default function AddStudentPage() {
 														waliReligion: "",
 														waliEducation: "",
 														waliJob: "",
+														waliIncome: "",
 													}),
 									}));
 								}}
 								className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-1"
 							>
-								<div className="flex items-center space-x-2.5 p-3 bg-white border rounded-md shadow-xs cursor-pointer hover:border-primary">
+								<div className="flex items-center space-x-2.5 p-3 bg-white border rounded-md cursor-pointer hover:border-primary">
 									<RadioGroupItem value="ayah" id="add-wali-ayah" />
 									<Label
 										htmlFor="add-wali-ayah"
@@ -2019,7 +2175,7 @@ export default function AddStudentPage() {
 										Ayah Kandung
 									</Label>
 								</div>
-								<div className="flex items-center space-x-2.5 p-3 bg-white border rounded-md shadow-xs cursor-pointer hover:border-primary">
+								<div className="flex items-center space-x-2.5 p-3 bg-white border rounded-md cursor-pointer hover:border-primary">
 									<RadioGroupItem value="ibu" id="add-wali-ibu" />
 									<Label
 										htmlFor="add-wali-ibu"
@@ -2028,7 +2184,7 @@ export default function AddStudentPage() {
 										Ibu Kandung
 									</Label>
 								</div>
-								<div className="flex items-center space-x-2.5 p-3 bg-white border rounded-md shadow-xs cursor-pointer hover:border-primary">
+								<div className="flex items-center space-x-2.5 p-3 bg-white border rounded-md cursor-pointer hover:border-primary">
 									<RadioGroupItem value="lainnya" id="add-wali-lainnya" />
 									<Label
 										htmlFor="add-wali-lainnya"
@@ -2042,12 +2198,11 @@ export default function AddStudentPage() {
 
 						{/* Tampilan Konfirmasi Otomatis bila Ayah Kandung */}
 						{formData.waliRole === "ayah" && (
-							<div className="p-4 border border-blue-200 bg-blue-50/60 rounded-lg text-sm text-blue-950 space-y-2">
-								<div className="font-semibold flex items-center gap-2 text-blue-900">
-									<CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+							<div className="border-l-2 border-slate-300 pl-3 text-sm text-slate-600 space-y-1">
+								<div className="font-medium text-slate-900">
 									Data Wali Tersinkronisasi Otomatis dengan Ayah Kandung
 								</div>
-								<p className="text-xs text-blue-800">
+								<p className="text-xs text-slate-600">
 									Nama Wali:{" "}
 									<strong>
 										{formData.ayahName || "(Akan diisi di Tab 4: Ayah Kandung)"}
@@ -2055,7 +2210,7 @@ export default function AddStudentPage() {
 									| Status: <strong>{formData.ayahStatus}</strong> |
 									Kewarganegaraan: <strong>{formData.ayahNationality}</strong>
 								</p>
-								<p className="text-[11px] text-blue-600">
+								<p className="text-xs text-slate-500">
 									Sistem akan otomatis menggunakan identitas Ayah Kandung
 									sebagai wali tanpa perlu pengisian berulang. Silakan klik
 									tombol &apos;Selanjutnya&apos; untuk melengkapi data Ayah
@@ -2066,12 +2221,11 @@ export default function AddStudentPage() {
 
 						{/* Tampilan Konfirmasi Otomatis bila Ibu Kandung */}
 						{formData.waliRole === "ibu" && (
-							<div className="p-4 border border-blue-200 bg-blue-50/60 rounded-lg text-sm text-blue-950 space-y-2">
-								<div className="font-semibold flex items-center gap-2 text-blue-900">
-									<CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+							<div className="border-l-2 border-slate-300 pl-3 text-sm text-slate-600 space-y-1">
+								<div className="font-medium text-slate-900">
 									Data Wali Tersinkronisasi Otomatis dengan Ibu Kandung
 								</div>
-								<p className="text-xs text-blue-800">
+								<p className="text-xs text-slate-600">
 									Nama Wali:{" "}
 									<strong>
 										{formData.ibuName || "(Akan diisi di Tab 5: Ibu Kandung)"}
@@ -2079,7 +2233,7 @@ export default function AddStudentPage() {
 									| Status: <strong>{formData.ibuStatus}</strong> |
 									Kewarganegaraan: <strong>{formData.ibuNationality}</strong>
 								</p>
-								<p className="text-[11px] text-blue-600">
+								<p className="text-xs text-slate-500">
 									Sistem akan otomatis menggunakan identitas Ibu Kandung sebagai
 									wali tanpa perlu pengisian berulang. Silakan klik tombol
 									&apos;Selanjutnya&apos; untuk melengkapi data orang tua.
@@ -2228,6 +2382,14 @@ export default function AddStudentPage() {
 										onChange={(e) => updateData("waliJob", e.target.value)}
 									/>
 								</div>
+								<OptionSelect
+									label="Rentang Pendapatan"
+									required={false}
+									value={formData.waliIncome}
+									onChange={(v) => updateData("waliIncome", v)}
+									options={INCOME_RANGE_OPTIONS}
+									placeholder="Pilih rentang pendapatan"
+								/>
 								<div className="space-y-2">
 									<Label>
 										Nomor HP{" "}
@@ -2279,7 +2441,7 @@ export default function AddStudentPage() {
 
 				{/* TAB 5: Ayah Kandung */}
 				{currentTab === 4 && (
-					<div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+					<div className="space-y-6 animate-in fade-in duration-200">
 						<h3 className="font-semibold text-lg border-b pb-2">
 							Keterangan Ayah Kandung
 						</h3>
@@ -2419,6 +2581,14 @@ export default function AddStudentPage() {
 									onChange={(e) => updateData("ayahJob", e.target.value)}
 								/>
 							</div>
+							<OptionSelect
+								label="Rentang Pendapatan"
+								required={false}
+								value={formData.ayahIncome}
+								onChange={(v) => updateData("ayahIncome", v)}
+								options={INCOME_RANGE_OPTIONS}
+								placeholder="Pilih rentang pendapatan"
+							/>
 							<div className="space-y-2">
 								<Label>
 									Nomor HP{" "}
@@ -2469,7 +2639,7 @@ export default function AddStudentPage() {
 
 				{/* TAB 6: Ibu Kandung */}
 				{currentTab === 5 && (
-					<div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+					<div className="space-y-6 animate-in fade-in duration-200">
 						<h3 className="font-semibold text-lg border-b pb-2">
 							Keterangan Ibu Kandung
 						</h3>
@@ -2609,6 +2779,14 @@ export default function AddStudentPage() {
 									onChange={(e) => updateData("ibuJob", e.target.value)}
 								/>
 							</div>
+							<OptionSelect
+								label="Rentang Pendapatan"
+								required={false}
+								value={formData.ibuIncome}
+								onChange={(v) => updateData("ibuIncome", v)}
+								options={INCOME_RANGE_OPTIONS}
+								placeholder="Pilih rentang pendapatan"
+							/>
 							<div className="space-y-2">
 								<Label>
 									Nomor HP{" "}
@@ -2657,49 +2835,126 @@ export default function AddStudentPage() {
 					</div>
 				)}
 
-				{/* TAB 7: Informasi PMB, Rekomendasi & Referral */}
+				{/* TAB 7: Informasi PMB & Rekomendasi */}
 				{currentTab === 6 && (
-					<div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-						<div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-3 gap-2">
-							<div>
-								<h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
-									<Building2 className="w-5 h-5 text-[#0517B0]" />
-									Informasi PMB, Rekomendasi & Referral
-								</h3>
-								<p className="text-xs text-slate-500 mt-0.5">
-									Lengkapi data asal rekomendasi pendaftaran dan tim akuisisi
-									PMB.
-								</p>
-							</div>
-							<span className="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-[#0517B0] rounded-md border border-blue-100 self-start sm:self-auto">
-								Panel PMB
-							</span>
-						</div>
+					<div className="space-y-6 animate-in fade-in duration-200">
+						<h3 className="font-semibold text-lg border-b pb-2">
+							Informasi PMB & Rekomendasi
+						</h3>
 
-						{/* Seksi 1: Asal Referral & Rekomendasi Terstruktur */}
-						<div className="p-5 bg-gradient-to-br from-blue-50/70 via-indigo-50/30 to-white rounded-xl border border-blue-200/70 space-y-4 shadow-xs">
-							<div className="flex items-center gap-2">
-								<div className="p-1.5 bg-blue-100 text-[#0517B0] rounded-lg">
-									<Award className="w-4 h-4" />
-								</div>
+						<section className="rounded-xl border border-slate-200 bg-white p-4 md:p-5 space-y-4">
+							<div className="flex flex-wrap items-start justify-between gap-2">
 								<div>
-									<h4 className="font-semibold text-slate-900 text-sm">
-										Asal Rekomendasi & Referral Terstruktur
+									<h4 className="text-sm font-semibold text-slate-800">
+										Pendaftaran
 									</h4>
-									<p className="text-[11px] text-slate-500">
-										Data pihak yang merekomendasikan pendaftar untuk fee
-										sharing, komisi, dan tracking referral PMB.
+									<p className="text-xs text-slate-500">
+										Batch dan pihak yang merekomendasikan calon mahasiswa.
 									</p>
 								</div>
+								<span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+									Negara tujuan:{" "}
+									{formData.destinationCountry || "otomatis dari Peminatan"}
+								</span>
 							</div>
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								<div className="space-y-2 min-w-0">
+									<Label>Batch Pendaftaran</Label>
+									<Input
+										placeholder="Contoh: Batch 1 atau 2026/2027"
+										value={formData.period}
+										onChange={(e) => updateData("period", e.target.value)}
+										className="bg-white"
+									/>
+								</div>
 
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-								{/* Rekomendasi */}
-								<div className="space-y-2">
-									<Label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-										<span>Jenis Rekomendasi</span>
-										<span className="text-red-500">*</span>
+								<div className="space-y-2 min-w-0">
+									<Label>Siapa yang Merekomendasikan?</Label>
+									<Select
+										value={formData.recommendedBy}
+										onValueChange={(v) => updateData("recommendedBy", v || "")}
+									>
+										<SelectTrigger className="bg-white">
+											<SelectValue placeholder="Pilih pemberi rekomendasi" />
+										</SelectTrigger>
+										<SelectContent>
+											{RECOMMENDED_BY_OPTIONS.map((opt) => (
+												<SelectItem key={opt} value={opt}>
+													{opt}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+
+								<div className="space-y-2 min-w-0 md:col-span-2">
+									<Label>
+										{formData.recommendedBy === "Tim Nusadaya"
+											? "Nama Anggota Tim Nusadaya yang Merekomendasikan"
+											: "Nama yang Merekomendasikan"}
 									</Label>
+									<Input
+										placeholder={
+											formData.recommendedBy === "Tim Nusadaya"
+												? "Nama anggota tim Nusadaya"
+												: "Nama lengkap pihak yang merekomendasikan"
+										}
+										value={formData.recommenderName}
+										onChange={(e) =>
+											updateData("recommenderName", e.target.value)
+										}
+										className="bg-white"
+									/>
+								</div>
+							</div>
+						</section>
+
+						<section className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 md:p-5 space-y-3">
+							<div>
+								<h4 className="text-sm font-semibold text-slate-800">
+									Kontak Darurat
+								</h4>
+								<p className="text-xs text-slate-500">
+									Kontak pertama boleh orang tua / wali; berikutnya harus selain
+									keduanya.
+								</p>
+							</div>
+							<EmergencyContactsFields
+								contacts={formData.emergencyContacts}
+								onChange={(next) => updateData("emergencyContacts", next)}
+							/>
+						</section>
+
+						<section className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 md:p-5 space-y-3">
+							<div>
+								<h4 className="text-sm font-semibold text-slate-800">
+									Kontak Prospek
+								</h4>
+								<p className="text-xs text-slate-500">
+									{FRIEND_CONTACTS_PROMPT} Minimal 3, maksimal 5 kontak.
+								</p>
+							</div>
+							<FriendContactsFields
+								contacts={formData.friendContacts}
+								onChange={(next) => updateData("friendContacts", next)}
+							/>
+						</section>
+
+						<OptionalSection
+							title="Referral & Rekomendasi"
+							filledCount={
+								[
+									formData.rekomendasi,
+									formData.referralCategory,
+									formData.referralInstitutionName,
+									formData.referralContactName,
+									formData.referralContactPhone,
+								].filter((v) => v?.trim()).length
+							}
+						>
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								<div className="space-y-2 min-w-0">
+									<Label>Jenis Rekomendasi</Label>
 									<Select
 										value={formData.rekomendasi}
 										onValueChange={(v) => updateData("rekomendasi", v)}
@@ -2717,11 +2972,8 @@ export default function AddStudentPage() {
 									</Select>
 								</div>
 
-								{/* Kategori Referral */}
-								<div className="space-y-2">
-									<Label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-										<span>Kategori Referral</span>
-									</Label>
+								<div className="space-y-2 min-w-0">
+									<Label>Kategori Referral</Label>
 									<Select
 										value={formData.referralCategory}
 										onValueChange={(v) => updateData("referralCategory", v)}
@@ -2739,11 +2991,8 @@ export default function AddStudentPage() {
 									</Select>
 								</div>
 
-								{/* Nama Institusi / Lembaga Referral */}
-								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Nama Institusi / Lembaga / Sekolah Referral
-									</Label>
+								<div className="space-y-2 min-w-0 md:col-span-2">
+									<Label>Institusi / Sekolah</Label>
 									<Input
 										placeholder="Contoh: SMKN 1 Denpasar / BKK Karya Mandiri"
 										value={formData.referralInstitutionName}
@@ -2754,11 +3003,8 @@ export default function AddStudentPage() {
 									/>
 								</div>
 
-								{/* Nama Kontak PIC Referral */}
-								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Nama Kontak / Guru / PIC yang Merekomendasikan
-									</Label>
+								<div className="space-y-2 min-w-0">
+									<Label>Nama PIC</Label>
 									<Input
 										placeholder="Nama lengkap pemberi rekomendasi"
 										value={formData.referralContactName}
@@ -2769,14 +3015,11 @@ export default function AddStudentPage() {
 									/>
 								</div>
 
-								{/* No HP Kontak Referral */}
-								<div className="space-y-2 md:col-span-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										No. WhatsApp / HP Kontak Referral
-									</Label>
+								<div className="space-y-2 min-w-0">
+									<Label>WhatsApp PIC</Label>
 									<Input
 										type="tel"
-										placeholder="0812xxxx (untuk komunikasi fee share atau validasi)"
+										placeholder="0812xxxx"
 										value={formData.referralContactPhone}
 										onKeyDown={preventNonPhoneKey}
 										onChange={(e) =>
@@ -2789,44 +3032,23 @@ export default function AddStudentPage() {
 									/>
 								</div>
 							</div>
-						</div>
+						</OptionalSection>
 
-						{/* Seksi 2: Tim Akuisisi PMB & Periode */}
-						<div className="p-5 bg-slate-50/70 rounded-xl border border-slate-200 space-y-4">
-							<div className="flex items-center gap-2">
-								<div className="p-1.5 bg-slate-200/70 text-slate-700 rounded-lg">
-									<UserPlus className="w-4 h-4" />
-								</div>
-								<div>
-									<h4 className="font-semibold text-slate-900 text-sm">
-										Tim Akuisisi PMB & Periode Studi
-									</h4>
-									<p className="text-[11px] text-slate-500">
-										Informasi penanggung jawab akuisisi dan jadwal keberangkatan
-										mahasiswa.
-									</p>
-								</div>
-							</div>
-
-							<div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-								{/* Periode Keberangkatan */}
-								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Periode Keberangkatan / Intake
-									</Label>
-									<Input
-										placeholder="Contoh: 2026/2027 atau Batch 1"
-										value={formData.period}
-										onChange={(e) => updateData("period", e.target.value)}
-										className="bg-white"
-									/>
-								</div>
-
-								{/* Tim Visit */}
-								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Tim Visit PMB
-									</Label>
+						<OptionalSection
+							title="Tim Akuisisi & Mitra"
+							filledCount={
+								[
+									formData.timVisit,
+									formData.timSosialisasi,
+									formData.roReferral,
+									formData.mitraSponsor,
+									formData.koordinator,
+								].filter((v) => v?.trim()).length
+							}
+						>
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								<div className="space-y-2 min-w-0">
+									<Label>Tim Visit PMB</Label>
 									<Input
 										placeholder="Nama tim visit (isi '-' jika tidak ada)"
 										value={formData.timVisit}
@@ -2835,11 +3057,8 @@ export default function AddStudentPage() {
 									/>
 								</div>
 
-								{/* Tim Sosialisasi */}
-								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Tim Sosialisasi PMB
-									</Label>
+								<div className="space-y-2 min-w-0">
+									<Label>Tim Sosialisasi PMB</Label>
 									<Input
 										placeholder="Nama tim sosialisasi (isi '-' jika tidak ada)"
 										value={formData.timSosialisasi}
@@ -2850,11 +3069,8 @@ export default function AddStudentPage() {
 									/>
 								</div>
 
-								{/* RO Referral */}
-								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										RO Referral
-									</Label>
+								<div className="space-y-2 min-w-0">
+									<Label>RO Referral</Label>
 									<Input
 										placeholder="Nama / kode RO Referral"
 										value={formData.roReferral}
@@ -2863,11 +3079,8 @@ export default function AddStudentPage() {
 									/>
 								</div>
 
-								{/* Mitra Sponsor */}
-								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Mitra Sponsor
-									</Label>
+								<div className="space-y-2 min-w-0">
+									<Label>Mitra Sponsor</Label>
 									<Input
 										placeholder="Nama mitra sponsor pembiayaan"
 										value={formData.mitraSponsor}
@@ -2876,11 +3089,8 @@ export default function AddStudentPage() {
 									/>
 								</div>
 
-								{/* Koordinator PMB */}
-								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Koordinator PMB
-									</Label>
+								<div className="space-y-2 min-w-0 md:col-span-2">
+									<Label>Koordinator PMB</Label>
 									<Input
 										placeholder="Nama koordinator PMB"
 										value={formData.koordinator}
@@ -2889,49 +3099,30 @@ export default function AddStudentPage() {
 									/>
 								</div>
 							</div>
-						</div>
+						</OptionalSection>
 					</div>
 				)}
-
-				{/* Bottom Navigation */}
-				<div className="pt-8 mt-8 border-t border-slate-200 flex justify-between items-center">
-					{currentTab > 0 ? (
-						<Button
-							type="button"
-							variant="outline"
-							onClick={handlePrev}
-							disabled={isLoading}
-						>
-							Sebelumnya
-						</Button>
-					) : (
-						<div></div> // Spacer
-					)}
-
-					{currentTab < TABS.length - 1 ? (
-						<Button
-							type="button"
-							className="bg-[#0517B0] hover:bg-blue-800 text-white min-w-[120px]"
-							onClick={handleNext}
-						>
-							Selanjutnya
-						</Button>
-					) : (
-						<Button
-							type="button"
-							className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[160px]"
-							onClick={handleSubmit}
-							disabled={isLoading}
-						>
-							{isLoading ? (
-								<Loader2 className="w-5 h-5 animate-spin" />
-							) : (
-								"Simpan Mahasiswa"
-							)}
-						</Button>
-					)}
-				</div>
 			</div>
+
+			<FormNav
+				isFirst={currentTab === 0}
+				isLast={currentTab === TABS.length - 1}
+				loading={isLoading}
+				onBack={handlePrev}
+				onNext={handleNext}
+				onSubmit={handleOpenBiaya}
+				submitLabel="Simpan Mahasiswa"
+			/>
+
+			<BiayaPendaftaranDialog
+				open={isBiayaOpen}
+				onOpenChange={setIsBiayaOpen}
+				onConfirm={handleSubmit}
+				loading={isLoading}
+				subProgram={formData.subProgram}
+				description="Nominal ini tersimpan pada data mahasiswa dan otomatis menjadi tagihan DP di Panel Finance."
+				confirmLabel="Simpan Mahasiswa"
+			/>
 		</div>
 	);
 }

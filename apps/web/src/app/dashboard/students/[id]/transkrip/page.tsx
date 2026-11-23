@@ -4,7 +4,6 @@ import {
 	ArrowLeft,
 	Award,
 	CheckCircle2,
-	Download,
 	GraduationCap,
 	Loader2,
 	Printer,
@@ -17,7 +16,6 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { API_URL, getToken } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 
 export default function StudentTranscriptPrintPage() {
 	const params = useParams();
@@ -79,30 +77,6 @@ export default function StudentTranscriptPrintPage() {
 	} else if (gpaNum >= 3.0) {
 		predikatKelulusan = "SANGAT MEMUASKAN";
 	}
-
-	const handleExportCsv = () => {
-		if (!grades || grades.length === 0) {
-			toast.error("Tidak ada data transkrip untuk diexport");
-			return;
-		}
-		const exportRows = grades.map((item: any, idx: number) => ({
-			No: idx + 1,
-			"Kode MK": item.code || "-",
-			"Nama Mata Kuliah": item.name || "-",
-			Semester: item.semester || 1,
-			"SKS (K)": item.sks || 0,
-			"Nilai (N)": item.finalScore ?? "-",
-			Grade: item.grade || "-",
-			Status: item.isPassed ? "Lulus" : "Tidak Lulus",
-		}));
-		const studentNameSlug = (
-			summaryData?.name ||
-			summaryData?.studentName ||
-			`Mahasiswa_${studentId}`
-		).replace(/[^a-zA-Z0-9]/g, "_");
-		exportToCSV(exportRows, `Transkrip_${studentNameSlug}_Semua_Semester`);
-		toast.success("Dokumen Transkrip berhasil diexport ke CSV");
-	};
 
 	return (
 		<div className="min-h-screen bg-slate-100/70 p-4 sm:p-6 lg:p-8 print:p-0 print:bg-white text-slate-900">
@@ -177,18 +151,6 @@ export default function StudentTranscriptPrintPage() {
 				</div>
 
 				<div className="flex items-center gap-2.5">
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={handleExportCsv}
-						disabled={isLoading || grades.length === 0}
-						className="h-8 text-xs gap-1.5 text-slate-700 hover:bg-slate-50 border-slate-200 font-semibold"
-						title="Export seluruh transkrip ke format file CSV / Excel"
-					>
-						<Download className="w-3.5 h-3.5 text-emerald-600" />
-						<span>Export CSV</span>
-					</Button>
-
 					<Button
 						size="sm"
 						onClick={() => window.print()}

@@ -38,7 +38,12 @@ export const dashboardRoutes = new Elysia({ prefix: "/dashboard" }).get(
 				if (cohort && !Number.isNaN(cohort)) {
 					conditions.push(eq(students.cohort, cohort));
 				}
-				const whereClause = and(...conditions);
+				const baseCondition = and(...conditions);
+				// Total & statistik panel hanya untuk mahasiswa yang sudah lolos waiting list
+				const whereClause = and(
+					baseCondition,
+					sql`${students.studentStatus} is distinct from 'menunggu_pembayaran'`,
+				);
 
 				// 1. Student counts & statuses
 				const [overallStats] = await db
@@ -57,6 +62,16 @@ export const dashboardRoutes = new Elysia({ prefix: "/dashboard" }).get(
 					})
 					.from(students)
 					.where(whereClause);
+
+				const [waitingStats] = await db
+					.select({ n: count(students.id) })
+					.from(students)
+					.where(
+						and(
+							baseCondition,
+							eq(students.studentStatus, "menunggu_pembayaran"),
+						),
+					);
 
 				// 2. Panel statuses (PMB, CRM, Finance, Academic, PA, Internship, Decision)
 				const [panelStats] = await db
@@ -132,6 +147,7 @@ export const dashboardRoutes = new Elysia({ prefix: "/dashboard" }).get(
 						dropout: Number(overallStats?.dropout || 0),
 						keluar: Number(overallStats?.keluar || 0),
 						mengundurkanDiri: Number(overallStats?.mengundurkanDiri || 0),
+						menungguPembayaran: Number(waitingStats?.n || 0),
 					},
 					panels: {
 						pmb: {

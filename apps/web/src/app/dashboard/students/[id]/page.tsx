@@ -8,10 +8,8 @@ import {
 	ChevronUp,
 	Clock,
 	FileText,
-	Globe,
-	GraduationCap,
 	Lock,
-	Phone,
+	MoreHorizontal,
 	Printer,
 	XCircle,
 } from "lucide-react";
@@ -21,6 +19,12 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { StudentProgress } from "@/components/StudentProgress";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { PanelSkeleton } from "@/components/ui/PanelSkeleton";
 
 const AkademikPanel = dynamic(
@@ -72,6 +76,7 @@ const StatusPanel = dynamic(
 	{ loading: () => <PanelSkeleton title="Status Mahasiswa" /> },
 );
 
+import { AvatarPersonFallback } from "@/components/ui/AvatarPersonFallback";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -83,7 +88,7 @@ import {
 	AlertDialogTitle,
 	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -216,10 +221,9 @@ const NAV_LINKS = [
 			"superadmin",
 			"akademik",
 			"pa",
-			"pmb",
+			// PMB & Magang tidak memakai Catatan Internal (cukup panelnya sendiri)
 			"crm",
 			"finance",
-			"magang",
 			"dosen",
 		],
 	},
@@ -294,6 +298,13 @@ function getStudentStatusBadgeConfig(val: string | null | undefined) {
 			label: "Mengundurkan Diri",
 			color: "bg-orange-50 text-orange-700 border-orange-200",
 			dot: "bg-orange-500",
+		};
+	}
+	if (normalized === "menunggu_pembayaran") {
+		return {
+			label: "Menunggu Pembayaran",
+			color: "bg-slate-50 text-slate-700 border-slate-200",
+			dot: "bg-slate-500",
 		};
 	}
 	if (normalized === "lulus") {
@@ -547,13 +558,6 @@ function StudentDetailContent() {
 		? STATUS_COLORS[s.overallStatus as keyof typeof STATUS_COLORS]
 		: STATUS_COLORS.PERLU_PERHATIAN;
 
-	const getInitials = (name?: string) => {
-		if (!name) return "M";
-		const parts = name.trim().split(/\s+/);
-		if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-		return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-	};
-
 	const getCountryFlag = (subProgram?: string | null, dest?: string | null) => {
 		const text = `${subProgram || ""} ${dest || ""}`.toLowerCase();
 		if (text.includes("malaysia") || text.includes("my")) {
@@ -725,7 +729,7 @@ function StudentDetailContent() {
 			</AlertDialog>
 
 			{/* ─── TOP BAR ACTIONS ─── */}
-			<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+			<div className="flex flex-row items-center justify-between gap-3">
 				<button
 					type="button"
 					onClick={() => {
@@ -782,199 +786,129 @@ function StudentDetailContent() {
 					Kembali ke Dashboard
 				</button>
 
-				<div className="flex flex-wrap items-center gap-2">
-					{hasRole(user, "superadmin") && (
-						<Button
-							size="sm"
-							variant="outline"
-							onClick={handleGenerateAccount}
-							disabled={isGenerating || !!data?.student?.studentUserId}
-							className="bg-blue-50 text-[#0517B0] border-blue-200 hover:bg-blue-100 text-xs h-8.5 font-semibold"
+				{hasRole(user, "superadmin", "pmb") && (
+					<DropdownMenu>
+						<DropdownMenuTrigger
+							aria-label="Aksi mahasiswa"
+							className="inline-flex size-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 outline-none focus-visible:ring-2 focus-visible:ring-[#0517B0]/40"
 						>
-							{isGenerating
-								? "Memproses..."
-								: data?.student?.studentUserId
-									? "Akun Aktif"
-									: "Buat Akun"}
-						</Button>
-					)}
-					{hasRole(user, "superadmin", "pmb") && (
-						<Button
-							size="sm"
-							variant="outline"
-							onClick={handleArchive}
-							disabled={isArchiving}
-							className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 text-xs h-8.5 font-semibold"
-						>
-							{isArchiving ? "Memproses..." : "Arsip"}
-						</Button>
-					)}
-					{hasRole(user, "superadmin") && (
-						<Button
-							size="sm"
-							variant="outline"
-							onClick={() => setShowDeleteDialog(true)}
-							className="bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 text-xs h-8.5 font-semibold"
-						>
-							Hapus
-						</Button>
-					)}
-				</div>
+							<MoreHorizontal className="w-4 h-4" />
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end" className="min-w-44">
+							{hasRole(user, "superadmin") && (
+								<DropdownMenuItem
+									onClick={handleGenerateAccount}
+									disabled={isGenerating || !!data?.student?.studentUserId}
+								>
+									{isGenerating
+										? "Memproses..."
+										: data?.student?.studentUserId
+											? "Akun sudah aktif"
+											: "Buat akun mahasiswa"}
+								</DropdownMenuItem>
+							)}
+							<DropdownMenuItem onClick={handleArchive} disabled={isArchiving}>
+								{isArchiving ? "Memproses..." : "Arsipkan"}
+							</DropdownMenuItem>
+							{hasRole(user, "superadmin") && (
+								<DropdownMenuItem
+									onClick={() => setShowDeleteDialog(true)}
+									className="text-rose-700"
+								>
+									Hapus mahasiswa
+								</DropdownMenuItem>
+							)}
+						</DropdownMenuContent>
+					</DropdownMenu>
+				)}
 			</div>
 
-			{/* ─── HEADER DETAIL MAHASISWA (COMPACT & MODERN EXECUTIVE CARD) ─── */}
-			<div
-				className="relative rounded-2xl p-[3px] transition-all duration-500 select-none mb-6"
-				style={{
-					background:
-						"linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(226, 232, 240, 0.7) 100%)",
-					boxShadow:
-						"8px 8px 20px rgba(163, 177, 198, 0.45), -8px -8px 20px rgba(255, 255, 255, 0.95), 0 1px 3px rgba(0, 0, 0, 0.03)",
-				}}
-			>
-				<div
-					className="rounded-[calc(1rem-2px)] p-4 sm:p-5 space-y-3.5 relative overflow-hidden"
-					style={{
-						backgroundColor: "#f4f7fb",
-						boxShadow: "inset 0 1px 1px rgba(255, 255, 255, 0.95)",
-					}}
-				>
-					<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-						{/* Left: Profile Summary */}
-						<div className="flex items-start gap-3.5">
-							<Avatar className="w-13 h-13 border-2 border-blue-100 shadow-2xs shrink-0 rounded-full">
-								{s.profilePhotoUrl ? (
-									<img
-										src={
-											s.profilePhotoUrl.startsWith("http")
-												? s.profilePhotoUrl
-												: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}${s.profilePhotoUrl}`
-										}
-										alt={s.name}
-										className="w-full h-full object-cover rounded-full"
-									/>
-								) : (
-									<AvatarFallback className="bg-linear-to-br from-[#0517B0] to-blue-600 text-white text-base font-black flex items-center justify-center">
-										{getInitials(s.name)}
-									</AvatarFallback>
-								)}
-							</Avatar>
+			{/* ─── HEADER MAHASISWA (ringkas: identitas inti, info sekunder di biodata) ─── */}
+			<section className="mb-6 rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
+				<div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+					<div className="flex min-w-0 items-start gap-3 sm:gap-4">
+						<Avatar className="w-12 h-12 shrink-0 rounded-full">
+							{s.profilePhotoUrl ? (
+								<img
+									src={
+										s.profilePhotoUrl.startsWith("http")
+											? s.profilePhotoUrl
+											: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}${s.profilePhotoUrl}`
+									}
+									alt={s.name}
+									className="w-full h-full object-cover rounded-full"
+								/>
+							) : (
+								<AvatarPersonFallback />
+							)}
+						</Avatar>
 
-							<div className="space-y-1">
-								<div className="flex flex-wrap items-center gap-2">
-									<h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-										{s.name}
-									</h1>
-									{s.studentStatus &&
-										(() => {
-											const statusCfg = getStudentStatusBadgeConfig(
-												s.studentStatus,
-											);
-											return (
-												<Badge
-													className={`${statusCfg.color} border text-xs font-semibold px-2.5 py-0.5`}
-												>
-													<span
-														className={`w-2 h-2 rounded-full ${statusCfg.dot} mr-1.5 inline-block`}
-													/>
-													{statusCfg.label}
-												</Badge>
-											);
-										})()}
-									<Badge
-										variant="outline"
-										className="text-xs px-2 py-0.5 font-semibold text-slate-700 border-slate-200 bg-slate-100/80 font-mono"
-									>
-										Angkatan {s.cohort || "-"}
-									</Badge>
-								</div>
-								{/* Essential Metadata Strip */}
-								<div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-600 pt-0.5">
-									<span className="font-mono bg-slate-100 px-2 py-0.5 rounded-md text-slate-700 font-semibold border border-slate-200/60 text-[11px]">
-										NIM: {s.nim || "Belum ada NIM"}
-									</span>
-
-									<div className="flex items-center gap-1.5 font-semibold text-slate-800">
-										<GraduationCap className="w-3.5 h-3.5 text-[#0517B0]" />
-										<span>{s.program || "-"}</span>
-										{s.subProgram && (
-											<span className="inline-flex items-center gap-1.5 text-slate-700 font-semibold bg-slate-100/90 border border-slate-200 px-2 py-0.5 rounded-md text-[11px] shadow-2xs">
-												{flagUrl ? (
-													<img
-														src={flagUrl}
-														alt={s.subProgram}
-														className="w-4 h-3 object-cover rounded-xs shadow-2xs inline-block"
-													/>
-												) : (
-													<Globe className="w-3.5 h-3.5 text-slate-500" />
-												)}
-												<span>{s.subProgram}</span>
-											</span>
-										)}
-									</div>
-
-									{s.destinationCountry && (
-										<div className="flex items-center gap-1.5 font-medium text-slate-600 bg-blue-50/60 border border-blue-100 px-2 py-0.5 rounded-md">
+						<div className="min-w-0 space-y-1">
+							<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+								<h1 className="text-xl sm:text-2xl font-bold text-slate-900 [overflow-wrap:anywhere]">
+									{s.name}
+								</h1>
+								{s.studentStatus &&
+									(() => {
+										const statusCfg = getStudentStatusBadgeConfig(
+											s.studentStatus,
+										);
+										return (
+											<Badge
+												className={`${statusCfg.color} border text-xs font-semibold px-2.5 py-0.5`}
+											>
+												<span
+													className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot} mr-1.5 inline-block`}
+												/>
+												{statusCfg.label}
+											</Badge>
+										);
+									})()}
+							</div>
+							<p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600">
+								<span className="font-mono">{s.nim || "Belum ada NIM"}</span>
+								<span aria-hidden="true">·</span>
+								<span>Angkatan {s.cohort || "-"}</span>
+								{(s.subProgram || s.program) && (
+									<>
+										<span aria-hidden="true">·</span>
+										<span className="inline-flex items-center gap-1.5">
 											{flagUrl && (
 												<img
 													src={flagUrl}
-													alt={s.destinationCountry}
-													className="w-4 h-3 object-cover rounded-xs shadow-2xs"
+													alt=""
+													className="w-4 h-3 object-cover rounded-xs"
 												/>
 											)}
-											<span>Tujuan:</span>
-											<span className="font-semibold text-[#0517B0]">
+											<span className="font-medium text-slate-800">
+												{s.subProgram || s.program}
+											</span>
+											{s.subProgram && s.program && (
+												<span className="text-slate-500">({s.program})</span>
+											)}
+										</span>
+									</>
+								)}
+								{s.destinationCountry && (
+									<>
+										<span aria-hidden="true">·</span>
+										<span>
+											Tujuan{" "}
+											<span className="font-medium text-slate-800">
 												{s.destinationCountry}
 											</span>
 											{s.period && (
-												<span className="text-slate-400">({s.period})</span>
+												<span className="text-slate-500"> ({s.period})</span>
 											)}
-										</div>
-									)}
-
-									{s.phone && (
-										<a
-											href={`https://wa.me/${s.phone.replace(/[^0-9]/g, "")}`}
-											target="_blank"
-											rel="noreferrer"
-											className="inline-flex items-center gap-1 text-slate-700 hover:text-emerald-600 font-medium transition-colors"
-											title="Buka WhatsApp"
-										>
-											<Phone className="w-3.5 h-3.5 text-emerald-600" />
-											<span className="font-mono text-xs">{s.phone}</span>
-										</a>
-									)}
-
-									{/* Dosen Pembimbing Akademik (PA) */}
-									<div
-										className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-medium shadow-2xs ${
-											s.pa?.fullName
-												? "bg-amber-50/90 text-amber-900 border-amber-200"
-												: "bg-slate-100/80 text-slate-500 border-slate-200/70"
-										}`}
-										title={
-											s.pa?.fullName
-												? `Dosen Pembimbing Akademik: ${s.pa.fullName}`
-												: "Dosen PA Belum Ditentukan"
-										}
-									>
-										<div
-											className={`w-3.5 h-3.5 rounded-full text-white font-bold text-[8px] flex items-center justify-center shrink-0 ${
-												s.pa?.fullName ? "bg-amber-600" : "bg-slate-400"
-											}`}
-										>
-											PA
-										</div>
-										<span className="text-slate-500 font-normal">PA:</span>
-										<span className="font-semibold text-slate-800 truncate max-w-[140px] sm:max-w-[200px]">
-											{s.pa?.fullName || "Belum Ditentukan"}
 										</span>
-									</div>
-								</div>
-							</div>
+									</>
+								)}
+							</p>
 						</div>
+					</div>
 
-						{/* Right: Progress Overview */}
+					{/* Progress panel lain tetap di header; di tab PMB ringkasan ada di dalam panel */}
+					{mounted && (activeTab || visibleLinks[0]?.id) !== "pmb" && (
 						<div className="shrink-0 w-full lg:w-auto">
 							<StudentProgress
 								studentId={s.id}
@@ -989,45 +923,59 @@ function StudentDetailContent() {
 								}
 							/>
 						</div>
-					</div>
+					)}
+				</div>
 
-					{/* Collapsible Biodata Toggle */}
-					<div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-						<button
-							type="button"
-							onClick={() => setShowFullBiodata(!showFullBiodata)}
-							className="text-xs font-semibold text-[#0517B0] hover:text-blue-800 flex items-center gap-1.5 transition-colors cursor-pointer"
-						>
-							<FileText className="w-3.5 h-3.5" />
-							<span>
-								{showFullBiodata
-									? "Sembunyikan Biodata Lengkap"
-									: "Lihat Biodata Lengkap (NIK, Alamat, Orang Tua)"}
-							</span>
-							{showFullBiodata ? (
-								<ChevronUp className="w-3.5 h-3.5" />
-							) : (
-								<ChevronDown className="w-3.5 h-3.5" />
-							)}
-						</button>
-					</div>
+				{/* Biodata lengkap (WA, PA, NIK, alamat, orang tua) */}
+				<div className="mt-4 border-t border-slate-100 pt-2">
+					<button
+						type="button"
+						onClick={() => setShowFullBiodata(!showFullBiodata)}
+						aria-expanded={showFullBiodata}
+						className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-xs font-semibold text-[#0517B0] hover:text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0517B0]/40"
+					>
+						{showFullBiodata ? "Sembunyikan biodata" : "Lihat biodata lengkap"}
+						{showFullBiodata ? (
+							<ChevronUp className="h-3.5 w-3.5" />
+						) : (
+							<ChevronDown className="h-3.5 w-3.5" />
+						)}
+					</button>
 
-					{/* Collapsible Biodata Content */}
 					{showFullBiodata && (
-						<div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200/80 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs animate-in fade-in duration-200">
+						<div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-4 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-2 md:grid-cols-4">
 							<div>
-								<span className="text-slate-400 font-medium block text-[11px]">
+								<span className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+									WhatsApp
+								</span>
+								{s.phone ? (
+									<a
+										href={`https://wa.me/${s.phone.replace(/[^0-9]/g, "")}`}
+										target="_blank"
+										rel="noreferrer"
+										className="mt-0.5 block font-mono text-sm font-medium text-emerald-700 hover:underline"
+									>
+										{s.phone}
+									</a>
+								) : (
+									<span className="mt-0.5 block text-sm font-medium text-slate-900">
+										-
+									</span>
+								)}
+							</div>
+							<div>
+								<span className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
 									NIK / NISN
 								</span>
-								<span className="font-semibold text-slate-800">
+								<span className="mt-0.5 block text-sm font-medium text-slate-900">
 									{s.nik || "-"} / {s.nisn || "-"}
 								</span>
 							</div>
 							<div>
-								<span className="text-slate-400 font-medium block text-[11px]">
+								<span className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
 									Tempat, Tanggal Lahir
 								</span>
-								<span className="font-semibold text-slate-800">
+								<span className="mt-0.5 block text-sm font-medium text-slate-900">
 									{s.birthPlace || "-"},{" "}
 									{s.birthDate
 										? new Date(s.birthDate).toLocaleDateString("id-ID")
@@ -1035,87 +983,89 @@ function StudentDetailContent() {
 								</span>
 							</div>
 							<div>
-								<span className="text-slate-400 font-medium block text-[11px]">
+								<span className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
 									Jenis Kelamin
 								</span>
-								<span className="font-semibold text-slate-800">
+								<span className="mt-0.5 block text-sm font-medium text-slate-900">
 									{s.gender || "-"}
 								</span>
 							</div>
 							<div>
-								<span className="text-slate-400 font-medium block text-[11px]">
+								<span className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
 									Asal Sekolah
 								</span>
-								<span className="font-semibold text-slate-800">
+								<span className="mt-0.5 block text-sm font-medium text-slate-900">
 									{s.schoolOrigin || "-"}
 								</span>
 							</div>
-							<div className="col-span-2 md:col-span-4">
-								<span className="text-slate-400 font-medium block text-[11px]">
+							<div className="sm:col-span-2 md:col-span-4">
+								<span className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
 									Alamat Lengkap
 								</span>
-								<span className="font-medium text-slate-700">
+								<span className="mt-0.5 block text-sm font-medium text-slate-900">
 									{formatAddress(s)}
 								</span>
 							</div>
 							<div>
-								<span className="text-slate-400 font-medium block text-[11px]">
+								<span className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
 									Nama Orang Tua / Wali
 								</span>
-								<span className="font-semibold text-slate-800">
+								<span className="mt-0.5 block text-sm font-medium text-slate-900">
 									{primaryParent?.name || "-"}
 								</span>
 							</div>
 							<div>
-								<span className="text-slate-400 font-medium block text-[11px]">
+								<span className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
 									Pekerjaan / Penghasilan
 								</span>
-								<span className="font-semibold text-slate-800">
+								<span className="mt-0.5 block text-sm font-medium text-slate-900">
 									{primaryParent?.job || "-"} / {primaryParent?.income || "-"}
 								</span>
 							</div>
 							<div>
-								<span className="text-slate-400 font-medium block text-[11px]">
+								<span className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
 									No. HP Orang Tua
 								</span>
-								<span className="font-semibold text-slate-800 font-mono">
+								<span className="mt-0.5 block font-mono text-sm font-medium text-slate-900">
 									{primaryParent?.phone || "-"}
 								</span>
 							</div>
-							<div className="col-span-2 md:col-span-4 pt-1 border-t border-slate-200/60 flex items-center gap-2">
-								<span className="text-slate-400 font-medium text-[11px]">
-									Dosen Pembimbing Akademik (PA):
+							<div className="sm:col-span-2 md:col-span-4 border-t border-slate-200/60 pt-3">
+								<span className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+									Dosen Pembimbing Akademik (PA)
 								</span>
-								<span className="font-semibold text-slate-800">
+								<span className="mt-0.5 block text-sm font-medium text-slate-900">
 									{s.pa?.fullName || "Belum Ditentukan"}
 								</span>
 							</div>
 						</div>
 					)}
 				</div>
-			</div>
+			</section>
 
-			{/* ─── DIVISION TABS NAVIGATION (SEGMENTED PILLS) ─── */}
-			<div className="flex overflow-x-auto gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 hide-scrollbar w-fit max-w-full">
-				{mounted &&
-					visibleLinks.map((link) => (
-						<button
-							type="button"
-							key={link.id}
-							onClick={() => scrollToAnchor(link.id)}
-							className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 ${
-								(activeTab || visibleLinks[0]?.id) === link.id
-									? "bg-white text-[#0517B0] shadow-xs font-bold"
-									: "text-slate-600 hover:text-slate-900 hover:bg-white/50"
-							}`}
-						>
-							{link.label}
-						</button>
-					))}
-			</div>
+			{/* ─── DIVISION TABS NAVIGATION (disembunyikan bila hanya 1 tab) ─── */}
+			{visibleLinks.length > 1 && (
+				<div className="flex overflow-x-auto gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 hide-scrollbar w-fit max-w-full">
+					{mounted &&
+						visibleLinks.map((link) => (
+							<button
+								type="button"
+								key={link.id}
+								onClick={() => scrollToAnchor(link.id)}
+								className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 ${
+									(activeTab || visibleLinks[0]?.id) === link.id
+										? "bg-white text-[#0517B0] shadow-xs font-bold"
+										: "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+								}`}
+							>
+								{link.label}
+							</button>
+						))}
+				</div>
+			)}
 
 			{/* PANELS CONTENT */}
-			<div className="mt-8 space-y-6">
+			<div className={`${visibleLinks.length > 1 ? "mt-8" : ""} space-y-6`}>
 				{mounted &&
 					(() => {
 						const currentLink = visibleLinks.find(
@@ -1273,37 +1223,7 @@ function StudentDetailContent() {
 										? (data.academic as any)?.accBy
 										: undefined),
 							)}
-							{renderStamp(
-								"Dosen",
-								Boolean(
-									data.courseGrades &&
-										data.courseGrades.length > 0 &&
-										data.courseGrades.every((g: any) => g.isAcc),
-								),
-								data.courseGrades &&
-									data.courseGrades.length > 0 &&
-									data.courseGrades.every((g: any) => g.isAcc)
-									? new Date(
-											Math.max(
-												...data.courseGrades.map((g: any) =>
-													new Date(g.accAt || 0).getTime(),
-												),
-											),
-										).toLocaleDateString("id-ID")
-									: undefined,
-							)}
-							{renderStamp(
-								"PA",
-								!!data.pa?.isAcc,
-								data.pa?.accAt
-									? new Date(data.pa.accAt).toLocaleDateString("id-ID")
-									: undefined,
-								(data.pa as any)?.accBy?.fullName ||
-									(data.pa as any)?.accByUser?.fullName ||
-									(typeof (data.pa as any)?.accBy === "string"
-										? (data.pa as any)?.accBy
-										: undefined),
-							)}
+							{/* Dosen & PA tidak lagi memberi ACC terpisah: keduanya di bawah Akademik */}
 							{renderStamp(
 								"Magang",
 								!!data.internship?.isAcc,
@@ -1329,9 +1249,13 @@ function StudentDetailContent() {
 									)}{" "}
 									Persetujuan Akhir (Direktur)
 								</h4>
+								{/* Teks mengikuti status nyata: dulu selalu menulis
+								    "Kandidat berstatus AMAN" walau ACC masih Pending. */}
 								<p className="text-sm text-amber-600/80 mt-1">
-									Kandidat berstatus AMAN. Direktur dapat mengatur tanggal
-									keberangkatan dan catatan untuk SK.
+									{data.student.overallStatus === "AMAN" ||
+									data.decision?.isApprovedByDirector
+										? "Kandidat berstatus AMAN. Direktur dapat mengatur tanggal keberangkatan dan catatan untuk SK."
+										: `Kandidat berstatus ${data.student.overallStatus || "BELUM LENGKAP"}. Menunggu ACC divisi sebelum persetujuan Direktur.`}
 								</p>
 							</div>
 							<AlertDialog>

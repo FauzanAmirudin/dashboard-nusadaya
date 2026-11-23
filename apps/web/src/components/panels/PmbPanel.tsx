@@ -1,18 +1,9 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import {
-	CheckCircle,
-	CheckCircle2,
-	ClipboardList,
-	Clock,
-	DollarSign,
-	Home,
-	Users,
-} from "lucide-react";
+import { CheckCircle, ClipboardList, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { AccPanelStatusCard } from "@/components/ui/AccPanelStatusCard";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -26,8 +17,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PanelHeader } from "@/components/ui/PanelHeader";
-import { PanelStatusBadge } from "@/components/ui/PanelStatusBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
 	Tooltip,
@@ -41,7 +30,6 @@ import { formatDeviceDateTime } from "@/utils/format";
 import { calculatePmbChecklist } from "@/utils/panel-logic";
 
 import { TabChecklist } from "./pmb/TabChecklist";
-import { TabDataTambahan } from "./pmb/TabDataTambahan";
 import { TabFeeSharing } from "./pmb/TabFeeSharing";
 import { TabSkemaKeuangan } from "./pmb/TabSkemaKeuangan";
 
@@ -76,7 +64,7 @@ export function PmbPanel({
 
 	const [pmbData, setPmbData] = useState<any>(initialPmbData || null);
 	const [documents, setDocuments] = useState<Record<string, DocFile[]>>({});
-	const [activeTab, setActiveTab] = useState("data-tambahan");
+	const [activeTab, setActiveTab] = useState("checklist");
 	const [isLoading, setIsLoading] = useState(!initialPmbData);
 	const [isAccSaving, setIsAccSaving] = useState(false);
 
@@ -86,12 +74,32 @@ export function PmbPanel({
 		}
 	}, [initialPmbData]);
 
+	// Syarat ACC per tab (sumber: server, aturan yang sama dengan validasi ACC)
+	const [accReq, setAccReq] = useState<{
+		dokumen: { ok: boolean; done: number; total: number };
+		keuangan: { ok: boolean };
+		feeSharing: { ok: boolean; paid: number; total: number };
+		ok: boolean;
+		missing: string[];
+	} | null>(null);
+
+	const fetchAccRequirements = async () => {
+		try {
+			const res: any =
+				await api.students[studentId.toString()].pmb["acc-requirements"].get();
+			if (res?.data?.success) setAccReq(res.data.data);
+		} catch {
+			// biarkan null: tombol ACC tetap nonaktif
+		}
+	};
+
 	const fetchPmbData = async () => {
 		try {
 			const res = await api.students[studentId.toString()].pmb.get();
 			if (res.data?.success && res.data.data) {
 				setPmbData(res.data.data);
 			}
+			await fetchAccRequirements();
 		} catch (err) {
 			console.error("Gagal memuat data PMB:", err);
 		} finally {
@@ -132,7 +140,6 @@ export function PmbPanel({
 		mainCompletedCount,
 		requiredDocsCompletedCount,
 		totalRequiredCompleted16,
-		isAllChecklistDone,
 	} = calculatePmbChecklist(pmbData);
 
 	const handleAcc = async () => {
@@ -216,64 +223,213 @@ export function PmbPanel({
 		}
 	};
 
+	// Aturan ACC: 5 berkas utama + 9 dokumen wajib = 14 (lihat calculatePmbChecklist)
+	const PMB_REQUIRED_TOTAL = 13;
+	const completed = totalRequiredCompleted16;
+	const isAcc = Boolean(pmbData?.isAcc);
+	const accByName =
+		pmbData?.accBy?.fullName ||
+		pmbData?.accByUser?.fullName ||
+		(typeof pmbData?.accBy === "string" ? pmbData?.accBy : "Tim PMB");
+
+	const reqOk = Boolean(accReq?.ok);
+	const nextStep = !accReq
+		? "Memuat syarat ACC..."
+		: !accReq.dokumen.ok
+			? "Lengkapi Dokumen"
+			: !accReq.keuangan.ok
+				? "Lengkapi Skema Keuangan"
+				: accReq.feeSharing.total === 0
+					? "Tambah penerima fee"
+					: "Menunggu pembayaran fee oleh Finance";
+
+	const accButton = (extraClass = "") => (
+		<Button
+			onClick={handleAcc}
+			disabled={!reqOk || isAccSaving}
+			className={`h-11 bg-[#0517B0] hover:bg-blue-800 text-white text-sm font-semibold ${extraClass}`}
+		>
+			{isAccSaving ? "Memproses..." : reqOk ? "Beri ACC PMB" : nextStep}
+		</Button>
+	);
+
+	const requirementRows = [
+		{
+			key: "dokumen",
+			label: "Dokumen",
+			ok: Boolean(accReq?.dokumen.ok),
+			detail: `${accReq?.dokumen.done ?? completed}/${accReq?.dokumen.total ?? PMB_REQUIRED_TOTAL} berkas wajib`,
+		},
+		{
+			key: "keuangan",
+			label: "Skema Keuangan",
+			ok: Boolean(accReq?.keuangan.ok),
+			detail: accReq?.keuangan.ok
+				? "Total biaya & DP terisi"
+				: "Total biaya & DP belum diisi",
+		},
+		{
+			key: "fee",
+			label: "Fee Sharing",
+			ok: Boolean(accReq?.feeSharing.ok),
+			detail:
+				!accReq || accReq.feeSharing.total === 0
+					? "Belum ada penerima"
+					: `${accReq.feeSharing.paid}/${accReq.feeSharing.total} penerima sudah dibayarkan`,
+		},
+	];
+
+	// Ponsel: titik status (hemat ruang, tab tetap 1 baris); tablet/desktop: badge teks
+	const tabBadge = (ok: boolean, text: string) => (
+		<>
+			<span
+				aria-hidden="true"
+				className={`size-2 shrink-0 rounded-full sm:hidden ${ok ? "bg-emerald-500" : "bg-amber-500"}`}
+			/>
+			<span
+				aria-hidden="true"
+				className={`hidden sm:inline-flex ml-0.5 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${ok ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}
+			>
+				{text}
+			</span>
+			<span className="sr-only">
+				{ok ? "(lengkap)" : `(belum lengkap: ${text})`}
+			</span>
+		</>
+	);
+
 	return (
 		<div className="space-y-6">
-			<PanelHeader
-				icon={<Users className="w-5 h-5 text-[#0517B0]" />}
-				title="Panel PMB (Penerimaan Mahasiswa Baru)"
-				subtitle="Dikelola oleh: Admin PMB & Superadmin"
-				progressTag={
-					<span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-						Dokumen: {totalRequiredCompleted16}/17 Wajib
-					</span>
-				}
-				badge={
-					<PanelStatusBadge
-						isAcc={pmbData?.isAcc}
-						completed={totalRequiredCompleted16}
-						total={17}
-						size="lg"
-					/>
-				}
-			/>
+			{/* Ringkasan: satu angka, satu progress, satu aksi utama */}
+			<section className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 sm:p-6">
+				<div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+					<div className="min-w-0 flex-1">
+						<h2 className="text-base font-bold text-slate-900">
+							Syarat ACC PMB
+						</h2>
+						<p className="mt-0.5 text-sm text-slate-700">
+							{isAcc ? (
+								<>
+									<span className="font-semibold text-emerald-700">
+										Sudah ACC
+									</span>{" "}
+									oleh {accByName}
+									{pmbData?.accAt
+										? ` · ${formatDeviceDateTime(pmbData.accAt)}`
+										: ""}
+								</>
+							) : reqOk ? (
+								"Semua syarat terpenuhi. Siap diberi ACC."
+							) : (
+								"ACC bisa diberikan setelah ketiga tab di bawah lengkap."
+							)}
+						</p>
+						<ul className="mt-3 grid gap-2 sm:grid-cols-3">
+							{requirementRows.map((r) => (
+								<li
+									key={r.key}
+									className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 ${r.ok ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-white"}`}
+								>
+									<span
+										aria-hidden="true"
+										className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${r.ok ? "bg-emerald-500 text-white" : "bg-amber-100 text-amber-700"}`}
+									>
+										{r.ok ? "✓" : "!"}
+									</span>
+									<span className="min-w-0">
+										<span className="block text-sm font-semibold text-slate-900">
+											{r.label}
+											<span className="sr-only">
+												{r.ok ? " (lengkap)" : " (belum lengkap)"}
+											</span>
+										</span>
+										<span className="block text-xs text-slate-600">
+											{r.detail}
+										</span>
+									</span>
+								</li>
+							))}
+						</ul>
+					</div>
 
-			{/* Tabs Container */}
+					{canEdit &&
+						(isAcc ? (
+							<AlertDialog>
+								<AlertDialogTrigger
+									render={
+										<Button
+											variant="outline"
+											disabled={isAccSaving}
+											className="h-11 border-slate-200 text-slate-700 text-sm font-semibold"
+										/>
+									}
+								>
+									Batalkan ACC
+								</AlertDialogTrigger>
+								<AlertDialogContent>
+									<AlertDialogHeader>
+										<AlertDialogTitle>
+											Konfirmasi Pembatalan ACC PMB
+										</AlertDialogTitle>
+										<AlertDialogDescription>
+											Apakah Anda yakin ingin membatalkan status ACC untuk panel
+											PMB mahasiswa ini? Status PMB akan kembali ke tahap
+											berproses.
+										</AlertDialogDescription>
+									</AlertDialogHeader>
+									<div className="flex justify-end gap-2">
+										<AlertDialogCancel>Batal</AlertDialogCancel>
+										<AlertDialogAction onClick={handleCancelAcc}>
+											Ya, batalkan ACC
+										</AlertDialogAction>
+									</div>
+								</AlertDialogContent>
+							</AlertDialog>
+						) : (
+							<div className="hidden sm:block shrink-0">{accButton()}</div>
+						))}
+				</div>
+			</section>
+
+			{/* Sub-tab bergaya tombol segmen: jelas bisa diklik, tab aktif menonjol */}
 			<Tabs
 				value={activeTab}
 				onValueChange={setActiveTab}
-				className="w-full space-y-4"
+				className="w-full space-y-6"
 			>
-				<TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 bg-slate-100 p-1.5 rounded-xl border border-slate-200 h-auto gap-1">
-					<TabsTrigger
-						value="data-tambahan"
-						className="flex items-center justify-center gap-2 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
-					>
-						<Home className="w-4 h-4 text-rose-600" />
-						Fasilitas Rumah Juang
-					</TabsTrigger>
+				<TabsList className="grid h-auto w-full grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 sm:inline-flex sm:w-auto">
 					<TabsTrigger
 						value="checklist"
-						className="flex items-center justify-center gap-2 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
+						className="min-h-11 h-auto min-w-0 sm:flex-none gap-1.5 whitespace-nowrap rounded-lg border border-transparent px-1.5 sm:px-5 py-2 text-center text-[13px] sm:text-[15px] font-semibold text-slate-600 hover:bg-white/70 hover:text-slate-900 data-active:border-slate-200 data-active:bg-white data-active:text-[#0517B0] data-active:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0517B0]/40"
 					>
-						<CheckCircle2 className="w-4 h-4 text-emerald-600" />
-						<span>Dokumen Mahasiswa</span>
-						<span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-200">
-							{totalRequiredCompleted16}/17
-						</span>
+						Dokumen
+						{tabBadge(
+							Boolean(accReq?.dokumen.ok),
+							`${accReq?.dokumen.done ?? completed}/${accReq?.dokumen.total ?? PMB_REQUIRED_TOTAL}`,
+						)}
 					</TabsTrigger>
 					<TabsTrigger
 						value="finance"
-						className="flex items-center justify-center gap-2 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
+						className="min-h-11 h-auto min-w-0 sm:flex-none gap-1.5 whitespace-nowrap rounded-lg border border-transparent px-1.5 sm:px-5 py-2 text-center text-[13px] sm:text-[15px] font-semibold text-slate-600 hover:bg-white/70 hover:text-slate-900 data-active:border-slate-200 data-active:bg-white data-active:text-[#0517B0] data-active:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0517B0]/40"
 					>
-						<DollarSign className="w-4 h-4 text-indigo-600" />
-						Skema Keuangan
+						<span className="sm:hidden">Keuangan</span>
+						<span className="hidden sm:inline">Skema Keuangan</span>
+						{tabBadge(
+							Boolean(accReq?.keuangan.ok),
+							accReq?.keuangan.ok ? "✓" : "Belum",
+						)}
 					</TabsTrigger>
 					<TabsTrigger
 						value="fee-sharing"
-						className="flex items-center justify-center gap-2 py-2 text-xs sm:text-sm font-semibold rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#0517B0] data-[state=active]:shadow-sm transition-all"
+						className="min-h-11 h-auto min-w-0 sm:flex-none gap-1.5 whitespace-nowrap rounded-lg border border-transparent px-1.5 sm:px-5 py-2 text-center text-[13px] sm:text-[15px] font-semibold text-slate-600 hover:bg-white/70 hover:text-slate-900 data-active:border-slate-200 data-active:bg-white data-active:text-[#0517B0] data-active:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0517B0]/40"
 					>
-						<Users className="w-4 h-4 text-amber-600" />
 						Fee Sharing
+						{tabBadge(
+							Boolean(accReq?.feeSharing.ok),
+							!accReq || accReq.feeSharing.total === 0
+								? "Belum"
+								: `${accReq.feeSharing.paid}/${accReq.feeSharing.total}`,
+						)}
 					</TabsTrigger>
 				</TabsList>
 
@@ -304,43 +460,14 @@ export function PmbPanel({
 						onUpdate={handleDataUpdate}
 					/>
 				</TabsContent>
-
-				<TabsContent value="data-tambahan">
-					<TabDataTambahan
-						studentId={studentId}
-						pmbData={pmbData}
-						canEdit={canEdit}
-						onUpdate={handleDataUpdate}
-					/>
-				</TabsContent>
 			</Tabs>
 
-			{/* Status ACC Panel PMB Card (Persistent across all tabs) */}
-			<AccPanelStatusCard
-				isAcc={Boolean(pmbData?.isAcc)}
-				accByUser={
-					pmbData?.accBy?.fullName ||
-					pmbData?.accByUser?.fullName ||
-					(typeof pmbData?.accBy === "string" ? pmbData?.accBy : "Tim PMB")
-				}
-				accAt={pmbData?.accAt}
-				isReadyForAcc={isAllChecklistDone}
-				title="ACC Panel PMB"
-				pendingTitle={
-					!isAllChecklistDone
-						? `Menunggu Kelengkapan Berkas (${16 - totalRequiredCompleted16} item wajib belum selesai)`
-						: "ACC Panel PMB (Penerimaan Mahasiswa Baru)"
-				}
-				pendingDescription="Selesaikan semua 4 checklist berkas utama dan 12 dokumen wajib sebelum memberikan ACC PMB."
-				readyDescription="Semua 16 berkas wajib PMB telah lengkap dan tervalidasi. Anda dapat memberikan persetujuan ACC resmi sekarang."
-				canEdit={canEdit}
-				isSaving={isAccSaving}
-				onAcc={handleAcc}
-				onCancelAcc={handleCancelAcc}
-				cancelDialogTitle="Konfirmasi Pembatalan ACC PMB"
-				cancelDialogDescription="Apakah Anda yakin ingin membatalkan status ACC untuk panel PMB mahasiswa ini? Status PMB akan kembali ke tahap berproses."
-				disabledReason="Harus menyelesaikan 16/16 checklist berkas wajib PMB sebelum ACC"
-			/>
+			{/* Ponsel: aksi utama menempel di bawah, dalam jangkauan ibu jari */}
+			{canEdit && !isAcc && (
+				<div className="sm:hidden sticky bottom-0 z-20 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-sm">
+					{accButton("w-full")}
+				</div>
+			)}
 		</div>
 	);
 }

@@ -2,23 +2,24 @@
 
 import {
 	AlertCircle,
+	AlertTriangle,
 	ArrowLeft,
-	Award,
-	Building2,
 	CheckCircle2,
 	Copy,
 	Globe,
 	Loader2,
-	PhoneCall,
 	Sparkles,
 	UploadCloud,
-	UserCheck,
-	UserPlus,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { EmergencyContactsFields } from "@/components/common/EmergencyContactsFields";
+import { HealthQuestion } from "@/components/common/HealthQuestion";
+import { OptionalSection } from "@/components/common/OptionalSection";
+import { OptionSelect } from "@/components/common/OptionSelect";
+import { YesNoWithDetail } from "@/components/common/YesNoWithDetail";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +38,16 @@ import {
 } from "@/lib/cohort-generator";
 import { API_URL, api, getToken } from "@/lib/eden";
 import {
+	emptyEmergencyContact,
+	parseEmergencyContacts,
+	validateEmergencyContacts,
+} from "@/lib/emergency-contacts";
+import {
+	INCOME_RANGE_OPTIONS,
+	LAST_EDUCATION_OPTIONS,
+} from "@/lib/form-options";
+import { RECOMMENDED_BY_OPTIONS } from "@/lib/recommenders";
+import {
 	getCities,
 	getDistricts,
 	getProvinces,
@@ -49,6 +60,7 @@ import {
 	isValidEmail,
 	preventNonNumericKey,
 	preventNonPhoneKey,
+	validateIndonesianPhone,
 } from "@/utils/form-validators";
 
 const TABS = [
@@ -130,6 +142,11 @@ export default function EditStudentPage() {
 
 		// Tab 2: Pendidikan
 		schoolOrigin: "",
+		lastEducation: "",
+		hasStudiedCollege: "Tidak",
+		priorCollege: "",
+		ayahIncome: "",
+		ibuIncome: "",
 		schoolAddress: "",
 		schoolMajor: "",
 		graduationYear: "",
@@ -154,9 +171,9 @@ export default function EditStudentPage() {
 		referralInstitutionName: "",
 		referralContactName: "",
 		referralContactPhone: "",
-		emergencyContactName: "",
-		emergencyContactPhone: "",
-		emergencyContactRelation: "",
+		recommendedBy: "",
+		recommenderName: "",
+		emergencyContacts: [emptyEmergencyContact()],
 
 		// Tab 3: Kesehatan
 		bloodType: "",
@@ -210,6 +227,7 @@ export default function EditStudentPage() {
 		waliNationalityOther: "",
 		waliEducation: "",
 		waliJob: "",
+		waliIncome: "",
 		waliAddress: "",
 		waliPhone: "",
 		waliEmail: "",
@@ -282,6 +300,9 @@ export default function EditStudentPage() {
 
 						// Tab 2
 						schoolOrigin: std.schoolOrigin || "",
+						lastEducation: std.lastEducation || "",
+						hasStudiedCollege: std.priorCollege ? "Ya" : "Tidak",
+						priorCollege: std.priorCollege || "",
 						schoolAddress: std.schoolAddress || "",
 						schoolMajor: std.schoolMajor || "",
 						graduationYear: std.graduationYear?.toString() || "",
@@ -306,9 +327,9 @@ export default function EditStudentPage() {
 						referralInstitutionName: pmb?.referralInstitutionName || "",
 						referralContactName: pmb?.referralContactName || "",
 						referralContactPhone: pmb?.referralContactPhone || "",
-						emergencyContactName: std.emergencyContactName || "",
-						emergencyContactPhone: std.emergencyContactPhone || "",
-						emergencyContactRelation: std.emergencyContactRelation || "",
+						recommendedBy: pmb?.recommendedBy || "",
+						recommenderName: pmb?.recommenderName || "",
+						emergencyContacts: parseEmergencyContacts(std),
 
 						// Tab 3 Health
 						bloodType: health?.bloodType || "",
@@ -334,6 +355,7 @@ export default function EditStudentPage() {
 						ayahNationality: ayah.nationality || "Indonesia",
 						ayahEducation: ayah.education || "",
 						ayahJob: ayah.job || "",
+						ayahIncome: ayah.income || "",
 						ayahAddress: ayah.address || "",
 						ayahPhone: ayah.phone || "",
 						ayahEmail: ayah.email || "",
@@ -349,6 +371,7 @@ export default function EditStudentPage() {
 						ibuNationality: ibu.nationality || "Indonesia",
 						ibuEducation: ibu.education || "",
 						ibuJob: ibu.job || "",
+						ibuIncome: ibu.income || "",
 						ibuAddress: ibu.address || "",
 						ibuPhone: ibu.phone || "",
 						ibuEmail: ibu.email || "",
@@ -364,6 +387,7 @@ export default function EditStudentPage() {
 						waliNationality: wali.nationality || "Indonesia",
 						waliEducation: wali.education || "",
 						waliJob: wali.job || "",
+						waliIncome: wali.income || "",
 						waliAddress: wali.address || "",
 						waliPhone: wali.phone || "",
 						waliEmail: wali.email || "",
@@ -466,6 +490,7 @@ export default function EditStudentPage() {
 				if (key === "ayahNationalityOther") next.waliNationalityOther = value;
 				if (key === "ayahEducation") next.waliEducation = value;
 				if (key === "ayahJob") next.waliJob = value;
+				if (key === "ayahIncome") next.waliIncome = value;
 				if (key === "ayahAddress") next.waliAddress = value;
 				if (key === "ayahPhone") next.waliPhone = value;
 				if (key === "ayahEmail") next.waliEmail = value;
@@ -479,6 +504,7 @@ export default function EditStudentPage() {
 				if (key === "ibuNationalityOther") next.waliNationalityOther = value;
 				if (key === "ibuEducation") next.waliEducation = value;
 				if (key === "ibuJob") next.waliJob = value;
+				if (key === "ibuIncome") next.waliIncome = value;
 				if (key === "ibuAddress") next.waliAddress = value;
 				if (key === "ibuPhone") next.waliPhone = value;
 				if (key === "ibuEmail") next.waliEmail = value;
@@ -547,9 +573,15 @@ export default function EditStudentPage() {
 				);
 				return false;
 			}
-			if (formData.phone.length < 8) {
-				toast.error("Nomor HP / WhatsApp minimal 8 digit");
-				return false;
+			{
+				const phoneErr = validateIndonesianPhone(
+					formData.phone,
+					"Nomor HP / WhatsApp",
+				);
+				if (phoneErr) {
+					toast.error(phoneErr);
+					return false;
+				}
 			}
 		} else if (index === 1) {
 			const reqKeys: (keyof typeof formData)[] = [
@@ -564,6 +596,22 @@ export default function EditStudentPage() {
 				toast.error(
 					"Mohon lengkapi seluruh field di Keterangan Pendidikan (Jurusan Sekolah opsional)",
 				);
+				return false;
+			}
+			if (
+				formData.lastEducation &&
+				!(LAST_EDUCATION_OPTIONS as readonly string[]).includes(
+					formData.lastEducation,
+				)
+			) {
+				toast.error("Pendidikan terakhir hanya SMA, MA, SMK, atau Paket C");
+				return false;
+			}
+			if (
+				formData.hasStudiedCollege === "Ya" &&
+				!formData.priorCollege.trim()
+			) {
+				toast.error("Nama perguruan tinggi sebelumnya wajib diisi");
 				return false;
 			}
 			const grad = Number(formData.graduationYear);
@@ -663,9 +711,15 @@ export default function EditStudentPage() {
 				toast.error("Format Email Wali tidak valid");
 				return false;
 			}
-			if (formData.waliPhone && formData.waliPhone.length < 8) {
-				toast.error("Nomor HP Wali minimal 8 digit");
-				return false;
+			{
+				const phoneErr = validateIndonesianPhone(
+					formData.waliPhone,
+					"Nomor HP Wali",
+				);
+				if (phoneErr) {
+					toast.error(phoneErr);
+					return false;
+				}
 			}
 		} else if (index === 4) {
 			const reqKeys: (keyof typeof formData)[] = [
@@ -688,9 +742,15 @@ export default function EditStudentPage() {
 				toast.error("Format Email Ayah tidak valid");
 				return false;
 			}
-			if (formData.ayahPhone && formData.ayahPhone.length < 8) {
-				toast.error("Nomor HP Ayah minimal 8 digit");
-				return false;
+			{
+				const phoneErr = validateIndonesianPhone(
+					formData.ayahPhone,
+					"Nomor HP Ayah",
+				);
+				if (phoneErr) {
+					toast.error(phoneErr);
+					return false;
+				}
 			}
 		} else if (index === 5) {
 			const reqKeys: (keyof typeof formData)[] = [
@@ -713,23 +773,34 @@ export default function EditStudentPage() {
 				toast.error("Format Email Ibu tidak valid");
 				return false;
 			}
-			if (formData.ibuPhone && formData.ibuPhone.length < 8) {
-				toast.error("Nomor HP Ibu minimal 8 digit");
-				return false;
+			{
+				const phoneErr = validateIndonesianPhone(
+					formData.ibuPhone,
+					"Nomor HP Ibu",
+				);
+				if (phoneErr) {
+					toast.error(phoneErr);
+					return false;
+				}
 			}
 		} else if (index === 6) {
-			if (
-				formData.referralContactPhone &&
-				formData.referralContactPhone.length < 8
-			) {
-				toast.error("Nomor WhatsApp Kontak Referral minimal 8 digit");
-				return false;
+			{
+				const phoneErr = validateIndonesianPhone(
+					formData.referralContactPhone,
+					"Nomor WhatsApp Kontak Referral",
+				);
+				if (phoneErr) {
+					toast.error(phoneErr);
+					return false;
+				}
 			}
-			if (
-				formData.emergencyContactPhone &&
-				formData.emergencyContactPhone.length < 8
-			) {
-				toast.error("Nomor WhatsApp Kontak Darurat minimal 8 digit");
+			const emergencyErr = validateEmergencyContacts(
+				formData.emergencyContacts,
+				validateIndonesianPhone,
+				false,
+			);
+			if (emergencyErr) {
+				toast.error(emergencyErr);
 				return false;
 			}
 		}
@@ -741,6 +812,22 @@ export default function EditStudentPage() {
 			setCurrentTab((prev) => Math.min(prev + 1, TABS.length - 1));
 			window.scrollTo(0, 0);
 		}
+	};
+
+	const handleTabClick = (targetTab: number) => {
+		if (targetTab === currentTab) return;
+		// Melompat maju: semua tab di depan posisi sekarang harus lolos validasi
+		if (targetTab > currentTab) {
+			for (let t = currentTab; t < targetTab; t++) {
+				if (!validateTab(t)) {
+					setCurrentTab(t);
+					window.scrollTo({ top: 0, behavior: "smooth" });
+					return;
+				}
+			}
+		}
+		setCurrentTab(targetTab);
+		window.scrollTo({ top: 0, behavior: "smooth" });
 	};
 
 	const handlePrev = () => {
@@ -758,6 +845,7 @@ export default function EditStudentPage() {
 			waliNationality: prev.ayahNationality,
 			waliEducation: prev.ayahEducation,
 			waliJob: prev.ayahJob,
+			waliIncome: prev.ayahIncome,
 			waliAddress: prev.ayahAddress,
 			waliPhone: prev.ayahPhone,
 			waliEmail: prev.ayahEmail,
@@ -776,6 +864,7 @@ export default function EditStudentPage() {
 			waliNationality: prev.ibuNationality,
 			waliEducation: prev.ibuEducation,
 			waliJob: prev.ibuJob,
+			waliIncome: prev.ibuIncome,
 			waliAddress: prev.ibuAddress,
 			waliPhone: prev.ibuPhone,
 			waliEmail: prev.ibuEmail,
@@ -806,6 +895,7 @@ export default function EditStudentPage() {
 							: formData.ayahNationality || undefined,
 					education: formData.ayahEducation || undefined,
 					job: formData.ayahJob || undefined,
+					income: formData.ayahIncome || undefined,
 					address: formData.ayahAddress || undefined,
 					phone: formData.ayahPhone || undefined,
 					email: formData.ayahEmail || undefined,
@@ -827,6 +917,7 @@ export default function EditStudentPage() {
 							: formData.ibuNationality || undefined,
 					education: formData.ibuEducation || undefined,
 					job: formData.ibuJob || undefined,
+					income: formData.ibuIncome || undefined,
 					address: formData.ibuAddress || undefined,
 					phone: formData.ibuPhone || undefined,
 					email: formData.ibuEmail || undefined,
@@ -849,6 +940,7 @@ export default function EditStudentPage() {
 								: formData.ayahNationality || undefined,
 						education: formData.ayahEducation || undefined,
 						job: formData.ayahJob || undefined,
+						income: formData.ayahIncome || undefined,
 						address: formData.ayahAddress || undefined,
 						phone: formData.ayahPhone || undefined,
 						email: formData.ayahEmail || undefined,
@@ -872,6 +964,7 @@ export default function EditStudentPage() {
 								: formData.ibuNationality || undefined,
 						education: formData.ibuEducation || undefined,
 						job: formData.ibuJob || undefined,
+						income: formData.ibuIncome || undefined,
 						address: formData.ibuAddress || undefined,
 						phone: formData.ibuPhone || undefined,
 						email: formData.ibuEmail || undefined,
@@ -894,6 +987,7 @@ export default function EditStudentPage() {
 							: formData.waliNationality || undefined,
 					education: formData.waliEducation || undefined,
 					job: formData.waliJob || undefined,
+					income: formData.waliIncome || undefined,
 					address: formData.waliAddress || undefined,
 					phone: formData.waliPhone || undefined,
 					email: formData.waliEmail || undefined,
@@ -931,6 +1025,9 @@ export default function EditStudentPage() {
 
 				// Tab 2
 				schoolOrigin: formData.schoolOrigin || undefined,
+				lastEducation: formData.lastEducation || undefined,
+				priorCollege:
+					formData.hasStudiedCollege === "Ya" ? formData.priorCollege : "",
 				schoolAddress: formData.schoolAddress || undefined,
 				schoolMajor: formData.schoolMajor || undefined,
 				graduationYear: formData.graduationYear
@@ -993,10 +1090,16 @@ export default function EditStudentPage() {
 				referralInstitutionName: formData.referralInstitutionName || undefined,
 				referralContactName: formData.referralContactName || undefined,
 				referralContactPhone: formData.referralContactPhone || undefined,
-				emergencyContactName: formData.emergencyContactName || undefined,
-				emergencyContactPhone: formData.emergencyContactPhone || undefined,
-				emergencyContactRelation:
-					formData.emergencyContactRelation || undefined,
+				recommendedBy: formData.recommendedBy || undefined,
+				recommenderName: formData.recommenderName || undefined,
+				emergencyContacts: formData.emergencyContacts
+					.filter((c) => c.name.trim() && c.phone.trim())
+					.map((c) => ({
+						name: c.name.trim(),
+						phone: c.phone.trim(),
+						relation: c.relation.trim(),
+						...(c.note.trim() ? { note: c.note.trim() } : {}),
+					})),
 			};
 
 			// 1. Upload foto profil jika ada file baru yang dipilih
@@ -1092,7 +1195,11 @@ export default function EditStudentPage() {
 			{/* Stepper Tabs */}
 			<div className="flex items-center space-x-2 mb-8 overflow-x-auto pb-4 hide-scrollbar">
 				{TABS.map((tab, idx) => (
-					<div key={tab} className="flex items-center">
+					<div
+						key={tab}
+						onClick={() => handleTabClick(idx)}
+						className="flex items-center cursor-pointer"
+					>
 						<div
 							className={`flex items-center justify-center h-8 w-8 rounded-full border-2 text-sm font-medium shrink-0 transition-colors ${
 								idx === currentTab
@@ -1182,6 +1289,7 @@ export default function EditStudentPage() {
 								<Input
 									placeholder="Nomor Induk"
 									value={formData.nim}
+									inputMode="numeric"
 									onKeyDown={preventNonNumericKey}
 									onChange={(e) =>
 										updateData(
@@ -1378,6 +1486,7 @@ export default function EditStudentPage() {
 								<Input
 									placeholder="001"
 									value={formData.addressRt}
+									inputMode="numeric"
 									onKeyDown={preventNonNumericKey}
 									onChange={(e) =>
 										updateData(
@@ -1398,6 +1507,7 @@ export default function EditStudentPage() {
 								<Input
 									placeholder="002"
 									value={formData.addressRw}
+									inputMode="numeric"
 									onKeyDown={preventNonNumericKey}
 									onChange={(e) =>
 										updateData(
@@ -1759,6 +1869,17 @@ export default function EditStudentPage() {
 								</h4>
 							</div>
 
+							<div className="md:col-span-2">
+								<OptionSelect
+									label="Pendidikan Terakhir"
+									required={false}
+									value={formData.lastEducation}
+									onChange={(v) => updateData("lastEducation", v)}
+									options={LAST_EDUCATION_OPTIONS}
+									placeholder="Pilih SMA / MA / SMK / Paket C"
+								/>
+							</div>
+
 							<div className="space-y-2">
 								<Label>
 									Nama Sekolah Asal <span className="text-red-500">*</span>
@@ -1789,6 +1910,7 @@ export default function EditStudentPage() {
 								<Input
 									placeholder="2023"
 									value={formData.graduationYear}
+									inputMode="numeric"
 									onKeyDown={preventNonNumericKey}
 									onChange={(e) =>
 										updateData(
@@ -1812,6 +1934,35 @@ export default function EditStudentPage() {
 									onChange={(e) => updateData("schoolAddress", e.target.value)}
 								/>
 							</div>
+							<div className="rounded-xl border border-slate-200 bg-white px-4 md:col-span-2">
+								<HealthQuestion
+									label="Pernah kuliah sebelumnya?"
+									noLabel="Belum pernah"
+									yesLabel="Pernah"
+									value={formData.hasStudiedCollege === "Ya" ? "ada" : "tidak"}
+									onChange={(next) =>
+										setFormData((prev) => ({
+											...prev,
+											hasStudiedCollege: next === "ada" ? "Ya" : "Tidak",
+											priorCollege: next === "ada" ? prev.priorCollege : "",
+										}))
+									}
+								>
+									<div className="space-y-2">
+										<Label>
+											Nama Perguruan Tinggi{" "}
+											<span className="text-red-500">*</span>
+										</Label>
+										<Input
+											placeholder="Contoh: Universitas Lampung"
+											value={formData.priorCollege}
+											onChange={(e) =>
+												updateData("priorCollege", e.target.value)
+											}
+										/>
+									</div>
+								</HealthQuestion>
+							</div>
 						</div>
 					</div>
 				)}
@@ -1822,173 +1973,197 @@ export default function EditStudentPage() {
 						<h3 className="font-semibold text-lg border-b pb-2">
 							Keterangan Kesehatan
 						</h3>
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-							<div className="space-y-2">
-								<Label>
-									Golongan Darah <span className="text-red-500">*</span>
-								</Label>
-								<Select
-									value={formData.bloodType}
-									onValueChange={(v) => updateData("bloodType", v)}
-								>
-									<SelectTrigger>
-										<SelectValue placeholder="Pilih Gol. Darah" />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="Belum Diketahui">
-											Belum Diketahui
-										</SelectItem>
-										<SelectItem value="A+">A+</SelectItem>
-										<SelectItem value="A-">A-</SelectItem>
-										<SelectItem value="B+">B+</SelectItem>
-										<SelectItem value="B-">B-</SelectItem>
-										<SelectItem value="AB+">AB+</SelectItem>
-										<SelectItem value="AB-">AB-</SelectItem>
-										<SelectItem value="O+">O+</SelectItem>
-										<SelectItem value="O-">O-</SelectItem>
-										<SelectItem value="O">O</SelectItem>
-									</SelectContent>
-								</Select>
-							</div>
-							<div className="space-y-2">
-								<Label>
-									Ukuran Baju <span className="text-red-500">*</span>
-								</Label>
-								<Select
-									value={formData.clothingSize}
-									onValueChange={(v) => updateData("clothingSize", v)}
-								>
-									<SelectTrigger>
-										<SelectValue placeholder="Pilih Ukuran" />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="XS">XS</SelectItem>
-										<SelectItem value="S">S</SelectItem>
-										<SelectItem value="M">M</SelectItem>
-										<SelectItem value="L">L</SelectItem>
-										<SelectItem value="XL">XL</SelectItem>
-										<SelectItem value="XXL">XXL</SelectItem>
-										<SelectItem value="Lainnya">Lainnya</SelectItem>
-									</SelectContent>
-								</Select>
-								{formData.clothingSize === "Lainnya" && (
-									<Input
-										className="mt-2"
-										placeholder="Sebutkan ukuran lainnya"
-										value={formData.clothingSizeOther}
-										onChange={(e) =>
-											updateData("clothingSizeOther", e.target.value)
-										}
-									/>
-								)}
-							</div>
-							<div className="space-y-2">
-								<Label>
-									Tinggi Badan (cm) <span className="text-red-500">*</span>
-								</Label>
-								<Input
-									placeholder="170"
-									value={formData.height}
-									onKeyDown={preventNonNumericKey}
-									onChange={(e) =>
-										updateData(
-											"height",
-											filterNumeric(
-												e.target.value,
-												3,
-												"Tinggi badan berupa angka (cm)",
-											),
-										)
-									}
-								/>
-							</div>
-							<div className="space-y-2">
-								<Label>
-									Berat Badan (kg) <span className="text-red-500">*</span>
-								</Label>
-								<Input
-									placeholder="60"
-									value={formData.weight}
-									onKeyDown={preventNonNumericKey}
-									onChange={(e) =>
-										updateData(
-											"weight",
-											filterNumeric(
-												e.target.value,
-												3,
-												"Berat badan berupa angka (kg)",
-											),
-										)
-									}
-								/>
-							</div>
-							<div className="space-y-2">
-								<Label>
-									Riwayat Penyakit <span className="text-red-500">*</span>
-								</Label>
-								<Input
-									placeholder="Tuliskan 'Tidak ada' jika tidak ada"
-									value={formData.diseaseHistory}
-									onChange={(e) => updateData("diseaseHistory", e.target.value)}
-								/>
-							</div>
-							<div className="space-y-2">
-								<Label>
-									Penyakit Bawaan <span className="text-red-500">*</span>
-								</Label>
-								<Input
-									placeholder="Tuliskan 'Tidak ada' jika tidak ada"
-									value={formData.congenitalDisease}
-									onChange={(e) =>
-										updateData("congenitalDisease", e.target.value)
-									}
-								/>
-							</div>
-							{/* Riwayat Patah Tulang */}
-							<div className="space-y-4 md:col-span-2 p-4 border rounded-lg bg-slate-50/50">
+						<section className="space-y-3">
+							<h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+								Data Fisik
+							</h4>
+							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 								<div className="space-y-2">
-									<Label className="text-sm font-medium">
-										Pernah Mengalami Patah Tulang?{" "}
-										<span className="text-red-500">*</span>
+									<Label>
+										Golongan Darah <span className="text-red-500">*</span>
 									</Label>
-									<RadioGroup
-										value={formData.hasBoneFracture}
-										onValueChange={(val) => {
-											const v = val || "Tidak";
-											setFormData((prev) => ({
-												...prev,
-												hasBoneFracture: v,
-												boneFractureLocation:
-													v === "Tidak" ? "" : prev.boneFractureLocation,
-												boneFractureYear:
-													v === "Tidak" ? "" : prev.boneFractureYear,
-											}));
-										}}
-										className="flex gap-6 mt-1"
+									<Select
+										value={formData.bloodType}
+										onValueChange={(v) => updateData("bloodType", v)}
 									>
-										<div className="flex items-center space-x-2">
-											<RadioGroupItem value="Tidak" id="edit-bone-no" />
-											<Label
-												htmlFor="edit-bone-no"
-												className="cursor-pointer font-normal"
-											>
-												Tidak Pernah
-											</Label>
-										</div>
-										<div className="flex items-center space-x-2">
-											<RadioGroupItem value="Ya" id="edit-bone-yes" />
-											<Label
-												htmlFor="edit-bone-yes"
-												className="cursor-pointer font-normal"
-											>
-												Pernah
-											</Label>
-										</div>
-									</RadioGroup>
+										<SelectTrigger>
+											<SelectValue placeholder="Pilih Gol. Darah" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="Belum Diketahui">
+												Belum Diketahui
+											</SelectItem>
+											<SelectItem value="A+">A+</SelectItem>
+											<SelectItem value="A-">A-</SelectItem>
+											<SelectItem value="B+">B+</SelectItem>
+											<SelectItem value="B-">B-</SelectItem>
+											<SelectItem value="AB+">AB+</SelectItem>
+											<SelectItem value="AB-">AB-</SelectItem>
+											<SelectItem value="O+">O+</SelectItem>
+											<SelectItem value="O-">O-</SelectItem>
+											<SelectItem value="O">O</SelectItem>
+										</SelectContent>
+									</Select>
 								</div>
+								<div className="space-y-2">
+									<Label>
+										Ukuran Baju <span className="text-red-500">*</span>
+									</Label>
+									<Select
+										value={formData.clothingSize}
+										onValueChange={(v) => updateData("clothingSize", v)}
+									>
+										<SelectTrigger>
+											<SelectValue placeholder="Pilih Ukuran" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="XS">XS</SelectItem>
+											<SelectItem value="S">S</SelectItem>
+											<SelectItem value="M">M</SelectItem>
+											<SelectItem value="L">L</SelectItem>
+											<SelectItem value="XL">XL</SelectItem>
+											<SelectItem value="XXL">XXL</SelectItem>
+											<SelectItem value="Lainnya">Lainnya</SelectItem>
+										</SelectContent>
+									</Select>
+									{formData.clothingSize === "Lainnya" && (
+										<Input
+											className="mt-2"
+											placeholder="Sebutkan ukuran lainnya"
+											value={formData.clothingSizeOther}
+											onChange={(e) =>
+												updateData("clothingSizeOther", e.target.value)
+											}
+										/>
+									)}
+								</div>
+								<div className="space-y-2">
+									<Label>
+										Tinggi Badan <span className="text-red-500">*</span>
+									</Label>
+									<div className="relative">
+										<Input
+											className="pr-10"
+											placeholder="170"
+											value={formData.height}
+											inputMode="numeric"
+											onKeyDown={preventNonNumericKey}
+											onChange={(e) =>
+												updateData(
+													"height",
+													filterNumeric(
+														e.target.value,
+														3,
+														"Tinggi badan berupa angka (cm)",
+													),
+												)
+											}
+										/>
+										<span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+											cm
+										</span>
+									</div>
+									{formData.height &&
+										(Number(formData.height) < 150 ||
+											Number(formData.height) > 220) && (
+											<p className="flex items-center gap-1 text-xs font-medium text-amber-600">
+												<AlertTriangle className="h-3.5 w-3.5" />
+												Tinggi badan di luar rentang umum (150–220 cm)
+											</p>
+										)}
+								</div>
+								<div className="space-y-2">
+									<Label>
+										Berat Badan <span className="text-red-500">*</span>
+									</Label>
+									<div className="relative">
+										<Input
+											className="pr-10"
+											placeholder="60"
+											value={formData.weight}
+											inputMode="numeric"
+											onKeyDown={preventNonNumericKey}
+											onChange={(e) =>
+												updateData(
+													"weight",
+													filterNumeric(
+														e.target.value,
+														3,
+														"Berat badan berupa angka (kg)",
+													),
+												)
+											}
+										/>
+										<span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+											kg
+										</span>
+									</div>
+									{formData.weight &&
+										(Number(formData.weight) < 35 ||
+											Number(formData.weight) > 160) && (
+											<p className="flex items-center gap-1 text-xs font-medium text-amber-600">
+												<AlertTriangle className="h-3.5 w-3.5" />
+												Berat badan di luar rentang umum (35–160 kg)
+											</p>
+										)}
+								</div>
+							</div>
+						</section>
 
-								{formData.hasBoneFracture === "Ya" && (
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t mt-3">
+						<section className="space-y-1">
+							<h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+								Riwayat Kesehatan
+							</h4>
+							<div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white px-4">
+								<YesNoWithDetail
+									rowLabel={
+										<>
+											Riwayat Penyakit <span className="text-red-500">*</span>
+										</>
+									}
+									value={formData.diseaseHistory}
+									onChange={(v) => updateData("diseaseHistory", v)}
+									placeholder="Jelaskan riwayat penyakit (jenis, tahun, kondisi saat ini)"
+								/>
+								<YesNoWithDetail
+									rowLabel={
+										<>
+											Penyakit Bawaan <span className="text-red-500">*</span>
+										</>
+									}
+									value={formData.congenitalDisease}
+									onChange={(v) => updateData("congenitalDisease", v)}
+									placeholder="Jelaskan penyakit bawaan (jenis, sejak kapan, kondisi saat ini)"
+								/>
+								<HealthQuestion
+									label={
+										<>
+											Pernah Mengalami Patah Tulang?{" "}
+											<span className="text-red-500">*</span>
+										</>
+									}
+									noLabel="Tidak pernah"
+									yesLabel="Pernah"
+									value={
+										formData.hasBoneFracture === "Ya"
+											? "ada"
+											: formData.hasBoneFracture === "Tidak"
+												? "tidak"
+												: ""
+									}
+									onChange={(next) => {
+										const val = next === "ada" ? "Ya" : "Tidak";
+										setFormData((prev) => ({
+											...prev,
+											hasBoneFracture: val,
+											boneFractureLocation:
+												val === "Tidak" ? "" : prev.boneFractureLocation,
+											boneFractureYear:
+												val === "Tidak" ? "" : prev.boneFractureYear,
+										}));
+									}}
+								>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 										<div className="space-y-2">
 											<Label>
 												Bagian Tubuh yang Patah{" "}
@@ -2010,6 +2185,7 @@ export default function EditStudentPage() {
 												placeholder="Contoh: 2021"
 												maxLength={4}
 												value={formData.boneFractureYear}
+												inputMode="numeric"
 												onKeyDown={preventNonNumericKey}
 												onChange={(e) =>
 													updateData(
@@ -2024,52 +2200,34 @@ export default function EditStudentPage() {
 											/>
 										</div>
 									</div>
-								)}
-							</div>
-
-							{/* Riwayat Operasi */}
-							<div className="space-y-4 md:col-span-2 p-4 border rounded-lg bg-slate-50/50">
-								<div className="space-y-2">
-									<Label className="text-sm font-medium">
-										Pernah Menjalani Operasi?{" "}
-										<span className="text-red-500">*</span>
-									</Label>
-									<RadioGroup
-										value={formData.hasSurgery}
-										onValueChange={(val) => {
-											const v = val || "Tidak";
-											setFormData((prev) => ({
-												...prev,
-												hasSurgery: v,
-												surgeryType: v === "Tidak" ? "" : prev.surgeryType,
-												surgeryYear: v === "Tidak" ? "" : prev.surgeryYear,
-											}));
-										}}
-										className="flex gap-6 mt-1"
-									>
-										<div className="flex items-center space-x-2">
-											<RadioGroupItem value="Tidak" id="edit-surgery-no" />
-											<Label
-												htmlFor="edit-surgery-no"
-												className="cursor-pointer font-normal"
-											>
-												Tidak Pernah
-											</Label>
-										</div>
-										<div className="flex items-center space-x-2">
-											<RadioGroupItem value="Ya" id="edit-surgery-yes" />
-											<Label
-												htmlFor="edit-surgery-yes"
-												className="cursor-pointer font-normal"
-											>
-												Pernah
-											</Label>
-										</div>
-									</RadioGroup>
-								</div>
-
-								{formData.hasSurgery === "Ya" && (
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t mt-3">
+								</HealthQuestion>
+								<HealthQuestion
+									label={
+										<>
+											Pernah Menjalani Operasi?{" "}
+											<span className="text-red-500">*</span>
+										</>
+									}
+									noLabel="Tidak pernah"
+									yesLabel="Pernah"
+									value={
+										formData.hasSurgery === "Ya"
+											? "ada"
+											: formData.hasSurgery === "Tidak"
+												? "tidak"
+												: ""
+									}
+									onChange={(next) => {
+										const val = next === "ada" ? "Ya" : "Tidak";
+										setFormData((prev) => ({
+											...prev,
+											hasSurgery: val,
+											surgeryType: val === "Tidak" ? "" : prev.surgeryType,
+											surgeryYear: val === "Tidak" ? "" : prev.surgeryYear,
+										}));
+									}}
+								>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 										<div className="space-y-2">
 											<Label>
 												Jenis / Rincian Operasi{" "}
@@ -2091,6 +2249,7 @@ export default function EditStudentPage() {
 												placeholder="Contoh: 2022"
 												maxLength={4}
 												value={formData.surgeryYear}
+												inputMode="numeric"
 												onKeyDown={preventNonNumericKey}
 												onChange={(e) =>
 													updateData(
@@ -2105,9 +2264,9 @@ export default function EditStudentPage() {
 											/>
 										</div>
 									</div>
-								)}
+								</HealthQuestion>
 							</div>
-						</div>
+						</section>
 					</div>
 				)}
 
@@ -2145,6 +2304,7 @@ export default function EditStudentPage() {
 													waliReligion: prev.ayahReligion,
 													waliEducation: prev.ayahEducation,
 													waliJob: prev.ayahJob,
+													waliIncome: prev.ayahIncome,
 												}
 											: role === "ibu"
 												? {
@@ -2160,6 +2320,7 @@ export default function EditStudentPage() {
 														waliReligion: prev.ibuReligion,
 														waliEducation: prev.ibuEducation,
 														waliJob: prev.ibuJob,
+														waliIncome: prev.ibuIncome,
 													}
 												: {
 														waliName: "",
@@ -2174,6 +2335,7 @@ export default function EditStudentPage() {
 														waliReligion: "",
 														waliEducation: "",
 														waliJob: "",
+														waliIncome: "",
 													}),
 									}));
 								}}
@@ -2397,6 +2559,14 @@ export default function EditStudentPage() {
 										onChange={(e) => updateData("waliJob", e.target.value)}
 									/>
 								</div>
+								<OptionSelect
+									label="Rentang Pendapatan"
+									required={false}
+									value={formData.waliIncome}
+									onChange={(v) => updateData("waliIncome", v)}
+									options={INCOME_RANGE_OPTIONS}
+									placeholder="Pilih rentang pendapatan"
+								/>
 								<div className="space-y-2">
 									<Label>
 										Nomor HP{" "}
@@ -2588,6 +2758,14 @@ export default function EditStudentPage() {
 									onChange={(e) => updateData("ayahJob", e.target.value)}
 								/>
 							</div>
+							<OptionSelect
+								label="Rentang Pendapatan"
+								required={false}
+								value={formData.ayahIncome}
+								onChange={(v) => updateData("ayahIncome", v)}
+								options={INCOME_RANGE_OPTIONS}
+								placeholder="Pilih rentang pendapatan"
+							/>
 							<div className="space-y-2">
 								<Label>
 									Nomor HP{" "}
@@ -2778,6 +2956,14 @@ export default function EditStudentPage() {
 									onChange={(e) => updateData("ibuJob", e.target.value)}
 								/>
 							</div>
+							<OptionSelect
+								label="Rentang Pendapatan"
+								required={false}
+								value={formData.ibuIncome}
+								onChange={(v) => updateData("ibuIncome", v)}
+								options={INCOME_RANGE_OPTIONS}
+								placeholder="Pilih rentang pendapatan"
+							/>
 							<div className="space-y-2">
 								<Label>
 									Nomor HP{" "}
@@ -2826,262 +3012,76 @@ export default function EditStudentPage() {
 					</div>
 				)}
 
-				{/* TAB 7: Informasi PMB, Rekomendasi & Referral */}
+				{/* TAB 7: Informasi PMB */}
 				{currentTab === 6 && (
-					<div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-						<div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-3 gap-2">
-							<div>
-								<h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
-									<Building2 className="w-5 h-5 text-[#0517B0]" />
-									Informasi PMB, Rekomendasi & Referral
-								</h3>
-								<p className="text-xs text-slate-500 mt-0.5">
-									Lengkapi data asal rekomendasi pendaftaran, tim akuisisi PMB,
-									dan kontak darurat mahasiswa.
-								</p>
-							</div>
-							<span className="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-[#0517B0] rounded-md border border-blue-100 self-start sm:self-auto">
-								Panel PMB
-							</span>
-						</div>
+					<div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
+						<h3 className="font-semibold text-lg border-b pb-2">
+							Informasi PMB
+						</h3>
 
-						{/* Seksi 1: Asal Referral & Rekomendasi Terstruktur */}
-						<div className="p-5 bg-gradient-to-br from-blue-50/70 via-indigo-50/30 to-white rounded-xl border border-blue-200/70 space-y-4 shadow-xs">
-							<div className="flex items-center gap-2">
-								<div className="p-1.5 bg-blue-100 text-[#0517B0] rounded-lg">
-									<Award className="w-4 h-4" />
-								</div>
-								<div>
-									<h4 className="font-semibold text-slate-900 text-sm">
-										Asal Rekomendasi & Referral Terstruktur
-									</h4>
-									<p className="text-[11px] text-slate-500">
-										Data pihak yang merekomendasikan pendaftar untuk fee
-										sharing, komisi, dan tracking referral PMB.
-									</p>
-								</div>
-							</div>
-
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-								{/* Rekomendasi */}
+						<section className="space-y-3">
+							<h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+								Pendaftaran
+							</h4>
+							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 								<div className="space-y-2">
-									<Label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-										<span>Jenis Rekomendasi</span>
-										<span className="text-red-500">*</span>
-									</Label>
-									<Select
-										value={formData.rekomendasi}
-										onValueChange={(v) => updateData("rekomendasi", v)}
-									>
-										<SelectTrigger className="bg-white">
-											<SelectValue placeholder="Pilih Jenis Rekomendasi" />
-										</SelectTrigger>
-										<SelectContent>
-											{REKOMENDASI_OPTIONS.map((item) => (
-												<SelectItem key={item} value={item}>
-													{item}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</div>
-
-								{/* Kategori Referral */}
-								<div className="space-y-2">
-									<Label className="flex items-center gap-1 text-xs font-semibold text-slate-700">
-										<span>Kategori Referral</span>
-									</Label>
-									<Select
-										value={formData.referralCategory}
-										onValueChange={(v) => updateData("referralCategory", v)}
-									>
-										<SelectTrigger className="bg-white">
-											<SelectValue placeholder="Pilih Kategori Referral" />
-										</SelectTrigger>
-										<SelectContent>
-											{REFERRAL_CATEGORY_OPTIONS.map((opt) => (
-												<SelectItem key={opt.value} value={opt.value}>
-													{opt.label}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</div>
-
-								{/* Nama Institusi / Lembaga Referral */}
-								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Nama Institusi / Lembaga / Sekolah Referral
-									</Label>
+									<Label>Batch Pendaftaran</Label>
 									<Input
-										placeholder="Contoh: SMKN 1 Denpasar / BKK Karya Mandiri"
-										value={formData.referralInstitutionName}
-										onChange={(e) =>
-											updateData("referralInstitutionName", e.target.value)
-										}
-										className="bg-white"
-									/>
-								</div>
-
-								{/* Nama Kontak PIC Referral */}
-								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Nama Kontak / Guru / PIC yang Merekomendasikan
-									</Label>
-									<Input
-										placeholder="Nama lengkap pemberi rekomendasi"
-										value={formData.referralContactName}
-										onChange={(e) =>
-											updateData("referralContactName", e.target.value)
-										}
-										className="bg-white"
-									/>
-								</div>
-
-								{/* No HP Kontak Referral */}
-								<div className="space-y-2 md:col-span-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										No. WhatsApp / HP Kontak Referral
-									</Label>
-									<Input
-										type="tel"
-										placeholder="0812xxxx (untuk komunikasi fee share atau validasi)"
-										value={formData.referralContactPhone}
-										onKeyDown={preventNonPhoneKey}
-										onChange={(e) =>
-											updateData(
-												"referralContactPhone",
-												filterPhone(e.target.value, 15),
-											)
-										}
-										className="bg-white"
-									/>
-								</div>
-							</div>
-						</div>
-
-						{/* Seksi 2: Tim Akuisisi PMB & Periode */}
-						<div className="p-5 bg-slate-50/70 rounded-xl border border-slate-200 space-y-4">
-							<div className="flex items-center gap-2">
-								<div className="p-1.5 bg-slate-200/70 text-slate-700 rounded-lg">
-									<UserPlus className="w-4 h-4" />
-								</div>
-								<div>
-									<h4 className="font-semibold text-slate-900 text-sm">
-										Tim Akuisisi PMB & Periode Studi
-									</h4>
-									<p className="text-[11px] text-slate-500">
-										Informasi penanggung jawab akuisisi dan jadwal keberangkatan
-										mahasiswa.
-									</p>
-								</div>
-							</div>
-
-							<div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-								{/* Periode Keberangkatan */}
-								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Periode Keberangkatan / Intake
-									</Label>
-									<Input
-										placeholder="Contoh: 2026/2027 atau Batch 1"
+										placeholder="Contoh: Batch 1 atau 2026/2027"
 										value={formData.period}
 										onChange={(e) => updateData("period", e.target.value)}
 										className="bg-white"
 									/>
 								</div>
 
-								{/* Tim Visit */}
 								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Tim Visit PMB
-									</Label>
-									<Input
-										placeholder="Nama tim visit (isi '-' jika tidak ada)"
-										value={formData.timVisit}
-										onChange={(e) => updateData("timVisit", e.target.value)}
-										className="bg-white"
-									/>
+									<Label>Siapa yang Merekomendasikan?</Label>
+									<Select
+										value={formData.recommendedBy}
+										onValueChange={(v) => updateData("recommendedBy", v || "")}
+									>
+										<SelectTrigger className="bg-white">
+											<SelectValue placeholder="Pilih pemberi rekomendasi" />
+										</SelectTrigger>
+										<SelectContent>
+											{RECOMMENDED_BY_OPTIONS.map((opt) => (
+												<SelectItem key={opt} value={opt}>
+													{opt}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
 								</div>
 
-								{/* Tim Sosialisasi */}
 								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Tim Sosialisasi PMB
+									<Label>
+										{formData.recommendedBy === "Tim Nusadaya"
+											? "Nama Anggota Tim Nusadaya yang Merekomendasikan"
+											: "Nama yang Merekomendasikan"}
 									</Label>
 									<Input
-										placeholder="Nama tim sosialisasi (isi '-' jika tidak ada)"
-										value={formData.timSosialisasi}
+										placeholder={
+											formData.recommendedBy === "Tim Nusadaya"
+												? "Nama anggota tim Nusadaya"
+												: "Nama lengkap pihak yang merekomendasikan"
+										}
+										value={formData.recommenderName}
 										onChange={(e) =>
-											updateData("timSosialisasi", e.target.value)
+											updateData("recommenderName", e.target.value)
 										}
 										className="bg-white"
 									/>
 								</div>
-
-								{/* RO Referral */}
-								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										RO Referral
-									</Label>
-									<Input
-										placeholder="Nama / kode RO Referral"
-										value={formData.roReferral}
-										onChange={(e) => updateData("roReferral", e.target.value)}
-										className="bg-white"
-									/>
-								</div>
-
-								{/* Mitra Sponsor */}
-								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Mitra Sponsor
-									</Label>
-									<Input
-										placeholder="Nama mitra sponsor pembiayaan"
-										value={formData.mitraSponsor}
-										onChange={(e) => updateData("mitraSponsor", e.target.value)}
-										className="bg-white"
-									/>
-								</div>
-
-								{/* Koordinator PMB */}
-								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Koordinator PMB
-									</Label>
-									<Input
-										placeholder="Nama koordinator PMB"
-										value={formData.koordinator}
-										onChange={(e) => updateData("koordinator", e.target.value)}
-										className="bg-white"
-									/>
-								</div>
 							</div>
-						</div>
+						</section>
 
-						{/* Seksi 3: Pembimbing Akademik & Negara Tujuan */}
-						<div className="p-5 bg-slate-50/70 rounded-xl border border-slate-200 space-y-4">
-							<div className="flex items-center gap-2">
-								<div className="p-1.5 bg-blue-100 text-[#0517B0] rounded-lg">
-									<UserCheck className="w-4 h-4" />
-								</div>
-								<div>
-									<h4 className="font-semibold text-slate-900 text-sm">
-										Pembimbing Akademik & Negara Tujuan
-									</h4>
-									<p className="text-[11px] text-slate-500">
-										Penugasan dosen PA dan target negara magang/penempatan.
-									</p>
-								</div>
-							</div>
-
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-								{/* Pembimbing Akademik */}
+						<section className="space-y-3">
+							<h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+								Penempatan
+							</h4>
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Pembimbing Akademik (Dosen PA)
-									</Label>
+									<Label>Pembimbing Akademik (Dosen PA)</Label>
 									<Select
 										value={formData.paId}
 										onValueChange={(val) => updateData("paId", val)}
@@ -3102,7 +3102,6 @@ export default function EditStudentPage() {
 									</Select>
 								</div>
 
-								{/* Negara Tujuan */}
 								<div className="space-y-2">
 									<Label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
 										<Globe className="w-3.5 h-3.5 text-slate-500" />
@@ -3118,54 +3117,116 @@ export default function EditStudentPage() {
 									/>
 								</div>
 							</div>
-						</div>
+						</section>
 
-						{/* Seksi 4: Kontak Darurat Mahasiswa */}
-						<div className="p-5 bg-slate-50/70 rounded-xl border border-slate-200 space-y-4">
-							<div className="flex items-center gap-2">
-								<div className="p-1.5 bg-amber-100 text-amber-700 rounded-lg">
-									<PhoneCall className="w-4 h-4" />
-								</div>
-								<div>
-									<h4 className="font-semibold text-slate-900 text-sm">
-										Kontak Darurat Mahasiswa
-									</h4>
-									<p className="text-[11px] text-slate-500">
-										Kontak keluarga / kerabat yang dapat dihubungi oleh pihak
-										kampus dalam situasi mendesak.
-									</p>
-								</div>
-							</div>
+						<section className="space-y-3">
+							<h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+								Kontak Darurat
+							</h4>
+							<p className="text-xs text-slate-500">
+								Kontak pertama boleh orang tua / wali; kontak berikutnya harus
+								selain keduanya.
+							</p>
+							<EmergencyContactsFields
+								contacts={formData.emergencyContacts}
+								onChange={(next) => updateData("emergencyContacts", next)}
+							/>
+						</section>
 
-							<div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-								{/* Nama Kontak Darurat */}
+						<OptionalSection
+							title="Referral & Tim Akuisisi"
+							filledCount={
+								[
+									formData.rekomendasi,
+									formData.referralCategory,
+									formData.referralInstitutionName,
+									formData.referralContactName,
+									formData.referralContactPhone,
+									formData.timVisit,
+									formData.timSosialisasi,
+									formData.roReferral,
+									formData.mitraSponsor,
+									formData.koordinator,
+								].filter((v) => v?.trim()).length
+							}
+						>
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Nama Kontak Darurat
+									<Label className="flex items-center gap-1">
+										<span>Jenis Rekomendasi</span>
 									</Label>
+									<Select
+										value={formData.rekomendasi}
+										onValueChange={(v) => updateData("rekomendasi", v)}
+									>
+										<SelectTrigger className="bg-white">
+											<SelectValue placeholder="Pilih Jenis Rekomendasi" />
+										</SelectTrigger>
+										<SelectContent>
+											{REKOMENDASI_OPTIONS.map((item) => (
+												<SelectItem key={item} value={item}>
+													{item}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+
+								<div className="space-y-2">
+									<Label className="flex items-center gap-1">
+										<span>Kategori Referral</span>
+									</Label>
+									<Select
+										value={formData.referralCategory}
+										onValueChange={(v) => updateData("referralCategory", v)}
+									>
+										<SelectTrigger className="bg-white">
+											<SelectValue placeholder="Pilih Kategori Referral" />
+										</SelectTrigger>
+										<SelectContent>
+											{REFERRAL_CATEGORY_OPTIONS.map((opt) => (
+												<SelectItem key={opt.value} value={opt.value}>
+													{opt.label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+
+								<div className="space-y-2">
+									<Label>Institusi / Sekolah</Label>
 									<Input
-										placeholder="Nama lengkap kontak darurat"
-										value={formData.emergencyContactName}
+										placeholder="Contoh: SMKN 1 Denpasar / BKK Karya Mandiri"
+										value={formData.referralInstitutionName}
 										onChange={(e) =>
-											updateData("emergencyContactName", e.target.value)
+											updateData("referralInstitutionName", e.target.value)
 										}
 										className="bg-white"
 									/>
 								</div>
 
-								{/* Nomor WA Darurat */}
 								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Nomor WhatsApp Darurat
-									</Label>
+									<Label>Nama PIC</Label>
+									<Input
+										placeholder="Nama lengkap pemberi rekomendasi"
+										value={formData.referralContactName}
+										onChange={(e) =>
+											updateData("referralContactName", e.target.value)
+										}
+										className="bg-white"
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label>WhatsApp PIC</Label>
 									<Input
 										type="tel"
 										placeholder="0812xxxx"
-										value={formData.emergencyContactPhone}
+										value={formData.referralContactPhone}
 										onKeyDown={preventNonPhoneKey}
 										onChange={(e) =>
 											updateData(
-												"emergencyContactPhone",
+												"referralContactPhone",
 												filterPhone(e.target.value, 15),
 											)
 										}
@@ -3173,35 +3234,59 @@ export default function EditStudentPage() {
 									/>
 								</div>
 
-								{/* Hubungan Kontak Darurat */}
 								<div className="space-y-2">
-									<Label className="text-xs font-semibold text-slate-700">
-										Hubungan dengan Mahasiswa
-									</Label>
-									<Select
-										value={formData.emergencyContactRelation}
-										onValueChange={(v) =>
-											updateData("emergencyContactRelation", v)
+									<Label>Tim Visit PMB</Label>
+									<Input
+										placeholder="Nama tim visit (isi '-' jika tidak ada)"
+										value={formData.timVisit}
+										onChange={(e) => updateData("timVisit", e.target.value)}
+										className="bg-white"
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label>Tim Sosialisasi PMB</Label>
+									<Input
+										placeholder="Nama tim sosialisasi (isi '-' jika tidak ada)"
+										value={formData.timSosialisasi}
+										onChange={(e) =>
+											updateData("timSosialisasi", e.target.value)
 										}
-									>
-										<SelectTrigger className="bg-white">
-											<SelectValue placeholder="Pilih Hubungan" />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value="Orang Tua">Orang Tua</SelectItem>
-											<SelectItem value="Kakak">Kakak Kandung</SelectItem>
-											<SelectItem value="Adik">Adik Kandung</SelectItem>
-											<SelectItem value="Paman / Bibi">Paman / Bibi</SelectItem>
-											<SelectItem value="Saudara Lain">
-												Saudara / Kerabat Lain
-											</SelectItem>
-											<SelectItem value="Tetangga">Tetangga</SelectItem>
-											<SelectItem value="Lainnya">Lainnya</SelectItem>
-										</SelectContent>
-									</Select>
+										className="bg-white"
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label>RO Referral</Label>
+									<Input
+										placeholder="Nama / kode RO Referral"
+										value={formData.roReferral}
+										onChange={(e) => updateData("roReferral", e.target.value)}
+										className="bg-white"
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label>Mitra Sponsor</Label>
+									<Input
+										placeholder="Nama mitra sponsor pembiayaan"
+										value={formData.mitraSponsor}
+										onChange={(e) => updateData("mitraSponsor", e.target.value)}
+										className="bg-white"
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<Label>Koordinator PMB</Label>
+									<Input
+										placeholder="Nama koordinator PMB"
+										value={formData.koordinator}
+										onChange={(e) => updateData("koordinator", e.target.value)}
+										className="bg-white"
+									/>
 								</div>
 							</div>
-						</div>
+						</OptionalSection>
 					</div>
 				)}
 

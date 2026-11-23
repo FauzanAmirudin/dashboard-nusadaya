@@ -156,6 +156,7 @@ export const VALID_STUDENT_STATUSES = [
 	"dropout",
 	"mengundurkan_diri",
 	"lulus",
+	"menunggu_pembayaran",
 ] as const;
 
 export function validateStudentInput(data: any): {

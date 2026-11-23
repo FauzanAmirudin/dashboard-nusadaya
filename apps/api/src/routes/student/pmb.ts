@@ -13,7 +13,12 @@ import {
 	users,
 } from "../../db/schema";
 import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
-import { hasRole } from "../../lib/permissions";
+import { getValidUserId, hasRole } from "../../lib/permissions";
+import {
+	getPmbAccRequirements,
+	PMB_REQUIRED_DOC_FIELDS,
+} from "../../lib/pmb-acc-requirements";
+import { applyDpVerification } from "../../lib/student-activation";
 import { fileService } from "../../modules/file/service/file.service";
 import { invalidateFinanceCaches } from "./finance";
 
@@ -68,43 +73,28 @@ export const pmbRoutes = new Elysia()
 					roReferral: body.roReferral,
 					mitraSponsor: body.mitraSponsor,
 					koordinator: body.koordinator,
-					rumahJuang: body.rumahJuang,
+					// rumahJuang tidak lagi diubah dari PMB: dikelola CRM setelah DP lunas
 					updatedAt: new Date(),
 				})
 				.where(eq(pmbData.studentId, id));
 
-			// Auto-calculate status based on 17 required checklist items (BPJS is optional)
-			const requiredCheckboxes = [
-				body.formReceived,
-				body.documentsComplete,
-				body.dataInputted,
-				body.initialFollowUp,
-				body.pasFoto,
-				body.docKtp,
-				body.docKk,
-				body.docCv,
-				body.docIjazah,
-				body.docTranskrip,
-				body.docPassportDepan,
-				body.docPassportVisa,
-				body.docSkbm,
-				body.docPreMcu,
-				body.docMcu,
-				body.docSla,
-				body.docSertifikasiBahasa,
-			];
-			const checkedCount = requiredCheckboxes.filter(Boolean).length;
+			// Status otomatis dari 13 berkas wajib (berkas opsional tidak dihitung).
+			// ACC hanya direset jika ada berkas WAJIB yang belum lengkap.
+			const requiredCount = PMB_REQUIRED_DOC_FIELDS.length;
+			const checkedCount = PMB_REQUIRED_DOC_FIELDS.filter((k) =>
+				Boolean((body as Record<string, unknown>)[k]),
+			).length;
 
 			let newStatus: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
 				"BUTUH_PERHATIAN";
-			if (checkedCount === 17) newStatus = "AMAN";
-			else if (checkedCount >= 6) newStatus = "PROSES";
+			if (checkedCount === requiredCount) newStatus = "AMAN";
+			else if (checkedCount >= 4) newStatus = "PROSES";
 
 			await db
 				.update(pmbData)
 				.set({
 					status: newStatus,
-					...(checkedCount < 17
+					...(checkedCount < requiredCount
 						? { isAcc: false, accAt: null, accBy: null }
 						: {}),
 				})
@@ -150,11 +140,33 @@ export const pmbRoutes = new Elysia()
 		async (context) => {
 			const { params, body, set } = context;
 			const user = (context as any).user;
-			if (!hasRole(user, "superadmin", "pmb", "finance", "akademik")) {
+			// Fasilitas Rumah Juang dikelola CRM (bukan PMB/Finance/Akademik)
+			if (!hasRole(user, "crm")) {
 				set.status = 403;
-				return { success: false, message: "Forbidden" };
+				return {
+					success: false,
+					message: "Fasilitas Rumah Juang hanya dapat diubah oleh tim CRM.",
+				};
 			}
 			const id = parseInt(params.id, 10);
+
+			// Hanya untuk mahasiswa yang sudah aktif (DP diverifikasi lunas oleh Finance)
+			const student = await db.query.students.findFirst({
+				where: eq(students.id, id),
+				columns: { studentStatus: true },
+			});
+			if (!student) {
+				set.status = 404;
+				return { success: false, message: "Mahasiswa tidak ditemukan" };
+			}
+			if (student.studentStatus === "menunggu_pembayaran") {
+				set.status = 400;
+				return {
+					success: false,
+					message:
+						"Fasilitas Rumah Juang tersedia setelah pembayaran awal diverifikasi Finance.",
+				};
+			}
 
 			const existingPmb = await db.query.pmbData.findFirst({
 				where: eq(pmbData.studentId, id),
@@ -185,6 +197,11 @@ export const pmbRoutes = new Elysia()
 			}),
 		},
 	)
+	// Syarat ACC PMB per tab (dipakai badge tab & ringkasan di Panel PMB)
+	.get("/:id/pmb/acc-requirements", async ({ params }) => {
+		const id = parseInt(params.id, 10);
+		return { success: true, data: await getPmbAccRequirements(id) };
+	})
 	.post("/:id/pmb/acc", async (context) => {
 		const { params, set } = context;
 		const user = (context as any).user;
@@ -194,34 +211,14 @@ export const pmbRoutes = new Elysia()
 		}
 		const id = parseInt(params.id, 10);
 
-		const currentPmb = await db.query.pmbData.findFirst({
-			where: eq(pmbData.studentId, id),
-		});
-
-		// 14 Required checks (BPJS, Paspor Visa, MCU Full, dan Sertifikasi Bahasa adalah opsional di PMB dan dikelola di Magang)
-		const requiredChecks = [
-			currentPmb?.formReceived,
-			currentPmb?.documentsComplete,
-			currentPmb?.dataInputted,
-			currentPmb?.initialFollowUp,
-			currentPmb?.pasFoto,
-			currentPmb?.docKtp,
-			currentPmb?.docKk,
-			currentPmb?.docCv,
-			currentPmb?.docIjazah,
-			currentPmb?.docTranskrip,
-			currentPmb?.docPassportDepan,
-			currentPmb?.docSkbm,
-			currentPmb?.docPreMcu,
-			currentPmb?.docSla,
-		];
-
-		if (!requiredChecks.every(Boolean)) {
+		// Syarat ACC: semua tab Panel PMB lengkap (Dokumen, Skema Keuangan, Fee Sharing)
+		const req = await getPmbAccRequirements(id);
+		if (!req.ok) {
 			set.status = 400;
 			return {
 				success: false,
-				message:
-					"Semua checklist kelengkapan berkas utama (5) dan dokumen wajib PMB (9) harus selesai divalidasi sebelum melakukan ACC PMB.",
+				message: `ACC PMB belum bisa diberikan. Lengkapi: ${req.missing.join("; ")}.`,
+				data: req,
 			};
 		}
 
@@ -252,29 +249,13 @@ export const pmbRoutes = new Elysia()
 			where: eq(pmbData.studentId, id),
 		});
 
-		const allChecks = [
-			currentPmb?.formReceived,
-			currentPmb?.documentsComplete,
-			currentPmb?.dataInputted,
-			currentPmb?.initialFollowUp,
-			currentPmb?.docKtp,
-			currentPmb?.docKk,
-			currentPmb?.docCv,
-			currentPmb?.docIjazah,
-			currentPmb?.docTranskrip,
-			currentPmb?.docPassportDepan,
-			currentPmb?.docPassportVisa,
-			currentPmb?.docSkbm,
-			currentPmb?.docPreMcu,
-			currentPmb?.docMcu,
-			currentPmb?.docSla,
-			currentPmb?.docSertifikasiBahasa,
-		];
-		const checkedCount = allChecks.filter(Boolean).length;
+		const checkedCount = PMB_REQUIRED_DOC_FIELDS.filter((k) =>
+			Boolean((currentPmb as Record<string, unknown> | undefined)?.[k]),
+		).length;
 		const newStatus =
-			checkedCount === 16
+			checkedCount === PMB_REQUIRED_DOC_FIELDS.length
 				? "AMAN"
-				: checkedCount >= 6
+				: checkedCount >= 4
 					? "PROSES"
 					: "BUTUH_PERHATIAN";
 
@@ -537,6 +518,30 @@ export const pmbRoutes = new Elysia()
 			}
 			const id = parseInt(params.id, 10);
 
+			// Verifikasi lunas DP hanya boleh dilakukan Finance (waiting list)
+			let prevPaid = false;
+			if (body.statusDp !== undefined) {
+				const [prevPlan, prevFin] = await Promise.all([
+					db.query.pmbPaymentPlan.findFirst({
+						where: eq(pmbPaymentPlan.studentId, id),
+						columns: { statusDp: true },
+					}),
+					db.query.financeData.findFirst({
+						where: eq(financeData.studentId, id),
+						columns: { registrasiStatus: true },
+					}),
+				]);
+				prevPaid = Boolean(prevPlan?.statusDp || prevFin?.registrasiStatus);
+				if (body.statusDp !== prevPaid && !hasRole(user, "finance")) {
+					set.status = 403;
+					return {
+						success: false,
+						message:
+							"Status lunas DP hanya dapat diverifikasi oleh tim Finance.",
+					};
+				}
+			}
+
 			// Validasi Total Biaya
 			if (body.totalBiaya !== undefined && body.totalBiaya !== null) {
 				if (
@@ -701,6 +706,15 @@ export const pmbRoutes = new Elysia()
 					registrasiNominal: effectiveDp || 0,
 					registrasiStatus: Boolean(body.statusDp),
 					registrasiPaidDate: body.statusDp ? new Date() : null,
+				});
+			}
+
+			if (body.statusDp !== undefined && body.statusDp !== prevPaid) {
+				await applyDpVerification({
+					studentId: id,
+					paid: body.statusDp,
+					wasPaid: prevPaid,
+					userId: (await getValidUserId(user)) ?? undefined,
 				});
 			}
 

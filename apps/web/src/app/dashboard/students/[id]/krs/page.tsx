@@ -2,7 +2,6 @@
 
 import {
 	ArrowLeft,
-	Download,
 	FileText,
 	GraduationCap,
 	Loader2,
@@ -23,7 +22,6 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { API_URL, getToken } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 
 function StudentKrsPrintContent() {
 	const params = useParams();
@@ -151,31 +149,6 @@ function StudentKrsPrintContent() {
 		year: "numeric",
 	});
 
-	const handleExportCsv = () => {
-		if (!grades || grades.length === 0) {
-			toast.error("Tidak ada data KRS untuk diexport");
-			return;
-		}
-		const exportRows = grades.map((item: any, idx: number) => ({
-			No: idx + 1,
-			"Kode MK": item.code || "-",
-			"Nama Mata Kuliah": item.name || "-",
-			SKS: item.sks || 0,
-			Kelas: summaryData?.rombel || "A",
-			"Dosen Pengampu": item.dosenName || "-",
-		}));
-		const studentNameSlug = (
-			summaryData?.name ||
-			summaryData?.studentName ||
-			`Mahasiswa_${studentId}`
-		).replace(/[^a-zA-Z0-9]/g, "_");
-		exportToCSV(
-			exportRows,
-			`KRS_${studentNameSlug}_Semester_${selectedSemester}`,
-		);
-		toast.success("Dokumen KRS berhasil diexport ke CSV");
-	};
-
 	return (
 		<div className="min-h-screen bg-slate-100/70 p-4 sm:p-6 lg:p-8 print:p-0 print:bg-white text-slate-900">
 			{/* Aturan Cetak Scoped A4 Portrait & Paginasi Bersih */}
@@ -287,18 +260,6 @@ function StudentKrsPrintContent() {
 							<span>Lihat KHS</span>
 						</Button>
 					</Link>
-
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={handleExportCsv}
-						disabled={isLoading || grades.length === 0}
-						className="h-8 text-xs gap-1.5 text-slate-700 hover:bg-slate-50 border-slate-200 font-semibold"
-						title="Export data KRS ke format file CSV / Excel"
-					>
-						<Download className="w-3.5 h-3.5 text-emerald-600" />
-						<span>Export CSV</span>
-					</Button>
 
 					<Button
 						size="sm"

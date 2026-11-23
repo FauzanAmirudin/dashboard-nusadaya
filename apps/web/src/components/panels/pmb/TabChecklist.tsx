@@ -1,12 +1,15 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, FileText, FolderCheck, Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import { api } from "@/lib/eden";
 
@@ -95,13 +98,6 @@ const ADDITIONAL_DOCS = [
 		isOptional: false,
 	},
 	{
-		key: "mcu",
-		propKey: "docMcu",
-		label: "Medical Check Up Full (MCU Lengkap Keberangkatan - Opsional PMB)",
-		desc: "Pemeriksaan klinis & laboratorium menyeluruh untuk magang (Dikelola di Panel Magang, tidak mengunci ACC PMB)",
-		isOptional: true,
-	},
-	{
 		key: "sla",
 		propKey: "docSla",
 		label: "Service Level Agreement (SLA)",
@@ -188,13 +184,6 @@ export function TabChecklist({
 			checked: localChecks.formReceived,
 		},
 		{
-			id: "documentsComplete",
-			documentKey: "documents_complete",
-			label: "Berkas Lengkap",
-			desc: "Semua dokumen fisik/digital mahasiswa telah lengkap",
-			checked: localChecks.documentsComplete,
-		},
-		{
 			id: "dataInputted",
 			documentKey: "data_inputted",
 			label: "Input Data Awal",
@@ -219,7 +208,6 @@ export function TabChecklist({
 
 	const completedMainCount = [
 		localChecks.formReceived,
-		localChecks.documentsComplete,
 		localChecks.dataInputted,
 		localChecks.initialFollowUp,
 		localChecks.pasFoto,
@@ -283,7 +271,6 @@ export function TabChecklist({
 			// 2. Hitung progress baru untuk 0ms real-time header sync
 			const updatedMainCompleted = [
 				newState.formReceived,
-				newState.documentsComplete,
 				newState.dataInputted,
 				newState.initialFollowUp,
 				newState.pasFoto,
@@ -298,7 +285,7 @@ export function TabChecklist({
 					detail: {
 						studentId,
 						completed: updatedTotal,
-						total: 14,
+						total: 13,
 					},
 				}),
 			);
@@ -320,234 +307,167 @@ export function TabChecklist({
 		setLoadingItem(null);
 	};
 
-	return (
-		<div className="space-y-6">
-			{/* 1. Checklist Kelengkapan Berkas Utama */}
-			<Card className="border border-slate-200 shadow-sm border-l-4 border-l-[#0517B0]">
-				<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-					<div>
-						<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-							<CheckCircle className="w-4 h-4 text-[#0517B0]" />
-							Checklist Kelengkapan Berkas Utama (5)
-						</CardTitle>
-						<p className="text-[11px] text-slate-500 mt-0.5">
-							Tahapan esensial registrasi dan verifikasi berkas awal PMB
-						</p>
-					</div>
-					<div className="flex items-center gap-2">
-						<Badge
-							className={`text-xs font-bold px-2.5 py-0.5 ${
-								completedMainCount === 5
-									? "bg-emerald-50 text-emerald-700 border-emerald-200"
-									: "bg-blue-50 text-[#0517B0] border-blue-200"
-							}`}
-						>
-							{completedMainCount}/5 Selesai
-						</Badge>
-					</div>
-				</CardHeader>
-				<CardContent className="p-4 sm:p-5 space-y-3.5">
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-						{mainChecklist.map((item) => (
-							<div
-								key={item.id}
-								className={`p-3.5 rounded-xl border transition-colors space-y-2.5 ${
-									item.checked
-										? "border-emerald-200 bg-emerald-50/20"
-										: "border-slate-200 bg-white"
-								}`}
+	const optionalDocs = ADDITIONAL_DOCS.filter((d) => d.isOptional);
+
+	// Label tanpa penanda "(Opsional)" karena sudah dikelompokkan
+	const cleanLabel = (label: string) =>
+		label
+			.replace(/\s*-\s*Opsional PMB/g, "")
+			.replace(/\s*\(Opsional\)/g, "")
+			.trim();
+
+	// Satu baris dokumen: checkbox + label + deskripsi singkat + unggah berkas
+	const renderRow = (row: {
+		key: string;
+		checkboxId: string;
+		propKey: string;
+		label: string;
+		desc: string;
+		checked: boolean;
+		documentKey: string;
+		action?: React.ReactNode;
+	}) => (
+		<li
+			key={row.key}
+			className={`px-4 py-4 sm:px-6 transition-colors ${row.checked ? "bg-emerald-50/60" : "bg-white"}`}
+		>
+			<div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)] md:items-start md:gap-6">
+				<div className="flex min-w-0 items-start gap-3">
+					<Checkbox
+						id={row.checkboxId}
+						checked={row.checked}
+						disabled={!canEdit || loadingItem === row.propKey}
+						onCheckedChange={(checked) =>
+							handleCheckboxChange(row.propKey, !!checked)
+						}
+						className="mt-0.5 size-5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+					/>
+					<div className="min-w-0 flex-1">
+						<div className="flex items-center gap-2">
+							<label
+								htmlFor={row.checkboxId}
+								className="text-sm font-semibold text-slate-900 cursor-pointer [overflow-wrap:anywhere]"
 							>
-								<div className="flex items-start justify-between">
-									<div className="flex items-start gap-3">
-										<Checkbox
-											id={item.id}
-											checked={item.checked}
-											disabled={!canEdit || loadingItem === item.id}
-											onCheckedChange={(checked) =>
-												handleCheckboxChange(item.id, !!checked)
-											}
-											className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
-										/>
-										<div>
-											<label
-												htmlFor={item.id}
-												className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block"
-											>
-												{item.label}
-											</label>
-											<p className="text-[11px] text-slate-500 mt-0.5">
-												{item.desc}
-											</p>
-										</div>
-									</div>
-									<div className="flex items-center gap-2">
-										{loadingItem === item.id ? (
-											<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-										) : item.checked ? (
-											<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-												✓ Selesai
-											</Badge>
-										) : (
-											<Badge
-												variant="outline"
-												className="text-slate-400 border-slate-200 text-[10px]"
-											>
-												Belum
-											</Badge>
-										)}
-									</div>
-								</div>
-
-								{/* Inline Document Upload Bukti per Item */}
-								<div className="pt-2 border-t border-slate-100">
-									<div className="flex items-center justify-between mb-1.5">
-										<span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-											<FileText className="w-3 h-3 text-indigo-600" />
-											Upload Bukti Dokumen {item.label} (PDF)
-										</span>
-									</div>
-									<DocumentUpload
-										studentId={studentId}
-										panel="pmb"
-										documentKey={item.documentKey}
-										onUploadSuccess={() => {
-											fetchDocuments();
-											if (!item.checked) {
-												handleCheckboxChange(item.id, true);
-											}
-										}}
-										canEdit={canEdit}
-									/>
-								</div>
-							</div>
-						))}
-					</div>
-				</CardContent>
-			</Card>
-
-			{/* 2. Checklist Dokumen Mahasiswa Tambahan (13 Item) */}
-			<Card className="border border-slate-200 shadow-sm border-l-4 border-l-indigo-600">
-				<CardHeader className="bg-slate-50/70 border-b border-slate-100 py-3.5 px-4 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-					<div>
-						<CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-							<FolderCheck className="w-4 h-4 text-indigo-600" />
-							Dokumen Mahasiswa Tambahan ({ADDITIONAL_DOCS.length})
-						</CardTitle>
-						<p className="text-[11px] text-slate-500 mt-0.5">
-							Validasi berkas identitas, paspor, kesehatan (Pre-MCU & MCU Full),
-							SLA, dan kualifikasi
-						</p>
-					</div>
-
-					<div className="flex items-center gap-2">
-						<Badge
-							className={`text-xs font-bold px-2.5 py-0.5 ${
-								completedRequiredDocsCount === requiredDocs.length
-									? "bg-emerald-50 text-emerald-700 border-emerald-200"
-									: completedRequiredDocsCount >= 6
-										? "bg-indigo-50 text-indigo-700 border-indigo-200"
-										: "bg-amber-50 text-amber-700 border-amber-200"
-							}`}
+								{cleanLabel(row.label)}
+							</label>
+							{loadingItem === row.propKey && (
+								<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400 shrink-0" />
+							)}
+						</div>
+						<p
+							className="mt-0.5 text-xs text-slate-500 line-clamp-2"
+							title={row.desc}
 						>
-							{completedRequiredDocsCount}/{requiredDocs.length} Dokumen Wajib
-							Selesai
-						</Badge>
+							{row.desc}
+						</p>
+						{row.action}
 					</div>
-				</CardHeader>
+				</div>
+				<div className="min-w-0 pl-8 md:pl-0">
+					<DocumentUpload
+						studentId={studentId}
+						panel="pmb"
+						documentKey={row.documentKey}
+						onUploadSuccess={() => {
+							fetchDocuments();
+							if (!row.checked) {
+								handleCheckboxChange(row.propKey, true);
+							}
+						}}
+						canEdit={canEdit}
+					/>
+				</div>
+			</div>
+		</li>
+	);
 
-				<CardContent className="p-4 sm:p-5 space-y-3.5">
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-						{ADDITIONAL_DOCS.map((doc) => {
-							const docFiles = documents[doc.key] || [];
-							const isChecked = !!localChecks[doc.propKey];
-							const hasUploadedFile = docFiles.length > 0;
+	const docRow = (doc: (typeof ADDITIONAL_DOCS)[number]) =>
+		renderRow({
+			key: doc.key,
+			checkboxId: `doc-${doc.key}`,
+			propKey: doc.propKey,
+			label: doc.label,
+			desc: doc.desc,
+			checked: !!localChecks[doc.propKey],
+			documentKey: doc.key,
+		});
 
-							return (
-								<div
-									key={doc.key}
-									className={`p-3.5 rounded-xl border transition-colors space-y-2.5 ${
-										isChecked
-											? "border-emerald-200 bg-emerald-50/20"
-											: "border-slate-200 bg-white"
-									}`}
-								>
-									<div className="flex items-start justify-between">
-										<div className="flex items-start gap-3">
-											<Checkbox
-												id={`doc-${doc.key}`}
-												checked={isChecked}
-												disabled={!canEdit || loadingItem === doc.propKey}
-												onCheckedChange={(checked) =>
-													handleCheckboxChange(doc.propKey, !!checked)
-												}
-												className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
-											/>
-											<div>
-												<div className="flex items-center gap-1.5 flex-wrap">
-													<label
-														htmlFor={`doc-${doc.key}`}
-														className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer block"
-													>
-														{doc.label}
-													</label>
-													{doc.isOptional && (
-														<span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded-full">
-															Opsional
-														</span>
-													)}
-												</div>
-												<p className="text-[11px] text-slate-500 mt-0.5">
-													{doc.desc}
-												</p>
-											</div>
-										</div>
+	const groupHeader = (title: string, done: number, total: number) => (
+		<div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
+			<h3 className="text-sm sm:text-base font-bold text-slate-900">{title}</h3>
+			<span
+				className={`rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums ${
+					done >= total
+						? "bg-emerald-100 text-emerald-800"
+						: "bg-amber-100 text-amber-800"
+				}`}
+			>
+				{done} / {total} selesai
+			</span>
+		</div>
+	);
 
-										<div className="flex items-center gap-2">
-											{loadingItem === doc.propKey ? (
-												<Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-											) : isChecked ? (
-												<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-													✓ Selesai{" "}
-													{hasUploadedFile && `(${docFiles.length} File)`}
-												</Badge>
-											) : (
-												<Badge
-													variant="outline"
-													className="text-slate-400 border-slate-200 text-[10px]"
-												>
-													Belum
-												</Badge>
-											)}
-										</div>
-									</div>
+	return (
+		<div className="w-full space-y-6">
+			{/* 1. Berkas Utama (wajib) */}
+			<section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+				{groupHeader("Berkas Utama", completedMainCount, mainChecklist.length)}
+				<ul className="divide-y divide-slate-100">
+					{mainChecklist.map((item) =>
+						renderRow({
+							key: item.id,
+							checkboxId: item.id,
+							propKey: item.id,
+							label: item.label,
+							desc: item.desc,
+							checked: item.checked,
+							documentKey: item.documentKey,
+							// Formulir Masuk: cetak → tanda tangan ortu → unggah di baris ini
+							action:
+								item.id === "formReceived" ? (
+									<a
+										href={`/dashboard/students/${studentId}/formulir`}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="mt-1.5 inline-flex min-h-9 items-center text-xs font-semibold text-[#0517B0] hover:underline"
+									>
+										Cetak formulir untuk tanda tangan orang tua →
+									</a>
+								) : undefined,
+						}),
+					)}
+				</ul>
+			</section>
 
-									{/* Inline Document Upload Bukti per Item */}
-									<div className="pt-2 border-t border-slate-100">
-										<div className="flex items-center justify-between mb-1.5">
-											<span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-												<FileText className="w-3 h-3 text-indigo-600" />
-												Upload Berkas {doc.label} (PDF)
-											</span>
-										</div>
-										<DocumentUpload
-											studentId={studentId}
-											panel="pmb"
-											documentKey={doc.key}
-											onUploadSuccess={() => {
-												fetchDocuments();
-												if (!isChecked) {
-													handleCheckboxChange(doc.propKey, true);
-												}
-											}}
-											canEdit={canEdit}
-										/>
-									</div>
-								</div>
-							);
-						})}
-					</div>
-				</CardContent>
-			</Card>
+			{/* 2. Dokumen Wajib */}
+			<section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+				{groupHeader(
+					"Dokumen Wajib",
+					completedRequiredDocsCount,
+					requiredDocs.length,
+				)}
+				<ul className="divide-y divide-slate-100">
+					{requiredDocs.map(docRow)}
+				</ul>
+			</section>
+
+			{/* 3. Dokumen Opsional (tidak mengunci ACC) */}
+			<Collapsible className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+				<CollapsibleTrigger className="group flex min-h-12 w-full items-center justify-between gap-3 bg-slate-50 px-4 sm:px-6 text-left hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0517B0]/40">
+					<span className="text-sm font-semibold text-slate-700">
+						Dokumen opsional ({optionalDocs.length})
+						<span className="ml-2 font-normal text-slate-500">
+							tidak mempengaruhi ACC
+						</span>
+					</span>
+					<ChevronDown className="w-4 h-4 text-slate-500 transition-transform group-data-[panel-open]:rotate-180" />
+				</CollapsibleTrigger>
+				<CollapsibleContent>
+					<ul className="divide-y divide-slate-100 border-t border-slate-200">
+						{optionalDocs.map(docRow)}
+					</ul>
+				</CollapsibleContent>
+			</Collapsible>
 		</div>
 	);
 }

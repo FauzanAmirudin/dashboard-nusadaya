@@ -51,8 +51,10 @@ import {
 	cacheInvalidatePattern,
 	cacheSet,
 } from "../../lib/cache";
+import { normalizeEmergencyContacts } from "../../lib/emergency-contacts";
 import { autoIssueStudentNim } from "../../lib/nim-helper";
 import { getValidUserId, hasRole } from "../../lib/permissions";
+import { checkWaitingStatusChange } from "../../lib/student-activation";
 import { requireRole } from "../../middleware/rbac";
 import { fileService } from "../../modules/file/service/file.service";
 
@@ -85,6 +87,27 @@ export function formatBirthDateToPassword(
 }
 
 export async function createStudentPipeline(body: any, userId: number) {
+	// 0. Validasi skema keuangan awal lebih dulu: gagal di sini tidak boleh
+	// meninggalkan akun/mahasiswa yatim (dicek di test pmb_biaya_pendaftaran).
+	const inputTotalBiaya =
+		body.totalBiaya !== undefined && body.totalBiaya !== null
+			? Math.max(0, Math.floor(Number(body.totalBiaya)) || 0)
+			: undefined;
+	const inputPendaftaranDp =
+		body.pendaftaranDp !== undefined && body.pendaftaranDp !== null
+			? Math.max(0, Math.floor(Number(body.pendaftaranDp)) || 0)
+			: undefined;
+	if (
+		inputTotalBiaya !== undefined &&
+		inputTotalBiaya > 0 &&
+		inputPendaftaranDp !== undefined &&
+		inputPendaftaranDp > inputTotalBiaya
+	) {
+		throw new Error(
+			`Nominal DP Pendaftaran (Rp ${inputPendaftaranDp.toLocaleString("id-ID")}) tidak boleh melebihi Total Biaya Pendidikan (Rp ${inputTotalBiaya.toLocaleString("id-ID")}).`,
+		);
+	}
+
 	// 1. Validasi email & nim
 	if (body.nim) {
 		const existingNim = await db.query.students.findFirst({
@@ -154,6 +177,8 @@ export async function createStudentPipeline(body: any, userId: number) {
 			schoolOrigin: body.schoolOrigin,
 			schoolAddress: body.schoolAddress,
 			schoolMajor: body.schoolMajor || null,
+			lastEducation: body.lastEducation || null,
+			priorCollege: body.priorCollege || null,
 			graduationYear: body.graduationYear,
 			classType: body.classType,
 			academicYear: body.academicYear,
@@ -162,12 +187,11 @@ export async function createStudentPipeline(body: any, userId: number) {
 			email: body.email,
 			profilePhotoUrl: body.profilePhotoUrl,
 			paId: body.paId,
-			studentStatus: body.studentStatus || "aktif",
+			// Mahasiswa baru masuk waiting list sampai DP diverifikasi lunas oleh Finance
+			studentStatus: body.studentStatus || "menunggu_pembayaran",
 			destinationCountry: body.destinationCountry,
 			period: body.period,
-			emergencyContactName: body.emergencyContactName || null,
-			emergencyContactPhone: body.emergencyContactPhone || null,
-			emergencyContactRelation: body.emergencyContactRelation || null,
+			...normalizeEmergencyContacts(body),
 			studentUserId: newUser.id, // Relasi ke akun login
 		})
 		.returning();
@@ -220,6 +244,7 @@ export async function createStudentPipeline(body: any, userId: number) {
 				nationality: p.nationality,
 				education: p.education,
 				job: p.job,
+				income: p.income,
 				address: p.address,
 				phone: p.phone,
 				email: p.email,
@@ -307,7 +332,7 @@ export async function createStudentPipeline(body: any, userId: number) {
 		}
 	}
 
-	// 5c. Fetch program fee default jika ada (Task J-2)
+	// 5c. Skema keuangan awal: nominal yang diinput PMB menang atas pagu program (Task J-2)
 	let defaultBiaya = 0;
 	let defaultReg = 0;
 	if (body.subProgram) {
@@ -318,6 +343,12 @@ export async function createStudentPipeline(body: any, userId: number) {
 			defaultBiaya = feeDefault.defaultTotalBiaya || 0;
 			defaultReg = feeDefault.defaultRegistrasi || 0;
 		}
+	}
+	if (inputTotalBiaya !== undefined) {
+		defaultBiaya = inputTotalBiaya;
+	}
+	if (inputPendaftaranDp !== undefined) {
+		defaultReg = inputPendaftaranDp;
 	}
 
 	// 6. Initialize related panels
@@ -334,10 +365,16 @@ export async function createStudentPipeline(body: any, userId: number) {
 			referralInstitutionName: body.referralInstitutionName || null,
 			referralContactName: body.referralContactName || null,
 			referralContactPhone: body.referralContactPhone || null,
+			recommendedBy: body.recommendedBy || null,
+			recommenderName: body.recommenderName || null,
 		}),
 		db.insert(pmbPaymentPlan).values({
 			studentId,
 			totalBiaya: defaultBiaya,
+			// Tiga kolom DP ini dibaca Panel Finance (waiting list) & Tab Skema Keuangan
+			pendaftaranDp: defaultReg,
+			totalDp: defaultReg,
+			pembayaranAwalDp: defaultReg,
 		}),
 		db.insert(crmData).values({ studentId }),
 		db.insert(financeData).values({
@@ -461,9 +498,18 @@ export const coreRoutes = new Elysia()
 			// Build dynamic WHERE conditions
 			const conditions = [eq(students.isArchived, isArchived)];
 
+			// Waiting list (belum lunas DP) tidak tampil di daftar panel mana pun,
+			// kecuali diminta eksplisit. Antrean tagihan ada di Panel Finance.
+			const includeWaiting = query?.includeWaiting === "true";
+			if (!includeWaiting) {
+				conditions.push(
+					sql`${students.studentStatus} is distinct from 'menunggu_pembayaran'`,
+				);
+			}
+
 			if (cohort && !Number.isNaN(cohort)) {
 				if (cohort >= 2000) {
-					const derivedCohort = cohort - 2010;
+					const derivedCohort = cohort - 2009; // Angkatan 17 = 2026/2027
 					conditions.push(
 						or(
 							eq(students.cohort, cohort),
@@ -472,7 +518,7 @@ export const coreRoutes = new Elysia()
 						)!,
 					);
 				} else {
-					const derivedYear = 2010 + cohort;
+					const derivedYear = 2009 + cohort;
 					conditions.push(
 						or(
 							eq(students.cohort, cohort),
@@ -515,7 +561,7 @@ export const coreRoutes = new Elysia()
 			const whereClause = and(...conditions);
 
 			// Cache key for pagination & filter combination
-			const cacheKey = `cache:students:list:p${page}:l${limit}:c${cohort || "all"}:r${query?.rombel || "all"}:s${status || "all"}:q${search || ""}:a${isArchived}`;
+			const cacheKey = `cache:students:list:p${page}:l${limit}:c${cohort || "all"}:r${query?.rombel || "all"}:s${status || "all"}:q${search || ""}:a${isArchived}:w${includeWaiting}`;
 
 			const responsePayload = await cacheFetch(
 				cacheKey,
@@ -596,6 +642,10 @@ export const coreRoutes = new Elysia()
 								referralContactName: pmbData.referralContactName,
 								referralContactPhone: pmbData.referralContactPhone,
 								rumahJuang: pmbData.rumahJuang,
+								// Ringkasan syarat ACC (Skema Keuangan & Fee Sharing) untuk kolom Kelengkapan
+								keuanganOk: sql<boolean>`exists (select 1 from pmb_payment_plan pp where pp.student_id = ${students.id} and coalesce(pp.total_biaya, 0) > 0 and coalesce(pp.pendaftaran_dp, 0) > 0)`,
+								feeTotal: sql<number>`(select count(*)::int from fee_share_recipients f where f.student_id = ${students.id})`,
+								feePaid: sql<number>`(select count(*)::int from fee_share_recipients f where f.student_id = ${students.id} and f.status_pencairan = 'sudah_dibayarkan')`,
 							},
 							crm: {
 								id: crmData.id,
@@ -635,6 +685,7 @@ export const coreRoutes = new Elysia()
 								registrasiBuktiBayarUrl: financeData.registrasiBuktiBayarUrl,
 								registrasiStatus: financeData.registrasiStatus,
 								metodePembayaran: financeData.metodePembayaran,
+								talanganTipe: financeData.talanganTipe,
 								mandiriSemesterNominal: financeData.mandiriSemesterNominal,
 								mandiriSemesterStatus: financeData.mandiriSemesterStatus,
 								mandiriInterviewNominal: financeData.mandiriInterviewNominal,
@@ -734,8 +785,16 @@ export const coreRoutes = new Elysia()
 								visaStatus: internshipData.visaStatus,
 								ticketReady: internshipData.ticketReady,
 								pdtReady: internshipData.pdtReady,
-								lolReady: internshipData.lolReady,
 								moaReady: internshipData.moaReady,
+								mouReady: internshipData.mouReady,
+								suhanReady: internshipData.suhanReady,
+								asesmenReady: internshipData.asesmenReady,
+								agenDpPaid: internshipData.agenDpPaid,
+								agenDpDate: internshipData.agenDpDate,
+								agenDpNominal: internshipData.agenDpNominal,
+								agenPelunasanPaid: internshipData.agenPelunasanPaid,
+								agenPelunasanDate: internshipData.agenPelunasanDate,
+								agenPelunasanNominal: internshipData.agenPelunasanNominal,
 								isDanaTahap2Disbursed: internshipData.isDanaTahap2Disbursed,
 								logbookReady: internshipData.logbookReady,
 								laporanAkhirReady: internshipData.laporanAkhirReady,
@@ -837,6 +896,7 @@ export const coreRoutes = new Elysia()
 					search: t.Optional(t.String()),
 					archived: t.Optional(t.String()),
 					all: t.Optional(t.String()),
+					includeWaiting: t.Optional(t.String()),
 				}),
 			),
 		},
@@ -858,6 +918,12 @@ export const coreRoutes = new Elysia()
 		},
 		{
 			body: t.Object({
+				// Skema keuangan awal (modal biaya PMB)
+				totalBiaya: t.Optional(t.Integer({ minimum: 0, maximum: 999_999_999 })),
+				pendaftaranDp: t.Optional(
+					t.Integer({ minimum: 0, maximum: 999_999_999 }),
+				),
+
 				// Tab 1
 				nim: t.Optional(t.String()),
 				name: t.String(),
@@ -884,6 +950,8 @@ export const coreRoutes = new Elysia()
 				schoolOrigin: t.Optional(t.String()),
 				schoolAddress: t.Optional(t.String()),
 				schoolMajor: t.Optional(t.String()),
+				lastEducation: t.Optional(t.String()),
+				priorCollege: t.Optional(t.String()),
 				graduationYear: t.Optional(t.Number()),
 				program: t.String(),
 				subProgram: t.Optional(t.String()),
@@ -919,6 +987,7 @@ export const coreRoutes = new Elysia()
 							nationality: t.Optional(t.String()),
 							education: t.Optional(t.String()),
 							job: t.Optional(t.String()),
+							income: t.Optional(t.String()),
 							address: t.Optional(t.String()),
 							phone: t.Optional(t.String()),
 							email: t.Optional(t.String()),
@@ -942,9 +1011,13 @@ export const coreRoutes = new Elysia()
 				referralInstitutionName: t.Optional(t.String()),
 				referralContactName: t.Optional(t.String()),
 				referralContactPhone: t.Optional(t.String()),
+				recommendedBy: t.Optional(t.String()),
+				recommenderName: t.Optional(t.String()),
 				emergencyContactName: t.Optional(t.String()),
 				emergencyContactPhone: t.Optional(t.String()),
 				emergencyContactRelation: t.Optional(t.String()),
+				emergencyContacts: t.Optional(t.Any()),
+				friendContacts: t.Optional(t.Any()),
 			}),
 		},
 	)
@@ -977,6 +1050,16 @@ export const coreRoutes = new Elysia()
 				}
 			}
 
+			const waitingErr = await checkWaitingStatusChange(
+				id,
+				body.studentStatus,
+				user,
+			);
+			if (waitingErr) {
+				set.status = 400;
+				return { success: false, message: waitingErr };
+			}
+
 			// 2. Update student
 			await db
 				.update(students)
@@ -1004,6 +1087,12 @@ export const coreRoutes = new Elysia()
 					schoolOrigin: body.schoolOrigin,
 					schoolAddress: body.schoolAddress,
 					schoolMajor: body.schoolMajor,
+					...(body.lastEducation !== undefined
+						? { lastEducation: body.lastEducation || null }
+						: {}),
+					...(body.priorCollege !== undefined
+						? { priorCollege: body.priorCollege || null }
+						: {}),
 					graduationYear: body.graduationYear,
 					classType: body.classType,
 					academicYear: body.academicYear,
@@ -1012,17 +1101,15 @@ export const coreRoutes = new Elysia()
 					email: body.email,
 					profilePhotoUrl: body.profilePhotoUrl,
 					paId: body.paId,
-					studentStatus: body.studentStatus || "aktif",
+					// Tanpa status di body, status lama dipertahankan (jangan mengaktifkan waiting list)
+					...(body.studentStatus ? { studentStatus: body.studentStatus } : {}),
 					destinationCountry: body.destinationCountry,
 					period: body.period,
-					...(body.emergencyContactName !== undefined
-						? { emergencyContactName: body.emergencyContactName }
-						: {}),
-					...(body.emergencyContactPhone !== undefined
-						? { emergencyContactPhone: body.emergencyContactPhone }
-						: {}),
-					...(body.emergencyContactRelation !== undefined
-						? { emergencyContactRelation: body.emergencyContactRelation }
+					...(body.emergencyContacts !== undefined ||
+					body.emergencyContactName !== undefined ||
+					body.emergencyContactPhone !== undefined ||
+					body.emergencyContactRelation !== undefined
+						? normalizeEmergencyContacts(body)
 						: {}),
 					...(body.rombel !== undefined ? { rombel: body.rombel } : {}),
 					updatedAt: new Date(),
@@ -1085,6 +1172,7 @@ export const coreRoutes = new Elysia()
 					nationality: p.nationality,
 					education: p.education,
 					job: p.job,
+					income: p.income,
 					address: p.address,
 					phone: p.phone,
 					email: p.email,
@@ -1115,6 +1203,12 @@ export const coreRoutes = new Elysia()
 						: {}),
 					...(body.referralContactPhone !== undefined
 						? { referralContactPhone: body.referralContactPhone }
+						: {}),
+					...(body.recommendedBy !== undefined
+						? { recommendedBy: body.recommendedBy }
+						: {}),
+					...(body.recommenderName !== undefined
+						? { recommenderName: body.recommenderName }
 						: {}),
 					updatedAt: new Date(),
 				})
@@ -1165,6 +1259,8 @@ export const coreRoutes = new Elysia()
 				schoolOrigin: t.Optional(t.String()),
 				schoolAddress: t.Optional(t.String()),
 				schoolMajor: t.Optional(t.String()),
+				lastEducation: t.Optional(t.String()),
+				priorCollege: t.Optional(t.String()),
 				graduationYear: t.Optional(t.Number()),
 				program: t.String(),
 				subProgram: t.Optional(t.String()),
@@ -1200,6 +1296,7 @@ export const coreRoutes = new Elysia()
 							nationality: t.Optional(t.String()),
 							education: t.Optional(t.String()),
 							job: t.Optional(t.String()),
+							income: t.Optional(t.String()),
 							address: t.Optional(t.String()),
 							phone: t.Optional(t.String()),
 							email: t.Optional(t.String()),
@@ -1223,9 +1320,12 @@ export const coreRoutes = new Elysia()
 				referralInstitutionName: t.Optional(t.String()),
 				referralContactName: t.Optional(t.String()),
 				referralContactPhone: t.Optional(t.String()),
+				recommendedBy: t.Optional(t.String()),
+				recommenderName: t.Optional(t.String()),
 				emergencyContactName: t.Optional(t.String()),
 				emergencyContactPhone: t.Optional(t.String()),
 				emergencyContactRelation: t.Optional(t.String()),
+				emergencyContacts: t.Optional(t.Any()),
 			}),
 		},
 	)
@@ -1762,17 +1862,12 @@ export const coreRoutes = new Elysia()
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
+		// Hanya role PA. Dulu role "dosen" ikut terdaftar sehingga Dosen Pengajar
+		// tercampur di dropdown Dosen PA dan mudah salah pilih.
 		const paUsers = await db
 			.select({ id: users.id, fullName: users.fullName })
 			.from(users)
-			.where(
-				or(
-					eq(users.role, "pa"),
-					eq(users.role, "dosen"),
-					sql`${users.roles} @> '["pa"]'::jsonb`,
-					sql`${users.roles} @> '["dosen"]'::jsonb`,
-				)!,
-			)
+			.where(or(eq(users.role, "pa"), sql`${users.roles} @> '["pa"]'::jsonb`)!)
 			.orderBy(users.fullName);
 		return { success: true, data: paUsers };
 	})
@@ -1789,6 +1884,15 @@ export const coreRoutes = new Elysia()
 				};
 			}
 			const id = parseInt(params.id, 10);
+			const waitingErr = await checkWaitingStatusChange(
+				id,
+				body.studentStatus,
+				user,
+			);
+			if (waitingErr) {
+				set.status = 400;
+				return { success: false, message: waitingErr };
+			}
 			await db
 				.update(students)
 				.set({ studentStatus: body.studentStatus, updatedAt: new Date() })
@@ -2010,7 +2114,7 @@ export const coreRoutes = new Elysia()
 			if (recordsToInsert.length > 0) {
 				await db.insert(studentFriendContacts).values(recordsToInsert);
 			}
-			return { success: true, message: "Kontak kawan berhasil ditambahkan" };
+			return { success: true, message: "Kontak teman berhasil ditambahkan" };
 		},
 		{
 			body: t.Any(),

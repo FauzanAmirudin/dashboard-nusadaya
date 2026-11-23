@@ -124,7 +124,6 @@ export const statusRoutes = new Elysia().get(
 		// 1. PMB (14 Items Total: 5 Berkas Utama + 9 Dokumen Wajib Pendaftaran)
 		const pmbItems = [
 			{ prop: pmb?.formReceived, name: "Formulir Pendaftaran" },
-			{ prop: pmb?.documentsComplete, name: "Dokumen Lengkap" },
 			{ prop: pmb?.dataInputted, name: "Data Diinput" },
 			{ prop: pmb?.initialFollowUp, name: "Follow Up Awal" },
 			{ prop: pmb?.pasFoto, name: "Pas Foto (Standar Visa / Formal)" },
@@ -254,6 +253,11 @@ export const statusRoutes = new Elysia().get(
 				academic.attendanceTotal > 0 &&
 				academic.attendancePresent! / academic.attendanceTotal! >= 0.8
 			: false;
+		// PA berada di bawah Akademik: ketiga indikatornya melebur jadi satu butir
+		// progres Akademik, bukan panel ACC tersendiri.
+		const paAllDone = Boolean(
+			pa?.counselingDone && pa?.mentalStable && pa?.disciplineGood,
+		);
 		const academicItems = [
 			{ prop: academic?.pddiktiInput, name: "Input PDDIKTI" },
 			{ prop: academic?.utsPassed, name: "Lulus UTS" },
@@ -265,6 +269,11 @@ export const statusRoutes = new Elysia().get(
 				prop: academic?.assessmentCompleted,
 				name: "Asesmen Pra-keberangkatan",
 			},
+			{
+				prop: paAllDone,
+				name: "Pendampingan Akademik (PA)",
+				link: "pa",
+			},
 		];
 		const academicCompleted = academicItems.filter((i) => i.prop).length;
 		academicItems
@@ -274,19 +283,24 @@ export const statusRoutes = new Elysia().get(
 					panel: "Akademik",
 					name: i.name,
 					status: "PROSES",
-					link: "akademik",
+					// Butir PA tetap menautkan ke halaman PA sebagai sumber datanya
+					link: (i as { link?: string }).link || "akademik",
 				}),
 			);
 		panels.push({
 			id: "akademik",
 			name: "Akademik",
 			completed: academicCompleted,
-			total: 7,
-			status: calculatePanelStatus(academicCompleted, 7, academic?.isAcc),
+			total: academicItems.length,
+			status: calculatePanelStatus(
+				academicCompleted,
+				academicItems.length,
+				academic?.isAcc,
+			),
 			isAcc: Boolean(academic?.isAcc),
 		});
 		totalCompleted += academicCompleted;
-		totalIndicators += 7;
+		totalIndicators += academicItems.length;
 
 		// 5. Dosen per MK
 		let dosenCompleted = 0;
@@ -333,33 +347,8 @@ export const statusRoutes = new Elysia().get(
 		totalCompleted += dosenCompleted;
 		totalIndicators += dosenTotal;
 
-		// 6. PA
-		const paItems = [
-			{ prop: pa?.counselingDone, name: "Konseling Dilakukan" },
-			{ prop: pa?.mentalStable, name: "Mental Stabil" },
-			{ prop: pa?.disciplineGood, name: "Disiplin Baik" },
-		];
-		const paCompleted = paItems.filter((i) => i.prop).length;
-		paItems
-			.filter((i) => !i.prop)
-			.forEach((i) =>
-				incompleteIndicators.push({
-					panel: "Pendamping Akademik",
-					name: i.name,
-					status: "PROSES",
-					link: "pa",
-				}),
-			);
-		panels.push({
-			id: "pa",
-			name: "Pendamping Akademik",
-			completed: paCompleted,
-			total: 3,
-			status: calculatePanelStatus(paCompleted, 3, pa?.isAcc),
-			isAcc: Boolean(pa?.isAcc),
-		});
-		totalCompleted += paCompleted;
-		totalIndicators += 3;
+		// 6. PA — tidak lagi jadi panel ACC tersendiri; sudah melebur ke butir
+		// "Pendampingan Akademik (PA)" di dalam progres Akademik di atas.
 
 		// 7. Magang
 		const magangItems = [

@@ -2,6 +2,8 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../db";
 import { pmbFormResponses, pmbFormTokens, students, users } from "../db/schema";
+import { normalizeEmergencyContacts } from "../lib/emergency-contacts";
+import { normalizeExtraData } from "../lib/extra-data";
 import { hasRole } from "../lib/permissions";
 import { createStudentPipeline } from "./student/core";
 
@@ -136,6 +138,15 @@ export const formRegisterRoutes = new Elysia()
 				}
 			}
 
+			// Kontak darurat: simpan sebagai daftar (maks. 3); klien lama yang masih
+			// mengirim kolom tunggal dibaca sebagai satu kontak.
+			insertData.emergencyContacts =
+				normalizeEmergencyContacts(insertData).emergencyContacts;
+			insertData.extraData = normalizeExtraData(insertData.extraData);
+			delete insertData.emergencyContactName;
+			delete insertData.emergencyContactPhone;
+			delete insertData.emergencyContactRelation;
+
 			// Save / Update Response
 			if (tokenRecord.response) {
 				await db
@@ -259,6 +270,8 @@ export const formRegisterRoutes = new Elysia()
 				emergencyContactName: t.Optional(t.String()),
 				emergencyContactPhone: t.Optional(t.String()),
 				emergencyContactRelation: t.Optional(t.String()),
+				emergencyContacts: t.Optional(t.Any()),
+				extraData: t.Optional(t.Any()),
 				recommendedBy: t.Optional(t.String()),
 				recommenderName: t.Optional(t.String()),
 				friendContacts: t.Optional(t.Any()),
@@ -432,237 +445,264 @@ export const formRegisterRoutes = new Elysia()
 		},
 	)
 	// 9. ADMIN: Approve Response
-	.patch("/pmb/form-responses/:id/approve", async (context) => {
-		const auth = checkPmbAdminAuth(context);
-		if (!auth.authorized) return auth.response;
-		const user = auth.user;
+	.patch(
+		"/pmb/form-responses/:id/approve",
+		async (context) => {
+			const auth = checkPmbAdminAuth(context);
+			if (!auth.authorized) return auth.response;
+			const user = auth.user;
 
-		const { params, set } = context;
-		const id = parseInt(params.id, 10);
+			const { params, body, set } = context;
+			const id = parseInt(params.id, 10);
 
-		const response = await db.query.pmbFormResponses.findFirst({
-			where: eq(pmbFormResponses.id, id),
-		});
+			const response = await db.query.pmbFormResponses.findFirst({
+				where: eq(pmbFormResponses.id, id),
+			});
 
-		if (!response || response.status !== "PENDING") {
-			set.status = 400;
-			return { success: false, message: "Data tidak valid" };
-		}
-
-		try {
-			// Susun payload parents (Task B-2)
-			const parents: any[] = [];
-			if (response.ayahName) {
-				parents.push({
-					type: "ayah",
-					name: response.ayahName,
-					birthPlace: response.ayahBirthPlace,
-					birthDate: response.ayahBirthDate
-						? new Date(response.ayahBirthDate)
-						: null,
-					religion: response.ayahReligion,
-					nationality: response.ayahNationality,
-					education: response.ayahEducation,
-					job: response.ayahJob,
-					address: response.ayahAddress,
-					phone: response.ayahPhone,
-					email: response.ayahEmail,
-					status: response.ayahStatus || "Hidup",
-				});
-			}
-			if (response.ibuName) {
-				parents.push({
-					type: "ibu",
-					name: response.ibuName,
-					birthPlace: response.ibuBirthPlace,
-					birthDate: response.ibuBirthDate
-						? new Date(response.ibuBirthDate)
-						: null,
-					religion: response.ibuReligion,
-					nationality: response.ibuNationality,
-					education: response.ibuEducation,
-					job: response.ibuJob,
-					address: response.ibuAddress,
-					phone: response.ibuPhone,
-					email: response.ibuEmail,
-					status: response.ibuStatus || "Hidup",
-				});
-			}
-			if (response.waliName) {
-				parents.push({
-					type: "wali",
-					name: response.waliName,
-					birthPlace: response.waliBirthPlace,
-					birthDate: response.waliBirthDate
-						? new Date(response.waliBirthDate)
-						: null,
-					religion: response.waliReligion,
-					nationality: response.waliNationality,
-					education: response.waliEducation,
-					job: response.waliJob,
-					address: response.waliAddress,
-					phone: response.waliPhone,
-					email: response.waliEmail,
-					guardianRelation: response.waliGuardianRelation,
-				});
+			if (!response || response.status !== "PENDING") {
+				set.status = 400;
+				return { success: false, message: "Data tidak valid" };
 			}
 
-			// Convert payload back to match what `createStudentPipeline` expects
-			const studentPayload = {
-				name: response.name,
-				nickname: response.nickname,
-				gender: response.gender,
-				birthPlace: response.birthPlace,
-				birthDate: response.birthDate
-					? new Date(response.birthDate)
-					: undefined,
-				religion: response.religion,
-				nationality: response.nationality,
-				addressStreet: response.addressStreet,
-				addressRt: response.addressRt,
-				addressRw: response.addressRw,
-				addressNo: response.addressNo,
-				addressVillage: response.addressVillage,
-				addressDistrict: response.addressDistrict,
-				addressCity: response.addressCity,
-				addressProvince: response.addressProvince,
-				livingWith: response.livingWith,
-				phone: response.phone,
-				email: response.email,
-				profilePhotoUrl: response.profilePhotoUrl,
+			try {
+				const extra = normalizeExtraData(response.extraData);
 
-				schoolOrigin: response.schoolOrigin,
-				schoolAddress: response.schoolAddress,
-				schoolMajor: response.schoolMajor,
-				graduationYear: response.graduationYear,
-				program: response.program || "Reguler", // Fallback
-				subProgram: response.subProgram || "Indonesia-Reguler",
-				destinationCountry:
-					response.subProgram === "Malaysia-Hospitality"
-						? "Malaysia"
-						: response.subProgram === "Taiwan-Hospitality"
-							? "Taiwan"
-							: response.subProgram === "Timur tengah-Barista"
-								? "Timur Tengah"
-								: "Indonesia",
-				classType: response.classType,
-				batch: response.batch,
-				academicYear: response.academicYear || undefined,
-				cohort: (() => {
-					if (response.academicYear) {
-						const startYear = parseInt(response.academicYear.split("/")[0], 10);
-						if (!Number.isNaN(startYear)) {
-							return startYear >= 2000 ? startYear - 2010 : startYear;
+				// Susun payload parents (Task B-2)
+				const parents: any[] = [];
+				if (response.ayahName) {
+					parents.push({
+						type: "ayah",
+						name: response.ayahName,
+						birthPlace: response.ayahBirthPlace,
+						birthDate: response.ayahBirthDate
+							? new Date(response.ayahBirthDate)
+							: null,
+						religion: response.ayahReligion,
+						nationality: response.ayahNationality,
+						education: response.ayahEducation,
+						job: response.ayahJob,
+						income: extra.ayahIncome,
+						address: response.ayahAddress,
+						phone: response.ayahPhone,
+						email: response.ayahEmail,
+						status: response.ayahStatus || "Hidup",
+					});
+				}
+				if (response.ibuName) {
+					parents.push({
+						type: "ibu",
+						name: response.ibuName,
+						birthPlace: response.ibuBirthPlace,
+						birthDate: response.ibuBirthDate
+							? new Date(response.ibuBirthDate)
+							: null,
+						religion: response.ibuReligion,
+						nationality: response.ibuNationality,
+						education: response.ibuEducation,
+						job: response.ibuJob,
+						income: extra.ibuIncome,
+						address: response.ibuAddress,
+						phone: response.ibuPhone,
+						email: response.ibuEmail,
+						status: response.ibuStatus || "Hidup",
+					});
+				}
+				if (response.waliName) {
+					parents.push({
+						type: "wali",
+						name: response.waliName,
+						birthPlace: response.waliBirthPlace,
+						birthDate: response.waliBirthDate
+							? new Date(response.waliBirthDate)
+							: null,
+						religion: response.waliReligion,
+						nationality: response.waliNationality,
+						education: response.waliEducation,
+						job: response.waliJob,
+						income: extra.waliIncome,
+						address: response.waliAddress,
+						phone: response.waliPhone,
+						email: response.waliEmail,
+						guardianRelation: response.waliGuardianRelation,
+					});
+				}
+
+				// Convert payload back to match what `createStudentPipeline` expects
+				const studentPayload = {
+					name: response.name,
+					nickname: response.nickname,
+					gender: response.gender,
+					birthPlace: response.birthPlace,
+					birthDate: response.birthDate
+						? new Date(response.birthDate)
+						: undefined,
+					religion: response.religion,
+					nationality: response.nationality,
+					addressStreet: response.addressStreet,
+					addressRt: response.addressRt,
+					addressRw: response.addressRw,
+					addressNo: response.addressNo,
+					addressVillage: response.addressVillage,
+					addressDistrict: response.addressDistrict,
+					addressCity: response.addressCity,
+					addressProvince: response.addressProvince,
+					livingWith: response.livingWith,
+					phone: response.phone,
+					email: response.email,
+					profilePhotoUrl: response.profilePhotoUrl,
+
+					schoolOrigin: response.schoolOrigin,
+					schoolAddress: response.schoolAddress,
+					schoolMajor: response.schoolMajor,
+					graduationYear: response.graduationYear,
+					program: response.program || "Reguler", // Fallback
+					subProgram: response.subProgram || "Indonesia-Reguler",
+					destinationCountry:
+						response.subProgram === "Malaysia-Hospitality"
+							? "Malaysia"
+							: response.subProgram === "Taiwan-Hospitality"
+								? "Taiwan"
+								: response.subProgram === "Timur tengah-Barista"
+									? "Timur Tengah"
+									: "Indonesia",
+					classType: response.classType,
+					batch: response.batch,
+					academicYear: response.academicYear || undefined,
+					// Angkatan 17 = tahun ajaran 2026/2027 (tahun awal - 2009)
+					cohort: (() => {
+						if (response.academicYear) {
+							const startYear = parseInt(
+								response.academicYear.split("/")[0],
+								10,
+							);
+							if (!Number.isNaN(startYear)) {
+								return startYear >= 2000 ? startYear - 2009 : startYear;
+							}
 						}
-					}
-					return new Date().getFullYear() - 2010;
-				})(),
+						return new Date().getFullYear() - 2009;
+					})(),
 
-				bloodType: response.bloodType,
-				diseaseHistory: response.diseaseHistory,
-				congenitalDisease: response.congenitalDisease,
-				height: response.height ? Number(response.height) : undefined,
-				weight: response.weight ? Number(response.weight) : undefined,
-				clothingSize: response.clothingSize,
+					bloodType: response.bloodType,
+					...extra,
+					diseaseHistory: response.diseaseHistory,
+					congenitalDisease: response.congenitalDisease,
+					height: response.height ? Number(response.height) : undefined,
+					weight: response.weight ? Number(response.weight) : undefined,
+					clothingSize: response.clothingSize,
 
-				// Parents array (Task B-2)
-				parents,
+					// Parents array (Task B-2)
+					parents,
 
-				// Ayah, Ibu, Wali flat fields (fallback)
-				ayahName: response.ayahName,
-				ayahBirthPlace: response.ayahBirthPlace,
-				ayahBirthDate: response.ayahBirthDate
-					? new Date(response.ayahBirthDate)
-					: undefined,
-				ayahReligion: response.ayahReligion,
-				ayahNationality: response.ayahNationality,
-				ayahEducation: response.ayahEducation,
-				ayahJob: response.ayahJob,
-				ayahAddress: response.ayahAddress,
-				ayahPhone: response.ayahPhone,
-				ayahEmail: response.ayahEmail,
-				ayahStatus: response.ayahStatus,
+					// Ayah, Ibu, Wali flat fields (fallback)
+					ayahName: response.ayahName,
+					ayahBirthPlace: response.ayahBirthPlace,
+					ayahBirthDate: response.ayahBirthDate
+						? new Date(response.ayahBirthDate)
+						: undefined,
+					ayahReligion: response.ayahReligion,
+					ayahNationality: response.ayahNationality,
+					ayahEducation: response.ayahEducation,
+					ayahJob: response.ayahJob,
+					ayahAddress: response.ayahAddress,
+					ayahPhone: response.ayahPhone,
+					ayahEmail: response.ayahEmail,
+					ayahStatus: response.ayahStatus,
 
-				ibuName: response.ibuName,
-				ibuBirthPlace: response.ibuBirthPlace,
-				ibuBirthDate: response.ibuBirthDate
-					? new Date(response.ibuBirthDate)
-					: undefined,
-				ibuReligion: response.ibuReligion,
-				ibuNationality: response.ibuNationality,
-				ibuEducation: response.ibuEducation,
-				ibuJob: response.ibuJob,
-				ibuAddress: response.ibuAddress,
-				ibuPhone: response.ibuPhone,
-				ibuEmail: response.ibuEmail,
-				ibuStatus: response.ibuStatus,
+					ibuName: response.ibuName,
+					ibuBirthPlace: response.ibuBirthPlace,
+					ibuBirthDate: response.ibuBirthDate
+						? new Date(response.ibuBirthDate)
+						: undefined,
+					ibuReligion: response.ibuReligion,
+					ibuNationality: response.ibuNationality,
+					ibuEducation: response.ibuEducation,
+					ibuJob: response.ibuJob,
+					ibuAddress: response.ibuAddress,
+					ibuPhone: response.ibuPhone,
+					ibuEmail: response.ibuEmail,
+					ibuStatus: response.ibuStatus,
 
-				waliName: response.waliName,
-				waliBirthPlace: response.waliBirthPlace,
-				waliBirthDate: response.waliBirthDate
-					? new Date(response.waliBirthDate)
-					: undefined,
-				waliReligion: response.waliReligion,
-				waliNationality: response.waliNationality,
-				waliEducation: response.waliEducation,
-				waliJob: response.waliJob,
-				waliAddress: response.waliAddress,
-				waliPhone: response.waliPhone,
-				waliEmail: response.waliEmail,
-				waliGuardianRelation: response.waliGuardianRelation,
+					waliName: response.waliName,
+					waliBirthPlace: response.waliBirthPlace,
+					waliBirthDate: response.waliBirthDate
+						? new Date(response.waliBirthDate)
+						: undefined,
+					waliReligion: response.waliReligion,
+					waliNationality: response.waliNationality,
+					waliEducation: response.waliEducation,
+					waliJob: response.waliJob,
+					waliAddress: response.waliAddress,
+					waliPhone: response.waliPhone,
+					waliEmail: response.waliEmail,
+					waliGuardianRelation: response.waliGuardianRelation,
 
-				// PMB & Referensi Terstruktur (Task I-1 & I-2)
-				period: response.period || undefined,
-				rekomendasi: response.rekomendasi || undefined,
-				timVisit: response.timVisit || undefined,
-				timSosialisasi: response.timSosialisasi || undefined,
-				roReferral: response.roReferral || undefined,
-				mitraSponsor: response.mitraSponsor || undefined,
-				koordinator: response.koordinator || undefined,
-				referralCategory: response.referralCategory || undefined,
-				referralInstitutionName: response.referralInstitutionName || undefined,
-				referralContactName: response.referralContactName || undefined,
-				referralContactPhone: response.referralContactPhone || undefined,
+					// PMB & Referensi Terstruktur (Task I-1 & I-2)
+					period: response.period || undefined,
+					rekomendasi: response.rekomendasi || undefined,
+					timVisit: response.timVisit || undefined,
+					timSosialisasi: response.timSosialisasi || undefined,
+					roReferral: response.roReferral || undefined,
+					mitraSponsor: response.mitraSponsor || undefined,
+					koordinator: response.koordinator || undefined,
+					referralCategory: response.referralCategory || undefined,
+					referralInstitutionName:
+						response.referralInstitutionName || undefined,
+					referralContactName: response.referralContactName || undefined,
+					referralContactPhone: response.referralContactPhone || undefined,
+					recommendedBy: response.recommendedBy || undefined,
+					recommenderName: response.recommenderName || undefined,
 
-				// Kontak Darurat & Kawan (Task N-1 & N-3)
-				emergencyContactName: response.emergencyContactName || undefined,
-				emergencyContactPhone: response.emergencyContactPhone || undefined,
-				emergencyContactRelation:
-					response.emergencyContactRelation || undefined,
-				friendContacts: response.friendContacts || [],
+					// Kontak Darurat & Kawan (Task N-1 & N-3)
+					emergencyContacts: response.emergencyContacts || [],
+					friendContacts: response.friendContacts || [],
 
-				studentStatus: "aktif",
-			};
+					// Skema keuangan awal dari modal biaya PMB (gerbang ACC)
+					totalBiaya: body.totalBiaya,
+					pendaftaranDp: body.pendaftaranDp,
 
-			// Use the existing student creation pipeline
-			const { student } = await createStudentPipeline(studentPayload, user.id);
+					// Waiting list: aktif hanya setelah DP diverifikasi lunas oleh Finance
+					studentStatus: "menunggu_pembayaran",
+				};
 
-			// Update response status to APPROVED
-			await db
-				.update(pmbFormResponses)
-				.set({
-					status: "APPROVED",
-					processedAt: new Date(),
-					processedBy: user.id,
-					studentId: student.id,
-				})
-				.where(eq(pmbFormResponses.id, id));
+				// Use the existing student creation pipeline
+				const { student } = await createStudentPipeline(
+					studentPayload,
+					user.id,
+				);
 
-			// Lock token
-			if (response.tokenId) {
+				// Update response status to APPROVED
 				await db
-					.update(pmbFormTokens)
-					.set({ isUsed: true, usedAt: new Date() })
-					.where(eq(pmbFormTokens.id, response.tokenId));
-			}
+					.update(pmbFormResponses)
+					.set({
+						status: "APPROVED",
+						processedAt: new Date(),
+						processedBy: user.id,
+						studentId: student.id,
+					})
+					.where(eq(pmbFormResponses.id, id));
 
-			return { success: true, data: student };
-		} catch (error: any) {
-			console.error("Failed to approve form response:", error);
-			set.status = 500;
-			return { success: false, message: error.message };
-		}
-	})
+				// Lock token
+				if (response.tokenId) {
+					await db
+						.update(pmbFormTokens)
+						.set({ isUsed: true, usedAt: new Date() })
+						.where(eq(pmbFormTokens.id, response.tokenId));
+				}
+
+				return { success: true, data: student };
+			} catch (error: any) {
+				console.error("Failed to approve form response:", error);
+				set.status = 500;
+				return { success: false, message: error.message };
+			}
+		},
+		{
+			body: t.Object({
+				totalBiaya: t.Integer({ minimum: 1, maximum: 999_999_999 }),
+				pendaftaranDp: t.Integer({ minimum: 0, maximum: 999_999_999 }),
+			}),
+		},
+	)
 	// 10. ADMIN: Delete Form Token
 	.delete("/pmb/form-tokens/:id", async (context) => {
 		const auth = checkPmbAdminAuth(context);
