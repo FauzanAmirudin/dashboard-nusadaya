@@ -67,28 +67,71 @@ async function seed() {
 
 	const demoAccounts = [
 		// PERINGATAN: File seed ini HANYA untuk environment lokal / development.
-		// Jangan dijalankan di produksi karena menjalankan TRUNCATE pada tabel.
+		// Sesuai dengan spesifikasi Daftar Akun Demo di README.md
 		{
 			username: "superadmin",
 			fullName: "Superadmin Nusadaya",
 			role: "superadmin" as const,
+			roles: ["superadmin"],
 			email: "onedatanusadaya@gmail.com",
+			phone: "081234567890",
 		},
-		{ username: "pmb", fullName: "Divisi PMB", role: "pmb" as const },
-		{ username: "crm", fullName: "Divisi CRM", role: "crm" as const },
+		{
+			username: "pmb",
+			fullName: "Divisi PMB",
+			role: "pmb" as const,
+			roles: ["pmb"],
+			email: "pmb@nusadaya.ac.id",
+			phone: "081234567891",
+		},
+		{
+			username: "crm",
+			fullName: "Divisi CRM",
+			role: "crm" as const,
+			roles: ["crm"],
+			email: "crm@nusadaya.ac.id",
+			phone: "081234567892",
+		},
 		{
 			username: "finance",
 			fullName: "Divisi Finance",
 			role: "finance" as const,
+			roles: ["finance"],
+			email: "finance@nusadaya.ac.id",
+			phone: "081234567893",
 		},
 		{
 			username: "akademik",
 			fullName: "Divisi Akademik",
 			role: "akademik" as const,
+			roles: ["akademik"],
+			email: "akademik@nusadaya.ac.id",
+			phone: "081234567894",
 		},
-		{ username: "dosen", fullName: "Dosen Pengajar", role: "dosen" as const },
-		{ username: "pa", fullName: "Pembimbing Akademik", role: "pa" as const },
-		{ username: "magang", fullName: "Tim Magang", role: "magang" as const },
+		{
+			username: "dosen",
+			fullName: "Dosen Pengajar",
+			role: "dosen" as const,
+			roles: ["dosen"],
+			email: "dosen@nusadaya.ac.id",
+			phone: "081234567000",
+		},
+		{
+			username: "pa",
+			fullName: "Koordinator Pembimbing Akademik",
+			role: "pa" as const,
+			roles: ["pa"],
+			email: "pa@nusadaya.ac.id",
+			phone: "081234567896",
+		},
+		{
+			username: "magang",
+			fullName: "Tim Magang",
+			role: "magang" as const,
+			roles: ["magang"],
+			email: "magang@nusadaya.ac.id",
+			phone: "081234567897",
+		},
 	];
 
 	const insertedUsers = await db
