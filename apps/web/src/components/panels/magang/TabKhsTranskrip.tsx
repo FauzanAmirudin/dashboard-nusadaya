@@ -1,31 +1,10 @@
 "use client";
 
-import {
-	AlertCircle,
-	Award,
-	BookOpen,
-	CheckCircle,
-	CheckCircle2,
-	Clock,
-	Download,
-	ExternalLink,
-	FileText,
-	GraduationCap,
-	Info,
-	Loader2,
-	Printer,
-	RefreshCw,
-	ShieldCheck,
-	Sparkles,
-} from "lucide-react";
+import { Loader2, Printer } from "lucide-react";
 import Link from "next/link";
 import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DocumentUpload } from "@/components/ui/DocumentUpload";
-import { Progress } from "@/components/ui/progress";
 import {
 	Select,
 	SelectContent,
@@ -42,7 +21,6 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { API_URL, getToken } from "@/lib/eden";
-import { exportToCSV } from "@/lib/export";
 
 interface CourseGradeItem {
 	courseId: number;
@@ -90,23 +68,14 @@ interface AcademicSummaryData {
 
 interface TabKhsTranskripProps {
 	studentId: number;
-	data: Record<string, unknown> | null;
-	canEdit: boolean;
-	fetchInternshipData: () => Promise<void>;
 }
 
-export function TabKhsTranskrip({
-	studentId,
-	data,
-	canEdit,
-	fetchInternshipData,
-}: TabKhsTranskripProps) {
+export function TabKhsTranskrip({ studentId }: TabKhsTranskripProps) {
 	const [selectedSemester, setSelectedSemester] = useState<number>(1);
 	const [summaryData, setSummaryData] = useState<AcademicSummaryData | null>(
 		null,
 	);
 	const [isLoading, setIsLoading] = useState(true);
-	const [isSyncingAcademic, setIsSyncingAcademic] = useState(false);
 
 	const fetchKhsData = useCallback(
 		async (isSilent = false) => {
@@ -206,41 +175,11 @@ export function TabKhsTranskrip({
 		};
 	}, [fetchKhsData, studentId]);
 
-	// Sinkronisasi data ke Magang secara atomik
-	const handleSyncFromAcademic = async () => {
-		setIsSyncingAcademic(true);
-		try {
-			const res = await fetch(
-				`${API_URL}/students/${studentId}/academic/sync-to-magang`,
-				{
-					method: "POST",
-					headers: { Authorization: `Bearer ${getToken()}` },
-				},
-			);
-			const json = await res.json();
-			if (json.success) {
-				toast.success(
-					"KHS & Transkrip berhasil disinkronkan secara real-time dari BAAK Akademik!",
-				);
-				await fetchInternshipData();
-				await fetchKhsData(false);
-			} else {
-				toast.error(json.message || "Gagal sinkronisasi data akademik");
-			}
-		} catch (err: unknown) {
-			const errMsg =
-				err instanceof Error ? err.message : "Gagal terhubung ke server";
-			toast.error(errMsg);
-		} finally {
-			setIsSyncingAcademic(false);
-		}
-	};
-
 	if (isLoading) {
 		return (
 			<div className="flex flex-col items-center justify-center p-12 space-y-3 bg-white rounded-xl border border-slate-200">
 				<Loader2 className="w-8 h-8 animate-spin text-[#0517B0]" />
-				<p className="text-xs text-slate-500 font-medium">
+				<p className="text-sm text-slate-500">
 					Memuat rincian nilai perkuliahan & KHS mahasiswa...
 				</p>
 			</div>
@@ -252,42 +191,84 @@ export function TabKhsTranskrip({
 	const gpaNum = Number(gpaDisplay) || 0;
 	const totalSksTaken = summaryData?.totalSksTaken || 0;
 	const totalSksPassed = summaryData?.totalSksPassed || 0;
-	const isKhsSynced = Boolean(data?.praPasporKhs);
-	const isTranskripSynced = Boolean(data?.praPasporTranskrip);
+
+	const examStatus = (status?: string, count?: number, passed?: boolean) =>
+		status === "BELUM_ADA_NILAI" || count === 0
+			? { text: "Belum ada nilai", cls: "text-slate-500" }
+			: passed
+				? { text: "Lulus", cls: "text-emerald-700" }
+				: { text: "Remedial", cls: "text-rose-700" };
+	const uts = examStatus(
+		summaryData?.utsStatus,
+		summaryData?.evaluatedUtsCount,
+		summaryData?.allUtsPassed,
+	);
+	const uas = examStatus(
+		summaryData?.uasStatus,
+		summaryData?.evaluatedUasCount,
+		summaryData?.allUasPassed,
+	);
+	const isEligible = gpaNum >= 2.75;
+
+	const tiles = [
+		{
+			label: "IPK Kumulatif",
+			value: gpaDisplay,
+			sub: "dari 4.00",
+			tone: "text-[#0517B0]",
+		},
+		{
+			label: "SKS Lulus",
+			value: `${totalSksPassed}/${totalSksTaken}`,
+			sub:
+				totalSksPassed === totalSksTaken && totalSksTaken > 0
+					? "Semua SKS terpenuhi"
+					: `${totalSksTaken - totalSksPassed} SKS belum lulus`,
+			tone: "text-slate-900",
+		},
+		{
+			label: "Seleksi Magang",
+			value: isEligible ? "Layak" : "Perlu evaluasi",
+			sub: "Standar IPK ≥ 2.75",
+			tone: isEligible ? "text-emerald-700" : "text-amber-700",
+		},
+	];
+
+	const gradeTone = (grade: string) =>
+		grade.startsWith("A")
+			? "bg-emerald-50 text-emerald-800 border-emerald-200"
+			: grade.startsWith("B")
+				? "bg-blue-50 text-blue-800 border-blue-200"
+				: grade.startsWith("C")
+					? "bg-amber-50 text-amber-800 border-amber-200"
+					: "bg-rose-50 text-rose-800 border-rose-200";
+	const score = (v: number | null | undefined) =>
+		v !== null && v !== undefined ? v : "–";
 
 	return (
 		<div className="space-y-6">
-			{/* Top Action Bar & Control Header (Konsisten dengan Panel Akademik) */}
-			<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-				<div className="space-y-1">
-					<div className="flex items-center gap-2">
-						<span className="p-2 bg-blue-50 text-[#0517B0] rounded-lg">
-							<GraduationCap className="w-5 h-5" />
-						</span>
-						<div>
-							<h3 className="text-base font-bold text-slate-900">
-								Rekapitulasi KHS & Transkrip Akademik (Segmen 19)
-							</h3>
-							<p className="text-xs text-slate-500">
-								Integrasi nilai BAAK untuk syarat verifikasi seleksi wawancara
-								industri luar negeri
-							</p>
-						</div>
+			{/* Ringkasan: status sinkron BAAK + tombol cetak */}
+			<section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
+				<div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+					<div className="min-w-0">
+						<h3 className="text-sm sm:text-base font-bold text-slate-900">
+							Nilai Akademik
+						</h3>
+						<p className="mt-0.5 text-xs text-slate-500">
+							Nilai dari BAAK Akademik untuk seleksi wawancara industri. Berkas
+							KHS, KRS & Transkrip diperiksa di tab Pra-Paspor.
+						</p>
 					</div>
-				</div>
 
-				{/* Tombol Aksi Download, Print, dan Sinkronisasi Identik */}
-				<div className="flex flex-wrap items-center gap-2">
-					{/* Selector Semester */}
-					<div className="flex items-center gap-1.5 mr-1">
-						<span className="text-xs font-semibold text-slate-600">
-							Semester:
-						</span>
+					<div className="grid grid-cols-3 gap-2 md:flex md:shrink-0">
 						<Select
 							value={selectedSemester.toString()}
 							onValueChange={(val) => setSelectedSemester(Number(val))}
 						>
-							<SelectTrigger className="w-28 h-9 text-xs bg-slate-50 border-slate-200 font-medium">
+							<SelectTrigger
+								aria-label="Pilih semester"
+								className="w-full md:w-36 h-10 text-sm bg-white border-slate-200"
+							>
 								<SelectValue placeholder="Semester" />
 							</SelectTrigger>
 							<SelectContent>
@@ -297,440 +278,210 @@ export function TabKhsTranskrip({
 								<SelectItem value="4">Semester 4</SelectItem>
 							</SelectContent>
 						</Select>
-					</div>
-
-					{/* 1. Button KHS */}
-					<Link
-						href={`/dashboard/students/${studentId}/khs?semester=${selectedSemester}`}
-						target="_blank"
-					>
-						<Button
-							variant="outline"
-							size="sm"
-							className="h-9 text-xs gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold"
-							title="Buka / Cetak Kartu Hasil Studi (KHS) Format Lembar A4 Resmi"
+						<Link
+							href={`/dashboard/students/${studentId}/khs?semester=${selectedSemester}`}
+							target="_blank"
 						>
-							<Printer className="w-3.5 h-3.5 text-slate-600" />
-							KHS
-						</Button>
-					</Link>
-
-					{/* 2. Button Transkrip */}
-					<Link
-						href={`/dashboard/students/${studentId}/transkrip`}
-						target="_blank"
-					>
-						<Button
-							variant="outline"
-							size="sm"
-							className="h-9 text-xs gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold"
-							title="Buka / Cetak Transkrip Nilai Kumulatif Format Lembar A4 Resmi"
-						>
-							<Award className="w-3.5 h-3.5 text-amber-600" />
-							Transkrip
-						</Button>
-					</Link>
-				</div>
-			</div>
-
-			{/* KPI Performance Cards (Konsisten dengan Panel Akademik) */}
-			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-				{/* IPK / GPA */}
-				<div className="p-4 bg-gradient-to-br from-indigo-50/80 to-blue-50/40 rounded-2xl border border-indigo-100 flex flex-col justify-between">
-					<p className="text-[11px] font-bold text-indigo-900 uppercase tracking-wider">
-						IPK Kumulatif
-					</p>
-					<div className="my-2">
-						<span className="text-3xl font-black text-indigo-950 font-mono">
-							{gpaDisplay}
-						</span>
-						<span className="text-xs text-indigo-600 font-semibold ml-1">
-							/ 4.00
-						</span>
-					</div>
-					<Progress
-						value={(gpaNum / 4) * 100}
-						className="h-1.5 bg-indigo-200/50 rounded-full"
-					/>
-				</div>
-
-				{/* SKS Lulus */}
-				<div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-100 flex flex-col justify-between">
-					<p className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider">
-						SKS Lulus
-					</p>
-					<div className="my-2">
-						<span className="text-3xl font-black text-emerald-950 font-mono">
-							{totalSksPassed}
-						</span>
-						<span className="text-xs text-emerald-700 font-semibold ml-1">
-							/ {totalSksTaken} SKS
-						</span>
-					</div>
-					<p className="text-[11px] text-emerald-700 font-medium">
-						{totalSksPassed === totalSksTaken && totalSksTaken > 0
-							? "100% SKS Terpenuhi"
-							: `${totalSksTaken - totalSksPassed} SKS Belum Lulus`}
-					</p>
-				</div>
-
-				{/* Status UTS & UAS */}
-				<div className="p-4 bg-sky-50/60 rounded-2xl border border-sky-100 flex flex-col justify-between">
-					<p className="text-[11px] font-bold text-sky-900 uppercase tracking-wider">
-						Evaluasi UTS & UAS
-					</p>
-					<div className="my-1.5 space-y-1">
-						<div className="flex items-center justify-between text-xs font-semibold">
-							<span className="text-slate-600">UTS:</span>
-							{summaryData?.utsStatus === "BELUM_ADA_NILAI" ||
-							summaryData?.evaluatedUtsCount === 0 ? (
-								<Badge
-									variant="outline"
-									className="bg-white text-slate-500 border-slate-200 text-[10px] py-0 font-medium"
-								>
-									Belum Ada Nilai
-								</Badge>
-							) : summaryData?.allUtsPassed ? (
-								<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px] py-0">
-									Lulus
-								</Badge>
-							) : (
-								<Badge className="bg-rose-100 text-rose-800 border-0 text-[10px] py-0">
-									Remedial
-								</Badge>
-							)}
-						</div>
-						<div className="flex items-center justify-between text-xs font-semibold">
-							<span className="text-slate-600">UAS:</span>
-							{summaryData?.uasStatus === "BELUM_ADA_NILAI" ||
-							summaryData?.evaluatedUasCount === 0 ? (
-								<Badge
-									variant="outline"
-									className="bg-white text-slate-500 border-slate-200 text-[10px] py-0 font-medium"
-								>
-									Belum Ada Nilai
-								</Badge>
-							) : summaryData?.allUasPassed ? (
-								<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px] py-0">
-									Lulus
-								</Badge>
-							) : (
-								<Badge className="bg-rose-100 text-rose-800 border-0 text-[10px] py-0">
-									Remedial
-								</Badge>
-							)}
-						</div>
-					</div>
-					<p className="text-[10px] text-sky-700 italic">Standar Min. 60</p>
-				</div>
-
-				{/* Standar Kelayakan Magang Industri */}
-				<div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-100 flex flex-col justify-between">
-					<p className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">
-						Kriteria Seleksi Magang
-					</p>
-					<div className="my-2">
-						{gpaNum >= 2.75 ? (
-							<Badge className="bg-emerald-100 text-emerald-800 border-0 text-xs font-bold gap-1">
-								<Sparkles className="w-3.5 h-3.5 text-emerald-600" /> Layak
-								Wawancara
-							</Badge>
-						) : (
-							<Badge
+							<Button
 								variant="outline"
-								className="text-amber-800 border-amber-300 bg-white text-xs font-semibold"
+								className="w-full h-10 text-sm gap-1.5 border-slate-200 text-slate-700 font-semibold"
+								title="Buka / cetak KHS format A4"
 							>
-								Perlu Evaluasi Nilai
-							</Badge>
-						)}
+								<Printer className="w-4 h-4" />
+								KHS
+							</Button>
+						</Link>
+						<Link
+							href={`/dashboard/students/${studentId}/transkrip`}
+							target="_blank"
+						>
+							<Button
+								variant="outline"
+								className="w-full h-10 text-sm gap-1.5 border-slate-200 text-slate-700 font-semibold"
+								title="Buka / cetak transkrip format A4"
+							>
+								<Printer className="w-4 h-4" />
+								Transkrip
+							</Button>
+						</Link>
 					</div>
-					<p className="text-[10px] text-amber-800">
-						Standar kualifikasi IPK $\ge 2.75$
-					</p>
+				</div>
+			</section>
+
+			{/* Ringkasan nilai */}
+			<div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+				{tiles.map((t) => (
+					<div
+						key={t.label}
+						className="rounded-xl border border-slate-200 bg-white p-4"
+					>
+						<p className="text-xs font-medium text-slate-600">{t.label}</p>
+						<p
+							className={`mt-1 text-xl sm:text-2xl font-bold tabular-nums leading-tight ${t.tone}`}
+						>
+							{t.value}
+						</p>
+						<p className="mt-1 text-xs text-slate-500">{t.sub}</p>
+					</div>
+				))}
+				<div className="rounded-xl border border-slate-200 bg-white p-4">
+					<p className="text-xs font-medium text-slate-600">UTS & UAS</p>
+					<dl className="mt-1 space-y-0.5 text-sm">
+						<div className="flex justify-between gap-2">
+							<dt className="text-slate-600">UTS</dt>
+							<dd className={`font-semibold ${uts.cls}`}>{uts.text}</dd>
+						</div>
+						<div className="flex justify-between gap-2">
+							<dt className="text-slate-600">UAS</dt>
+							<dd className={`font-semibold ${uas.cls}`}>{uas.text}</dd>
+						</div>
+					</dl>
+					<p className="mt-1 text-xs text-slate-500">Standar minimal 60</p>
 				</div>
 			</div>
 
-			{/* Main Table: Rincian Gabungan Komponen Nilai per Mata Kuliah (Konsisten dengan Panel Akademik) */}
-			<Card className="bg-white border-slate-200 shadow-sm overflow-hidden rounded-2xl">
-				<CardHeader className="border-b border-slate-100 bg-slate-50/70 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
-					<div>
-						<CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
-							<BookOpen className="w-4 h-4 text-[#0517B0]" />
-							Rincian Gabungan Komponen Nilai per Mata Kuliah
-						</CardTitle>
-						<p className="text-xs text-slate-500 mt-0.5">
-							Semester {selectedSemester} • Terdaftar {grades.length} mata
-							kuliah ({totalSksTaken} Total SKS)
+			{/* Rincian nilai per mata kuliah */}
+			<section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+				<div className="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
+					<h3 className="text-sm sm:text-base font-bold text-slate-900">
+						Nilai per Mata Kuliah
+					</h3>
+					<p className="mt-0.5 text-xs text-slate-500">
+						Semester {selectedSemester} · {grades.length} mata kuliah ·{" "}
+						{totalSksTaken} SKS · Bobot: Presensi 10–15%, Teori 20–25%, Praktik
+						40%, UTS 15–30%, UAS 15–30%
+					</p>
+				</div>
+
+				{grades.length === 0 ? (
+					<div className="px-4 py-12 text-center">
+						<p className="text-sm font-semibold text-slate-700">
+							Belum ada mata kuliah terdaftar di semester ini.
+						</p>
+						<p className="mt-1 text-sm text-slate-500">
+							Pastikan kurikulum Kohort {summaryData?.cohort} sudah dibuka oleh
+							Akademik.
 						</p>
 					</div>
-
-					<div className="flex items-center gap-2">
-						<span className="text-xs text-slate-500 font-medium bg-white px-2.5 py-1 rounded-lg border border-slate-200">
-							Bobot: P (10-15%) | T (20-25%) | Prak (40%) | UTS (15-30%) | UAS
-							(15-30%)
-						</span>
-					</div>
-				</CardHeader>
-
-				<CardContent className="p-0">
-					{grades.length === 0 ? (
-						<div className="p-10 text-center space-y-2">
-							<AlertCircle className="w-8 h-8 text-slate-400 mx-auto" />
-							<p className="text-sm font-semibold text-slate-700">
-								Belum ada mata kuliah yang terdaftar untuk mahasiswa ini
-							</p>
-							<p className="text-xs text-slate-500 max-w-sm mx-auto">
-								Pastikan kurikulum dan jadwal mata kuliah untuk Kohort{" "}
-								{summaryData?.cohort} telah dibuka pada semester ini.
-							</p>
-						</div>
-					) : (
-						<div className="overflow-x-auto">
-							<Table>
-								<TableHeader className="bg-slate-50/90 text-xs">
-									<TableRow>
-										<TableHead className="w-12 text-center font-bold">
-											No
-										</TableHead>
-										<TableHead className="w-24 font-bold">Kode</TableHead>
-										<TableHead className="font-bold min-w-[200px]">
-											Mata Kuliah
-										</TableHead>
-										<TableHead className="text-center font-bold w-14">
-											SKS
-										</TableHead>
-										<TableHead className="text-center font-bold w-20">
-											Presensi
-										</TableHead>
-										<TableHead className="text-center font-bold w-16">
-											Teori
-										</TableHead>
-										<TableHead className="text-center font-bold w-16">
-											Praktik
-										</TableHead>
-										<TableHead className="text-center font-bold w-16">
-											UTS
-										</TableHead>
-										<TableHead className="text-center font-bold w-16">
-											UAS
-										</TableHead>
-										<TableHead className="text-center font-bold w-20 bg-blue-50/50 text-[#0517B0]">
-											Nilai Akhir
-										</TableHead>
-										<TableHead className="text-center font-bold w-16 bg-blue-50/50 text-[#0517B0]">
-											Grade
-										</TableHead>
-										<TableHead className="text-center font-bold w-24">
-											Status
-										</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{grades.map((item, idx) => {
-										const isA = item.grade?.startsWith("A");
-										const isB = item.grade?.startsWith("B");
-										const isC = item.grade?.startsWith("C");
-
-										return (
-											<TableRow
-												key={item.courseId || idx}
-												className="hover:bg-slate-50/80 text-xs"
-											>
-												<TableCell className="text-center font-mono text-slate-500">
-													{idx + 1}
-												</TableCell>
-												<TableCell className="font-mono font-bold text-slate-700">
-													{item.code}
-												</TableCell>
-												<TableCell>
-													<div className="flex items-center gap-2 flex-wrap">
-														<span className="font-semibold text-slate-900">
-															{item.name}
+				) : (
+					<div className="overflow-x-auto">
+						<Table>
+							<TableHeader className="bg-slate-100/80">
+								<TableRow className="border-slate-200 hover:bg-transparent">
+									<TableHead className="py-3 pl-4 sm:pl-6 text-xs font-semibold text-slate-600 min-w-[220px]">
+										Mata Kuliah
+									</TableHead>
+									<TableHead className="py-3 text-center text-xs font-semibold text-slate-600">
+										SKS
+									</TableHead>
+									<TableHead className="py-3 text-center text-xs font-semibold text-slate-600">
+										Presensi
+									</TableHead>
+									<TableHead className="py-3 text-center text-xs font-semibold text-slate-600">
+										Teori
+									</TableHead>
+									<TableHead className="py-3 text-center text-xs font-semibold text-slate-600">
+										Praktik
+									</TableHead>
+									<TableHead className="py-3 text-center text-xs font-semibold text-slate-600">
+										UTS
+									</TableHead>
+									<TableHead className="py-3 text-center text-xs font-semibold text-slate-600">
+										UAS
+									</TableHead>
+									<TableHead className="py-3 text-center text-xs font-semibold text-slate-600">
+										Akhir
+									</TableHead>
+									<TableHead className="py-3 pr-4 sm:pr-6 text-center text-xs font-semibold text-slate-600">
+										Grade
+									</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{grades.map((item, idx) => {
+									const graded =
+										item.grade &&
+										item.grade !== "-" &&
+										item.status !== "BELUM_DINILAI";
+									return (
+										<TableRow
+											key={item.courseId || idx}
+											className="border-slate-100 text-sm"
+										>
+											<TableCell className="py-3 pl-4 sm:pl-6 whitespace-normal">
+												<div className="font-semibold text-slate-900">
+													{item.name}
+													{item.isCustomEnrollment && (
+														<span className="ml-2 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+															Peserta tambahan
 														</span>
-														{item.isCustomEnrollment && (
-															<Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[10px] px-1.5 py-0 font-bold">
-																Peserta Tambahan
-															</Badge>
-														)}
-													</div>
-													<div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-														<span className="capitalize text-slate-600">
-															{item.type}
-														</span>
-														<span>•</span>
-														<span>{item.dosenName || "Dosen Pengampu"}</span>
-														{item.enrollmentNotes && (
-															<span className="italic text-slate-400">
-																({item.enrollmentNotes})
-															</span>
-														)}
-													</div>
-												</TableCell>
-												<TableCell className="text-center font-mono font-bold text-slate-800">
-													{item.sks}
-												</TableCell>
-												<TableCell className="text-center font-mono">
-													<span
-														className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
-															item.attendanceRate >= 80
-																? "text-emerald-700 bg-emerald-50"
-																: "text-rose-700 bg-rose-50"
-														}`}
-													>
-														{item.attendanceRate}%
-													</span>
-													<div className="text-[10px] text-slate-400 mt-0.5">
-														{item.attendancePresent}/16
-													</div>
-												</TableCell>
-												<TableCell className="text-center font-mono text-slate-700">
-													{item.theoryScore !== null &&
-													item.theoryScore !== undefined
-														? item.theoryScore
-														: "-"}
-												</TableCell>
-												<TableCell className="text-center font-mono text-slate-700">
-													{item.practicalScore !== null &&
-													item.practicalScore !== undefined
-														? item.practicalScore
-														: "-"}
-												</TableCell>
-												<TableCell className="text-center font-mono text-slate-700">
-													{item.utsScore !== null && item.utsScore !== undefined
-														? item.utsScore
-														: "-"}
-												</TableCell>
-												<TableCell className="text-center font-mono text-slate-700">
-													{item.uasScore !== null && item.uasScore !== undefined
-														? item.uasScore
-														: "-"}
-												</TableCell>
-												<TableCell className="text-center font-mono font-bold text-sm bg-blue-50/30 text-blue-950">
-													{item.grade &&
-													item.grade !== "-" &&
-													item.status !== "BELUM_DINILAI"
-														? item.finalScore
-														: "-"}
-												</TableCell>
-												<TableCell className="text-center bg-blue-50/30">
-													{item.grade &&
-													item.grade !== "-" &&
-													item.status !== "BELUM_DINILAI" ? (
-														<Badge
-															className={`font-black text-xs px-2 py-0.5 ${
-																isA
-																	? "bg-emerald-100 text-emerald-800 border-emerald-300"
-																	: isB
-																		? "bg-blue-100 text-blue-800 border-blue-300"
-																		: isC
-																			? "bg-amber-100 text-amber-800 border-amber-300"
-																			: "bg-rose-100 text-rose-800 border-rose-300"
-															}`}
+													)}
+												</div>
+												<div className="mt-0.5 text-xs text-slate-500">
+													<span className="font-mono">{item.code}</span> ·{" "}
+													<span className="capitalize">{item.type}</span> ·{" "}
+													{item.dosenName || "Dosen pengampu"}
+													{item.enrollmentNotes && ` (${item.enrollmentNotes})`}
+												</div>
+											</TableCell>
+											<TableCell className="text-center tabular-nums">
+												{item.sks}
+											</TableCell>
+											<TableCell className="text-center tabular-nums">
+												<span
+													className={
+														item.attendanceRate >= 80
+															? "text-emerald-700"
+															: "font-semibold text-rose-700"
+													}
+												>
+													{item.attendanceRate}%
+												</span>
+												<div className="text-xs text-slate-500">
+													{item.attendancePresent}/16
+												</div>
+											</TableCell>
+											<TableCell className="text-center tabular-nums text-slate-700">
+												{score(item.theoryScore)}
+											</TableCell>
+											<TableCell className="text-center tabular-nums text-slate-700">
+												{score(item.practicalScore)}
+											</TableCell>
+											<TableCell className="text-center tabular-nums text-slate-700">
+												{score(item.utsScore)}
+											</TableCell>
+											<TableCell className="text-center tabular-nums text-slate-700">
+												{score(item.uasScore)}
+											</TableCell>
+											<TableCell className="text-center font-semibold tabular-nums text-slate-900">
+												{graded ? item.finalScore : "–"}
+											</TableCell>
+											<TableCell className="pr-4 sm:pr-6 text-center">
+												{graded ? (
+													<>
+														<span
+															className={`inline-flex min-w-9 justify-center rounded-md border px-1.5 py-0.5 text-xs font-bold ${gradeTone(item.grade)}`}
 														>
 															{item.grade}
-														</Badge>
-													) : (
-														<span className="text-slate-400 font-mono text-xs">
-															-
 														</span>
-													)}
-												</TableCell>
-												<TableCell className="text-center">
-													{item.isPassed ? (
-														<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px] px-2 py-0.5 font-bold">
-															Lulus
-														</Badge>
-													) : (
-														<Badge
-															variant="outline"
-															className="text-rose-600 border-rose-200 text-[10px] px-2 py-0.5"
-														>
-															Remedial
-														</Badge>
-													)}
-												</TableCell>
-											</TableRow>
-										);
-									})}
-								</TableBody>
-							</Table>
-						</div>
-					)}
-				</CardContent>
-			</Card>
-
-			{/* CARD 3: ARSIP BERKAS KHS & TRANSKRIP TERLEGALISIR */}
-			<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-				{/* Slot KHS */}
-				<div className="p-4 bg-white border border-slate-200 rounded-xl space-y-3 shadow-xs">
-					<div className="flex items-start justify-between gap-3">
-						<div className="flex items-start gap-2.5">
-							<FileText className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-							<div>
-								<h5 className="text-xs font-bold text-slate-800">
-									Arsip Dokumen KHS (Kartu Hasil Studi)
-								</h5>
-								<p className="text-[11px] text-slate-500 mt-0.5">
-									Hasil cetak KHS resmi atau scan berkas legalisir per semester
-								</p>
-							</div>
-						</div>
-						{isKhsSynced ? (
-							<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-								✓ Terverifikasi
-							</Badge>
-						) : (
-							<Badge variant="outline" className="text-slate-400 text-[10px]">
-								Menunggu
-							</Badge>
-						)}
+														{!item.isPassed && (
+															<div className="mt-0.5 text-xs font-semibold text-rose-700">
+																Remedial
+															</div>
+														)}
+													</>
+												) : (
+													<span className="text-slate-400">–</span>
+												)}
+											</TableCell>
+										</TableRow>
+									);
+								})}
+							</TableBody>
+						</Table>
 					</div>
-					<div className="pt-2 border-t border-slate-100">
-						<DocumentUpload
-							studentId={studentId}
-							panel="magang"
-							documentKey="khs"
-							canEdit={canEdit}
-							onUploadSuccess={fetchInternshipData}
-						/>
-					</div>
-				</div>
-
-				{/* Slot Transkrip */}
-				<div className="p-4 bg-white border border-slate-200 rounded-xl space-y-3 shadow-xs">
-					<div className="flex items-start justify-between gap-3">
-						<div className="flex items-start gap-2.5">
-							<Award className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-							<div>
-								<h5 className="text-xs font-bold text-slate-800">
-									Arsip Dokumen Transkrip Akademik Kumulatif
-								</h5>
-								<p className="text-[11px] text-slate-500 mt-0.5">
-									Transkrip nilai keseluruhan masa studi resmi terlegalisir
-								</p>
-							</div>
-						</div>
-						{isTranskripSynced ? (
-							<Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-								✓ Terverifikasi
-							</Badge>
-						) : (
-							<Badge variant="outline" className="text-slate-400 text-[10px]">
-								Menunggu
-							</Badge>
-						)}
-					</div>
-					<div className="pt-2 border-t border-slate-100">
-						<DocumentUpload
-							studentId={studentId}
-							panel="magang"
-							documentKey="transkrip"
-							canEdit={canEdit}
-							onUploadSuccess={fetchInternshipData}
-						/>
-					</div>
-				</div>
-			</div>
+				)}
+			</section>
 		</div>
 	);
 }
