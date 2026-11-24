@@ -119,6 +119,19 @@ export const internshipData = pgTable(
 		agenPeminatan: text("agen_peminatan"),
 		mitraPenempatanNama: text("mitra_penempatan_nama"),
 
+		// Pencatatan Ahli Waris & Asuransi Musibah (SOP Hong Ta / Mitra Penempatan - Segmen 22, 23, 24)
+		ahliWarisNama: text("ahli_waris_nama"),
+		ahliWarisHubungan: text("ahli_waris_hubungan"),
+		ahliWarisNik: text("ahli_waris_nik"),
+		ahliWarisPhone: text("ahli_waris_phone"),
+		ahliWarisAlamat: text("ahli_waris_alamat"),
+		ahliWarisBank: text("ahli_waris_bank"),
+		ahliWarisRekening: text("ahli_waris_rekening"),
+		ahliWarisAtasNama: text("ahli_waris_atas_nama"),
+		ahliWarisReady: boolean("ahli_waris_ready").default(false),
+		asuransiHongTaReady: boolean("asuransi_hong_ta_ready").default(false),
+		asuransiPolisNo: text("asuransi_polis_no"),
+
 		// Pembayaran kampus ke agensi mitra (dicatat Divisi Magang)
 		// DP saat Suhan terbit (sebelum MCU); pelunasan saat visa terbit (sebelum tiket)
 		agenDpPaid: boolean("agen_dp_paid").default(false),

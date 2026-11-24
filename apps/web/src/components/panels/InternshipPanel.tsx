@@ -101,6 +101,19 @@ interface InternshipData {
 	agenPeminatan: string | null;
 	mitraPenempatanNama?: string | null;
 
+	// Pencatatan Ahli Waris & Asuransi Musibah (SOP Hong Ta / Mitra Penempatan)
+	ahliWarisNama?: string | null;
+	ahliWarisHubungan?: string | null;
+	ahliWarisNik?: string | null;
+	ahliWarisPhone?: string | null;
+	ahliWarisAlamat?: string | null;
+	ahliWarisBank?: string | null;
+	ahliWarisRekening?: string | null;
+	ahliWarisAtasNama?: string | null;
+	ahliWarisReady?: boolean;
+	asuransiHongTaReady?: boolean;
+	asuransiPolisNo?: string | null;
+
 	// Syarat Akhir
 	logbookReady?: boolean;
 	laporanAkhirReady?: boolean;

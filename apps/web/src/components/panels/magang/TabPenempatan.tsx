@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown, Info, Loader2, ShieldAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +25,7 @@ import {
 	toDateInput,
 } from "./ChecklistRow";
 
-/** Field form Detail Penempatan — disimpan bersama lewat satu tombol. */
+/** Field form Detail Penempatan & Ahli Waris — disimpan bersama lewat satu tombol. */
 const PENEMPATAN_FIELDS = [
 	"mitraPenempatanNama",
 	"internshipCompany",
@@ -34,6 +34,16 @@ const PENEMPATAN_FIELDS = [
 	"internshipDuration",
 	"agenPeminatan",
 	"estDepartureDate",
+	// Pencatatan Ahli Waris & Asuransi Santunan Musibah (Segmen 22, 23, 24)
+	"ahliWarisNama",
+	"ahliWarisHubungan",
+	"ahliWarisNik",
+	"ahliWarisPhone",
+	"ahliWarisAlamat",
+	"ahliWarisBank",
+	"ahliWarisRekening",
+	"ahliWarisAtasNama",
+	"asuransiPolisNo",
 ] as const;
 
 interface TabPenempatanProps {
@@ -89,6 +99,27 @@ export function TabPenempatan({
 		"Lainnya",
 	];
 
+	const HUBUNGAN_OPTIONS = [
+		{ value: "Orang Tua (Ayah)", label: "Orang Tua (Ayah Kandung)" },
+		{ value: "Orang Tua (Ibu)", label: "Orang Tua (Ibu Kandung)" },
+		{ value: "Suami / Istri", label: "Suami / Istri Sah" },
+		{ value: "Anak Kandung", label: "Anak Kandung" },
+		{ value: "Kakak Kandung", label: "Kakak Kandung" },
+		{ value: "Adik Kandung", label: "Adik Kandung" },
+		{ value: "Wali Sah", label: "Wali Sah / Keluarga Lainnya" },
+	];
+
+	const BANK_OPTIONS = [
+		{ value: "BCA", label: "Bank Central Asia (BCA)" },
+		{ value: "Mandiri", label: "Bank Mandiri" },
+		{ value: "BRI", label: "Bank Rakyat Indonesia (BRI)" },
+		{ value: "BNI", label: "Bank Negara Indonesia (BNI)" },
+		{ value: "BSI", label: "Bank Syariah Indonesia (BSI)" },
+		{ value: "BTN", label: "Bank Tabungan Negara (BTN)" },
+		{ value: "CIMB", label: "Bank CIMB Niaga" },
+		{ value: "Lainnya", label: "Bank Lainnya" },
+	];
+
 	// Perubahan ditahan di state sampai tombol Simpan ditekan. Nilai kosong tampil sebagai
 	// placeholder, bukan nilai bawaan palsu yang belum pernah tersimpan.
 	const selectField = (
@@ -113,6 +144,19 @@ export function TabPenempatan({
 					))}
 				</SelectContent>
 			</Select>
+		</RowField>
+	);
+
+	const textField = (field: string, label: string, placeholder: string) => (
+		<RowField label={label} htmlFor={`f-${field}`}>
+			<Input
+				id={`f-${field}`}
+				placeholder={placeholder}
+				className={rowInputClass}
+				value={(data?.[field] as string) || ""}
+				disabled={!canEdit}
+				onChange={(e) => handleLocalChange(field, e.target.value)}
+			/>
 		</RowField>
 	);
 
@@ -163,11 +207,12 @@ export function TabPenempatan({
 			<section className="rounded-xl border border-slate-200 bg-white">
 				<div className="border-b border-slate-200 px-4 py-3 sm:px-6">
 					<h3 className="text-sm font-semibold text-slate-900 sm:text-base">
-						Detail Penempatan
+						Detail Penempatan &amp; Mitra Magang
 					</h3>
 				</div>
 
 				<div className="space-y-6 p-4 sm:p-6">
+					{/* 1. Mitra & Lokasi */}
 					<div className="space-y-3">
 						<p className="text-xs font-medium uppercase tracking-wide text-slate-500">
 							Mitra &amp; Lokasi
@@ -227,7 +272,8 @@ export function TabPenempatan({
 						</div>
 					</div>
 
-					<div className="space-y-3">
+					{/* 2. Jadwal & Posisi */}
+					<div className="space-y-3 border-t border-slate-100 pt-5">
 						<p className="text-xs font-medium uppercase tracking-wide text-slate-500">
 							Jadwal &amp; Posisi
 						</p>
@@ -258,6 +304,123 @@ export function TabPenempatan({
 						</div>
 					</div>
 
+					{/* 3. SEGMEN 22 & 23: Pencatatan Ahli Waris & Asuransi Santunan Musibah */}
+					<div className="space-y-4 border-t border-slate-200 pt-6">
+						<div>
+							<div className="flex items-center gap-2">
+								<ShieldAlert className="size-4.5 text-[#0517B0]" />
+								<p className="text-xs font-bold uppercase tracking-wider text-[#0517B0]">
+									Pencatatan Ahli Waris &amp; Asuransi Musibah (SOP Hong Ta /
+									Mitra Penempatan)
+								</p>
+							</div>
+							<p className="mt-1 text-xs text-slate-600">
+								Pencatatan identitas keluarga dan rekening penyaluran santunan
+								bila terjadi musibah sakit/kecelakaan di luar negeri.
+							</p>
+						</div>
+
+						{/* Disclaimer Batas Tanggung Jawab Kampus (Notula Segmen 22 & 23) */}
+						<div className="rounded-xl border border-blue-200 bg-blue-50/80 p-3.5 sm:p-4 text-xs text-blue-900 space-y-1">
+							<div className="flex items-center gap-1.5 font-bold text-blue-950">
+								<Info className="size-4 shrink-0 text-[#0517B0]" />
+								<span>Batas Tanggung Jawab &amp; Kebijakan Kampus</span>
+							</div>
+							<p className="leading-relaxed text-blue-900/90 pl-5.5">
+								Pencatatan identitas ahli waris ini berfungsi semata-mata
+								sebagai referensi resmi administrasi bagi kampus untuk
+								meneruskan informasi kepada pihak agensi luar negeri (seperti
+								Hong Ta) dan lembaga asuransi bila terjadi musibah. Kampus{" "}
+								<strong>
+									tidak bertindak sebagai penjamin penetapan hak waris perdata
+								</strong>{" "}
+								dan dibebaskan dari segala tuntutan atau perselisihan pembagian
+								waris internal keluarga.
+							</p>
+						</div>
+
+						{/* Form Data Ahli Waris */}
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+							{textField(
+								"ahliWarisNama",
+								"Nama Lengkap Ahli Waris",
+								"Nama orang tua / wali sah",
+							)}
+							{selectField(
+								"ahliWarisHubungan",
+								"Hubungan Keluarga",
+								HUBUNGAN_OPTIONS,
+							)}
+							{textField(
+								"ahliWarisNik",
+								"NIK KTP Ahli Waris",
+								"16 digit NIK KTP",
+							)}
+							{textField(
+								"ahliWarisPhone",
+								"No. HP / WhatsApp",
+								"Contoh: 081234567890",
+							)}
+						</div>
+
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+							{textField(
+								"ahliWarisAlamat",
+								"Alamat Domisili Ahli Waris",
+								"Alamat lengkap tempat tinggal ahli waris di Indonesia",
+							)}
+							{textField(
+								"asuransiPolisNo",
+								"Nomor Polis / Sertifikat Asuransi",
+								"No. polis perlindungan kerja / Hong Ta",
+							)}
+						</div>
+
+						{/* Form Rekening Penyaluran Santunan */}
+						<div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+							<p className="text-xs font-semibold text-slate-800">
+								Rekening Bank Penyaluran Hak Santunan (Keluarga di Indonesia)
+							</p>
+							<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+								{selectField("ahliWarisBank", "Nama Bank", BANK_OPTIONS)}
+								{textField(
+									"ahliWarisRekening",
+									"Nomor Rekening",
+									"Nomor rekening bank aktif",
+								)}
+								{textField(
+									"ahliWarisAtasNama",
+									"Nama Pemilik Rekening",
+									"Harus selaras nama ahli waris",
+								)}
+							</div>
+						</div>
+
+						{/* Slot Berkas Unggahan: Surat Pernyataan Ahli Waris */}
+						<div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 space-y-2">
+							<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+								<div>
+									<p className="text-xs font-semibold text-slate-800">
+										Unggah Surat Pernyataan Penetapan Ahli Waris (Bermaterai)
+									</p>
+									<p className="text-[11px] text-slate-500">
+										Surat pernyataan penunjukan resmi bertandatangan mahasiswa
+										dan orang tua/keluarga di atas materai Rp 10.000.
+									</p>
+								</div>
+								<div className="shrink-0">
+									<DocumentUpload
+										studentId={studentId}
+										panel="magang"
+										documentKey="surat_ahli_waris"
+										canEdit={canEdit}
+										onUploadSuccess={fetchInternshipData}
+									/>
+								</div>
+							</div>
+						</div>
+					</div>
+
 					<div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-end">
 						{isDirty && (
 							<p role="status" className="text-xs font-medium text-amber-700">
@@ -277,11 +440,15 @@ export function TabPenempatan({
 				</div>
 			</section>
 
-			{/* Verifikasi (field yang sama dengan "Mitra Penempatan" di Dokumen Keberangkatan) */}
+			{/* Verifikasi (Penempatan & SOP Asuransi / Ahli Waris) */}
 			<ChecklistGroup
-				title="Verifikasi Penempatan"
-				done={isVerified ? 1 : 0}
-				total={1}
+				title="Verifikasi Penempatan & Asuransi SOP Hong Ta"
+				done={
+					(isVerified ? 1 : 0) +
+					(data?.ahliWarisReady ? 1 : 0) +
+					(data?.asuransiHongTaReady ? 1 : 0)
+				}
+				total={3}
 			>
 				<ChecklistRow
 					id="tabPenempatan-agenReady"
@@ -291,6 +458,28 @@ export function TabPenempatan({
 					loading={isLoading}
 					disabled={!canEdit}
 					onCheckedChange={(checked) => handleToggleField("agenReady", checked)}
+				/>
+				<ChecklistRow
+					id="tabPenempatan-ahliWarisReady"
+					label="Identitas & Berkas Penetapan Ahli Waris Lengkap"
+					desc="Keluarga telah menetapkan ahli waris & rekening penyaluran santunan bermaterai tanpa membebani kampus."
+					checked={Boolean(data?.ahliWarisReady)}
+					loading={loadingItem === "ahliWarisReady"}
+					disabled={!canEdit}
+					onCheckedChange={(checked) =>
+						handleToggleField("ahliWarisReady", checked)
+					}
+				/>
+				<ChecklistRow
+					id="tabPenempatan-asuransiHongTaReady"
+					label="SOP Asuransi Hong Ta / Perlindungan Kerja Dikonfirmasi"
+					desc="Skema asuransi kecelakaan/kesehatan kerja luar negeri telah diverifikasi bersama mitra penempatan."
+					checked={Boolean(data?.asuransiHongTaReady)}
+					loading={loadingItem === "asuransiHongTaReady"}
+					disabled={!canEdit}
+					onCheckedChange={(checked) =>
+						handleToggleField("asuransiHongTaReady", checked)
+					}
 				/>
 			</ChecklistGroup>
 
