@@ -1535,11 +1535,16 @@ export const financeRouter = new Elysia({ prefix: "/finance" })
 			}
 
 			const validUploaderId = await getValidUserId(user);
+			const recipientRow = await db.query.feeShareRecipients.findFirst({
+				where: eq(feeShareRecipients.id, recipientIdInt),
+				columns: { studentId: true },
+			});
 
 			let uploadResult;
 			try {
 				uploadResult = await fileService.uploadFile({
 					file,
+					studentId: recipientRow?.studentId ?? undefined,
 					category: "finance",
 					panel: "finance",
 					documentKey: `fee_transfer_${recipientIdInt}_${Date.now()}`,

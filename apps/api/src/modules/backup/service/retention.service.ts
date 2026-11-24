@@ -59,25 +59,23 @@ export class RetentionService {
 			);
 
 			// 6. Pastikan record di database backup_jobs disinkronkan & dihapus jika melebihi batas
+			// Catatan: Tipe "student" tidak dipotong secara global agar riwayat mahasiswa berbeda tidak terhapus;
+			// rotasi per mahasiswa ditangani per folder mahasiswa pada cleanupGroupOfGroups di atas.
 			await backupRepository.cleanupJobRecordsByType(
 				"full",
 				RETENTION_RULES.full.maxKeep,
 			);
 			await backupRepository.cleanupJobRecordsByType(
-				"student",
-				RETENTION_RULES.student.maxKeep,
-			);
-			await backupRepository.cleanupJobRecordsByType(
 				"cohort",
-				RETENTION_RULES.cohort.maxKeep,
+				RETENTION_RULES.cohort.maxKeep * 5,
 			);
 			await backupRepository.cleanupJobRecordsByType(
 				"program",
-				RETENTION_RULES.program.maxKeep,
+				RETENTION_RULES.program.maxKeep * 5,
 			);
 			await backupRepository.cleanupJobRecordsByType(
 				"specialization",
-				RETENTION_RULES.specialization.maxKeep,
+				RETENTION_RULES.specialization.maxKeep * 5,
 			);
 
 			console.log("[RetentionService] Rotasi backup selesai ✅");

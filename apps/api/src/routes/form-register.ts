@@ -5,6 +5,7 @@ import { pmbFormResponses, pmbFormTokens, students, users } from "../db/schema";
 import { normalizeEmergencyContacts } from "../lib/emergency-contacts";
 import { normalizeExtraData } from "../lib/extra-data";
 import { hasRole } from "../lib/permissions";
+import { fileService } from "../modules/file/service/file.service";
 import { createStudentPipeline } from "./student/core";
 
 // Helper Auth Guard PMB Admin
@@ -90,6 +91,67 @@ export const formRegisterRoutes = new Elysia()
 			rejectedFields: tokenRecord.response?.rejectedFields || [],
 		};
 	})
+	// 1b. PUBLIC: Upload foto profil calon mahasiswa melalui token form registrasi aktif
+	.post(
+		"/form/:token/upload-photo",
+		async ({ params, body, set }) => {
+			const tokenRecord = await db.query.pmbFormTokens.findFirst({
+				where: eq(pmbFormTokens.token, params.token),
+				with: { response: true },
+			});
+
+			if (
+				!tokenRecord ||
+				tokenRecord.isUsed ||
+				tokenRecord.response?.status === "APPROVED"
+			) {
+				set.status = 400;
+				return {
+					success: false,
+					message: "Token formulir tidak valid atau sudah disetujui",
+				};
+			}
+
+			const file = (body as { file?: File }).file;
+			if (!file || !file.name) {
+				set.status = 400;
+				return { success: false, message: "File foto tidak ditemukan" };
+			}
+			if (!file.type.startsWith("image/")) {
+				set.status = 400;
+				return {
+					success: false,
+					message: "Foto profil harus berupa gambar (JPG/PNG/WEBP)",
+				};
+			}
+
+			try {
+				const uploadResult = await fileService.uploadFile({
+					file,
+					category: "profile",
+					panel: "pmb",
+					documentKey: "profile_photo",
+					visibility: "public",
+				});
+				return {
+					success: true,
+					data: {
+						id: uploadResult.id,
+						url: `/files/${uploadResult.id}/download`,
+					},
+				};
+			} catch (err) {
+				const error = err as Error;
+				set.status = 400;
+				return { success: false, message: error.message };
+			}
+		},
+		{
+			body: t.Object({
+				file: t.File(),
+			}),
+		},
+	)
 	// 2. PUBLIC: Submit Form
 	.post(
 		"/form/:token/submit",

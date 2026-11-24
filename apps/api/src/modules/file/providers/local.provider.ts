@@ -1,5 +1,6 @@
 import { mkdir, rename, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { resolveStoragePath } from "../../../lib/paths";
 import type {
 	StorageProvider,
 	UploadOptions,
@@ -10,8 +11,8 @@ import type {
  * LocalStorageProvider — implementasi StorageProvider untuk local disk.
  *
  * Base path dikonfigurasi via env STORAGE_PATH.
- * Development lokal (Windows): relative ke cwd, fallback ke ".storage/"
- * Docker production: "/app/storage"
+ * Development lokal (Windows): <workspace>/storage
+ * Docker production: /app/storage
  *
  * Ketika nanti migrasi ke S3, hanya file ini yang perlu diganti dengan S3Provider.
  * Semua kode bisnis dan FileService tidak perlu berubah.
@@ -20,15 +21,7 @@ export class LocalStorageProvider implements StorageProvider {
 	private readonly basePath: string;
 
 	constructor() {
-		if (process.env.STORAGE_PATH) {
-			this.basePath = process.env.STORAGE_PATH;
-		} else {
-			const rootStorage = join(process.cwd(), "storage");
-			const relativeStorage = join(process.cwd(), "../../storage");
-			this.basePath = process.cwd().endsWith("api")
-				? relativeStorage
-				: rootStorage;
-		}
+		this.basePath = resolveStoragePath();
 	}
 
 	getAbsolutePath(storagePath: string): string {

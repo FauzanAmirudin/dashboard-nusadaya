@@ -7,7 +7,11 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/eden";
 import { BackupJobDetailPanel } from "./BackupJobDetailPanel";
 
-export function BackupHistoryTable() {
+export function BackupHistoryTable({
+	refreshTrigger = 0,
+}: {
+	refreshTrigger?: number;
+}) {
 	const [jobs, setJobs] = useState<any[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [selectedJob, setSelectedJob] = useState<any | null>(null);
@@ -31,7 +35,7 @@ export function BackupHistoryTable() {
 
 	useEffect(() => {
 		fetchJobs();
-	}, []);
+	}, [refreshTrigger]);
 
 	const formatBytes = (bytes: number) => {
 		if (bytes === 0) return "0 B";
@@ -49,9 +53,17 @@ export function BackupHistoryTable() {
 				: "Per Angkatan";
 		}
 		if (job.type === "student") {
-			return job.filters?.nim
-				? `Mahasiswa (${job.filters.nim})`
-				: "Per Mahasiswa";
+			const idText = job.filters?.nim
+				? `NIM ${job.filters.nim}`
+				: job.filters?.studentId
+					? `ID ${job.filters.studentId}`
+					: "Per Mahasiswa";
+			return `Mahasiswa (${idText})`;
+		}
+		if (job.type === "program") {
+			return job.filters?.programId
+				? `Program (${job.filters.programId})`
+				: "Per Program Studi";
 		}
 		if (job.type === "full") {
 			return "Full Backup (Otomatis Harian)";
@@ -227,11 +239,16 @@ export function BackupHistoryTable() {
 															},
 														);
 														if (!res.ok) throw new Error("Gagal mengunduh");
+														const disposition = res.headers.get(
+															"Content-Disposition",
+														);
+														const fnMatch =
+															disposition?.match(/filename="?([^"]+)"?/i);
 														const blob = await res.blob();
 														const url = window.URL.createObjectURL(blob);
 														const a = document.createElement("a");
 														a.href = url;
-														a.download = `backup-${job.id}.zip`;
+														a.download = fnMatch?.[1] || `backup-${job.id}.zip`;
 														document.body.appendChild(a);
 														a.click();
 														window.URL.revokeObjectURL(url);

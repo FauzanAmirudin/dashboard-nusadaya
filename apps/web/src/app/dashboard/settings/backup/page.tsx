@@ -2,15 +2,21 @@
 
 import { History, Settings2, ShieldAlert } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { BackupHistoryTable } from "@/components/backup/BackupHistoryTable";
 import { BackupManualForm } from "@/components/backup/BackupManualForm";
+import { StorageStatusCard } from "@/components/backup/StorageStatusCard";
 import { Button } from "@/components/ui/button";
 import { hasRole, useAuthStore } from "@/store";
 
 export default function BackupSettingsPage() {
 	const { user, hasHydrated } = useAuthStore();
 	const [activeTab, setActiveTab] = useState<"history" | "manual">("history");
+	const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+	const handleBackupCompleted = useCallback(() => {
+		setRefreshTrigger((prev) => prev + 1);
+	}, []);
 
 	if (!hasHydrated) return null;
 
@@ -22,7 +28,7 @@ export default function BackupSettingsPage() {
 				</div>
 				<h2 className="text-xl font-bold text-slate-800 mb-2">Akses Ditolak</h2>
 				<p className="text-sm text-slate-500 max-w-md mb-6">
-					Halaman Backup & Sistem hanya dapat diakses oleh Administrator
+					Halaman Backup &amp; Sistem hanya dapat diakses oleh Administrator
 					(Superadmin).
 				</p>
 				<Link href="/dashboard">
@@ -36,17 +42,20 @@ export default function BackupSettingsPage() {
 		<div className="space-y-6 max-w-7xl mx-auto pb-10">
 			<div>
 				<h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-					Backup & Sistem
+					Backup &amp; Sistem
 				</h1>
 				<p className="text-sm text-slate-500 mt-1">
-					Kelola pencadangan data, lihat riwayat, dan pantau penggunaan storage
-					server.
+					Kelola pencadangan dokumen seluruh panel &amp; tab per mahasiswa,
+					lihat riwayat, dan pantau penggunaan storage server.
 				</p>
 			</div>
 
-			<div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[600px]">
+			<StorageStatusCard refreshTrigger={refreshTrigger} />
+
+			<div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[540px]">
 				<div className="flex border-b border-slate-200 shrink-0">
 					<button
+						type="button"
 						onClick={() => setActiveTab("history")}
 						className={`flex-1 py-4 px-6 text-sm font-medium flex justify-center items-center gap-2 transition-colors border-b-2 ${
 							activeTab === "history"
@@ -58,6 +67,7 @@ export default function BackupSettingsPage() {
 						Riwayat Backup
 					</button>
 					<button
+						type="button"
 						onClick={() => setActiveTab("manual")}
 						className={`flex-1 py-4 px-6 text-sm font-medium flex justify-center items-center gap-2 transition-colors border-b-2 ${
 							activeTab === "manual"
@@ -70,14 +80,14 @@ export default function BackupSettingsPage() {
 					</button>
 				</div>
 
-				<div className="flex-1 overflow-y-auto bg-slate-50/50 p-6">
+				<div className="flex-1 overflow-y-auto bg-slate-50/50 p-4 sm:p-6">
 					{activeTab === "history" ? (
 						<div className="h-full">
-							<BackupHistoryTable />
+							<BackupHistoryTable refreshTrigger={refreshTrigger} />
 						</div>
 					) : (
-						<div className="max-w-2xl mx-auto h-full flex flex-col justify-center">
-							<BackupManualForm />
+						<div className="max-w-2xl mx-auto py-2">
+							<BackupManualForm onBackupCompleted={handleBackupCompleted} />
 						</div>
 					)}
 				</div>

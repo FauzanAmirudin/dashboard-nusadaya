@@ -14,6 +14,7 @@ import {
 	crmLogs,
 	entrepreneurshipRecords,
 	feeShareRecipients,
+	files,
 	finalDecision,
 	financeCustomFields,
 	financeData,
@@ -197,6 +198,26 @@ export async function createStudentPipeline(body: any, userId: number) {
 		.returning();
 
 	const studentId = newStudent.id;
+
+	// Tautkan foto profil awal (bila diunggah sebelum student dibuat) ke studentId agar ter-backup
+	if (typeof body.profilePhotoUrl === "string") {
+		const photoMatch = body.profilePhotoUrl.match(
+			/\/files\/([A-Za-z0-9]+)\/download/,
+		);
+		if (photoMatch?.[1]) {
+			try {
+				await db
+					.update(files)
+					.set({ studentId, updatedAt: new Date() })
+					.where(eq(files.id, photoMatch[1]));
+			} catch (err) {
+				console.warn(
+					"[createStudentPipeline] Failed linking profile photo:",
+					err,
+				);
+			}
+		}
+	}
 
 	// 4. Insert Student Health
 	await db.insert(studentHealth).values({

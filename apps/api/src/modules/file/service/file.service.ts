@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { monotonicFactory } from "ulidx";
 import { db } from "../../../db";
 import { students, users } from "../../../db/schema";
+import { resolveBackupPath, resolveStoragePath } from "../../../lib/paths";
 import { LocalStorageProvider } from "../providers/local.provider";
 import type { StorageProvider } from "../providers/storage.interface";
 import type { FileRecord } from "../repository/file.repository";
@@ -125,7 +126,7 @@ export class FileService {
 		if (
 			studentId &&
 			typeof studentId === "number" &&
-			!isNaN(studentId) &&
+			!Number.isNaN(studentId) &&
 			studentId > 0
 		) {
 			try {
@@ -266,10 +267,8 @@ export class FileService {
 	 * Dipanggil sekali di index.ts.
 	 */
 	async ensureDirectories(): Promise<void> {
-		const storagePath =
-			process.env.STORAGE_PATH ?? join(process.cwd(), "../../storage");
-		const backupPath =
-			process.env.BACKUP_PATH ?? join(process.cwd(), "../../backups");
+		const storagePath = resolveStoragePath();
+		const backupPath = resolveBackupPath();
 
 		const dirs = [
 			// Storage

@@ -1,5 +1,5 @@
-import { mkdir, unlink } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { unlink } from "node:fs/promises";
+import { extname, join, resolve } from "node:path";
 import { asc, desc, eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import { db } from "../../db";
@@ -9,7 +9,9 @@ import {
 	students,
 	users,
 } from "../../db/schema";
+import { resolveLegacyUploadsPath } from "../../lib/paths";
 import { hasRole } from "../../lib/permissions";
+import { fileService } from "../../modules/file/service/file.service";
 
 function computeStatus(
 	score: number | null | undefined,
@@ -264,37 +266,51 @@ export const departureAssessmentRoutes = new Elysia()
 				return { success: false, message: "Ukuran file maksimal 10MB" };
 			}
 
-			// Hapus file lama jika ada
+			// Hapus file lama jika ada (baik FileService maupun legacy uploads/)
 			const existing = await db.query.departureAssessments.findFirst({
 				where: eq(departureAssessments.studentId, id),
 			});
 
 			if (existing?.resultFileUrl) {
-				try {
-					const oldPath = join(
-						process.cwd(),
-						"uploads",
-						existing.resultFileUrl,
-					);
-					await unlink(oldPath);
-				} catch (_) {
-					// File lama mungkin tidak ada, lanjutkan
+				const match = existing.resultFileUrl.match(
+					/\/files\/([A-Za-z0-9]+)\/download/,
+				);
+				if (match?.[1]) {
+					try {
+						await fileService.deleteFile(match[1]);
+					} catch {
+						// File lama mungkin sudah terhapus, lanjutkan
+					}
+				} else {
+					try {
+						const legacyBase = resolve(resolveLegacyUploadsPath());
+						const oldPath = resolve(legacyBase, existing.resultFileUrl);
+						if (oldPath.startsWith(legacyBase)) {
+							await unlink(oldPath);
+						}
+					} catch (_) {
+						// File lama mungkin tidak ada, lanjutkan
+					}
 				}
 			}
 
-			// Simpan file baru
-			const dir = join(
-				process.cwd(),
-				"uploads",
-				"departure_assessments",
-				String(id),
-			);
-			await mkdir(dir, { recursive: true });
-			const fileName = `hasil_assessment_${Date.now()}.pdf`;
-			const filePath = join(dir, fileName);
-			await Bun.write(filePath, await file.arrayBuffer());
-
-			const relativeUrl = `departure_assessments/${id}/${fileName}`;
+			// Simpan file baru lewat FileService agar terindeks & ikut di-backup
+			let relativeUrl: string;
+			try {
+				const uploadResult = await fileService.uploadFile({
+					file,
+					studentId: id,
+					category: "academic",
+					panel: "akademik",
+					documentKey: "departure_assessment",
+					uploadedBy: user.id,
+				});
+				relativeUrl = `/files/${uploadResult.id}/download`;
+			} catch (err) {
+				const error = err as Error;
+				set.status = 400;
+				return { success: false, message: error.message };
+			}
 
 			const newStatus = computeStatus(existing?.score, relativeUrl);
 
@@ -360,7 +376,32 @@ export const departureAssessmentRoutes = new Elysia()
 			return "File tidak ditemukan";
 		}
 
-		const filePath = join(process.cwd(), "uploads", assessment.resultFileUrl);
+		const fileMatch = assessment.resultFileUrl.match(
+			/\/files\/([A-Za-z0-9]+)\/download/,
+		);
+		if (fileMatch?.[1]) {
+			const record = await fileService.getFileMetadata(fileMatch[1]);
+			if (!record) {
+				set.status = 404;
+				return "File metadata tidak ditemukan";
+			}
+			const file = Bun.file(fileService.getAbsolutePath(record.storagePath));
+			if (!(await file.exists())) {
+				set.status = 404;
+				return "File fisik tidak ditemukan";
+			}
+			set.headers["Content-Type"] = record.mimeType || "application/pdf";
+			set.headers["Content-Disposition"] =
+				`inline; filename="${encodeURIComponent(record.originalName)}"`;
+			return file;
+		}
+
+		const legacyBase = resolve(resolveLegacyUploadsPath());
+		const filePath = resolve(legacyBase, assessment.resultFileUrl);
+		if (!filePath.startsWith(legacyBase)) {
+			set.status = 400;
+			return "Path file tidak valid";
+		}
 		const file = Bun.file(filePath);
 
 		if (!(await file.exists())) {
@@ -396,11 +437,25 @@ export const departureAssessmentRoutes = new Elysia()
 			return { success: false, message: "File tidak ditemukan" };
 		}
 
-		try {
-			const filePath = join(process.cwd(), "uploads", existing.resultFileUrl);
-			await unlink(filePath);
-		} catch (_) {
-			// lanjutkan meski file fisik tidak ada
+		const fileMatch = existing.resultFileUrl.match(
+			/\/files\/([A-Za-z0-9]+)\/download/,
+		);
+		if (fileMatch?.[1]) {
+			try {
+				await fileService.deleteFile(fileMatch[1]);
+			} catch (_) {
+				// lanjutkan meski file fisik tidak ada
+			}
+		} else {
+			try {
+				const legacyBase = resolve(resolveLegacyUploadsPath());
+				const filePath = resolve(legacyBase, existing.resultFileUrl);
+				if (filePath.startsWith(legacyBase)) {
+					await unlink(filePath);
+				}
+			} catch (_) {
+				// lanjutkan meski file fisik tidak ada
+			}
 		}
 
 		const newStatus = computeStatus(existing.score, null);

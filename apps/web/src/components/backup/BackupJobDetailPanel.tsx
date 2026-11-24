@@ -105,10 +105,12 @@ export function BackupJobDetailPanel({
 									{job.type === "cohort"
 										? `Per Angkatan (Angkatan ${job.filters?.cohortId ?? "-"})`
 										: job.type === "student"
-											? `Per Mahasiswa (NIM ${job.filters?.nim ?? "-"})`
-											: job.type === "full"
-												? "Full Backup (Seluruh Sistem & Database)"
-												: job.type}
+											? `Per Mahasiswa (${job.filters?.nim ? `NIM ${job.filters.nim}` : `ID ${job.filters?.studentId ?? "-"}`})`
+											: job.type === "program"
+												? `Per Program Studi (${job.filters?.programId ?? "-"})`
+												: job.type === "full"
+													? "Full Backup (Seluruh Sistem & Database)"
+													: job.type}
 								</p>
 							</div>
 
@@ -244,11 +246,13 @@ export function BackupJobDetailPanel({
 
 									if (!res.ok) throw new Error("Gagal mengunduh backup");
 
+									const disposition = res.headers.get("Content-Disposition");
+									const fnMatch = disposition?.match(/filename="?([^"]+)"?/i);
 									const blob = await res.blob();
 									const url = window.URL.createObjectURL(blob);
 									const a = document.createElement("a");
 									a.href = url;
-									a.download = `backup-${job.id}.zip`;
+									a.download = fnMatch?.[1] || `backup-${job.id}.zip`;
 									document.body.appendChild(a);
 									a.click();
 									window.URL.revokeObjectURL(url);

@@ -2,10 +2,25 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export interface ManifestFile {
-	path: string; // path relatif dalam backup
+	path: string; // path relatif dalam backup (selalu pakai '/' agar portable Windows/Linux)
 	originalName: string;
 	size: number;
 	checksum: string | null;
+	studentId?: number | null;
+	nim?: string | null;
+	studentName?: string | null;
+	panel?: string | null;
+	tabFolder?: string | null;
+	documentKey?: string | null;
+}
+
+export interface ManifestSkippedFile {
+	id: string;
+	originalName: string;
+	studentId?: number | null;
+	panel?: string | null;
+	documentKey?: string | null;
+	reason: string;
 }
 
 export interface ManifestData {
@@ -17,6 +32,7 @@ export interface ManifestData {
 	total_files: number;
 	total_size: number;
 	files: ManifestFile[];
+	skipped_files?: ManifestSkippedFile[];
 }
 
 /**
@@ -24,13 +40,7 @@ export interface ManifestData {
  *
  * Manifest berisi informasi lengkap tentang isi backup:
  * - ID backup, tipe, timestamp, filter yang digunakan
- * - Daftar semua file dengan checksum (untuk verifikasi integritas)
- *
- * Manifest digunakan untuk:
- * - Verifikasi integritas backup
- * - Panduan restore manual
- * - Audit trail
- * - Mendeteksi file korup
+ * - Daftar semua file dengan checksum (untuk verifikasi integritas) & identitas mahasiswa/panel/tab
  */
 export async function generateManifest(
 	outputDir: string,

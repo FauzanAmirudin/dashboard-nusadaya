@@ -1,10 +1,10 @@
 import { stat } from "node:fs/promises";
-import { join } from "node:path";
 import { desc, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { db } from "../db";
 import { backupJobs } from "../db/schema";
 import { getCacheStats } from "../lib/cache";
+import { resolveStoragePath } from "../lib/paths";
 import { queueLength } from "../lib/queue";
 import { redis } from "../lib/redis";
 
@@ -40,8 +40,7 @@ export const healthRoutes = new Elysia().get("/health", async ({ set }) => {
 	}
 
 	// 3. Storage info
-	const storagePath =
-		process.env.STORAGE_PATH ?? join(process.cwd(), "../../storage");
+	const storagePath = resolveStoragePath();
 	try {
 		const statResult = await stat(storagePath);
 		results.storage = {

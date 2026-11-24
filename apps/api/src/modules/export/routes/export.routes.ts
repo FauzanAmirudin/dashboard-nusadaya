@@ -1,7 +1,7 @@
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
-import { join } from "node:path";
-import { Elysia, t } from "elysia";
+import { Elysia } from "elysia";
+import { hasRole } from "../../../lib/permissions";
 import { exportService } from "../service/export.service";
 
 export const exportRoutes = new Elysia()
@@ -9,7 +9,7 @@ export const exportRoutes = new Elysia()
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (user?.role !== "superadmin") {
+		if (!hasRole(user, "superadmin")) {
 			set.status = 403;
 			return {
 				success: false,
@@ -41,7 +41,7 @@ export const exportRoutes = new Elysia()
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (user?.role !== "superadmin") {
+		if (!hasRole(user, "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -59,7 +59,7 @@ export const exportRoutes = new Elysia()
 		const { params, set } = context;
 		const user = (context as any).user;
 
-		if (user?.role !== "superadmin") {
+		if (!hasRole(user, "superadmin")) {
 			set.status = 403;
 			return { success: false, message: "Forbidden" };
 		}
@@ -76,17 +76,30 @@ export const exportRoutes = new Elysia()
 		try {
 			const filePath = status.downloadUrl;
 			const fileStat = await stat(filePath);
-
-			// Extract filename from path
 			const filename = filePath.split(/[\\/]/).pop() || "export.zip";
+			const nodeStream = createReadStream(filePath);
+			const webStream = new ReadableStream({
+				start(controller) {
+					nodeStream.on("data", (chunk) => {
+						controller.enqueue(
+							typeof chunk === "string" ? Buffer.from(chunk) : chunk,
+						);
+					});
+					nodeStream.on("end", () => controller.close());
+					nodeStream.on("error", (err) => controller.error(err));
+				},
+				cancel() {
+					nodeStream.destroy();
+				},
+			});
 
-			set.headers = {
-				"Content-Type": "application/zip",
-				"Content-Length": fileStat.size.toString(),
-				"Content-Disposition": `attachment; filename="${filename}"`,
-			};
-
-			return createReadStream(filePath);
+			return new Response(webStream, {
+				headers: {
+					"Content-Type": "application/zip",
+					"Content-Length": fileStat.size.toString(),
+					"Content-Disposition": `attachment; filename="${filename}"`,
+				},
+			});
 		} catch (err) {
 			console.error("[ExportDownload] Failed to stream:", err);
 			set.status = 404;

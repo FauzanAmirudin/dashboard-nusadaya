@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { users } from "../db/schema";
+import { resolveBackupPath } from "../lib/paths";
 import { archiveOverdueWaitingStudents } from "../lib/waiting-list";
 import { backupService } from "../modules/backup/service/backup.service";
 import { retentionService } from "../modules/backup/service/retention.service";
@@ -127,9 +128,7 @@ export function startScheduledWorker(): void {
 	// 4. Initial Retention Cleanup — jalan 30 detik setelah server nyala
 	setTimeout(() => {
 		console.log("[ScheduledWorker] Running initial retention cleanup...");
-		// fallback path jika process.env.BACKUP_PATH tidak ada
-		const backupPath =
-			process.env.BACKUP_PATH ?? join(process.cwd(), "../../backups");
+		const backupPath = resolveBackupPath();
 		retentionService.runRetentionCleanup(backupPath);
 	}, 30 * 1000);
 }

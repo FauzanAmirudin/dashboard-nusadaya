@@ -1160,7 +1160,7 @@ export default function FormMahasiswaPublic() {
 		if (!profilePhoto) return null;
 		const fd = new FormData();
 		fd.append("file", profilePhoto);
-		const uploadRes = await fetch(`${API_URL}/students/upload-photo`, {
+		const uploadRes = await fetch(`${API_URL}/form/${token}/upload-photo`, {
 			method: "POST",
 			body: fd,
 		});
