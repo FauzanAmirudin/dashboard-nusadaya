@@ -13,6 +13,7 @@ import {
 	users,
 } from "../../db/schema";
 import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
+import { syncPmbIdentityToMagang } from "../../lib/magang-sync";
 import { getValidUserId, hasRole } from "../../lib/permissions";
 import {
 	getPmbAccRequirements,
@@ -232,6 +233,7 @@ export const pmbRoutes = new Elysia()
 			})
 			.where(eq(pmbData.studentId, id));
 
+		await syncPmbIdentityToMagang(id);
 		await invalidatePmbCache(id);
 
 		return { success: true };

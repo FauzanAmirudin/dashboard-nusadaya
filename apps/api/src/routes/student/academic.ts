@@ -39,6 +39,7 @@ import {
 	weeklyEvents,
 } from "../../db/schema";
 import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
+import { recalculateInternshipStatus } from "../../lib/magang-sync";
 import { hasRole } from "../../lib/permissions";
 import { requireRole } from "../../middleware/rbac";
 import { GradeCalculationService } from "../../modules/academic/grade-calculation.service";
@@ -211,6 +212,13 @@ export const academicRoutes = new Elysia()
 				status: "ACC",
 			})
 			.where(eq(academicData.studentId, id));
+
+		try {
+			await GradeCalculationService.syncKhsToMagang(id, user.id);
+			await recalculateInternshipStatus(id);
+		} catch (err) {
+			console.warn("[Academic ACC] Auto-sync to Magang warning:", err);
+		}
 
 		return { success: true };
 	})

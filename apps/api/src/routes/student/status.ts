@@ -373,6 +373,15 @@ export const statusRoutes = new Elysia().get(
 			},
 			{ prop: internship?.dokumentasiReady, name: "Dokumentasi Keberangkatan" },
 			{ prop: internship?.agenReady, name: "Mitra Penempatan" },
+			{ prop: internship?.asuransiBtnBpjsReady, name: "Asuransi BTN BPJS TK" },
+			{
+				prop: internship?.asuransiPenempatanReady,
+				name: "Asuransi Penempatan Lokal",
+			},
+			{
+				prop: internship?.ahliWarisReady,
+				name: "Verifikasi Ahli Waris Keluarga",
+			},
 		];
 		const magangCompleted = magangItems.filter((i) => i.prop).length;
 		magangItems
