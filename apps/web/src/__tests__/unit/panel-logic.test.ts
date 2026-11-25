@@ -824,17 +824,20 @@ describe("Tahap 3 — Panel Business Logic", () => {
 					asesmenReady: true,
 					dokumentasiReady: true,
 					agenReady: true,
+					asuransiBtnBpjsReady: true,
+					asuransiPenempatanReady: true,
+					ahliWarisReady: true,
 				};
 				const res = calculateInternshipDokumenChecklist(allReady, "Taiwan");
 				expect(res.isInternshipReady).toBe(true);
-				expect(res.completedCount).toBe(12);
+				expect(res.completedCount).toBe(15);
 
-				// Non-Taiwan: Suhan tidak dihitung (11 item)
+				// Non-Taiwan: Suhan tidak dihitung (14 item)
 				const nonTaiwan = calculateInternshipDokumenChecklist(
 					{ ...allReady, suhanReady: false },
 					"Indonesia",
 				);
-				expect(nonTaiwan.totalCount).toBe(11);
+				expect(nonTaiwan.totalCount).toBe(14);
 				expect(nonTaiwan.isInternshipReady).toBe(true);
 			});
 		});
@@ -868,18 +871,35 @@ describe("Tahap 3 — Panel Business Logic", () => {
 			pdtReady: true,
 			dokumentasiReady: true,
 			agenReady: true,
+			asuransiBtnBpjsReady: true,
+			asuransiPenempatanReady: true,
+			ahliWarisReady: true,
 			logbookReady: true,
 			laporanAkhirReady: true,
 			videoDokumentasiReady: true,
 		});
 
-		it("counts 13 + 12 + 3 = 28 and accepts LOS in place of SKMA", () => {
+		it("counts 13 + 15 = 28 pre-departure items, keeps syaratAkhir non-blocking, and accepts LOS in place of SKMA", () => {
 			const r = getInternshipAccRequirements(allDone(), false, "Taiwan");
 			expect(r.praPaspor).toEqual({ done: 13, total: 13, ok: true });
-			expect(r.dokumen.total).toBe(12);
-			expect(r.syaratAkhir.total).toBe(3);
+			expect(r.dokumen.total).toBe(15);
+			expect(r.syaratAkhir).toEqual({ done: 3, total: 3, ok: true });
 			expect(r.total).toBe(28);
 			expect(r.ok).toBe(true);
+
+			const preDepartureOnly = {
+				...allDone(),
+				logbookReady: false,
+				laporanAkhirReady: false,
+				videoDokumentasiReady: false,
+			};
+			const rPre = getInternshipAccRequirements(
+				preDepartureOnly,
+				false,
+				"Taiwan",
+			);
+			expect(rPre.syaratAkhir).toEqual({ done: 0, total: 3, ok: false });
+			expect(rPre.ok).toBe(true);
 		});
 
 		it("adds Gap Year item only for gap-year students", () => {
@@ -897,8 +917,32 @@ describe("Tahap 3 — Panel Business Logic", () => {
 				false,
 			);
 			const nonTaiwan = getInternshipAccRequirements(data, false, "Indonesia");
-			expect(nonTaiwan.dokumen.total).toBe(11);
+			expect(nonTaiwan.dokumen.total).toBe(14);
 			expect(nonTaiwan.ok).toBe(true);
+		});
+
+		it("mewajibkan asuransi BTN BPJS TK, asuransi penempatan, dan ahli waris untuk ACC", () => {
+			expect(
+				getInternshipAccRequirements(
+					{ ...allDone(), asuransiBtnBpjsReady: false },
+					false,
+					"Taiwan",
+				).ok,
+			).toBe(false);
+			expect(
+				getInternshipAccRequirements(
+					{ ...allDone(), asuransiPenempatanReady: false },
+					false,
+					"Taiwan",
+				).ok,
+			).toBe(false);
+			expect(
+				getInternshipAccRequirements(
+					{ ...allDone(), ahliWarisReady: false },
+					false,
+					"Taiwan",
+				).ok,
+			).toBe(false);
 		});
 
 		it("ignores languageCertReady (not an ACC requirement)", () => {

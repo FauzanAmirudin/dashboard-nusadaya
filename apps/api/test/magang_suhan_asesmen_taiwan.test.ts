@@ -68,6 +68,19 @@ describe("Verifikasi Alur 6 Dokumen Taiwan, MCU Full, dan Asesmen (Segmen 20 & 2
 					asesmenReady: true,
 					asesmenDate: "2026-09-20T00:00:00.000Z",
 					pdtPlace: "Kampus Nusadaya",
+					// Asuransi & Ahli Waris (MAG-10 & MAG-11)
+					asuransiBtnBpjsReady: true,
+					asuransiBtnBpjsNo: "BPJS-BTN-2026-001",
+					asuransiBtnBpjsDate: "2026-09-21T00:00:00.000Z",
+					asuransiPenempatanReady: true,
+					asuransiPenempatanProvider: "Hong Ta Insurance Taiwan",
+					asuransiPenempatanNo: "TW-INS-2026-445",
+					asuransiPenempatanDate: "2026-09-22T00:00:00.000Z",
+					ahliWarisReady: true,
+					ahliWarisNama: "Budi Santoso",
+					ahliWarisHubungan: "Ayah",
+					ahliWarisKontak: "081234567890",
+					ahliWarisNotes: "Terverifikasi sesuai KK dan SOP Hong Ta",
 				}),
 			}),
 		);
@@ -93,5 +106,17 @@ describe("Verifikasi Alur 6 Dokumen Taiwan, MCU Full, dan Asesmen (Segmen 20 & 2
 		expect(row?.ticketReady).toBe(true);
 		expect(row?.asesmenReady).toBe(true);
 		expect(row?.pdtReady).toBe(true); // Verifikasi backward compatibility sync
+		expect(row?.asuransiBtnBpjsReady).toBe(true);
+		expect(row?.asuransiBtnBpjsNo).toBe("BPJS-BTN-2026-001");
+		expect(row?.asuransiBtnBpjsDate).toBeInstanceOf(Date);
+		expect(row?.asuransiPenempatanReady).toBe(true);
+		expect(row?.asuransiPenempatanProvider).toBe("Hong Ta Insurance Taiwan");
+		expect(row?.asuransiPenempatanNo).toBe("TW-INS-2026-445");
+		expect(row?.asuransiPenempatanDate).toBeInstanceOf(Date);
+		expect(row?.ahliWarisReady).toBe(true);
+		expect(row?.ahliWarisNama).toBe("Budi Santoso");
+		expect(row?.ahliWarisHubungan).toBe("Ayah");
+		expect(row?.ahliWarisKontak).toBe("081234567890");
+		expect(row?.ahliWarisNotes).toBe("Terverifikasi sesuai KK dan SOP Hong Ta");
 	});
 });

@@ -6,6 +6,8 @@ import { app } from "../src";
 import { db } from "../src/db";
 import {
 	feeShareRecipients,
+	internshipData,
+	internshipDocuments,
 	pmbData,
 	pmbPaymentPlan,
 	students,
@@ -62,6 +64,12 @@ describe("ACC PMB hanya jika semua tab lengkap", () => {
 	afterAll(async () => {
 		for (let attempt = 0; attempt < 5; attempt++) {
 			try {
+				await db
+					.delete(internshipDocuments)
+					.where(eq(internshipDocuments.studentId, studentId));
+				await db
+					.delete(internshipData)
+					.where(eq(internshipData.studentId, studentId));
 				await db
 					.delete(feeShareRecipients)
 					.where(eq(feeShareRecipients.studentId, studentId));

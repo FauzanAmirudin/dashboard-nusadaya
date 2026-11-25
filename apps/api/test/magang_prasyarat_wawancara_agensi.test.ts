@@ -1,17 +1,28 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { jwt } from "@elysiajs/jwt";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { app } from "../src";
 import { db } from "../src/db";
 import {
+	academicData,
+	academicDocuments,
+	auditLogs,
+	courseGrades,
+	files,
+	financeDocuments,
 	internshipData,
+	internshipDocuments,
 	internshipInterviews,
+	pmbData,
+	pmbDocuments,
+	postInternshipDocs,
 	students,
 	users,
 } from "../src/db/schema";
 import { computeMagangPrerequisites } from "../src/lib/magang-prerequisites";
 import { JWT_SECRET } from "../src/middleware/auth";
+import { fileService } from "../src/modules/file/service/file.service";
 
 describe("Prasyarat Magang (aturan murni)", () => {
 	const accAll = {
@@ -56,6 +67,8 @@ describe("Prasyarat Magang (aturan murni)", () => {
 describe("Panel Magang: prasyarat ACC, wawancara, termin agensi", () => {
 	let superToken: string;
 	let pmbToken: string;
+	let financeToken: string;
+	let magangToken: string;
 	let studentId: number;
 
 	const call = async (
@@ -94,12 +107,34 @@ describe("Panel Magang: prasyarat ACC, wawancara, termin agensi", () => {
 			)
 			.get("/pmb", ({ jwt }: any) =>
 				jwt.sign({ id: 0, username: "pmb", role: "pmb", roles: ["pmb"] }),
+			)
+			.get("/finance", ({ jwt }: any) =>
+				jwt.sign({
+					id: 0,
+					username: "finance",
+					role: "finance",
+					roles: ["finance"],
+				}),
+			)
+			.get("/magang", ({ jwt }: any) =>
+				jwt.sign({
+					id: 0,
+					username: "magang",
+					role: "magang",
+					roles: ["magang"],
+				}),
 			);
 		superToken = await (
 			await signer.handle(new Request("http://localhost/super"))
 		).text();
 		pmbToken = await (
 			await signer.handle(new Request("http://localhost/pmb"))
+		).text();
+		financeToken = await (
+			await signer.handle(new Request("http://localhost/finance"))
+		).text();
+		magangToken = await (
+			await signer.handle(new Request("http://localhost/magang"))
 		).text();
 
 		const [s] = await db
@@ -113,16 +148,55 @@ describe("Panel Magang: prasyarat ACC, wawancara, termin agensi", () => {
 	afterAll(async () => {
 		for (let attempt = 0; attempt < 5; attempt++) {
 			try {
+				const studentFiles = await db
+					.select({ id: files.id })
+					.from(files)
+					.where(eq(files.studentId, studentId));
+				for (const f of studentFiles) {
+					await fileService.deleteFile(f.id).catch(() => {});
+				}
+				await db.delete(files).where(eq(files.studentId, studentId));
+				await db
+					.delete(auditLogs)
+					.where(
+						and(
+							eq(auditLogs.entity, "student"),
+							eq(auditLogs.entityId, studentId),
+						),
+					);
+				await db
+					.delete(courseGrades)
+					.where(eq(courseGrades.studentId, studentId));
+				await db
+					.delete(academicDocuments)
+					.where(eq(academicDocuments.studentId, studentId));
+				await db
+					.delete(postInternshipDocs)
+					.where(eq(postInternshipDocs.studentId, studentId));
+				await db
+					.delete(internshipDocuments)
+					.where(eq(internshipDocuments.studentId, studentId));
+				await db
+					.delete(pmbDocuments)
+					.where(eq(pmbDocuments.studentId, studentId));
+				await db
+					.delete(financeDocuments)
+					.where(eq(financeDocuments.studentId, studentId));
 				await db
 					.delete(internshipInterviews)
 					.where(eq(internshipInterviews.studentId, studentId));
 				await db
 					.delete(internshipData)
 					.where(eq(internshipData.studentId, studentId));
+				await db
+					.delete(academicData)
+					.where(eq(academicData.studentId, studentId));
+				await db.delete(pmbData).where(eq(pmbData.studentId, studentId));
 				await db.delete(students).where(eq(students.id, studentId));
 				return;
-			} catch {
-				await Bun.sleep(1000);
+			} catch (err) {
+				console.warn("[Test afterAll retry]:", err);
+				await Bun.sleep(500);
 			}
 		}
 	});
@@ -206,18 +280,227 @@ describe("Panel Magang: prasyarat ACC, wawancara, termin agensi", () => {
 		expect(r.status).toBe(404);
 	});
 
-	it("termin agensi tersimpan lewat PATCH internship", async () => {
-		const r = await call("PATCH", "/internship", superToken, {
-			agenDpPaid: true,
-			agenDpDate: "2026-10-25T00:00:00.000Z",
-			agenDpNominal: 5000000,
+	it("termin agensi tersimpan lewat PATCH /finance/agency-payments untuk finance & superadmin", async () => {
+		const rFinance = await call(
+			"PATCH",
+			"/finance/agency-payments",
+			financeToken,
+			{
+				agenDpPaid: true,
+				agenDpDate: "2026-10-25T00:00:00.000Z",
+				agenDpNominal: 5000000,
+			},
+		);
+		expect(rFinance.status).toBe(200);
+		expect(rFinance.json.data.agenDpPaid).toBe(true);
+
+		const rSuper = await call("PATCH", "/finance/agency-payments", superToken, {
+			agenPelunasanPaid: true,
+			agenPelunasanDate: "2026-11-10T00:00:00.000Z",
+			agenPelunasanNominal: 12000000,
 		});
-		expect(r.status).toBe(200);
+		expect(rSuper.status).toBe(200);
+		expect(rSuper.json.data.agenPelunasanPaid).toBe(true);
+
 		const row = await db.query.internshipData.findFirst({
 			where: eq(internshipData.studentId, studentId),
 		});
 		expect(row?.agenDpPaid).toBe(true);
 		expect(row?.agenDpNominal).toBe(5000000);
 		expect(row?.agenDpDate).toBeInstanceOf(Date);
+		expect(row?.agenPelunasanPaid).toBe(true);
+		expect(row?.agenPelunasanNominal).toBe(12000000);
+		expect(row?.agenPelunasanDate).toBeInstanceOf(Date);
+	});
+
+	it("PATCH /finance/agency-payments ditolak 403 untuk magang dan pmb", async () => {
+		const rMagang = await call(
+			"PATCH",
+			"/finance/agency-payments",
+			magangToken,
+			{ agenDpPaid: true },
+		);
+		expect(rMagang.status).toBe(403);
+
+		const rPmb = await call("PATCH", "/finance/agency-payments", pmbToken, {
+			agenDpPaid: true,
+		});
+		expect(rPmb.status).toBe(403);
+	});
+
+	it("PATCH /internship menolak field pembayaran agensi dengan 403", async () => {
+		const r = await call("PATCH", "/internship", magangToken, {
+			agenDpPaid: true,
+		});
+		expect(r.status).toBe(403);
+	});
+
+	it("upload dan hapus bukti pembayaran agensi (agen_dp / agen_pelunasan) ditolak 403 untuk non-finance", async () => {
+		const form = new FormData();
+		form.append("documentKey", "agen_dp");
+		form.append(
+			"file",
+			new File(["%PDF-1.4"], "bukti-dp.pdf", { type: "application/pdf" }),
+		);
+
+		const uploadRes = await app.handle(
+			new Request(`http://localhost/students/${studentId}/finance/documents`, {
+				method: "POST",
+				headers: { Authorization: `Bearer ${magangToken}` },
+				body: form,
+			}),
+		);
+		expect(uploadRes.status).toBe(403);
+
+		const [insertedDoc] = await db
+			.insert(financeDocuments)
+			.values({
+				studentId,
+				documentKey: "agen_pelunasan",
+				fileName: "bukti-pelunasan.pdf",
+				fileUrl: "/files/test-dummy/download",
+			})
+			.returning();
+
+		const deleteRes = await app.handle(
+			new Request(
+				`http://localhost/students/${studentId}/finance/documents/${insertedDoc.id}`,
+				{
+					method: "DELETE",
+					headers: { Authorization: `Bearer ${magangToken}` },
+				},
+			),
+		);
+		expect(deleteRes.status).toBe(403);
+	});
+
+	it("PMB upload ktp otomatis menyinkronkan praPasporKtp dan menyalin dokumen ke Magang", async () => {
+		await db.insert(pmbData).values({ studentId }).onConflictDoNothing();
+
+		const form = new FormData();
+		form.append("documentKey", "ktp");
+		form.append(
+			"file",
+			new File(["%PDF-1.4\n%test"], "ktp-test.pdf", {
+				type: "application/pdf",
+			}),
+		);
+
+		const res = await app.handle(
+			new Request(`http://localhost/students/${studentId}/pmb/documents`, {
+				method: "POST",
+				headers: { Authorization: `Bearer ${superToken}` },
+				body: form,
+			}),
+		);
+		expect(res.status).toBe(200);
+
+		const row = await db.query.internshipData.findFirst({
+			where: eq(internshipData.studentId, studentId),
+		});
+		expect(row?.praPasporKtp).toBe(true);
+
+		const copiedDocs = await db
+			.select()
+			.from(internshipDocuments)
+			.where(
+				and(
+					eq(internshipDocuments.studentId, studentId),
+					eq(internshipDocuments.documentKey, "ktp"),
+				),
+			);
+		expect(copiedDocs.length).toBeGreaterThanOrEqual(1);
+	});
+
+	it("Academic ACC otomatis menyinkronkan KHS, KRS, dan Transkrip ke Magang", async () => {
+		await db
+			.insert(academicData)
+			.values({
+				studentId,
+				pddiktiInput: true,
+				utsPassed: true,
+				uasPassed: true,
+				attitudeIndicator: true,
+				assignmentsCompleted: true,
+				academicCommunication: true,
+			})
+			.onConflictDoNothing();
+
+		const res = await call("POST", "/academic/acc", superToken);
+		expect(res.status).toBe(200);
+
+		const row = await db.query.internshipData.findFirst({
+			where: eq(internshipData.studentId, studentId),
+		});
+		expect(row?.praPasporKhs).toBe(true);
+		expect(row?.praPasporKrs).toBe(true);
+		expect(row?.praPasporTranskrip).toBe(true);
+	});
+
+	it("Upload dokumen magang & post-internship otomatis mencentang checklist", async () => {
+		const passportForm = new FormData();
+		passportForm.append("documentKey", "passport");
+		passportForm.append(
+			"file",
+			new File(["%PDF-1.4\n%test"], "passport.pdf", {
+				type: "application/pdf",
+			}),
+		);
+		const passportRes = await app.handle(
+			new Request(`http://localhost/students/${studentId}/magang/documents`, {
+				method: "POST",
+				headers: { Authorization: `Bearer ${superToken}` },
+				body: passportForm,
+			}),
+		);
+		expect(passportRes.status).toBe(200);
+
+		const logbookForm = new FormData();
+		logbookForm.append("documentKey", "logbook");
+		logbookForm.append(
+			"file",
+			new File(["%PDF-1.4\n%test"], "logbook.pdf", {
+				type: "application/pdf",
+			}),
+		);
+		const logbookRes = await app.handle(
+			new Request(
+				`http://localhost/students/${studentId}/post-internship/documents`,
+				{
+					method: "POST",
+					headers: { Authorization: `Bearer ${superToken}` },
+					body: logbookForm,
+				},
+			),
+		);
+		expect(logbookRes.status).toBe(200);
+
+		const row = await db.query.internshipData.findFirst({
+			where: eq(internshipData.studentId, studentId),
+		});
+		expect(row?.passportReady).toBe(true);
+		expect(row?.logbookReady).toBe(true);
+	});
+
+	it("Wawancara berstatus lulus otomatis mencentang interviewReady", async () => {
+		const created = await call("POST", "/internship/interviews", magangToken, {
+			interviewDate: "2026-11-15",
+			partnerName: "Mandarin Oriental Taipei",
+			result: "lulus",
+		});
+		expect(created.status).toBe(200);
+
+		const row = await db.query.internshipData.findFirst({
+			where: eq(internshipData.studentId, studentId),
+		});
+		expect(row?.interviewReady).toBe(true);
+		expect(row?.interviewResult).toBe("Lulus");
+	});
+
+	it("PATCH /students/:id/finance ditolak 403 untuk role magang", async () => {
+		const res = await call("PATCH", "/finance", magangToken, {
+			talanganNotes: "Coba ubah dari magang",
+		});
+		expect(res.status).toBe(403);
 	});
 });
