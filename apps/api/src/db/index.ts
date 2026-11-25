@@ -939,6 +939,105 @@ export async function ensureDatabaseSchema() {
 			  ADD COLUMN IF NOT EXISTS agen_pelunasan_paid BOOLEAN DEFAULT false,
 			  ADD COLUMN IF NOT EXISTS agen_pelunasan_date TIMESTAMP,
 			  ADD COLUMN IF NOT EXISTS agen_pelunasan_nominal INTEGER;
+
+			-- FINANCE: Salin bukti pembayaran agensi lama dari internship_documents ke finance_documents (idempotent)
+			DO $$
+			BEGIN
+			  IF NOT EXISTS (SELECT 1 FROM app_migrations WHERE name = 'agency_docs_to_finance_backfill_v1') THEN
+			    INSERT INTO finance_documents (
+			      student_id,
+			      document_key,
+			      file_name,
+			      file_url,
+			      file_size,
+			      mime_type,
+			      uploaded_at,
+			      uploaded_by,
+			      is_verified,
+			      verified_at,
+			      verified_by
+			    )
+			    SELECT
+			      i.student_id,
+			      i.document_key,
+			      i.file_name,
+			      i.file_url,
+			      i.file_size,
+			      i.mime_type,
+			      i.uploaded_at,
+			      i.uploaded_by,
+			      i.is_verified,
+			      i.verified_at,
+			      i.verified_by
+			    FROM internship_documents i
+			    WHERE i.document_key IN ('agen_dp', 'agen_pelunasan')
+			      AND NOT EXISTS (
+			        SELECT 1 FROM finance_documents f
+			        WHERE f.student_id = i.student_id
+			          AND f.document_key = i.document_key
+			          AND f.file_url = i.file_url
+			      );
+			    INSERT INTO app_migrations(name) VALUES ('agency_docs_to_finance_backfill_v1');
+			  END IF;
+			END $$;
+
+			-- MAGANG: Salin berkas identitas PMB (pas_foto, ktp, kk, ijazah) yang sudah ada ke internship_documents & internship_data (idempotent)
+			DO $$
+			BEGIN
+			  IF NOT EXISTS (SELECT 1 FROM app_migrations WHERE name = 'pmb_identity_to_magang_backfill_v1') THEN
+			    INSERT INTO internship_documents (
+			      student_id,
+			      document_key,
+			      file_name,
+			      file_url,
+			      file_size,
+			      mime_type,
+			      uploaded_at,
+			      uploaded_by,
+			      is_verified,
+			      verified_at,
+			      verified_by
+			    )
+			    SELECT
+			      p.student_id,
+			      p.document_key,
+			      p.file_name,
+			      p.file_url,
+			      p.file_size,
+			      p.mime_type,
+			      p.uploaded_at,
+			      p.uploaded_by,
+			      p.is_verified,
+			      p.verified_at,
+			      p.verified_by
+			    FROM pmb_documents p
+			    WHERE p.document_key IN ('pas_foto', 'ktp', 'kk', 'ijazah')
+			      AND NOT EXISTS (
+			        SELECT 1 FROM internship_documents i
+			        WHERE i.student_id = p.student_id
+			          AND i.document_key = p.document_key
+			          AND i.file_url = p.file_url
+			      );
+
+			    UPDATE internship_data i
+			    SET
+			      pra_paspor_pas_foto = COALESCE(i.pra_paspor_pas_foto, false) OR COALESCE(pm.pas_foto, false),
+			      pra_paspor_ktp = COALESCE(i.pra_paspor_ktp, false) OR COALESCE(pm.doc_ktp, false),
+			      pra_paspor_kk = COALESCE(i.pra_paspor_kk, false) OR COALESCE(pm.doc_kk, false),
+			      pra_paspor_ijazah = COALESCE(i.pra_paspor_ijazah, false) OR COALESCE(pm.doc_ijazah, false),
+			      updated_at = now()
+			    FROM pmb_data pm
+			    WHERE pm.student_id = i.student_id
+			      AND (
+			        (COALESCE(pm.pas_foto, false) AND NOT COALESCE(i.pra_paspor_pas_foto, false))
+			        OR (COALESCE(pm.doc_ktp, false) AND NOT COALESCE(i.pra_paspor_ktp, false))
+			        OR (COALESCE(pm.doc_kk, false) AND NOT COALESCE(i.pra_paspor_kk, false))
+			        OR (COALESCE(pm.doc_ijazah, false) AND NOT COALESCE(i.pra_paspor_ijazah, false))
+			      );
+
+			    INSERT INTO app_migrations(name) VALUES ('pmb_identity_to_magang_backfill_v1');
+			  END IF;
+			END $$;
 		`);
 	} catch (err) {
 		console.warn("[Database] Schema check warning:", err);

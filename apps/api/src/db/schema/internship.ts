@@ -91,6 +91,25 @@ export const internshipData = pgTable(
 		asesmenNotes: text("asesmen_notes"),
 		asesmenPernyataanReady: boolean("asesmen_pernyataan_ready").default(false),
 
+		// 8b. Asuransi BTN BPJS TK & Asuransi Penempatan Lokal (Segmen 22 & 23)
+		asuransiBtnBpjsReady: boolean("asuransi_btn_bpjs_ready").default(false),
+		asuransiBtnBpjsNo: text("asuransi_btn_bpjs_no"),
+		asuransiBtnBpjsDate: timestamp("asuransi_btn_bpjs_date"),
+
+		asuransiPenempatanReady: boolean("asuransi_penempatan_ready").default(
+			false,
+		),
+		asuransiPenempatanProvider: text("asuransi_penempatan_provider"),
+		asuransiPenempatanNo: text("asuransi_penempatan_no"),
+		asuransiPenempatanDate: timestamp("asuransi_penempatan_date"),
+
+		// 8c. Verifikasi Identitas Ahli Waris Keluarga (SOP Agensi Hong Ta - Segmen 22, 23, 24)
+		ahliWarisReady: boolean("ahli_waris_ready").default(false),
+		ahliWarisNama: text("ahli_waris_nama"),
+		ahliWarisHubungan: text("ahli_waris_hubungan"),
+		ahliWarisKontak: text("ahli_waris_kontak"),
+		ahliWarisNotes: text("ahli_waris_notes"),
+
 		// Alur Berkas Taiwan (MOU -> LOA -> Kontrak -> Suhan -> MCU Full -> Visa)
 		mouReady: boolean("mou_ready").default(false),
 		mouDate: timestamp("mou_date"),
