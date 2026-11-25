@@ -18,7 +18,7 @@ import {
 	financeData,
 	financeDocuments,
 	internalNotes,
-	internshipData,
+	type internshipData,
 	internshipDocuments,
 	paData,
 	paDocuments,
@@ -34,11 +34,19 @@ import {
 	vocabLogs,
 	weeklyEvents,
 } from "../../db/schema";
+import {
+	invalidateMagangCaches,
+	recalculateInternshipStatus,
+	syncPmbIdentityToMagang,
+	upsertInternshipFlags,
+} from "../../lib/magang-sync";
 import { hasRole } from "../../lib/permissions";
 import { fileService } from "../../modules/file/service/file.service";
 import { invalidateCrmCaches } from "./crm";
 import { invalidateFinanceCaches } from "./finance";
 import { invalidatePmbCache } from "./pmb";
+
+const AGENCY_PAYMENT_DOC_KEYS = ["agen_dp", "agen_pelunasan"];
 
 export const documentsRoutes = new Elysia()
 	.get("/:id/:panel/documents", async (context) => {
@@ -94,6 +102,17 @@ export const documentsRoutes = new Elysia()
 			if (!user) {
 				set.status = 401;
 				return { success: false, message: "Unauthorized" };
+			}
+
+			if (
+				AGENCY_PAYMENT_DOC_KEYS.includes(documentKey) &&
+				!hasRole(user, "finance", "superadmin")
+			) {
+				set.status = 403;
+				return {
+					success: false,
+					message: "Bukti pembayaran agensi hanya dapat diunggah oleh Finance",
+				};
 			}
 
 			if (
@@ -154,56 +173,73 @@ export const documentsRoutes = new Elysia()
 						message: "Anda tidak diizinkan mengunggah dokumen mahasiswa lain",
 					};
 				}
-				// Mahasiswa hanya diizinkan upload ke panel CRM dengan documentKey tertentu
-				if (panel !== "crm") {
-					set.status = 403;
-					return {
-						success: false,
-						message: "Anda hanya diizinkan mengunggah dokumen CRM",
-					};
-				}
-				const crmAllowedKeys = [
-					"ods_1_report",
-					"ods_2_report",
-					"ods_3_report",
-					"ods_4_report",
-					"ods_5_report",
-					"ods_report",
-					"ods_1",
-					"ods_2",
-					"ods_3",
-					"ods_4",
-					"ods_5",
-					"ods_documentation",
-					"pramagang_report",
-					"pramagang",
-					"pramagang_documentation",
-					"tri_dharma_report",
-					"tri_dharma_pkm_report",
-					"tri_dharma_penelitian_report",
-					"tri_dharma_documentation",
-				];
-				const isAllowedKey =
-					crmAllowedKeys.includes(documentKey) ||
-					documentKey.startsWith("tri_dharma");
-				if (!isAllowedKey) {
-					set.status = 403;
-					return {
-						success: false,
-						message: "Jenis dokumen tidak diizinkan untuk diupload mahasiswa",
-					};
-				}
-
-				const currentCrm = await db.query.crmData.findFirst({
-					where: eq(crmData.studentId, studentId),
-				});
-				if (currentCrm?.isAcc) {
+				// Mahasiswa diizinkan upload ke panel CRM (dokumen tertentu) atau panel post-internship (3 berkas kepulangan)
+				if (panel === "post-internship") {
+					const postAllowedKeys = [
+						"logbook",
+						"laporan_akhir",
+						"video_portofolio",
+					];
+					if (!postAllowedKeys.includes(documentKey)) {
+						set.status = 403;
+						return {
+							success: false,
+							message: "Jenis berkas kepulangan tidak valid",
+						};
+					}
+				} else if (panel !== "crm") {
 					set.status = 403;
 					return {
 						success: false,
 						message:
-							"Panel CRM telah disetujui resmi (ACC). Dokumen tidak dapat diunggah.",
+							"Anda hanya diizinkan mengunggah dokumen CRM atau berkas kepulangan magang",
 					};
+				}
+
+				if (panel === "crm") {
+					const crmAllowedKeys = [
+						"ods_1_report",
+						"ods_2_report",
+						"ods_3_report",
+						"ods_4_report",
+						"ods_5_report",
+						"ods_report",
+						"ods_1",
+						"ods_2",
+						"ods_3",
+						"ods_4",
+						"ods_5",
+						"ods_documentation",
+						"pramagang_report",
+						"pramagang",
+						"pramagang_documentation",
+						"tri_dharma_report",
+						"tri_dharma_pkm_report",
+						"tri_dharma_penelitian_report",
+						"tri_dharma_documentation",
+					];
+					const isAllowedKey =
+						crmAllowedKeys.includes(documentKey) ||
+						documentKey.startsWith("tri_dharma");
+					if (!isAllowedKey) {
+						set.status = 403;
+						return {
+							success: false,
+							message: "Jenis dokumen tidak diizinkan untuk diupload mahasiswa",
+						};
+					}
+
+					const currentCrm = await db.query.crmData.findFirst({
+						where: eq(crmData.studentId, studentId),
+					});
+					if (currentCrm?.isAcc) {
+						set.status = 403;
+						return {
+							success: false,
+							message:
+								"Panel CRM telah disetujui resmi (ACC). Dokumen tidak dapat diunggah.",
+						};
+					}
 				}
 			}
 
@@ -469,7 +505,98 @@ export const documentsRoutes = new Elysia()
 						.where(eq(pmbData.studentId, studentId));
 				}
 
+				if (["pas_foto", "ktp", "kk", "ijazah"].includes(documentKey)) {
+					await syncPmbIdentityToMagang(studentId);
+				}
+
 				await invalidatePmbCache(studentId);
+			}
+
+			// Jika panel magang: otomatis centang checklist yang sesuai dengan dokumen PDF yang diunggah
+			if (panel === "magang") {
+				const magangDocFieldMap: Record<
+					string,
+					Partial<typeof internshipData.$inferInsert>
+				> = {
+					pas_foto: { praPasporPasFoto: true },
+					ktm: { praPasporKtm: true },
+					ktp: { praPasporKtp: true },
+					kk: { praPasporKk: true },
+					akta_kelahiran: { praPasporAktaKelahiran: true },
+					surat_izin_ortu: { praPasporSuratIzinOrtu: true },
+					sl21: { praPasporSl21: true },
+					gap_year: { praPasporGapYear: true },
+					los: { praPasporSkma: true, praPasporLos: true },
+					skma: { praPasporSkma: true, praPasporLos: true },
+					rekomendasi_disdik: { praPasporRekomendasiDisdik: true },
+					ijazah: { praPasporIjazah: true },
+					khs: { praPasporKhs: true },
+					krs: { praPasporKrs: true },
+					transkrip: { praPasporTranskrip: true },
+					passport: { passportReady: true },
+					interview: { interviewReady: true },
+					mou: { mouReady: true, moaReady: true },
+					loa: { loaConfirmed: true },
+					contract: { contractReady: true },
+					suhan: { suhanReady: true },
+					mcu: { mcuReady: true },
+					visa: { visaReady: true },
+					ticket: { ticketReady: true },
+					dokumentasi_keberangkatan: { dokumentasiReady: true },
+					mitra_agen: { agenReady: true },
+					asuransi_btn_bpjs: { asuransiBtnBpjsReady: true },
+					asuransi_penempatan: { asuransiPenempatanReady: true },
+					surat_keterangan_ahli_waris: { ahliWarisReady: true },
+					sertifikasi_bahasa: { languageCertReady: true },
+				};
+
+				const internshipUpdate: Partial<typeof internshipData.$inferInsert> = {
+					...(magangDocFieldMap[documentKey] ?? {}),
+				};
+
+				if (
+					documentKey === "asesmen_kompetensi" ||
+					documentKey === "surat_pernyataan_keberangkatan"
+				) {
+					const studentInternDocs = await db
+						.select({ documentKey: internshipDocuments.documentKey })
+						.from(internshipDocuments)
+						.where(eq(internshipDocuments.studentId, studentId));
+					const keySet = new Set(studentInternDocs.map((d) => d.documentKey));
+					if (documentKey === "surat_pernyataan_keberangkatan") {
+						internshipUpdate.asesmenPernyataanReady = true;
+					}
+					if (
+						keySet.has("asesmen_kompetensi") &&
+						keySet.has("surat_pernyataan_keberangkatan")
+					) {
+						internshipUpdate.asesmenReady = true;
+						internshipUpdate.pdtReady = true;
+					}
+				}
+
+				if (Object.keys(internshipUpdate).length > 0) {
+					await upsertInternshipFlags(studentId, internshipUpdate);
+				} else {
+					await recalculateInternshipStatus(studentId);
+				}
+			}
+
+			// Jika panel post-internship: otomatis centang checklist syarat akhir saat berkas diunggah
+			if (panel === "post-internship") {
+				const postDocFieldMap: Record<
+					string,
+					Partial<typeof internshipData.$inferInsert>
+				> = {
+					logbook: { logbookReady: true },
+					laporan_akhir: { laporanAkhirReady: true },
+					video_portofolio: { videoDokumentasiReady: true },
+				};
+
+				const postUpdate = postDocFieldMap[documentKey];
+				if (postUpdate) {
+					await upsertInternshipFlags(studentId, postUpdate);
+				}
 			}
 
 			return { success: true, message: "Dokumen berhasil diunggah", fileUrl };
@@ -521,13 +648,32 @@ export const documentsRoutes = new Elysia()
 				return { success: false, message: "Invalid panel" };
 		}
 
+		const [targetDoc] = await db
+			.select()
+			.from(table)
+			.where(and(eq(table.studentId, studentId), eq(table.id, docId)))
+			.limit(1);
+
+		if (
+			targetDoc &&
+			AGENCY_PAYMENT_DOC_KEYS.includes(targetDoc.documentKey) &&
+			!hasRole(user, "finance", "superadmin")
+		) {
+			set.status = 403;
+			return {
+				success: false,
+				message: "Bukti pembayaran agensi hanya dapat dihapus oleh Finance",
+			};
+		}
+
 		// === Guard untuk role mahasiswa saat hapus dokumen ===
 		if (user && user.role === "mahasiswa" && !hasRole(user, "superadmin")) {
-			if (panel !== "crm") {
+			if (panel !== "crm" && panel !== "post-internship") {
 				set.status = 403;
 				return {
 					success: false,
-					message: "Mahasiswa hanya diizinkan menghapus dokumen CRM",
+					message:
+						"Mahasiswa hanya diizinkan menghapus dokumen CRM atau berkas kepulangan magang",
 				};
 			}
 			// Verifikasi kepemilikan
@@ -608,6 +754,7 @@ export const documentsRoutes = new Elysia()
 		}
 
 		let deletedCrmDocKey: string | null = null;
+		let deletedPostDocKey: string | null = null;
 		let deletedFileUrl: string | null = null;
 		if (panel === "crm") {
 			const existingDoc = await db.query.crmDocuments.findFirst({
@@ -620,6 +767,9 @@ export const documentsRoutes = new Elysia()
 				deletedCrmDocKey = existingDoc.documentKey;
 				deletedFileUrl = existingDoc.fileUrl;
 			}
+		} else if (panel === "post-internship" && targetDoc) {
+			deletedPostDocKey = targetDoc.documentKey;
+			deletedFileUrl = targetDoc.fileUrl;
 		}
 
 		await db
@@ -711,6 +861,38 @@ export const documentsRoutes = new Elysia()
 
 		if (panel === "pmb") {
 			await invalidatePmbCache(studentId);
+		}
+
+		if (panel === "post-internship") {
+			if (deletedPostDocKey) {
+				const remainingPostDocs = await db
+					.select()
+					.from(postInternshipDocs)
+					.where(
+						and(
+							eq(postInternshipDocs.studentId, studentId),
+							eq(postInternshipDocs.documentKey, deletedPostDocKey),
+						),
+					);
+				const postFlagMap: Record<
+					string,
+					Partial<typeof internshipData.$inferInsert>
+				> = {
+					logbook: { logbookReady: false },
+					laporan_akhir: { laporanAkhirReady: false },
+					video_portofolio: { videoDokumentasiReady: false },
+				};
+				if (remainingPostDocs.length === 0 && postFlagMap[deletedPostDocKey]) {
+					await upsertInternshipFlags(
+						studentId,
+						postFlagMap[deletedPostDocKey],
+					);
+				} else {
+					await invalidateMagangCaches(studentId);
+				}
+			} else {
+				await invalidateMagangCaches(studentId);
+			}
 		}
 
 		return { success: true, message: "Dokumen berhasil dihapus" };

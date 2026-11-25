@@ -8,17 +8,10 @@ import {
 	CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { DocumentUpload } from "@/components/ui/DocumentUpload";
-import { Input } from "@/components/ui/input";
 import { API_URL, getToken } from "@/lib/eden";
 import { openDocumentReview } from "@/utils/document-review";
-import { getAgencyPaymentReminders } from "@/utils/panel-logic";
-import {
-	ChecklistGroup,
-	ChecklistRow,
-	RowField,
-	rowInputClass,
-	toDateInput,
-} from "./ChecklistRow";
+import { formatDate } from "@/utils/format";
+import { getAgencyPaymentTermsSummary } from "@/utils/panel-logic";
 
 interface TabDanaTalanganProps {
 	studentId: number;
@@ -34,10 +27,6 @@ export function TabDanaTalangan({
 	studentId,
 	data,
 	pmbPaymentData,
-	canEdit,
-	handleToggleField,
-	handleLocalChange,
-	handleBlurField,
 }: TabDanaTalanganProps) {
 	const [financeDetail, setFinanceDetail] = useState<any>(null);
 	const [previewModal, setPreviewModal] = useState<{
@@ -89,10 +78,12 @@ export function TabDanaTalangan({
 	const isDanaTalangan = financeState?.metodePembayaran === "dana_talangan";
 	const isDanaMandiri = financeState?.metodePembayaran === "mandiri";
 	const destCountry = financeDetail?.student?.destinationCountry || "";
-	const isMalaysia = destCountry.toLowerCase().includes("malaysia");
-	const penempatanLabel = isMalaysia
-		? "Penempatan Magang D3 Malaysia / Keberangkatan"
-		: "Penempatan Magang Taiwan / Keberangkatan";
+	const lowerDest = destCountry.toLowerCase();
+	const penempatanLabel = lowerDest.includes("malaysia")
+		? "Keberangkatan Magang (D3 Malaysia)"
+		: lowerDest.includes("taiwan")
+			? "Keberangkatan Magang (Taiwan)"
+			: "Keberangkatan Magang";
 
 	interface StageItemProps {
 		title: string;
@@ -587,98 +578,114 @@ export function TabDanaTalangan({
 				</div>
 			</section>
 
-			{/* Pembayaran kampus ke agensi mitra (dicatat Divisi Magang) */}
+			{/* Pembayaran kampus ke agensi mitra (dicatat Finance, hanya baca) */}
 			{(() => {
-				const reminders = getAgencyPaymentReminders(data);
-				const termin = [
-					{
-						key: "Dp",
-						docKey: "agen_dp",
-						label: "Uang Muka (DP) ke Agensi",
-						desc: "Dibayar saat Suhan terbit, sebelum MCU Full.",
-						reminder: reminders.find((r) => r.key === "dp"),
-					},
-					{
-						key: "Pelunasan",
-						docKey: "agen_pelunasan",
-						label: "Pelunasan Biaya Agensi",
-						desc: "Dibayar saat visa terbit, sebelum tiket diterbitkan.",
-						reminder: reminders.find((r) => r.key === "pelunasan"),
-					},
-				];
-				const done = termin.filter((t) => data?.[`agen${t.key}Paid`]).length;
+				const agencyTerms = getAgencyPaymentTermsSummary(data, destCountry);
+				const done = agencyTerms.filter((t) => t.paid).length;
 				return (
-					<ChecklistGroup
-						title="Pembayaran Kampus ke Agensi · dicatat Divisi Magang"
-						done={done}
-						total={termin.length}
-					>
-						{termin.map((t) => {
-							const paid = `agen${t.key}Paid`;
-							const date = `agen${t.key}Date`;
-							const nominal = `agen${t.key}Nominal`;
-							return (
-								<ChecklistRow
-									key={t.key}
-									id={paid}
-									label={t.label}
-									desc={t.desc}
-									warning={t.reminder?.text}
-									checked={Boolean(data?.[paid])}
-									disabled={!canEdit}
-									onCheckedChange={(checked) =>
-										handleToggleField(paid, checked)
-									}
-									upload={
-										<DocumentUpload
-											studentId={studentId}
-											panel="magang"
-											documentKey={t.docKey}
-											canEdit={canEdit}
-										/>
-									}
-								>
-									<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-										<RowField label="Tanggal Bayar" htmlFor={`f-${date}`}>
-											<Input
-												id={`f-${date}`}
-												type="date"
-												className={rowInputClass}
-												value={toDateInput(data?.[date])}
-												disabled={!canEdit}
-												onChange={(e) =>
-													handleLocalChange(date, e.target.value || null)
-												}
-												onBlur={() => handleBlurField(date)}
+					<section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+						<div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
+							<div className="min-w-0">
+								<h3 className="text-sm sm:text-base font-bold text-slate-900">
+									Pembayaran Kampus ke Agensi
+								</h3>
+								<p className="mt-0.5 text-xs text-slate-500">
+									Data dari Panel Finance, hanya baca.
+								</p>
+							</div>
+							<span
+								className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums ${
+									done >= agencyTerms.length
+										? "bg-emerald-100 text-emerald-800"
+										: "bg-amber-100 text-amber-800"
+								}`}
+							>
+								{done} / {agencyTerms.length} lunas
+							</span>
+						</div>
+
+						<div className="divide-y divide-slate-100 p-4 sm:p-6">
+							{agencyTerms.map((term) => {
+								const docKey = term.key === "dp" ? "agen_dp" : "agen_pelunasan";
+								const pill = term.paid
+									? {
+											text: "Lunas",
+											cls: "border-emerald-200 bg-emerald-50 text-emerald-800",
+										}
+									: term.isOverdue
+										? {
+												text: "Perlu Dibayar",
+												cls: "border-amber-200 bg-amber-50 text-amber-800",
+											}
+										: {
+												text: "Menunggu Pemicu",
+												cls: "border-slate-200 bg-white text-slate-600",
+											};
+
+								return (
+									<div
+										key={term.key}
+										className="space-y-3 py-4 first:pt-0 last:pb-0"
+									>
+										<div className="flex items-start justify-between gap-3">
+											<div className="min-w-0">
+												<h4 className="text-sm font-semibold text-slate-900">
+													{term.label}
+												</h4>
+												<p className="mt-0.5 text-xs text-slate-500">
+													Pemicu: {term.triggerLabel}
+												</p>
+												{term.reminderText && (
+													<p
+														role="status"
+														className="mt-1 text-xs font-medium text-amber-800"
+													>
+														{term.reminderText}
+													</p>
+												)}
+											</div>
+											<span
+												className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${pill.cls}`}
+											>
+												{pill.text}
+											</span>
+										</div>
+
+										<div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200/80 bg-slate-50/50 p-3 text-xs sm:grid-cols-2">
+											<div>
+												<span className="block text-slate-500">Nominal</span>
+												<span className="font-semibold tabular-nums text-slate-900">
+													{term.nominal !== null
+														? formatRupiah(term.nominal)
+														: "Belum diisi"}
+												</span>
+											</div>
+											<div>
+												<span className="block text-slate-500">
+													Tanggal Bayar
+												</span>
+												<span className="font-medium text-slate-900">
+													{term.paidDate ? formatDate(term.paidDate) : "-"}
+												</span>
+											</div>
+										</div>
+
+										<div>
+											<p className="text-xs font-medium text-slate-600">
+												Bukti Pembayaran (Finance)
+											</p>
+											<DocumentUpload
+												studentId={studentId}
+												panel="finance"
+												documentKey={docKey}
+												canEdit={false}
 											/>
-										</RowField>
-										<RowField label="Nominal (Rp)" htmlFor={`f-${nominal}`}>
-											<Input
-												id={`f-${nominal}`}
-												type="number"
-												inputMode="numeric"
-												min={0}
-												step={1}
-												placeholder="0"
-												className={rowInputClass}
-												value={data?.[nominal] ?? ""}
-												disabled={!canEdit}
-												onChange={(e) =>
-													handleLocalChange(
-														nominal,
-														e.target.value === ""
-															? null
-															: Math.max(0, Math.trunc(Number(e.target.value))),
-													)
-												}
-												onBlur={() => handleBlurField(nominal)}
-											/>
-										</RowField>
+										</div>
 									</div>
-								</ChecklistRow>
-							);
-						})}
-					</ChecklistGroup>
+								);
+							})}
+						</div>
+					</section>
 				);
 			})()}
 

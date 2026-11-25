@@ -633,6 +633,9 @@ export const INTERNSHIP_MAIN_KEYS = [
 	"asesmenReady",
 	"dokumentasiReady",
 	"agenReady",
+	"asuransiBtnBpjsReady",
+	"asuransiPenempatanReady",
+	"ahliWarisReady",
 ] as const;
 
 export function calculateInternshipDokumenChecklist(
@@ -738,15 +741,17 @@ export function getInternshipAccRequirements(
 	};
 	const syaratAkhir = group(SYARAT_AKHIR_KEYS.map((k) => Boolean(d[k])));
 
-	const completed = praPaspor.done + dokumen.done + syaratAkhir.done;
-	const total = praPaspor.total + dokumen.total + syaratAkhir.total;
+	// ACC keberangkatan hanya mensyaratkan Pra-Paspor + Dokumen Keberangkatan.
+	// Syarat Akhir (berkas kepulangan) tetap dilacak, tetapi tidak mengunci ACC.
+	const completed = praPaspor.done + dokumen.done;
+	const total = praPaspor.total + dokumen.total;
 	return {
 		praPaspor,
 		dokumen,
 		syaratAkhir,
 		completed,
 		total,
-		ok: completed === total,
+		ok: praPaspor.ok && dokumen.ok,
 	};
 }
 
@@ -843,7 +848,7 @@ export interface AgencyPaymentTermSummary {
 
 /**
  * Ringkasan dua termin pembayaran kampus ke agensi mitra (DP & Pelunasan)
- * untuk tampilan pantauan Finance (read-only) maupun antrean pengingat dashboard.
+ * untuk tampilan input Finance, ringkasan baca-saja Magang, dan antrean pengingat dashboard.
  */
 export function getAgencyPaymentTermsSummary(
 	internship: AgencyPaymentInternshipLike | null | undefined,

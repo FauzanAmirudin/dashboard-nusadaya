@@ -48,9 +48,6 @@ export const magangRouter = new Elysia({ prefix: "/magang" })
 				internship?.dokumentasiReady,
 				internship?.ticketReady,
 				internship?.agenReady,
-				internship?.logbookReady,
-				internship?.laporanAkhirReady,
-				internship?.videoDokumentasiReady,
 			];
 			const completedCount = checks.filter(Boolean).length;
 			const totalCount = checks.length;

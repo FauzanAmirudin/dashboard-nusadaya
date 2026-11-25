@@ -23,7 +23,7 @@ export function TabPraPaspor({
 	handleToggleField,
 	fetchInternshipData,
 }: TabPraPasporProps) {
-	// Berkas Pra-Paspor Legalitas & Identitas (Segmen 19: SL-21 Hong Ta, Gap Year Flamboyan, LOS/SKMA Aktif)
+	// Berkas Pra-Paspor Legalitas & Identitas (SL-21, Gap Year, LOS/SKMA Aktif)
 	const docItems = [
 		{
 			label: "1. Pas Foto Terbaru",
@@ -60,18 +60,14 @@ export function TabPraPaspor({
 			label: "7. Surat Pernyataan Usia >21 Tahun (SL-21)",
 			key: "praPasporSl21",
 			docKey: "sl21",
-			badge: {
-				text: "Khusus Mitra Hong Ta",
-				className: "bg-indigo-50 text-indigo-700 border-indigo-200",
-			},
-			desc: "Bermaterai.",
+			badge: { text: "Bermaterai" },
 		},
 		{
 			label: "8. Surat Keterangan Riwayat Gap Year",
 			key: "praPasporGapYear",
 			docKey: "gap_year",
 			badge: {
-				text: "Khusus Mitra Flamboyan",
+				text: "Khusus Gap Year",
 				className: "bg-amber-50 text-amber-800 border-amber-200",
 			},
 			desc: "Keterangan aktivitas & kelulusan masa gap year, bermaterai.",
@@ -130,13 +126,6 @@ export function TabPraPaspor({
 						disabled={!canEdit}
 						onCheckedChange={(checked) => {
 							handleToggleField(item.key, checked);
-							// Server menyinkronkan LOS↔SKMA; samakan juga state lokal agar centang bisa dilepas
-							if (
-								item.key === "praPasporSkma" &&
-								!checked &&
-								data?.praPasporLos
-							)
-								handleToggleField("praPasporLos", false);
 						}}
 						upload={
 							<DocumentUpload

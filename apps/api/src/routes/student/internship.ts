@@ -14,6 +14,14 @@ import {
 } from "../../db/schema";
 import { cacheDel, cacheInvalidatePattern } from "../../lib/cache";
 import { getMagangPrerequisites } from "../../lib/magang-prerequisites";
+import {
+	getInternshipChecks,
+	isTaiwanDestination,
+	recalculateInternshipStatus,
+	upsertInternshipFlags,
+} from "../../lib/magang-sync";
+
+export { isTaiwanDestination };
 
 /** Negara tujuan mahasiswa (untuk aturan khusus Taiwan: Suhan). */
 async function getDestinationCountry(studentId: number) {
@@ -22,6 +30,31 @@ async function getDestinationCountry(studentId: number) {
 		columns: { destinationCountry: true },
 	});
 	return row?.destinationCountry ?? null;
+}
+
+async function syncPassedInterviewToInternship(studentId: number) {
+	const [passed] = await db
+		.select()
+		.from(internshipInterviews)
+		.where(
+			and(
+				eq(internshipInterviews.studentId, studentId),
+				eq(internshipInterviews.result, "lulus"),
+			),
+		)
+		.orderBy(
+			desc(internshipInterviews.interviewDate),
+			desc(internshipInterviews.id),
+		)
+		.limit(1);
+
+	if (!passed) return;
+
+	await upsertInternshipFlags(studentId, {
+		interviewReady: true,
+		interviewResult: "Lulus",
+		...(passed.interviewDate ? { interviewDate: passed.interviewDate } : {}),
+	});
 }
 
 import { getValidUserId, hasRole } from "../../lib/permissions";
@@ -50,67 +83,6 @@ async function invalidateInternshipCaches(studentId: number) {
 		cacheInvalidatePattern("cache:students:*"),
 		cacheInvalidatePattern("cache:mahasiswa:*"),
 	]);
-}
-
-/**
- * Standard Helper to compute completed count and total items for Magang
- */
-/** Alur dokumen & istilah Suhan hanya berlaku untuk penempatan Taiwan. */
-export function isTaiwanDestination(destinationCountry?: string | null) {
-	return (destinationCountry || "").toLowerCase().includes("taiwan");
-}
-
-function getInternshipChecks(
-	internship: any,
-	isGapYear = false,
-	destinationCountry?: string | null,
-) {
-	const praPasporChecks = [
-		Boolean(internship?.praPasporPasFoto),
-		Boolean(internship?.praPasporKtm),
-		Boolean(internship?.praPasporKtp),
-		Boolean(internship?.praPasporKk),
-		Boolean(internship?.praPasporAktaKelahiran),
-		Boolean(internship?.praPasporSuratIzinOrtu),
-		Boolean(internship?.praPasporSl21),
-		Boolean(internship?.praPasporSkma || internship?.praPasporLos),
-		Boolean(internship?.praPasporRekomendasiDisdik),
-		Boolean(internship?.praPasporKhs),
-		Boolean(internship?.praPasporKrs),
-		Boolean(internship?.praPasporTranskrip),
-		Boolean(internship?.praPasporIjazah),
-		...(isGapYear ? [Boolean(internship?.praPasporGapYear)] : []),
-	];
-
-	const dokumenChecks = [
-		Boolean(internship?.passportReady),
-		Boolean(internship?.interviewReady),
-		Boolean(internship?.mouReady ?? internship?.moaReady),
-		Boolean(internship?.loaConfirmed),
-		Boolean(internship?.contractReady),
-		// Suhan = izin Biro Pariwisata Taiwan, hanya wajib untuk tujuan Taiwan
-		...(isTaiwanDestination(destinationCountry)
-			? [Boolean(internship?.suhanReady)]
-			: []),
-		Boolean(internship?.mcuReady),
-		Boolean(internship?.visaReady),
-		Boolean(internship?.ticketReady),
-		Boolean(internship?.asesmenReady ?? internship?.pdtReady),
-		Boolean(internship?.dokumentasiReady),
-		Boolean(internship?.agenReady),
-	];
-
-	const syaratAkhirChecks = [
-		Boolean(internship?.logbookReady),
-		Boolean(internship?.laporanAkhirReady),
-		Boolean(internship?.videoDokumentasiReady),
-	];
-
-	const all = [...praPasporChecks, ...dokumenChecks, ...syaratAkhirChecks];
-	const completed = all.filter(Boolean).length;
-	const total = all.length;
-
-	return { completed, total, isAllCompleted: completed === total };
 }
 
 export const internshipRoutes = new Elysia()
@@ -163,6 +135,9 @@ export const internshipRoutes = new Elysia()
 					result: body.result ?? "menunggu",
 				})
 				.returning();
+			if (row?.result === "lulus") {
+				await syncPassedInterviewToInternship(studentId);
+			}
 			await invalidateInternshipCaches(studentId);
 			return { success: true, data: row };
 		},
@@ -201,6 +176,9 @@ export const internshipRoutes = new Elysia()
 			if (!row) {
 				set.status = 404;
 				return { success: false, message: "Data wawancara tidak ditemukan" };
+			}
+			if (row.result === "lulus") {
+				await syncPassedInterviewToInternship(studentId);
 			}
 			await invalidateInternshipCaches(studentId);
 			return { success: true, data: row };
@@ -339,6 +317,23 @@ export const internshipRoutes = new Elysia()
 				return { success: false, message: "Forbidden" };
 			}
 
+			const agencyPaymentFields = [
+				"agenDpPaid",
+				"agenDpDate",
+				"agenDpNominal",
+				"agenPelunasanPaid",
+				"agenPelunasanDate",
+				"agenPelunasanNominal",
+			];
+			if (agencyPaymentFields.some((field) => Object.hasOwn(updates, field))) {
+				set.status = 403;
+				return {
+					success: false,
+					message:
+						"Pembayaran ke agensi mitra hanya dapat dicatat oleh Finance.",
+				};
+			}
+
 			// Convert string dates to Date objects if necessary
 			const dateFields = [
 				"passportExp",
@@ -354,11 +349,11 @@ export const internshipRoutes = new Elysia()
 				"mouDate",
 				"suhanDate",
 				"asesmenDate",
+				"asuransiBtnBpjsDate",
+				"asuransiPenempatanDate",
 				"estDepartureDate",
 				"danaTahap1Date",
 				"danaTahap2Date",
-				"agenDpDate",
-				"agenPelunasanDate",
 			];
 			for (const field of dateFields) {
 				if (updates[field]) {
@@ -464,33 +459,7 @@ export const internshipRoutes = new Elysia()
 			}
 
 			// Recalculate status
-			const current = await db.query.internshipData.findFirst({
-				where: eq(internshipData.studentId, id),
-			});
-			if (current) {
-				const pmbDataRow = await db.query.pmbData.findFirst({
-					where: eq(pmbData.studentId, id),
-				});
-				const isGapYear = pmbDataRow?.isGapYear || false;
-				const { completed, total } = getInternshipChecks(
-					current,
-					isGapYear,
-					await getDestinationCountry(id),
-				);
-
-				let newStatus: "ACC" | "AMAN" | "PROSES" | "BUTUH_PERHATIAN" =
-					"BUTUH_PERHATIAN";
-
-				if (current.isAcc) newStatus = "ACC";
-				else if (completed === total) newStatus = "AMAN";
-				else if (total > 0 && (completed / total) * 100 > 30)
-					newStatus = "PROSES";
-
-				await db
-					.update(internshipData)
-					.set({ status: newStatus })
-					.where(eq(internshipData.studentId, id));
-			}
+			await recalculateInternshipStatus(id);
 
 			await Promise.all([
 				cacheDel(`cache:student:${id}`),
@@ -568,17 +537,6 @@ export const internshipRoutes = new Elysia()
 				mitraPenempatanNama: t.Optional(t.Union([t.String(), t.Null()])),
 				agenNegaraTujuan: t.Optional(t.Union([t.String(), t.Null()])),
 				agenPeminatan: t.Optional(t.Union([t.String(), t.Null()])),
-				// Termin pembayaran kampus ke agensi
-				agenDpPaid: t.Optional(t.Boolean()),
-				agenDpDate: t.Optional(t.Union([t.String(), t.Null()])),
-				agenDpNominal: t.Optional(
-					t.Union([t.Integer({ minimum: 0 }), t.Null()]),
-				),
-				agenPelunasanPaid: t.Optional(t.Boolean()),
-				agenPelunasanDate: t.Optional(t.Union([t.String(), t.Null()])),
-				agenPelunasanNominal: t.Optional(
-					t.Union([t.Integer({ minimum: 0 }), t.Null()]),
-				),
 			}),
 		},
 	)

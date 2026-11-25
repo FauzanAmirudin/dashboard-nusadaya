@@ -20,6 +20,7 @@ interface TabSyaratAkhirProps {
 	handleToggleField: (field: string, value: any) => Promise<void> | void;
 	handleLocalChange: (field: string, value: any) => void;
 	handleBlurField: (field: string) => Promise<void> | void;
+	fetchInternshipData?: () => Promise<void>;
 }
 
 export function TabSyaratAkhir({
@@ -32,6 +33,7 @@ export function TabSyaratAkhir({
 	handleToggleField,
 	handleLocalChange,
 	handleBlurField,
+	fetchInternshipData,
 }: TabSyaratAkhirProps) {
 	const fetchDocs = () => {
 		api.students[studentId.toString()]["post-internship"].documents
@@ -39,6 +41,7 @@ export function TabSyaratAkhir({
 			.then((res) => {
 				if (res.data?.success) setPostInternshipDocs(res.data.data as any[]);
 			});
+		void fetchInternshipData?.();
 	};
 
 	const items = [

@@ -44,9 +44,11 @@ const RESULT_LABEL: Record<InterviewResult, string> = {
 export function InterviewList({
 	studentId,
 	canEdit,
+	onSaved,
 }: {
 	studentId: number;
 	canEdit: boolean;
+	onSaved?: () => Promise<void> | void;
 }) {
 	const [items, setItems] = useState<Interview[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -92,6 +94,7 @@ export function InterviewList({
 			await load(); // kembalikan ke data server
 		} else {
 			toast.success("Wawancara disimpan");
+			await onSaved?.();
 		}
 		setSavingId(null);
 	};
@@ -200,7 +203,7 @@ export function InterviewList({
 									</label>
 									<Input
 										id={`iv-partner-${it.id}`}
-										placeholder="Contoh: Grand Hyatt / Hong Ta"
+										placeholder="Contoh: Grand Hyatt Taipei"
 										className={rowInputClass}
 										value={it.partnerName ?? ""}
 										disabled={!canEdit}

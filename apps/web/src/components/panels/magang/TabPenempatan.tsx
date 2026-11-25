@@ -180,7 +180,7 @@ export function TabPenempatan({
 							>
 								<Input
 									id="f-mitraPenempatanNama"
-									placeholder="Contoh: Hong Ta / Flamboyan / MBM"
+									placeholder="Nama agensi / mitra penempatan"
 									className={rowInputClass}
 									value={(data?.mitraPenempatanNama as string) || ""}
 									disabled={!canEdit}
@@ -286,11 +286,20 @@ export function TabPenempatan({
 				<ChecklistRow
 					id="tabPenempatan-agenReady"
 					label="Mitra penempatan & lokasi magang sudah diverifikasi"
-					desc="Kuota dan departemen hotel sudah dikonfirmasi."
+					desc="Kuota dan departemen hotel sudah dikonfirmasi. Mengunggah dokumen otomatis menandai verifikasi."
 					checked={isVerified}
 					loading={isLoading}
 					disabled={!canEdit}
 					onCheckedChange={(checked) => handleToggleField("agenReady", checked)}
+					upload={
+						<DocumentUpload
+							studentId={studentId}
+							panel="magang"
+							documentKey="mitra_agen"
+							canEdit={canEdit}
+							onUploadSuccess={fetchInternshipData}
+						/>
+					}
 				/>
 			</ChecklistGroup>
 

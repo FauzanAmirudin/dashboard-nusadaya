@@ -29,7 +29,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -37,16 +39,20 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { DocumentUpload } from "@/components/ui/DocumentUpload";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { api } from "@/lib/eden";
+import { API_URL, api } from "@/lib/eden";
 import { useAuthStore } from "@/store";
 import { formatRupiah } from "@/utils/format";
 
 export default function MagangPanelMahasiswa() {
-	const { user, isAuthenticated, hasHydrated } = useAuthStore();
+	const { user, token, isAuthenticated, hasHydrated } = useAuthStore();
 	const [mounted, setMounted] = useState(false);
 	const [data, setData] = useState<any>(null);
 	const [loading, setLoading] = useState(true);
+	const [videoLink, setVideoLink] = useState("");
+	const [savingLink, setSavingLink] = useState(false);
 
 	useEffect(() => {
 		setMounted(true);
@@ -68,12 +74,41 @@ export default function MagangPanelMahasiswa() {
 		try {
 			const res = await api.mahasiswa.panel.magang.get();
 			if (res.data?.success) {
-				setData(res.data.data);
+				const d = res.data.data as any;
+				setData(d);
+				setVideoLink(d?.videoDokumentasiLink || "");
 			}
 		} catch (err) {
 			console.error("Gagal memuat data Magang:", err);
 		} finally {
 			if (showLoading) setLoading(false);
+		}
+	};
+
+	const handleSaveVideoLink = async () => {
+		setSavingLink(true);
+		try {
+			const res = await fetch(`${API_URL}/mahasiswa/magang/post-internship`, {
+				method: "PATCH",
+				headers: {
+					"Content-Type": "application/json",
+					...(token ? { Authorization: `Bearer ${token}` } : {}),
+				},
+				body: JSON.stringify({
+					videoDokumentasiLink: videoLink.trim() || null,
+				}),
+			});
+			const json = await res.json();
+			if (!res.ok || !json?.success) {
+				toast.error(json?.message || "Gagal menyimpan tautan video");
+				return;
+			}
+			toast.success("Tautan video portofolio tersimpan");
+			await fetchData(false);
+		} catch {
+			toast.error("Gagal menyimpan tautan video");
+		} finally {
+			setSavingLink(false);
 		}
 	};
 
@@ -183,6 +218,15 @@ export default function MagangPanelMahasiswa() {
 		{ key: "asesmenReady", label: "Asesmen & Pengarahan Keberangkatan" },
 		{ key: "dokumentasiReady", label: "Dokumentasi Keberangkatan" },
 		{ key: "agenReady", label: "Verifikasi Mitra Penempatan" },
+		{
+			key: "asuransiBtnBpjsReady",
+			label: "Asuransi BPJS TK (Bank BTN / Indonesia)",
+		},
+		{
+			key: "asuransiPenempatanReady",
+			label: "Asuransi Kecelakaan Kerja Penempatan",
+		},
+		{ key: "ahliWarisReady", label: "Verifikasi Ahli Waris Keluarga" },
 	];
 
 	const isMainItemChecked = (item: { key: string }) => {
@@ -357,7 +401,7 @@ export default function MagangPanelMahasiswa() {
 
 						<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 							{mainMagangItems.map((item) => {
-								const isChecked = Boolean(data?.[item.key]);
+								const isChecked = isMainItemChecked(item);
 								return (
 									<div key={item.key}>
 										{renderChecklistItem(item.label, isChecked)}
@@ -690,6 +734,142 @@ export default function MagangPanelMahasiswa() {
 								<p className="text-sm text-slate-500">
 									Belum ada dokumen magang yang diunggah.
 								</p>
+							</div>
+						)}
+					</div>
+
+					{/* Section 6: Syarat Akhir / Berkas Kepulangan (Pasca-Magang) */}
+					<div className="pt-6 border-t border-slate-100 space-y-4">
+						<div className="flex flex-wrap items-center justify-between gap-2">
+							<div>
+								<div className="flex items-center gap-2">
+									<FileCheck className="w-5 h-5 text-[#0517B0]" />
+									<h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+										Berkas Kepulangan (Pasca-Magang)
+									</h3>
+								</div>
+								<p className="text-xs text-slate-500 mt-1">
+									Diisi saat atau setelah menyelesaikan program magang.
+									Terhubung langsung dengan Panel Staf Magang.
+								</p>
+							</div>
+							{(() => {
+								const postDone = [
+									Boolean(data?.logbookReady),
+									Boolean(data?.laporanAkhirReady),
+									Boolean(data?.videoDokumentasiReady),
+								].filter(Boolean).length;
+								return (
+									<Badge
+										className={
+											postDone === 3
+												? "bg-emerald-100 text-emerald-800 border-0 text-xs font-semibold"
+												: "bg-slate-100 text-slate-700 border-0 text-xs font-semibold"
+										}
+									>
+										{postDone} / 3 selesai
+									</Badge>
+								);
+							})()}
+						</div>
+
+						{data?.studentId && (
+							<div className="space-y-3">
+								{[
+									{
+										key: "logbookReady",
+										docKey: "logbook",
+										title: "1. Logbook Harian Magang",
+										desc: "Buku harian kegiatan magang yang telah ditandatangani supervisor industri (PDF).",
+									},
+									{
+										key: "laporanAkhirReady",
+										docKey: "laporan_akhir",
+										title: "2. Laporan Akhir Magang",
+										desc: "Laporan akhir pelaksanaan magang industri sesuai format kampus (PDF).",
+									},
+									{
+										key: "videoDokumentasiReady",
+										docKey: "video_portofolio",
+										title: "3. Video Portofolio / Luaran",
+										desc: "Tautan video YouTube / Google Drive dan dokumen ringkasan luaran magang (PDF).",
+									},
+								].map((item) => {
+									const ready = Boolean(data?.[item.key]);
+									return (
+										<div
+											key={item.key}
+											className={`rounded-xl border p-4 space-y-3 ${
+												ready
+													? "border-emerald-200 bg-emerald-50/40"
+													: "border-slate-200 bg-slate-50/50"
+											}`}
+										>
+											<div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+												<div className="space-y-1 flex-1 min-w-0">
+													<div className="flex items-center gap-2 flex-wrap">
+														<p className="text-sm font-semibold text-slate-900">
+															{item.title}
+														</p>
+														{ready ? (
+															<Badge className="bg-emerald-100 text-emerald-800 border-0 text-[10px]">
+																<CheckCircle2 className="w-3 h-3 mr-1" /> Siap
+															</Badge>
+														) : (
+															<Badge
+																variant="outline"
+																className="text-slate-500 bg-white border-slate-200 text-[10px]"
+															>
+																<Clock className="w-3 h-3 mr-1" /> Belum
+															</Badge>
+														)}
+													</div>
+													<p className="text-xs text-slate-500">{item.desc}</p>
+													{item.key === "videoDokumentasiReady" && (
+														<div className="pt-2 space-y-1.5 max-w-md">
+															<label
+																htmlFor="mhs-videoDokumentasiLink"
+																className="block text-xs font-medium text-slate-700"
+															>
+																Link Video Portofolio
+															</label>
+															<div className="flex gap-2">
+																<Input
+																	id="mhs-videoDokumentasiLink"
+																	placeholder="https://youtube.com/... atau Drive"
+																	value={videoLink}
+																	onChange={(e) => setVideoLink(e.target.value)}
+																	className="h-9 text-xs bg-white"
+																/>
+																<Button
+																	type="button"
+																	size="sm"
+																	variant="outline"
+																	disabled={savingLink}
+																	onClick={handleSaveVideoLink}
+																	className="h-9 shrink-0 text-xs font-semibold"
+																>
+																	{savingLink
+																		? "Menyimpan..."
+																		: "Simpan Tautan"}
+																</Button>
+															</div>
+														</div>
+													)}
+												</div>
+												<div className="w-full md:w-72 shrink-0">
+													<DocumentUpload
+														studentId={data.studentId}
+														panel="post-internship"
+														documentKey={item.docKey}
+														canEdit={true}
+														onUploadSuccess={() => fetchData(false)}
+													/>
+												</div>
+											</div>
+										</div>
+									);
+								})}
 							</div>
 						)}
 					</div>

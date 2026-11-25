@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useStudentDetail } from "@/hooks/useStudentsList";
 import { api } from "@/lib/eden";
 import { hasRole, useAuthStore } from "@/store";
 import { formatDeviceDateTime } from "@/utils/format";
@@ -90,6 +91,18 @@ interface InternshipData {
 	asesmenResult?: string | null;
 	asesmenNotes?: string | null;
 	asesmenPernyataanReady?: boolean;
+	asuransiBtnBpjsReady?: boolean;
+	asuransiBtnBpjsNo?: string | null;
+	asuransiBtnBpjsDate?: string | null;
+	asuransiPenempatanReady?: boolean;
+	asuransiPenempatanProvider?: string | null;
+	asuransiPenempatanNo?: string | null;
+	asuransiPenempatanDate?: string | null;
+	ahliWarisReady?: boolean;
+	ahliWarisNama?: string | null;
+	ahliWarisHubungan?: string | null;
+	ahliWarisKontak?: string | null;
+	ahliWarisNotes?: string | null;
 	destinationCity: string | null;
 	internshipDuration: string | null;
 	internshipCompany: string | null;
@@ -142,7 +155,43 @@ export function InternshipPanel({
 	);
 	// Hak ACC sama dengan server (POST/DELETE /internship/acc)
 	const canAcc = hasRole(user, "magang", "internship", "superadmin");
+	const { data: studentDetail } = useStudentDetail(studentId);
 	const [data, setData] = useState<InternshipData | null>(null);
+
+	const studentRecord = studentDetail?.student as
+		| {
+				emergencyContactName?: string | null;
+				emergencyContactRelation?: string | null;
+				emergencyContactPhone?: string | null;
+		  }
+		| undefined;
+	const firstParent = Array.isArray(studentDetail?.parents)
+		? (
+				studentDetail.parents as Array<{
+					type?: string | null;
+					name?: string | null;
+					phone?: string | null;
+				}>
+			).find((p) => Boolean(p?.name))
+		: undefined;
+	const emergencyContact = studentRecord?.emergencyContactName
+		? {
+				name: studentRecord.emergencyContactName,
+				relation: studentRecord.emergencyContactRelation || "Keluarga",
+				phone: studentRecord.emergencyContactPhone || "",
+			}
+		: firstParent?.name
+			? {
+					name: firstParent.name,
+					relation:
+						firstParent.type === "ayah"
+							? "Ayah"
+							: firstParent.type === "ibu"
+								? "Ibu"
+								: "Wali",
+					phone: firstParent.phone || "",
+				}
+			: null;
 
 	const canEdit = isMagang;
 	const canEditPostInternship = isMagang;
@@ -278,10 +327,15 @@ export function InternshipPanel({
 		setLoadingItem(field);
 		const prevVal = data ? (data as any)[field] : undefined;
 
-		// Optimistic update
-		setData((prev) =>
-			prev ? ({ ...prev, [field]: value } as InternshipData) : null,
-		);
+		// Optimistic update (cerminkan pasangan legacy lokal tanpa kirim PATCH ganda)
+		setData((prev) => {
+			if (!prev) return null;
+			const next = { ...prev, [field]: value } as InternshipData;
+			if (field === "praPasporSkma") next.praPasporLos = Boolean(value);
+			if (field === "mouReady") next.moaReady = Boolean(value);
+			if (field === "asesmenReady") next.pdtReady = Boolean(value);
+			return next;
+		});
 
 		const { error } = await api.students[studentId.toString()].internship.patch(
 			{
@@ -381,18 +435,14 @@ export function InternshipPanel({
 			? "Prasyarat belum terpenuhi"
 			: !req.praPaspor.ok
 				? "Lengkapi Pra-Paspor"
-				: !req.dokumen.ok
-					? "Lengkapi Dokumen Keberangkatan"
-					: "Lengkapi Syarat Akhir";
+				: "Lengkapi Dokumen Keberangkatan";
 
-	// Tab pertama yang belum lengkap dibuka otomatis
+	// Tab pertama yang belum lengkap dibuka otomatis (pra-keberangkatan)
 	const defaultTab = !req.praPaspor.ok
 		? "pra-paspor"
 		: !req.dokumen.ok
 			? "dokumen"
-			: !req.syaratAkhir.ok
-				? "syarat-akhir"
-				: "pra-paspor";
+			: "pra-paspor";
 
 	const accButton = (extraClass = "") => (
 		<Button
@@ -408,7 +458,13 @@ export function InternshipPanel({
 		</Button>
 	);
 
-	const requirementRows = [
+	const requirementRows: Array<{
+		key: string;
+		label: string;
+		ok: boolean;
+		optional?: boolean;
+		detail: string;
+	}> = [
 		{
 			key: "pra-paspor",
 			label: "Pra-Paspor",
@@ -423,9 +479,10 @@ export function InternshipPanel({
 		},
 		{
 			key: "syarat-akhir",
-			label: "Syarat Akhir",
+			label: "Syarat Akhir (Pasca-Magang)",
 			ok: req.syaratAkhir.ok,
-			detail: `${req.syaratAkhir.done}/${req.syaratAkhir.total} berkas kepulangan`,
+			optional: true,
+			detail: `${req.syaratAkhir.done}/${req.syaratAkhir.total} berkas kepulangan · tidak mengunci ACC`,
 		},
 	];
 
@@ -514,20 +571,32 @@ export function InternshipPanel({
 							) : req.ok ? (
 								"Semua syarat terpenuhi. Siap diberi ACC."
 							) : (
-								"ACC bisa diberikan setelah ketiga kelompok di bawah lengkap."
+								"ACC keberangkatan bisa diberikan setelah Pra-Paspor dan Dokumen Keberangkatan lengkap."
 							)}
 						</p>
 						<ul className="mt-3 grid gap-2 sm:grid-cols-3">
 							{requirementRows.map((r) => (
 								<li
 									key={r.key}
-									className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 ${r.ok ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-white"}`}
+									className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 ${
+										r.ok
+											? "border-emerald-200 bg-emerald-50"
+											: r.optional
+												? "border-slate-200 bg-white/80"
+												: "border-amber-200 bg-white"
+									}`}
 								>
 									<span
 										aria-hidden="true"
-										className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${r.ok ? "bg-emerald-500 text-white" : "bg-amber-100 text-amber-700"}`}
+										className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+											r.ok
+												? "bg-emerald-500 text-white"
+												: r.optional
+													? "bg-slate-100 text-slate-600"
+													: "bg-amber-100 text-amber-700"
+										}`}
 									>
-										{r.ok ? "✓" : "!"}
+										{r.ok ? "✓" : r.optional ? "•" : "!"}
 									</span>
 									<span className="min-w-0">
 										<span className="block text-sm font-semibold text-slate-900">
@@ -679,6 +748,9 @@ export function InternshipPanel({
 						handleToggleField={handleToggleField}
 						handleLocalChange={handleLocalChange}
 						handleBlurField={handleBlurField}
+						handleSaveFields={handleSaveFields}
+						onOpenPenempatan={() => setActiveTab("penempatan")}
+						emergencyContact={emergencyContact}
 						fetchInternshipData={fetchInternshipData}
 						notes={notes}
 						setNotes={setNotes}
@@ -710,6 +782,7 @@ export function InternshipPanel({
 						handleToggleField={handleToggleField}
 						handleLocalChange={handleLocalChange}
 						handleBlurField={handleBlurField}
+						fetchInternshipData={fetchInternshipData}
 					/>
 				</TabsContent>
 			</Tabs>

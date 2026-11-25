@@ -1,8 +1,13 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import type React from "react";
 import { Button } from "@/components/ui/button";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { DocumentUpload } from "@/components/ui/DocumentUpload";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,6 +32,12 @@ import {
 } from "./ChecklistRow";
 import { InterviewList } from "./InterviewList";
 
+interface EmergencyContactSummary {
+	name: string;
+	relation: string;
+	phone: string;
+}
+
 interface TabDokumenProps {
 	studentId: number;
 	data: any;
@@ -36,6 +47,9 @@ interface TabDokumenProps {
 	handleToggleField: (field: string, value: any) => Promise<void> | void;
 	handleLocalChange: (field: string, value: any) => void;
 	handleBlurField: (field: string) => Promise<void> | void;
+	handleSaveFields?: (patch: Record<string, unknown>) => Promise<boolean>;
+	onOpenPenempatan?: () => void;
+	emergencyContact?: EmergencyContactSummary | null;
 	fetchInternshipData: () => Promise<void>;
 	notes: string;
 	setNotes: (val: string) => void;
@@ -52,6 +66,9 @@ export function TabDokumen({
 	handleToggleField,
 	handleLocalChange,
 	handleBlurField,
+	handleSaveFields,
+	onOpenPenempatan,
+	emergencyContact,
 	fetchInternshipData,
 	notes,
 	setNotes,
@@ -186,6 +203,12 @@ export function TabDokumen({
 	const taiwanKeys = TAIWAN_STEPS.map(([k]) => k);
 	// --- Grup 3: Keberangkatan ---
 	const keberangkatanKeys = ["asesmenReady", "dokumentasiReady", "agenReady"];
+	// --- Grup 4: Asuransi & Ahli Waris (wajib sebelum ACC) ---
+	const asuransiAhliWarisKeys = [
+		"asuransiBtnBpjsReady",
+		"asuransiPenempatanReady",
+		"ahliWarisReady",
+	];
 	const countDone = (keys: string[]) =>
 		keys.filter((k) => isChecklistDone(k)).length;
 
@@ -225,7 +248,8 @@ export function TabDokumen({
 				))}
 			</ul>
 			<p className="mt-1 text-xs text-amber-800">
-				Catat di tab Pembayaran Lanjutan.
+				Diproses &amp; dicatat oleh Finance — pantau statusnya di tab Pembayaran
+				Lanjutan.
 			</p>
 		</section>
 	) : null;
@@ -256,8 +280,12 @@ export function TabDokumen({
 				{row(
 					"interviewReady",
 					"Wawancara User (Interview)",
-					"Wawancara dengan hotel atau agent, bisa lebih dari satu kali. Centang bila sudah lolos.",
-					<InterviewList studentId={studentId} canEdit={canEdit} />,
+					"Wawancara dengan hotel atau agent, bisa lebih dari satu kali. Otomatis tercentang jika ada yang Lulus.",
+					<InterviewList
+						studentId={studentId}
+						canEdit={canEdit}
+						onSaved={fetchInternshipData}
+					/>,
 					upload("interview"),
 				)}
 			</ChecklistGroup>
@@ -267,7 +295,7 @@ export function TabDokumen({
 				done={countDone(taiwanKeys)}
 				total={taiwanKeys.length}
 			>
-				{/* MOU disimpan ganda ke field lama MOA (kompatibilitas data) */}
+				{/* MOU disinkronkan ke field lama MOA oleh server */}
 				<ChecklistRow
 					id="mouReady"
 					label="MOU Kampus & Hotel Mitra"
@@ -278,7 +306,6 @@ export function TabDokumen({
 					disabled={!canEdit}
 					onCheckedChange={(checked) => {
 						handleToggleField("mouReady", checked);
-						handleToggleField("moaReady", checked);
 					}}
 					upload={upload("mou")}
 				>
@@ -298,7 +325,6 @@ export function TabDokumen({
 									}}
 									onBlur={() => {
 										handleBlurField("mouDate");
-										handleBlurField("moaDate");
 									}}
 								/>
 							</RowField>
@@ -315,7 +341,6 @@ export function TabDokumen({
 									}}
 									onBlur={() => {
 										handleBlurField("mouNotes");
-										handleBlurField("moaNotes");
 									}}
 								/>
 							</RowField>
@@ -420,7 +445,7 @@ export function TabDokumen({
 				done={countDone(keberangkatanKeys)}
 				total={keberangkatanKeys.length}
 			>
-				{/* Asesmen disimpan ganda ke field lama PDT (kompatibilitas data) */}
+				{/* Asesmen disinkronkan ke field lama PDT oleh server */}
 				<ChecklistRow
 					id="asesmenReady"
 					label="Asesmen & Pengarahan Keberangkatan"
@@ -430,7 +455,6 @@ export function TabDokumen({
 					disabled={!canEdit}
 					onCheckedChange={(checked) => {
 						handleToggleField("asesmenReady", checked);
-						handleToggleField("pdtReady", checked);
 					}}
 					upload={
 						<>
@@ -470,7 +494,6 @@ export function TabDokumen({
 									}}
 									onBlur={() => {
 										handleBlurField("asesmenDate");
-										handleBlurField("pdtDate");
 									}}
 								/>
 							</RowField>
@@ -491,36 +514,207 @@ export function TabDokumen({
 					upload("dokumentasi_keberangkatan"),
 				)}
 
+				<li
+					className={`px-4 py-4 sm:px-6 transition-colors ${isChecklistDone("agenReady") ? "bg-emerald-50/60" : "bg-white"}`}
+				>
+					<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+						<div className="min-w-0 flex-1 space-y-2">
+							<div className="flex flex-wrap items-center gap-2">
+								<span className="text-sm font-semibold text-slate-900">
+									Mitra Penempatan &amp; Dokumen Tambahan
+								</span>
+								<span
+									className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${
+										isChecklistDone("agenReady")
+											? "border-emerald-200 bg-emerald-100 text-emerald-800"
+											: "border-amber-200 bg-amber-50 text-amber-800"
+									}`}
+								>
+									{isChecklistDone("agenReady")
+										? "Terverifikasi"
+										: "Belum diverifikasi"}
+								</span>
+							</div>
+							<p className="text-xs text-slate-500">
+								Diisi satu kali di tab Penempatan (otomatis tersinkron ke sini).
+							</p>
+							<div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200/80 bg-slate-50/70 p-2.5 text-xs sm:grid-cols-4">
+								<div>
+									<span className="block text-slate-500">
+										Perusahaan / Hotel
+									</span>
+									<span className="font-medium text-slate-800">
+										{data?.internshipCompany || "-"}
+									</span>
+								</div>
+								<div>
+									<span className="block text-slate-500">Kota Tujuan</span>
+									<span className="font-medium text-slate-800">
+										{data?.destinationCity || "-"}
+									</span>
+								</div>
+								<div>
+									<span className="block text-slate-500">Durasi</span>
+									<span className="font-medium text-slate-800">
+										{data?.internshipDuration || "-"}
+									</span>
+								</div>
+								<div>
+									<span className="block text-slate-500">Departemen</span>
+									<span className="font-medium text-slate-800">
+										{data?.agenPeminatan || "-"}
+									</span>
+								</div>
+							</div>
+						</div>
+						{onOpenPenempatan && (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={onOpenPenempatan}
+								className="h-9 shrink-0 border-blue-200 text-xs font-semibold text-[#0517B0] hover:bg-blue-50"
+							>
+								Atur di Tab Penempatan
+							</Button>
+						)}
+					</div>
+				</li>
+			</ChecklistGroup>
+
+			<ChecklistGroup
+				title="Asuransi & Ahli Waris"
+				done={countDone(asuransiAhliWarisKeys)}
+				total={asuransiAhliWarisKeys.length}
+			>
 				{row(
-					"agenReady",
-					"Mitra Penempatan & Dokumen Tambahan",
-					"",
+					"asuransiBtnBpjsReady",
+					"BPJS Ketenagakerjaan (BTN / Mandiri)",
+					"Kepesertaan asuransi ketenagakerjaan Indonesia.",
 					grid(
 						2,
 						<>
 							{textField(
-								"internshipCompany",
-								"Perusahaan Magang",
-								"Nama Hotel / Resto",
+								"asuransiBtnBpjsNo",
+								"Nomor KPJ / Polis",
+								"Contoh: 24012345678",
 							)}
-							{textField(
-								"destinationCity",
-								"Kota Tujuan",
-								"Kuala Lumpur / Taipei / dll",
-							)}
-							{textField(
-								"internshipDuration",
-								"Durasi Magang",
-								"6 Bulan / 1 Tahun",
-							)}
-							{textField(
-								"agenPeminatan",
-								"Peminatan / Posisi",
-								"Hospitality / Barista",
-							)}
+							{dateField("asuransiBtnBpjsDate", "Tanggal Aktif")}
 						</>,
 					),
-					upload("mitra_agen"),
+					upload("asuransi_btn_bpjs"),
+				)}
+
+				{row(
+					"asuransiPenempatanReady",
+					"Asuransi Kerja Penempatan",
+					"Asuransi kecelakaan kerja lokal di negara tujuan.",
+					grid(
+						2,
+						<>
+							{textField(
+								"asuransiPenempatanProvider",
+								"Penyelenggara / Mitra",
+								"Nama penyedia / mitra asuransi",
+							)}
+							{textField(
+								"asuransiPenempatanNo",
+								"Nomor Polis",
+								"Contoh: TW-INS-2026-001",
+							)}
+							{dateField("asuransiPenempatanDate", "Tanggal Berlaku")}
+						</>,
+					),
+					upload("asuransi_penempatan"),
+				)}
+
+				{row(
+					"ahliWarisReady",
+					"Ahli Waris Keluarga",
+					"Identitas penerima santunan sesuai KK / Akta.",
+					<div className="space-y-3">
+						{canEdit && emergencyContact?.name && (
+							<div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2">
+								<p className="text-xs text-slate-700">
+									Kontak darurat PMB:{" "}
+									<span className="font-semibold text-slate-900">
+										{emergencyContact.name}
+									</span>{" "}
+									({emergencyContact.relation}
+									{emergencyContact.phone ? ` · ${emergencyContact.phone}` : ""}
+									)
+								</p>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									disabled={isSaving}
+									onClick={async () => {
+										const patch = {
+											ahliWarisNama: emergencyContact.name,
+											ahliWarisHubungan: emergencyContact.relation,
+											ahliWarisKontak: emergencyContact.phone || null,
+										};
+										handleLocalChange("ahliWarisNama", patch.ahliWarisNama);
+										handleLocalChange(
+											"ahliWarisHubungan",
+											patch.ahliWarisHubungan,
+										);
+										handleLocalChange(
+											"ahliWarisKontak",
+											patch.ahliWarisKontak ?? "",
+										);
+										if (handleSaveFields) {
+											await handleSaveFields(patch);
+										}
+									}}
+									className="h-8 border-blue-200 bg-white text-xs font-semibold text-[#0517B0] hover:bg-blue-50"
+								>
+									Salin dari Kontak Darurat PMB
+								</Button>
+							</div>
+						)}
+						{grid(
+							2,
+							<>
+								{textField(
+									"ahliWarisNama",
+									"Nama Ahli Waris",
+									"Sesuai KTP / KK",
+								)}
+								{textField(
+									"ahliWarisHubungan",
+									"Hubungan",
+									"Ayah / Ibu / Wali",
+								)}
+								{textField(
+									"ahliWarisKontak",
+									"No. HP / Rekening",
+									"Contoh: 081234567890",
+								)}
+								{textField(
+									"ahliWarisNotes",
+									"Catatan SOP Mitra",
+									"Catatan tambahan ahli waris",
+								)}
+							</>,
+						)}
+						<Collapsible defaultOpen={false}>
+							<CollapsibleTrigger className="group inline-flex min-h-11 items-center gap-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0517B0]/40">
+								Ketentuan ahli waris
+								<ChevronDown className="size-3.5 transition-transform group-data-[panel-open]:rotate-180" />
+							</CollapsibleTrigger>
+							<CollapsibleContent>
+								<p className="pb-1 text-xs leading-relaxed text-slate-500">
+									Pencatatan ini hanya untuk acuan penyaluran santunan ke
+									keluarga di Indonesia. Penetapan ahli waris merupakan ranah
+									agensi asuransi dan hukum keluarga; kampus tidak
+									menandatangani surat penetapan ahli waris.
+								</p>
+							</CollapsibleContent>
+						</Collapsible>
+					</div>,
+					upload("surat_keterangan_ahli_waris"),
 				)}
 			</ChecklistGroup>
 

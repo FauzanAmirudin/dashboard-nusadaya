@@ -32,6 +32,7 @@ import {
 	pmbData,
 	pmbDocuments,
 	pmbPaymentPlan,
+	postInternshipDocs,
 	students,
 	users,
 	vocabLogs,
@@ -42,6 +43,10 @@ import {
 	cacheInvalidatePattern,
 	cacheSet,
 } from "../lib/cache";
+import {
+	invalidateMagangCaches,
+	upsertInternshipFlags,
+} from "../lib/magang-sync";
 import { PMB_REQUIRED_DOC_FIELDS } from "../lib/pmb-acc-requirements";
 import { GradeCalculationService } from "../modules/academic/grade-calculation.service";
 import { fileService } from "../modules/file/service/file.service";
@@ -516,7 +521,7 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 		const praPasporCompleted = praPasporChecklist.filter(Boolean).length;
 		const praPasporPercent = Math.round((praPasporCompleted / 14) * 100);
 
-		// 12 dokumen keberangkatan — sama dengan getInternshipChecks (routes/student/internship.ts)
+		// 15 dokumen keberangkatan & jaminan — sama dengan getInternshipChecks (routes/student/internship.ts)
 		const mainMagangChecklist = [
 			internship?.passportReady,
 			internship?.interviewReady,
@@ -530,9 +535,14 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 			internship?.asesmenReady ?? internship?.pdtReady,
 			internship?.dokumentasiReady,
 			internship?.agenReady,
+			internship?.asuransiBtnBpjsReady,
+			internship?.asuransiPenempatanReady,
+			internship?.ahliWarisReady,
 		];
 		const mainMagangCompleted = mainMagangChecklist.filter(Boolean).length;
-		const mainMagangPercent = Math.round((mainMagangCompleted / 12) * 100);
+		const mainMagangPercent = Math.round(
+			(mainMagangCompleted / mainMagangChecklist.length) * 100,
+		);
 
 		const responseData = {
 			pmb: {
@@ -1387,7 +1397,7 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				})),
 			};
 		} else if (panelKey === "magang") {
-			const [magang, decision, documents] = await Promise.all([
+			const [magang, decision, documents, postDocs] = await Promise.all([
 				db.query.internshipData.findFirst({
 					where: eq(internshipData.studentId, studentData.id),
 				}),
@@ -1397,9 +1407,13 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				db.query.internshipDocuments.findMany({
 					where: eq(internshipDocuments.studentId, studentData.id),
 				}),
+				db.query.postInternshipDocs.findMany({
+					where: eq(postInternshipDocs.studentId, studentData.id),
+				}),
 			]);
 
 			data = {
+				studentId: studentData.id,
 				// 0. Pra-Paspor (14 Berkas)
 				praPasporPasFoto: magang?.praPasporPasFoto ?? false,
 				praPasporKtm: magang?.praPasporKtm ?? false,
@@ -1491,6 +1505,21 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 				asesmenResult: magang?.asesmenResult,
 				asesmenNotes: magang?.asesmenNotes,
 				asesmenPernyataanReady: magang?.asesmenPernyataanReady ?? false,
+				dokumentasiReady: magang?.dokumentasiReady ?? false,
+				dokumentasiKeberangkatanLink: magang?.dokumentasiKeberangkatanLink,
+				// Asuransi & Ahli Waris (Segmen 22-24)
+				asuransiBtnBpjsReady: magang?.asuransiBtnBpjsReady ?? false,
+				asuransiBtnBpjsNo: magang?.asuransiBtnBpjsNo,
+				asuransiBtnBpjsDate: magang?.asuransiBtnBpjsDate,
+				asuransiPenempatanReady: magang?.asuransiPenempatanReady ?? false,
+				asuransiPenempatanProvider: magang?.asuransiPenempatanProvider,
+				asuransiPenempatanNo: magang?.asuransiPenempatanNo,
+				asuransiPenempatanDate: magang?.asuransiPenempatanDate,
+				ahliWarisReady: magang?.ahliWarisReady ?? false,
+				ahliWarisNama: magang?.ahliWarisNama,
+				ahliWarisHubungan: magang?.ahliWarisHubungan,
+				ahliWarisKontak: magang?.ahliWarisKontak,
+				ahliWarisNotes: magang?.ahliWarisNotes,
 				// Syarat Akhir
 				logbookReady: magang?.logbookReady ?? false,
 				laporanAkhirReady: magang?.laporanAkhirReady ?? false,
@@ -1521,6 +1550,13 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 					fileName: d.fileName,
 					fileUrl: d.fileUrl,
 					isVerified: d.isVerified,
+					uploadedAt: d.uploadedAt,
+				})),
+				postInternshipDocs: postDocs.map((d) => ({
+					id: d.id,
+					documentKey: d.documentKey,
+					fileName: d.fileName,
+					fileUrl: d.fileUrl,
 					uploadedAt: d.uploadedAt,
 				})),
 			};
@@ -1613,6 +1649,43 @@ export const mahasiswaRouter = new Elysia({ prefix: "/mahasiswa" })
 
 		return { success: true, data };
 	})
+	.patch(
+		"/magang/post-internship",
+		async ({ user, body, set }: any) => {
+			if (!user) {
+				set.status = 401;
+				return { success: false, message: "Unauthorized" };
+			}
+			const studentData = await db.query.students.findFirst({
+				where: eq(students.studentUserId, user.id),
+				columns: { id: true },
+			});
+			if (!studentData) {
+				set.status = 404;
+				return { success: false, message: "Data mahasiswa tidak ditemukan" };
+			}
+
+			const linkVal =
+				typeof body?.videoDokumentasiLink === "string"
+					? body.videoDokumentasiLink.trim() || null
+					: null;
+			await upsertInternshipFlags(studentData.id, {
+				videoDokumentasiLink: linkVal,
+			});
+			await invalidateMagangCaches(studentData.id);
+			await cacheInvalidatePattern(`cache:mahasiswa:${user.id}:*`);
+
+			return {
+				success: true,
+				message: "Tautan video portofolio berhasil disimpan",
+			};
+		},
+		{
+			body: t.Object({
+				videoDokumentasiLink: t.Optional(t.Union([t.String(), t.Null()])),
+			}),
+		},
+	)
 	.post(
 		"/panel/crm/pramagang-video",
 		async ({ user, body, set }: any) => {
