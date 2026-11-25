@@ -42,7 +42,7 @@ import {
 	computeFinanceAccRequirements,
 	parseTidakBerlaku,
 } from "../../lib/finance-acc-requirements";
-import { getValidUserId, hasRole } from "../../lib/permissions";
+import { type AuthUser, getValidUserId, hasRole } from "../../lib/permissions";
 import { applyDpVerification } from "../../lib/student-activation";
 import { requireRole } from "../../middleware/rbac";
 
@@ -115,52 +115,15 @@ export const financeRoutes = new Elysia()
 			}
 
 			const isFinance = hasRole(user, "finance");
-			const isMagang = hasRole(user, "magang");
 			const isPmb = hasRole(user, "pmb");
 			const isSuper = user.role === "superadmin";
 
-			if (!isFinance && !isMagang && !isPmb && !isSuper) {
+			if (!isFinance && !isPmb && !isSuper) {
 				set.status = 403;
 				return { success: false, message: "Forbidden" };
 			}
 			const id = Number(params.id);
 			const updates = body as Record<string, any>;
-
-			if (isMagang && !isFinance && !isSuper) {
-				const allowedKeys = [
-					"t1SemesterNominalTotal",
-					"t1SemesterPaidDate",
-					"danaT1Notes",
-					"t1SemesterStatus",
-					"t2KeberangkatanNominal",
-					"t2KeberangkatanPaidDate",
-					"danaT2Notes",
-					"t2KeberangkatanStatus",
-					"adminTalaganBankTujuan",
-					"adminTalaganMetode",
-					"kontrakMagangStatus",
-					"kontrakMagangPaidDate",
-					"kontrakMagangBuktiBayarUrl",
-					"suhanStatus",
-					"suhanPaidDate",
-					"suhanBuktiBayarUrl",
-					"talanganTipe",
-					"talanganTotalPengajuan",
-					"talanganLembaga",
-					"talanganNotes",
-				];
-				const hasForbiddenKey = Object.keys(updates).some(
-					(k) => !allowedKeys.includes(k),
-				);
-				if (hasForbiddenKey) {
-					set.status = 403;
-					return {
-						success: false,
-						message:
-							"Tim Magang hanya dapat mengupdate data Dana Talangan & Dokumen Magang",
-					};
-				}
-			}
 
 			// Total Biaya Pendidikan hanya bisa di-edit oleh PMB / Superadmin
 			if (user.role !== "superadmin" && user.role !== "pmb") {
@@ -1410,5 +1373,124 @@ export const financeRoutes = new Elysia()
 			await invalidateFinanceCaches(studentId);
 
 			return { success: true };
+		},
+	)
+	.patch(
+		"/:id/finance/agency-payments",
+		async (context) => {
+			const { params, body, set } = context;
+			const user = (context as { user?: AuthUser }).user ?? null;
+
+			if (!user) {
+				set.status = 401;
+				return { success: false, message: "Unauthorized" };
+			}
+			if (!hasRole(user, "finance", "superadmin")) {
+				set.status = 403;
+				return { success: false, message: "Forbidden" };
+			}
+
+			const studentId = Number(params.id);
+			if (!Number.isInteger(studentId) || studentId <= 0) {
+				set.status = 400;
+				return { success: false, message: "ID mahasiswa tidak valid" };
+			}
+
+			const updates: Partial<typeof internshipData.$inferInsert> = {
+				updatedAt: new Date(),
+			};
+
+			if (body.agenDpPaid !== undefined) {
+				updates.agenDpPaid = body.agenDpPaid;
+			}
+			if (body.agenDpDate !== undefined) {
+				if (body.agenDpDate === null || body.agenDpDate === "") {
+					updates.agenDpDate = null;
+				} else {
+					const parsed = new Date(body.agenDpDate);
+					if (Number.isNaN(parsed.getTime())) {
+						set.status = 400;
+						return {
+							success: false,
+							message: "Tanggal DP agensi tidak valid",
+						};
+					}
+					updates.agenDpDate = parsed;
+				}
+			}
+			if (body.agenDpNominal !== undefined) {
+				updates.agenDpNominal = body.agenDpNominal;
+			}
+
+			if (body.agenPelunasanPaid !== undefined) {
+				updates.agenPelunasanPaid = body.agenPelunasanPaid;
+			}
+			if (body.agenPelunasanDate !== undefined) {
+				if (body.agenPelunasanDate === null || body.agenPelunasanDate === "") {
+					updates.agenPelunasanDate = null;
+				} else {
+					const parsed = new Date(body.agenPelunasanDate);
+					if (Number.isNaN(parsed.getTime())) {
+						set.status = 400;
+						return {
+							success: false,
+							message: "Tanggal pelunasan agensi tidak valid",
+						};
+					}
+					updates.agenPelunasanDate = parsed;
+				}
+			}
+			if (body.agenPelunasanNominal !== undefined) {
+				updates.agenPelunasanNominal = body.agenPelunasanNominal;
+			}
+
+			const existing = await db.query.internshipData.findFirst({
+				where: eq(internshipData.studentId, studentId),
+			});
+
+			let saved: typeof internshipData.$inferSelect | undefined;
+			if (!existing) {
+				[saved] = await db
+					.insert(internshipData)
+					.values({
+						studentId,
+						...updates,
+					})
+					.returning();
+			} else {
+				[saved] = await db
+					.update(internshipData)
+					.set(updates)
+					.where(eq(internshipData.studentId, studentId))
+					.returning();
+			}
+
+			await invalidateFinanceCaches(studentId);
+
+			return {
+				success: true,
+				data: {
+					agenDpPaid: Boolean(saved?.agenDpPaid),
+					agenDpDate: saved?.agenDpDate ?? null,
+					agenDpNominal: saved?.agenDpNominal ?? null,
+					agenPelunasanPaid: Boolean(saved?.agenPelunasanPaid),
+					agenPelunasanDate: saved?.agenPelunasanDate ?? null,
+					agenPelunasanNominal: saved?.agenPelunasanNominal ?? null,
+				},
+			};
+		},
+		{
+			body: t.Object({
+				agenDpPaid: t.Optional(t.Boolean()),
+				agenDpDate: t.Optional(t.Union([t.String(), t.Null()])),
+				agenDpNominal: t.Optional(
+					t.Union([t.Integer({ minimum: 0 }), t.Null()]),
+				),
+				agenPelunasanPaid: t.Optional(t.Boolean()),
+				agenPelunasanDate: t.Optional(t.Union([t.String(), t.Null()])),
+				agenPelunasanNominal: t.Optional(
+					t.Union([t.Integer({ minimum: 0 }), t.Null()]),
+				),
+			}),
 		},
 	);

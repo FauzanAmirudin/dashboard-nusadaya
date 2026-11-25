@@ -1,7 +1,6 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Building2, CheckCircle2, Clock } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -15,13 +14,10 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { API_URL, getToken } from "@/lib/eden";
-import { formatDate, formatRupiah } from "@/utils/format";
-import {
-	type AgencyPaymentInternshipLike,
-	getAgencyPaymentTermsSummary,
-} from "@/utils/panel-logic";
+import { formatRupiah } from "@/utils/format";
+import type { AgencyPaymentInternshipLike } from "@/utils/panel-logic";
+import { AgencyPaymentSection } from "./AgencyPaymentSection";
 import { BiayaTambahanSection } from "./BiayaTambahanSection";
 import { CustomFieldModal } from "./CustomFieldModal";
 import { DanaTalanganSection } from "./DanaTalanganSection";
@@ -1821,105 +1817,14 @@ export function TabKeuangan({
 				}}
 			/>
 
-			{/* 5. Status Pembayaran Kampus ke Agensi Mitra (Read-Only, dicatat Divisi Magang) */}
-			{(() => {
-				const agencyTerms = getAgencyPaymentTermsSummary(
-					internshipState,
-					destinationCountry,
-				);
-				return (
-					<section className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
-							<div className="flex items-center gap-2">
-								<Building2 className="w-4 h-4 text-[#0517B0]" />
-								<h3 className="text-sm sm:text-base font-bold text-slate-900">
-									Pembayaran ke Agensi Mitra
-								</h3>
-							</div>
-							<Badge
-								variant="outline"
-								className="w-fit text-[11px] font-medium text-slate-600 bg-white border-slate-200"
-							>
-								Dicatat Divisi Magang · Hanya Baca
-							</Badge>
-						</div>
-
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 sm:p-6">
-							{agencyTerms.map((term) => {
-								const statusBadge = term.paid ? (
-									<Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[11px] gap-1">
-										<CheckCircle2 className="w-3 h-3" />
-										Lunas
-									</Badge>
-								) : term.isOverdue ? (
-									<Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[11px] gap-1">
-										<AlertCircle className="w-3 h-3" />
-										Perlu Dibayar
-									</Badge>
-								) : (
-									<Badge
-										variant="outline"
-										className="bg-slate-50 text-slate-600 border-slate-200 text-[11px] gap-1"
-									>
-										<Clock className="w-3 h-3" />
-										Menunggu Pemicu
-									</Badge>
-								);
-
-								return (
-									<div
-										key={term.key}
-										className={`rounded-lg border p-4 space-y-2.5 ${
-											term.paid
-												? "border-emerald-200/80 bg-emerald-50/30"
-												: term.isOverdue
-													? "border-amber-200 bg-amber-50/40"
-													: "border-slate-200 bg-slate-50/40"
-										}`}
-									>
-										<div className="flex items-start justify-between gap-2">
-											<div>
-												<p className="text-sm font-semibold text-slate-900">
-													{term.label}
-												</p>
-												<p className="text-xs text-slate-500">
-													Pemicu: {term.triggerLabel}
-												</p>
-											</div>
-											{statusBadge}
-										</div>
-
-										{term.reminderText && (
-											<p className="text-xs font-medium text-amber-800">
-												{term.reminderText}
-											</p>
-										)}
-
-										<div className="grid grid-cols-2 gap-3 pt-1 border-t border-slate-200/70 text-xs">
-											<div>
-												<span className="text-slate-500 block">Nominal</span>
-												<span className="font-mono font-semibold text-slate-900">
-													{term.nominal !== null
-														? formatRupiah(term.nominal)
-														: "Belum diisi"}
-												</span>
-											</div>
-											<div>
-												<span className="text-slate-500 block">
-													Tanggal Bayar
-												</span>
-												<span className="font-medium text-slate-900">
-													{term.paidDate ? formatDate(term.paidDate) : "-"}
-												</span>
-											</div>
-										</div>
-									</div>
-								);
-							})}
-						</div>
-					</section>
-				);
-			})()}
+			{/* 5. Pembayaran Kampus ke Agensi Mitra (Dicatat oleh Finance) */}
+			<AgencyPaymentSection
+				studentId={studentId}
+				internshipState={internshipState}
+				destinationCountry={destinationCountry}
+				canEdit={canEdit}
+				onUpdate={onUpdate}
+			/>
 
 			{/* Modal Atur Pembagian Biaya Pendidikan */}
 			<PartitionModal

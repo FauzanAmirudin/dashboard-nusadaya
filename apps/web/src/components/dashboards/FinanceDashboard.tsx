@@ -615,7 +615,7 @@ export function FinanceDashboard({ user, data = [] }: any) {
 							</Badge>
 						</CardTitle>
 						<p className="text-xs text-slate-500">
-							Dipicu proses Divisi Magang · Status lunas dicatat Divisi Magang
+							Dipicu proses Divisi Magang · Dicatat oleh Finance
 						</p>
 					</CardHeader>
 					<CardContent className="p-0 overflow-x-auto">
